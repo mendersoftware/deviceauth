@@ -14,6 +14,16 @@
 			"Rev": "4b6ea7319e214d98c938f12692336f7ca9348d6b"
 		},
 		{
+			"ImportPath": "github.com/ant0ine/go-json-rest/rest",
+			"Comment": "v3.3.1-5-gcfd0da1",
+			"Rev": "cfd0da14df1db088980175e1c3c7e77c11b90718"
+		},
+		{
+			"ImportPath": "github.com/ant0ine/go-json-rest/rest/trie",
+			"Comment": "v3.3.1-5-gcfd0da1",
+			"Rev": "cfd0da14df1db088980175e1c3c7e77c11b90718"
+		},
+		{
 			"ImportPath": "github.com/hashicorp/hcl",
 			"Rev": "2604f3bda7e8960c1be1063709e7d7f0765048d0"
 		},
