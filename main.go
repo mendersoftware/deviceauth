@@ -14,13 +14,64 @@
 package main
 
 import (
-	"log"
+	"flag"
+	"github.com/mendersoftware/deviceauth/config"
+	"github.com/mendersoftware/deviceauth/log"
+	"github.com/pkg/errors"
+	"github.com/spf13/viper"
 )
 
 func main() {
-	log.Printf("Authorization Service, version %s starting up",
+	var configPath string
+	var printVersion bool
+	var devSetup bool
+	var debug bool
+
+	flag.StringVar(&configPath, "config",
+		"config.yaml",
+		"Configuration file path. Supports JSON, TOML, YAML and HCL formatted configs.")
+	flag.BoolVar(&printVersion, "version",
+		false, "Show version")
+	flag.BoolVar(&devSetup, "dev",
+		false, "Use development setup")
+	flag.BoolVar(&debug, "debug",
+		false, "Enable debug logging")
+
+	flag.Parse()
+
+	log.Setup(debug)
+
+	l := log.New("main")
+
+	_, err := HandleConfigFile(configPath)
+	if err != nil {
+		l.Fatalf("error loading configuration: %s", err)
+	}
+
+	l.Printf("Device Authentication Service, version %s starting up",
 		CreateVersionString())
 
 	for {
 	}
+}
+
+func HandleConfigFile(filePath string) (config.Handler, error) {
+
+	c := viper.New()
+	c.SetConfigFile(filePath)
+
+	// Set default values for config
+	config.SetDefaults(c, configDefaults)
+
+	// Find and read the config file
+	if err := c.ReadInConfig(); err != nil {
+		return nil, errors.Wrap(err, "failed to read configuration")
+	}
+
+	// Validate config
+	if err := config.ValidateConfig(c, configValidators...); err != nil {
+		return nil, errors.Wrap(err, "failed to validate configuration")
+	}
+
+	return c, nil
 }
