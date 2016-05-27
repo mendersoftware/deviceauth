@@ -43,16 +43,20 @@ func main() {
 
 	l := log.New("main")
 
-	_, err := HandleConfigFile(configPath)
+	conf, err := HandleConfigFile(configPath)
 	if err != nil {
 		l.Fatalf("error loading configuration: %s", err)
+	}
+
+	if devSetup == true {
+		l.Infof("setting up development configuration")
+		conf.Set(SettingMiddleware, EnvDev)
 	}
 
 	l.Printf("Device Authentication Service, version %s starting up",
 		CreateVersionString())
 
-	for {
-	}
+	l.Fatal(RunServer(conf))
 }
 
 func HandleConfigFile(filePath string) (config.Handler, error) {

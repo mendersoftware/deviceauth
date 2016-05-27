@@ -20,11 +20,15 @@ import (
 const (
 	SettingListen        = "listen"
 	SettingListenDefault = ":8080"
+
+	SettingMiddleware        = "middleware"
+	SettingMiddlewareDefault = EnvProd
 )
 
 var (
 	configValidators = []config.Validator{}
 	configDefaults   = []config.Default{
 		{SettingListen, SettingListenDefault},
+		{SettingMiddleware, SettingMiddlewareDefault},
 	}
 )
