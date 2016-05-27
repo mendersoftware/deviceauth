@@ -28,10 +28,11 @@ const (
 )
 
 type DevAuthHandler struct {
+	DevAuth DevAuthApp
 }
 
-func NewDevAuthApiHandler() ApiHandler {
-	return &DevAuthHandler{}
+func NewDevAuthApiHandler(devauth DevAuthApp) ApiHandler {
+	return &DevAuthHandler{devauth}
 }
 
 func (d *DevAuthHandler) GetApp() (rest.App, error) {

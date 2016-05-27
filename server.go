@@ -45,7 +45,7 @@ func RunServer(c config.Reader) error {
 		return errors.Wrap(err, "API setup failed")
 	}
 
-	devauthapi := NewDevAuthApiHandler()
+	devauthapi := NewDevAuthApiHandler(nil)
 
 	apph, err := devauthapi.GetApp()
 	if err != nil {
