@@ -17,9 +17,14 @@ import (
 	"github.com/pkg/errors"
 )
 
+var (
+	ErrDevAuthUnauthorized = errors.New("dev auth: unauthorized")
+	ErrDevAuthInternal     = errors.New("dev auth: internal error")
+)
+
 // this device auth service interface
 type DevAuthApp interface {
-	SubmitAuthRequest(r *AuthReq) error
+	SubmitAuthRequest(r *AuthReq) (string, error)
 	GetAuthRequests(dev_id string) ([]AuthReq, error)
 
 	GetDevices(skip, limit int, tenant_token, status string) ([]Device, error)
@@ -39,8 +44,8 @@ func NewDevAuth() DevAuthApp {
 	return &DevAuth{}
 }
 
-func (*DevAuth) SubmitAuthRequest(r *AuthReq) error {
-	return errors.New("not implemented")
+func (*DevAuth) SubmitAuthRequest(r *AuthReq) (string, error) {
+	return "", errors.New("not implemented")
 }
 func (*DevAuth) GetAuthRequests(dev_id string) ([]AuthReq, error) {
 	return nil, errors.New("not implemented")

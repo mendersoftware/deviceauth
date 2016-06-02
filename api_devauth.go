@@ -14,8 +14,11 @@
 package main
 
 import (
+	"encoding/json"
 	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/mendersoftware/deviceauth/utils"
 	"github.com/pkg/errors"
+	"net/http"
 )
 
 const (
@@ -25,6 +28,8 @@ const (
 	uriDeviceToken = "/api/0.1.0/devices/:id/token"
 	uriToken       = "/api/0.1.0/tokens/:id"
 	uriTokenVerify = "/api/0.1.0/tokens/verify"
+
+	hdrAuthReqSign = "X-MEN-Signature"
 )
 
 type DevAuthHandler struct {
@@ -63,7 +68,71 @@ func (d *DevAuthHandler) GetApp() (rest.App, error) {
 	return app, nil
 }
 
-func (d *DevAuthHandler) SubmitAuthRequestHandler(w rest.ResponseWriter, r *rest.Request) {}
+func (d *DevAuthHandler) SubmitAuthRequestHandler(w rest.ResponseWriter, r *rest.Request) {
+	var authreq AuthReq
+
+	//validate req body by reading raw content manually
+	//(raw body will be needed later, DecodeJsonPayload would
+	//unmarshal and close it)
+	body, err := utils.ReadBodyRaw(r)
+	if err != nil {
+		rest.Error(w,
+			errors.Wrap(err, "failed to decode auth request").Error(),
+			http.StatusBadRequest)
+		return
+	}
+
+	err = json.Unmarshal(body, &authreq)
+	if err != nil {
+		rest.Error(w,
+			errors.Wrap(err, "failed to decode auth request").Error(),
+			http.StatusBadRequest)
+		return
+	}
+
+	err = authreq.Validate()
+	if err != nil {
+		rest.Error(w,
+			errors.Wrap(err, "invalid auth request").Error(),
+			http.StatusBadRequest)
+		return
+	}
+
+	//verify signature
+	signature := r.Header.Get(hdrAuthReqSign)
+	if signature == "" {
+		rest.Error(w,
+			"missing request signature header",
+			http.StatusBadRequest)
+		return
+	}
+
+	ok, err := utils.VerifyAuthReqSign(signature, authreq.PubKey, body)
+	if !ok {
+		rest.Error(w,
+			"signature verification failed",
+			http.StatusUnauthorized)
+		return
+	}
+
+	token, err := d.DevAuth.SubmitAuthRequest(&authreq)
+	switch err {
+	case ErrDevAuthUnauthorized:
+		rest.Error(w,
+			"unauthorized",
+			http.StatusUnauthorized)
+		return
+	case nil:
+		w.(http.ResponseWriter).Write([]byte(token))
+		return
+	default:
+		rest.Error(w,
+			"internal error",
+			http.StatusInternalServerError)
+		return
+	}
+
+}
 
 func (d *DevAuthHandler) GetAuthRequestsHandler(w rest.ResponseWriter, r *rest.Request) {}
 
