@@ -48,6 +48,13 @@ paths:
           * 'exp' - expiry date
           * 'sub' - subject (Mender-generated device ID)
           * 'jit' - token's unique identifier
+
+        Each request is signed with the device's private key. The 'X-MEN-Signature' custom header
+        contains a Base64-encoded form of the signed body.
+
+        An increasing 'seq_no' is used to prevent replay attacks. Upon the very first request
+        the client can provide any non-zero uint64, which will be recorded by the server for subsequent requests.
+
       parameters:
         - name: auth_request
           in: body
@@ -55,6 +62,10 @@ paths:
           required: true
           schema:
             $ref: "#/definitions/AuthRequestNew"
+        - name: X-MEN-Signature
+          in: header
+          type: string
+          description: Base64 version of body signed with device's private key.
       responses:
         200:
           description: Authentication successful - a new JWT is issued and returned
