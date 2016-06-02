@@ -14,6 +14,7 @@
 package main
 
 import (
+	"errors"
 	"time"
 )
 
@@ -23,4 +24,22 @@ type AuthReq struct {
 	PubKey      string    `json:"pubkey"`
 	Timestamp   time.Time `json:"ts"`
 	Status      string    `json:"status"`
+	SeqNo       uint64    `json:"seq_no"`
+}
+
+func (r *AuthReq) Validate() error {
+	if r.IdData == "" {
+		return errors.New("id_data must be provided")
+	}
+
+	if r.PubKey == "" {
+		return errors.New("pubkey must be provided")
+	}
+
+	if r.SeqNo == 0 {
+		return errors.New("seq_no must be provided")
+	}
+
+	// not checking tenant token for now - TODO
+	return nil
 }
