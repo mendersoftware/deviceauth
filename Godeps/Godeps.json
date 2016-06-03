@@ -19,9 +19,18 @@
 			"Rev": "cfd0da14df1db088980175e1c3c7e77c11b90718"
 		},
 		{
+			"ImportPath": "github.com/ant0ine/go-json-rest/rest/test",
+			"Comment": "v3.3.1-5-gcfd0da1",
+			"Rev": "cfd0da14df1db088980175e1c3c7e77c11b90718"
+		},
+		{
 			"ImportPath": "github.com/ant0ine/go-json-rest/rest/trie",
 			"Comment": "v3.3.1-5-gcfd0da1",
 			"Rev": "cfd0da14df1db088980175e1c3c7e77c11b90718"
+		},
+		{
+			"ImportPath": "github.com/davecgh/go-spew/spew",
+			"Rev": "5215b55f46b2b919f50a1df0eaa5886afe4e3b3d"
 		},
 		{
 			"ImportPath": "github.com/hashicorp/hcl",
@@ -83,6 +92,10 @@
 			"Rev": "0d62637d0446292fceb852ab68e3ce6e07bddc00"
 		},
 		{
+			"ImportPath": "github.com/pmezard/go-difflib/difflib",
+			"Rev": "792786c7400a136282c1664665ae0a8db921c6c2"
+		},
+		{
 			"ImportPath": "github.com/spf13/cast",
 			"Rev": "27b586b42e29bec072fe7379259cc719e1289da6"
 		},
@@ -97,6 +110,11 @@
 		{
 			"ImportPath": "github.com/spf13/viper",
 			"Rev": "c975dc1b4eacf4ec7fdbf0873638de5d090ba323"
+		},
+		{
+			"ImportPath": "github.com/stretchr/testify/assert",
+			"Comment": "v1.1.3-16-g6cb3b85",
+			"Rev": "6cb3b85ef5a0efef77caef88363ec4d4b5c0976d"
 		},
 		{
 			"ImportPath": "golang.org/x/sys/unix",
