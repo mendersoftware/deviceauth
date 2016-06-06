@@ -29,7 +29,7 @@ const (
 	uriToken       = "/api/0.1.0/tokens/:id"
 	uriTokenVerify = "/api/0.1.0/tokens/verify"
 
-	hdrAuthReqSign = "X-MEN-Signature"
+	HdrAuthReqSign = "X-MEN-Signature"
 )
 
 type DevAuthHandler struct {
@@ -99,7 +99,7 @@ func (d *DevAuthHandler) SubmitAuthRequestHandler(w rest.ResponseWriter, r *rest
 	}
 
 	//verify signature
-	signature := r.Header.Get(hdrAuthReqSign)
+	signature := r.Header.Get(HdrAuthReqSign)
 	if signature == "" {
 		rest.Error(w,
 			"missing request signature header",
