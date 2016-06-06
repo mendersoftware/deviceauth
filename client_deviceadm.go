@@ -14,6 +14,8 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"github.com/mendersoftware/deviceauth/log"
 	"github.com/pkg/errors"
 	"net/http"
@@ -43,9 +45,24 @@ type DevAdmClient struct {
 func (d *DevAdmClient) AddDevice(dev Device) error {
 	d.log.Debugf("add device %s for admission", dev.Id)
 
-	req, err := http.NewRequest(http.MethodPut, d.conf.AddUrl, nil)
+	AdmReqJson, err := json.Marshal(AdmReq{
+		Id:     dev.Id,
+		IdData: dev.IdData,
+		PubKey: dev.PubKey,
+	})
+	if err != nil {
+		return errors.Wrapf(err, "failed to prepare device admission request")
+	}
 
-	// TODO: prepare message
+	contentReader := bytes.NewReader(AdmReqJson)
+
+	req, err := http.NewRequest(
+		http.MethodPost, d.conf.AddDeviceUrl, contentReader)
+	if err != nil {
+		return errors.Wrapf(err, "failed to create request")
+	}
+
+	req.Header.Set("Content-Type", "application/json")
 
 	rsp, err := d.client.Do(req)
 	if err != nil {
