@@ -13,9 +13,18 @@
 //    limitations under the License.
 package main
 
+import (
+	"github.com/pkg/errors"
+)
+
+var (
+	ErrDevAuthUnauthorized = errors.New("dev auth: unauthorized")
+	ErrDevAuthInternal     = errors.New("dev auth: internal error")
+)
+
 // this device auth service interface
 type DevAuthApp interface {
-	SubmitAuthRequest(r *AuthReq) error
+	SubmitAuthRequest(r *AuthReq) (string, error)
 	GetAuthRequests(dev_id string) ([]AuthReq, error)
 
 	GetDevices(skip, limit int, tenant_token, status string) ([]Device, error)
@@ -26,4 +35,46 @@ type DevAuthApp interface {
 
 	RevokeToken(token_id string) error
 	VerifyToken(token string) (bool, error)
+}
+
+type DevAuth struct {
+}
+
+func NewDevAuth() DevAuthApp {
+	return &DevAuth{}
+}
+
+func (*DevAuth) SubmitAuthRequest(r *AuthReq) (string, error) {
+	return "", errors.New("not implemented")
+}
+func (*DevAuth) GetAuthRequests(dev_id string) ([]AuthReq, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (*DevAuth) GetDevices(skip, limit int, tenant_token, status string) ([]Device, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (*DevAuth) GetDevice(dev_id string) (*Device, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (*DevAuth) AcceptDevice(dev_id string) error {
+	return errors.New("not implemented")
+}
+
+func (*DevAuth) RejectDevice(dev_id string) error {
+	return errors.New("not implemented")
+}
+
+func (*DevAuth) GetDeviceToken(dev_id string) (*Token, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (*DevAuth) RevokeToken(token_id string) error {
+	return errors.New("not implemented")
+}
+
+func (*DevAuth) VerifyToken(token string) (bool, error) {
+	return false, errors.New("not implemented")
 }

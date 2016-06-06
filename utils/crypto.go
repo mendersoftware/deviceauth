@@ -11,35 +11,8 @@
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
-package main
+package utils
 
-import (
-	"errors"
-	"time"
-)
-
-type AuthReq struct {
-	IdData      string    `json:"id_data"`
-	TenantToken string    `json:"tenant_token"`
-	PubKey      string    `json:"pubkey"`
-	Timestamp   time.Time `json:"ts"`
-	Status      string    `json:"status"`
-	SeqNo       uint64    `json:"seq_no"`
-}
-
-func (r *AuthReq) Validate() error {
-	if r.IdData == "" {
-		return errors.New("id_data must be provided")
-	}
-
-	if r.PubKey == "" {
-		return errors.New("pubkey must be provided")
-	}
-
-	if r.SeqNo == 0 {
-		return errors.New("seq_no must be provided")
-	}
-
-	// not checking tenant token for now - TODO
-	return nil
+func VerifyAuthReqSign(signature, pubkey string, body []byte) (bool, error) {
+	return true, nil
 }
