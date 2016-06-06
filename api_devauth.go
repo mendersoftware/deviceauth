@@ -107,8 +107,8 @@ func (d *DevAuthHandler) SubmitAuthRequestHandler(w rest.ResponseWriter, r *rest
 		return
 	}
 
-	ok, err := utils.VerifyAuthReqSign(signature, authreq.PubKey, body)
-	if !ok {
+	err = utils.VerifyAuthReqSign(signature, authreq.PubKey, body)
+	if err != nil {
 		rest.Error(w,
 			"signature verification failed",
 			http.StatusUnauthorized)
