@@ -11,28 +11,27 @@
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
+
 package main
 
 import (
-	"github.com/mendersoftware/deviceauth/config"
-)
-
-const (
-	SettingListen        = "listen"
-	SettingListenDefault = ":8080"
-
-	SettingMiddleware        = "middleware"
-	SettingMiddlewareDefault = EnvProd
-
-	SettingDb        = "mongo"
-	SettingDbDefault = "mongo-device-auth:27019"
+	"errors"
 )
 
 var (
-	configValidators = []config.Validator{}
-	configDefaults   = []config.Default{
-		{SettingListen, SettingListenDefault},
-		{SettingMiddleware, SettingMiddlewareDefault},
-		{SettingDb, SettingDbDefault},
-	}
+	// device not found
+	ErrDevNotFound = errors.New("not found")
 )
+
+type DataStore interface {
+	// retrieve a history of device's auth requests
+	GetAuthRequests(device_id string, skip, limit int) ([]AuthReq, error)
+
+	// retrieve device by Mender-assigned device ID
+	//returns ErrDevNotFound if device not found
+	GetDeviceById(id string) (*Device, error)
+
+	// retrieve device by device public key
+	// returns ErrDevNotFound if device not found
+	GetDeviceByKey(key string) (*Device, error)
+}

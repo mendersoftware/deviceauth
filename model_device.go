@@ -17,12 +17,14 @@ import (
 	"time"
 )
 
+// note: fields with underscores need the 'bson' decorator
+// otherwise the underscore will be removed upon write to mongo
 type Device struct {
-	Id          string    `json:"id"`
-	TenantToken string    `json:"tenant_token"`
+	Id          string    `json:"id" bson:"_id"`
+	TenantToken string    `json:"tenant_token" bson:"tenant_token"`
 	PubKey      string    `json:"pubkey"`
-	IdData      string    `json:"id_data"`
+	IdData      string    `json:"id_data" bson:"id_data"`
 	Status      string    `json:"status"`
-	CreatedTs   time.Time `json:"created_ts"`
-	UpdatedTs   time.Time `json:"updated_ts"`
+	CreatedTs   time.Time `json:"created_ts" bson:"created_ts"`
+	UpdatedTs   time.Time `json:"updated_ts" bson:"updated_ts"`
 }

@@ -38,10 +38,11 @@ type DevAuthApp interface {
 }
 
 type DevAuth struct {
+	db DataStore
 }
 
-func NewDevAuth() DevAuthApp {
-	return &DevAuth{}
+func NewDevAuth(d DataStore) DevAuthApp {
+	return &DevAuth{db: d}
 }
 
 func (*DevAuth) SubmitAuthRequest(r *AuthReq) (string, error) {
