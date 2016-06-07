@@ -1,0 +1,11 @@
+[
+    {
+        "id": "0002",
+        "tenant_token": "tenant-0002",
+        "pubkey": "0002-key",
+        "id_data": "0002-id-data",
+        "status": "pending",
+        "created_ts": "2016-06-01T12:00:00Z",
+        "updated_ts": "2016-06-07T09:00:00Z"
+    }
+]
