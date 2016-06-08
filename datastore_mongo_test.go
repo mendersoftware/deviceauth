@@ -16,6 +16,7 @@ package main
 import (
 	"encoding/json"
 	"github.com/stretchr/testify/assert"
+	"gopkg.in/mgo.v2"
 	"os"
 	"path/filepath"
 	"testing"
@@ -38,19 +39,55 @@ func getDb() (*DataStoreMongo, error) {
 	return d, nil
 }
 
-func setUp(db *DataStoreMongo, dataset string) error {
+func setUp(db *DataStoreMongo, devs_dataset, authreqs_dataset string) error {
+	s := db.session.Copy()
+	defer s.Close()
+
+	if devs_dataset != "" {
+		err := setUpDevices(devs_dataset, s)
+		if err != nil {
+			return err
+		}
+	}
+
+	if authreqs_dataset != "" {
+		err := setUpAuthReqs(authreqs_dataset, s)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func setUpDevices(dataset string, s *mgo.Session) error {
 	devs, err := parseDevs(dataset)
 	if err != nil {
 		return err
 	}
 
-	s := db.session.Copy()
-	defer s.Close()
-
 	c := s.DB(DbName).C(DbDevicesColl)
 
 	for _, d := range devs {
 		err = c.Insert(d)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func setUpAuthReqs(dataset string, s *mgo.Session) error {
+	reqs, err := parseAuthReqs(dataset)
+	if err != nil {
+		return err
+	}
+
+	c := s.DB(DbName).C(DbAuthReqColl)
+
+	for _, r := range reqs {
+		err = c.Insert(r)
 		if err != nil {
 			return err
 		}
@@ -66,6 +103,13 @@ func wipe(db *DataStoreMongo) error {
 	c := s.DB(DbName).C(DbDevicesColl)
 
 	_, err := c.RemoveAll(nil)
+	if err != nil {
+		return err
+	}
+
+	c = s.DB(DbName).C(DbAuthReqColl)
+
+	_, err = c.RemoveAll(nil)
 	if err != nil {
 		return err
 	}
@@ -98,6 +142,22 @@ func parseDev(dataset string) (*Device, error) {
 	return &res[0], nil
 }
 
+func parseAuthReqs(dataset string) ([]AuthReq, error) {
+	f, err := os.Open(filepath.Join(testDataFolder, dataset))
+	if err != nil {
+		return nil, err
+	}
+
+	var reqs []AuthReq
+
+	j := json.NewDecoder(f)
+	if err = j.Decode(&reqs); err != nil {
+		return nil, err
+	}
+
+	return reqs, nil
+}
+
 // test funcs
 func TestGetDeviceById(t *testing.T) {
 	if testing.Short() {
@@ -117,7 +177,7 @@ func TestGetDeviceById(t *testing.T) {
 	err = wipe(d)
 	assert.NoError(t, err, "failed to wipe data")
 
-	err = setUp(d, "devices_input.json")
+	err = setUp(d, "devices_input.json", "")
 	assert.NoError(t, err, "failed to setup input data")
 
 	testCases := []struct {
