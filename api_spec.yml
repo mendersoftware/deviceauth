@@ -246,6 +246,42 @@ paths:
           description: Unexpected error
           schema:
             $ref: '#/definitions/Error'
+  /devices/{id}/status:
+    put:
+      description: Update device admission state
+      parameters:
+        - name: id
+          in: path
+          description: Device identifier
+          required: true
+          type: string
+        - name: status
+          in: body
+          description: New status
+          required: true
+          schema:
+            $ref: '#/definitions/Status'
+      responses:
+        303:
+          description: Device updated
+          headers:
+            Location:
+              type: string
+              description: URI of updated device
+        404:
+          description: Not Found
+          examples:
+            application/json:
+              error: Detailed error message
+          schema:
+            $ref: "#/definitions/Error"
+        500:
+          description: Internal Server Error
+          examples:
+            application/json:
+              error: Detailed error message
+          schema:
+            $ref: "#/definitions/Error"
   /devices/{id}/token:
     get:
       summary: Retrieve a device's active JWT token.
@@ -396,12 +432,7 @@ definitions:
                      In reference implementation, it is a JSON structure
                      with vendor-selected fields, such as MACs, serial numbers, etc.
       status:
-        type: string
-        description: Current status of the device.
-        enum:
-          - pending
-          - accepted
-          - rejected
+          $ref: "#/definitions/Status"
       created_ts:
           type: string
           format: datetime
@@ -410,6 +441,18 @@ definitions:
           type: string
           format: datetime
           description: Updated timestamp
+  Status:
+    description: Admission status of the device
+    type: object
+    properties:
+      status:
+        type: string
+        enum:
+          - pending
+          - accepted
+          - rejected
+    required:
+      - status
   TokenDescriptor:
     type: object
     properties:
