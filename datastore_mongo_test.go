@@ -279,3 +279,73 @@ func TestGetDeviceByKey(t *testing.T) {
 		assert.Equal(t, expected, dev)
 	}
 }
+
+func TestGetAuthRequests(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestGetAuthRequests in short mode.")
+	}
+
+	// set this to get reliable time.Time serialization
+	// (always get UTC instead of e.g. CEST)
+	time.Local = time.UTC
+
+	d, err := getDb()
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+
+	//setup
+	err = wipe(d)
+	assert.NoError(t, err, "failed to wipe data")
+
+	err = setUp(d, "", "auth_reqs_input.json")
+	assert.NoError(t, err, "failed to setup input data")
+
+	testCases := []struct {
+		deviceId string
+		skip     int
+		limit    int
+		expected string
+	}{
+		{
+			//existing device 1
+			deviceId: "0001",
+			skip:     0,
+			limit:    0,
+			expected: "auth_reqs_expected_1.json",
+		},
+		{
+			//existing device 2
+			deviceId: "0002",
+			skip:     0,
+			limit:    0,
+			expected: "auth_reqs_expected_2.json",
+		},
+		{
+			//existing device 1, skip + limit
+			deviceId: "0001",
+			skip:     1,
+			limit:    1,
+			expected: "auth_reqs_expected_3.json",
+		},
+		{
+			//device doesn't exist
+			deviceId: "0003",
+			expected: "",
+		},
+	}
+
+	for _, tc := range testCases {
+		expected := []AuthReq{}
+
+		if tc.expected != "" {
+			expected, err = parseAuthReqs(tc.expected)
+			assert.NoError(t, err, "failed to parse %s", tc.expected)
+			assert.NotNil(t, expected)
+		}
+
+		reqs, err := d.GetAuthRequests(tc.deviceId, tc.skip, tc.limit)
+		assert.NoError(t, err, "failed to get auth reqs")
+		assert.Equal(t, expected, reqs)
+	}
+}
