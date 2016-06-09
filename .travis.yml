@@ -1,10 +1,15 @@
 language: go
 
+# related to mongodb as per:
+# https://github.com/travis-ci/travis-ci/issues/5948
+group: edge
+
 # Forces travis to use VM insted container, required to be able to build containers.
 sudo: required
 
 services:
     - docker
+    - mongodb
 
 # Golang version matrix
 go:
