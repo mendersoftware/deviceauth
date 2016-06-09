@@ -25,13 +25,19 @@ import (
 
 const (
 	testDataFolder = "testdata/mongo"
-)
 
-const TestDb = "127.0.0.1:27019"
+	TestMongoEnv     = "TEST_MONGO"
+	TestMongoDefault = "127.0.0.1:27017"
+)
 
 // db and test management funcs
 func getDb() (*DataStoreMongo, error) {
-	d, err := NewDataStoreMongo(TestDb)
+	addr := TestMongoDefault
+	if env := os.Getenv(TestMongoEnv); env != "" {
+		addr = env
+	}
+
+	d, err := NewDataStoreMongo(addr)
 	if err != nil {
 		return nil, err
 	}
