@@ -28,3 +28,17 @@ type Device struct {
 	CreatedTs   time.Time `json:"created_ts" bson:"created_ts"`
 	UpdatedTs   time.Time `json:"updated_ts" bson:"updated_ts"`
 }
+
+func NewDevice(id, id_data, pubkey, tenant_token string) *Device {
+	now := time.Now()
+
+	return &Device{
+		Id:          id,
+		IdData:      id_data,
+		TenantToken: tenant_token,
+		PubKey:      pubkey,
+		Status:      DevStatusPending,
+		CreatedTs:   now,
+		UpdatedTs:   now,
+	}
+}
