@@ -40,12 +40,19 @@ func RunServer(c config.Reader) error {
 
 	l := log.New("server")
 
+	d, err := NewDataStoreMongo(c.GetString(SettingDb))
+	if err != nil {
+		return errors.Wrap(err, "database connection failed")
+	}
+
+	devauth := NewDevAuth(d)
+
 	api, err := SetupAPI(c.GetString(SettingMiddleware))
 	if err != nil {
 		return errors.Wrap(err, "API setup failed")
 	}
 
-	devauthapi := NewDevAuthApiHandler(nil)
+	devauthapi := NewDevAuthApiHandler(devauth)
 
 	apph, err := devauthapi.GetApp()
 	if err != nil {
