@@ -98,9 +98,27 @@ func (db *DataStoreMongo) GetDeviceByKey(key string) (*Device, error) {
 }
 
 func (db *DataStoreMongo) AddAuthReq(r *AuthReq) error {
-	return errors.New("not implemented")
+	s := db.session.Copy()
+	defer s.Close()
+
+	c := s.DB(DbName).C(DbAuthReqColl)
+
+	if err := c.Insert(r); err != nil {
+		return errors.Wrap(err, "failed to store auth req")
+	}
+
+	return nil
 }
 
-func (db *DataStoreMongo) AddDevice(r *Device) error {
-	return errors.New("not implemented")
+func (db *DataStoreMongo) AddDevice(d *Device) error {
+	s := db.session.Copy()
+	defer s.Close()
+
+	c := s.DB(DbName).C(DbDevicesColl)
+
+	if err := c.Insert(d); err != nil {
+		return errors.Wrap(err, "failed to store device")
+	}
+
+	return nil
 }

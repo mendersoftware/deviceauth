@@ -17,6 +17,7 @@ import (
 	"encoding/json"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/mgo.v2"
+	"gopkg.in/mgo.v2/bson"
 	"os"
 	"path/filepath"
 	"testing"
@@ -354,4 +355,111 @@ func TestGetAuthRequests(t *testing.T) {
 		assert.NoError(t, err, "failed to get auth reqs")
 		assert.Equal(t, expected, reqs)
 	}
+}
+
+func TestAddAuthReq(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestAddAuthReq in short mode.")
+	}
+
+	time.Local = time.UTC
+
+	//setup
+	req := AuthReq{
+		IdData:      "iddata",
+		TenantToken: "tenant",
+		PubKey:      "pubkey",
+		DeviceId:    "devid",
+		Timestamp:   time.Now(),
+		SeqNo:       123,
+		Status:      "pending",
+	}
+
+	d, err := getDb()
+	assert.NoError(t, err, "failed to get db")
+
+	err = d.AddAuthReq(&req)
+	assert.NoError(t, err, "failed to add auth req")
+
+	//verify
+	s := d.session.Copy()
+	defer s.Close()
+
+	var found AuthReq
+
+	c := s.DB(DbName).C(DbAuthReqColl)
+
+	filter := bson.M{"id_data": "iddata"}
+	err = c.Find(filter).One(&found)
+	assert.NoError(t, err, "failed to find auth req")
+
+	compareAuthReq(&req, &found, t)
+}
+
+// custom AuthReq comparison with 'compareTime'
+func compareAuthReq(expected *AuthReq, actual *AuthReq, t *testing.T) {
+	assert.Equal(t, expected.IdData, actual.IdData)
+	assert.Equal(t, expected.TenantToken, actual.TenantToken)
+	assert.Equal(t, expected.PubKey, actual.PubKey)
+	assert.Equal(t, expected.DeviceId, actual.DeviceId)
+	assert.Equal(t, expected.Status, actual.Status)
+	assert.Equal(t, expected.SeqNo, actual.SeqNo)
+	compareTime(expected.Timestamp, actual.Timestamp, t)
+}
+
+func TestAddDevice(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestAddDevice in short mode.")
+	}
+	time.Local = time.UTC
+
+	//setup
+	dev := Device{
+		Id:          "id",
+		TenantToken: "tenant",
+		PubKey:      "pubkey",
+		IdData:      "iddata",
+		Status:      "pending",
+		CreatedTs:   time.Now(),
+		UpdatedTs:   time.Now(),
+	}
+
+	d, err := getDb()
+	assert.NoError(t, err, "failed to get db")
+
+	err = d.AddDevice(&dev)
+	assert.NoError(t, err, "failed to add device")
+
+	//verify
+	s := d.session.Copy()
+	defer s.Close()
+
+	var found Device
+
+	c := s.DB(DbName).C(DbDevicesColl)
+
+	err = c.FindId(dev.Id).One(&found)
+	assert.NoError(t, err, "failed to find device")
+
+	compareDevices(&dev, &found, t)
+}
+
+// custom Device comparison with 'compareTime'
+func compareDevices(expected *Device, actual *Device, t *testing.T) {
+	assert.Equal(t, expected.Id, actual.Id)
+	assert.Equal(t, expected.TenantToken, actual.TenantToken)
+	assert.Equal(t, expected.PubKey, actual.PubKey)
+	assert.Equal(t, expected.IdData, actual.IdData)
+	assert.Equal(t, expected.Status, actual.Status)
+	compareTime(expected.CreatedTs, actual.CreatedTs, t)
+	compareTime(expected.UpdatedTs, actual.UpdatedTs, t)
+}
+
+// custom time comparison since mongo stores
+// time with lower precision than 'time', e.g.:
+//
+// 2016-06-10 08:08:18.782 vs
+// 2016-06-10 08:08:18.782397877
+func compareTime(expected time.Time, actual time.Time, t *testing.T) {
+	assert.Equal(t, expected.Unix(), actual.Unix())
 }
