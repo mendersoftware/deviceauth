@@ -1,10 +1,15 @@
 language: go
 
+# related to mongodb as per:
+# https://github.com/travis-ci/travis-ci/issues/5948
+group: edge
+
 # Forces travis to use VM insted container, required to be able to build containers.
 sudo: required
 
 services:
     - docker
+    - mongodb
 
 # Golang version matrix
 go:
@@ -100,10 +105,10 @@ before_script:
     - ./check_signed_off.sh
 
     # Perform static code analysys
-    - go vet `go list ./...`
+    - go vet `go list ./... | grep -v /vendor/`
 
     # Fail builds when the cyclomatic complexity reaches 15 or more
-    - gocyclo -over 15 `find . -iname '*.go' | grep -v 'Godeps' | grep -v '_test.go'`
+    - gocyclo -over 15 `find . -iname '*.go' | grep -v 'Godeps' | grep -v /vendor/ | grep -v '_test.go'`
 
 script:
     # go list supply import paths for all sub directories.
@@ -111,7 +116,7 @@ script:
     # also including their coverage may introduce to much noice. Concentrate on the coverage of local packages.
     # Execute go test on every local subpackage (resolved as dependencies) and generate covreage report for each.
     # Test packages pararell (xargs -P)
-    - go list ./... | grep -v Godeps | xargs -n1 -I {} -P 4 go test -v -covermode=count -coverprofile=../../../{}/profile.coverprofile {}
+    - go list ./... | grep -v Godeps | grep -v /vendor/ | xargs -n1 -I {} -P 4 go test -v -covermode=count -coverprofile=../../../{}/profile.coverprofile {}
 
     # Insert build information into compiled binary using ldflags
     - CGO_ENABLED=0 go build -ldflags "-X main.Commit=`echo $TRAVIS_COMMIT` -X main.Tag=`echo $TRAVIS_TAG` -X main.Branch=`echo $TRAVIS_BRANCH` -X main.BuildNumber=`echo $TRAVIS_BUILD_NUMBER`"
