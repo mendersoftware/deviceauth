@@ -96,3 +96,11 @@ func (db *DataStoreMongo) GetDeviceByKey(key string) (*Device, error) {
 
 	return &res, nil
 }
+
+func (db *DataStoreMongo) AddAuthReq(r *AuthReq) error {
+	return errors.New("not implemented")
+}
+
+func (db *DataStoreMongo) AddDevice(r *Device) error {
+	return errors.New("not implemented")
+}

@@ -14,12 +14,18 @@
 package main
 
 import (
+	"github.com/mendersoftware/deviceauth/utils"
 	"github.com/pkg/errors"
+	"time"
 )
 
 var (
 	ErrDevAuthUnauthorized = errors.New("dev auth: unauthorized")
 	ErrDevAuthInternal     = errors.New("dev auth: internal error")
+
+	DevStatusAccepted = "accepted"
+	DevStatusRejected = "rejected"
+	DevStatusPending  = "pending"
 )
 
 // this device auth service interface
@@ -45,9 +51,61 @@ func NewDevAuth(d DataStore) DevAuthApp {
 	return &DevAuth{db: d}
 }
 
-func (*DevAuth) SubmitAuthRequest(r *AuthReq) (string, error) {
-	return "", errors.New("not implemented")
+func (d *DevAuth) SubmitAuthRequest(r *AuthReq) (string, error) {
+	id := utils.CreateDevId(r.IdData)
+
+	//check if device exists with the same id+key
+	dev, err := d.findMatchingDevice(id, r.PubKey)
+	if err != nil {
+		return "", err
+	}
+
+	now := time.Now()
+
+	//for existing devices - check auth reqs seq_no
+	if dev != nil {
+		err = d.verifySeqNo(id, r.SeqNo)
+		if err != nil {
+			return "", err
+		}
+	} else {
+		//new device - create in 'pending' state
+		dev = &Device{}
+		dev.Id = id
+		dev.TenantToken = r.TenantToken
+		dev.PubKey = r.PubKey
+		dev.Status = DevStatusPending
+		dev.CreatedTs = now
+		dev.UpdatedTs = now
+	}
+
+	//save auth req
+	r.Timestamp = now
+	r.DeviceId = id
+	r.Status = dev.Status
+	err = d.db.AddAuthReq(r)
+	if err != nil {
+		return "", ErrDevAuthInternal
+	}
+
+	//return according to dev status
+	if dev.Status == DevStatusAccepted {
+		return "dummytoken", nil
+	} else {
+		return "", ErrDevAuthUnauthorized
+	}
 }
+
+// try to get an existing device, while checking for mismatched pubkey/id pairs
+func (d *DevAuth) findMatchingDevice(id, key string) (*Device, error) {
+	return nil, errors.New("not implemented")
+}
+
+// check seq_no against the latest auth req of this device
+func (d *DevAuth) verifySeqNo(dev_id string, seq_no uint64) error {
+	return errors.New("not implemented")
+}
+
 func (*DevAuth) GetAuthRequests(dev_id string) ([]AuthReq, error) {
 	return nil, errors.New("not implemented")
 }

@@ -66,3 +66,7 @@ func VerifyAuthReqSign(signature, pubkey string, content []byte) error {
 
 	return nil
 }
+
+func CreateDevId(id_data string) string {
+	return "placeholder"
+}
