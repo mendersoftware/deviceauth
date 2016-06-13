@@ -22,10 +22,6 @@ import (
 var (
 	ErrDevAuthUnauthorized = errors.New("dev auth: unauthorized")
 	ErrDevAuthInternal     = errors.New("dev auth: internal error")
-
-	DevStatusAccepted = "accepted"
-	DevStatusRejected = "rejected"
-	DevStatusPending  = "pending"
 )
 
 // this device auth service interface
