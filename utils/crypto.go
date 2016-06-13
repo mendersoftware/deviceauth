@@ -20,6 +20,7 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/pem"
 	"github.com/pkg/errors"
 )
@@ -65,4 +66,10 @@ func VerifyAuthReqSign(signature, pubkey string, content []byte) error {
 	}
 
 	return nil
+}
+
+func CreateDevId(id_data string) string {
+	b := sha256.Sum256([]byte(id_data))
+	return string(hex.EncodeToString(b[:]))
+
 }

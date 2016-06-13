@@ -34,4 +34,7 @@ type DataStore interface {
 	// retrieve device by device public key
 	// returns ErrDevNotFound if device not found
 	GetDeviceByKey(key string) (*Device, error)
+
+	AddAuthReq(r *AuthReq) error
+	AddDevice(r *Device) error
 }

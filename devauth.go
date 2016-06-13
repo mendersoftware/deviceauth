@@ -14,12 +14,18 @@
 package main
 
 import (
+	"github.com/mendersoftware/deviceauth/utils"
 	"github.com/pkg/errors"
+	"time"
 )
 
 var (
 	ErrDevAuthUnauthorized = errors.New("dev auth: unauthorized")
 	ErrDevAuthInternal     = errors.New("dev auth: internal error")
+
+	DevStatusAccepted = "accepted"
+	DevStatusRejected = "rejected"
+	DevStatusPending  = "pending"
 )
 
 // this device auth service interface
@@ -45,9 +51,88 @@ func NewDevAuth(d DataStore) DevAuthApp {
 	return &DevAuth{db: d}
 }
 
-func (*DevAuth) SubmitAuthRequest(r *AuthReq) (string, error) {
-	return "", errors.New("not implemented")
+func (d *DevAuth) SubmitAuthRequest(r *AuthReq) (string, error) {
+	id := utils.CreateDevId(r.IdData)
+
+	//check if device exists with the same id+key
+	dev, err := d.findMatchingDevice(id, r.PubKey)
+	if err != nil {
+		return "", err
+	}
+
+	//for existing devices - check auth reqs seq_no
+	if dev != nil {
+		err = d.verifySeqNo(id, r.SeqNo)
+		if err != nil {
+			return "", err
+		}
+	} else {
+		//new device - create in 'pending' state
+		dev = NewDevice(id, r.IdData, r.PubKey, r.TenantToken)
+	}
+
+	//save auth req
+	r.Timestamp = time.Now()
+	r.DeviceId = id
+	r.Status = dev.Status
+	err = d.db.AddAuthReq(r)
+	if err != nil {
+		return "", ErrDevAuthInternal
+	}
+
+	//return according to dev status
+	if dev.Status == DevStatusAccepted {
+		return "dummytoken", nil
+	} else {
+		return "", ErrDevAuthUnauthorized
+	}
 }
+
+// try to get an existing device, while checking for mismatched pubkey/id pairs
+func (d *DevAuth) findMatchingDevice(id, key string) (*Device, error) {
+	//find devs by id and key, compare results
+	devi, err := d.db.GetDeviceById(id)
+	if err != nil && err != ErrDevNotFound {
+		return nil, ErrDevAuthInternal
+	}
+
+	devk, err := d.db.GetDeviceByKey(key)
+	if err != nil && err != ErrDevNotFound {
+		return nil, ErrDevAuthInternal
+	}
+
+	//cases:
+	//both devs nil - new device
+	//both devs !nil - must compare id/key
+	//other combinations: id/key mismatch
+	if devi == nil && devk == nil {
+		return nil, nil
+	} else if devi != nil && devk != nil {
+		if devi.Id == devk.Id &&
+			devi.PubKey == devk.PubKey {
+			return devi, nil
+		}
+	}
+
+	return nil, ErrDevAuthUnauthorized
+}
+
+// check seq_no against the latest auth req of this device
+func (d *DevAuth) verifySeqNo(dev_id string, seq_no uint64) error {
+	r, err := d.db.GetAuthRequests(dev_id, 0, 1)
+	if err != nil {
+		return ErrDevAuthInternal
+	}
+
+	if r != nil {
+		if seq_no >= r[0].SeqNo {
+			return ErrDevAuthUnauthorized
+		}
+	}
+
+	return nil
+}
+
 func (*DevAuth) GetAuthRequests(dev_id string) ([]AuthReq, error) {
 	return nil, errors.New("not implemented")
 }
