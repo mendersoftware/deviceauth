@@ -25,7 +25,7 @@ const (
 	SettingMiddlewareDefault = EnvProd
 
 	SettingDb        = "mongo"
-	SettingDbDefault = "mongo-device-auth:27019"
+	SettingDbDefault = "mongo-device-auth"
 )
 
 var (
