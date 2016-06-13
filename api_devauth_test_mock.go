@@ -19,11 +19,14 @@ import (
 
 type MockDevAuth struct {
 	mockSubmitAuthRequest func(r *AuthReq) (string, error)
+	mockAcceptDevice      func(dev_id string) error
+	mockRejectDevice      func(dev_id string) error
 }
 
 func (mda *MockDevAuth) SubmitAuthRequest(r *AuthReq) (string, error) {
 	return mda.mockSubmitAuthRequest(r)
 }
+
 func (mda *MockDevAuth) GetAuthRequests(dev_id string) ([]AuthReq, error) {
 	return nil, errors.New("not implemented")
 }
@@ -37,11 +40,11 @@ func (mda *MockDevAuth) GetDevice(dev_id string) (*Device, error) {
 }
 
 func (mda *MockDevAuth) AcceptDevice(dev_id string) error {
-	return errors.New("not implemented")
+	return mda.mockAcceptDevice(dev_id)
 }
 
 func (mda *MockDevAuth) RejectDevice(dev_id string) error {
-	return errors.New("not implemented")
+	return mda.mockRejectDevice(dev_id)
 }
 
 func (mda *MockDevAuth) GetDeviceToken(dev_id string) (*Token, error) {
