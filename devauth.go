@@ -121,6 +121,7 @@ func (d *DevAuth) findMatchingDevice(id, key string) (*Device, error) {
 func (d *DevAuth) verifySeqNo(dev_id string, seq_no uint64) error {
 	r, err := d.db.GetAuthRequests(dev_id, 0, 1)
 	if err != nil {
+		//TODO log db err
 		return ErrDevAuthInternal
 	}
 
@@ -145,12 +146,25 @@ func (*DevAuth) GetDevice(dev_id string) (*Device, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (*DevAuth) AcceptDevice(dev_id string) error {
-	return errors.New("not implemented")
+func (d *DevAuth) AcceptDevice(dev_id string) error {
+	updev := &Device{Id: dev_id, Status: DevStatusAccepted}
+
+	if err := d.db.UpdateDevice(updev); err != nil {
+		//TODO log db err
+		return ErrDevAuthInternal
+	}
+
+	return nil
 }
 
-func (*DevAuth) RejectDevice(dev_id string) error {
-	return errors.New("not implemented")
+func (d *DevAuth) RejectDevice(dev_id string) error {
+	updev := &Device{Id: dev_id, Status: DevStatusRejected}
+
+	if err := d.db.UpdateDevice(updev); err != nil {
+		return ErrDevAuthInternal
+	}
+
+	return nil
 }
 
 func (*DevAuth) GetDeviceToken(dev_id string) (*Token, error) {
