@@ -37,4 +37,8 @@ type DataStore interface {
 
 	AddAuthReq(r *AuthReq) error
 	AddDevice(r *Device) error
+
+	// updates a single device selected via d.Id
+	// updates only set fields
+	UpdateDevice(d *Device) error
 }
