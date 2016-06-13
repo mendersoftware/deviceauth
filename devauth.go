@@ -77,6 +77,7 @@ func (d *DevAuth) SubmitAuthRequest(r *AuthReq) (string, error) {
 	r.Status = dev.Status
 	err = d.db.AddAuthReq(r)
 	if err != nil {
+		//TODO log db err
 		return "", ErrDevAuthInternal
 	}
 
@@ -93,11 +94,13 @@ func (d *DevAuth) findMatchingDevice(id, key string) (*Device, error) {
 	//find devs by id and key, compare results
 	devi, err := d.db.GetDeviceById(id)
 	if err != nil && err != ErrDevNotFound {
+		//TODO log db err
 		return nil, ErrDevAuthInternal
 	}
 
 	devk, err := d.db.GetDeviceByKey(key)
 	if err != nil && err != ErrDevNotFound {
+		//TODO log db err
 		return nil, ErrDevAuthInternal
 	}
 
@@ -161,6 +164,7 @@ func (d *DevAuth) RejectDevice(dev_id string) error {
 	updev := &Device{Id: dev_id, Status: DevStatusRejected}
 
 	if err := d.db.UpdateDevice(updev); err != nil {
+		//TODO log db err
 		return ErrDevAuthInternal
 	}
 
