@@ -22,18 +22,27 @@ import (
 )
 
 const (
-	uriAuthReqs    = "/api/0.1.0/auth_requests"
-	uriDevices     = "/api/0.1.0/devices"
-	uriDevice      = "/api/0.1.0/devices/:id"
-	uriDeviceToken = "/api/0.1.0/devices/:id/token"
-	uriToken       = "/api/0.1.0/tokens/:id"
-	uriTokenVerify = "/api/0.1.0/tokens/verify"
+	uriAuthReqs     = "/api/0.1.0/auth_requests"
+	uriDevices      = "/api/0.1.0/devices"
+	uriDevice       = "/api/0.1.0/devices/:id"
+	uriDeviceToken  = "/api/0.1.0/devices/:id/token"
+	uriToken        = "/api/0.1.0/tokens/:id"
+	uriTokenVerify  = "/api/0.1.0/tokens/verify"
+	uriDeviceStatus = "/api/0.1.0/devices/:id/status"
 
 	HdrAuthReqSign = "X-MEN-Signature"
 )
 
+var (
+	ErrIncorrectStatus = errors.New("incorrect device status")
+)
+
 type DevAuthHandler struct {
 	DevAuth DevAuthApp
+}
+
+type DevAuthApiStatus struct {
+	Status string `json:"status"`
 }
 
 func NewDevAuthApiHandler(devauth DevAuthApp) ApiHandler {
@@ -55,6 +64,8 @@ func (d *DevAuthHandler) GetApp() (rest.App, error) {
 		rest.Put(uriToken, d.UpdateTokenHandler),
 
 		rest.Post(uriTokenVerify, d.VerifyTokenHandler),
+
+		rest.Put(uriDeviceStatus, d.UpdateDeviceStatusHandler),
 	}
 
 	app, err := rest.MakeRouter(
@@ -147,3 +158,54 @@ func (d *DevAuthHandler) GetDeviceTokenHandler(w rest.ResponseWriter, r *rest.Re
 func (d *DevAuthHandler) UpdateTokenHandler(w rest.ResponseWriter, r *rest.Request) {}
 
 func (d *DevAuthHandler) VerifyTokenHandler(w rest.ResponseWriter, r *rest.Request) {}
+
+func (d *DevAuthHandler) UpdateDeviceStatusHandler(w rest.ResponseWriter, r *rest.Request) {
+	devid := r.PathParam("id")
+
+	var status DevAuthApiStatus
+	err := r.DecodeJsonPayload(&status)
+	if err != nil {
+		rest.Error(w,
+			errors.Wrap(err, "failed to decode status data").Error(),
+			http.StatusBadRequest)
+		return
+	}
+
+	if err = statusValidate(&status); err != nil {
+		rest.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if status.Status == DevStatusAccepted {
+		err = d.DevAuth.AcceptDevice(devid)
+	} else if status.Status == DevStatusRejected {
+		err = d.DevAuth.RejectDevice(devid)
+	}
+	if err != nil {
+		code := http.StatusInternalServerError
+		if err == ErrDevNotFound {
+			code = http.StatusNotFound
+		}
+		rest.Error(w, err.Error(), code)
+		return
+	}
+
+	devurl := utils.BuildURL(r, uriDevice, map[string]string{
+		":id": devid,
+	})
+	w.Header().Add("Location", devurl.String())
+	w.WriteHeader(http.StatusSeeOther)
+}
+
+// Validate status.
+// Expected statuses:
+// - "accepted"
+// - "rejected"
+func statusValidate(status *DevAuthApiStatus) error {
+	if status.Status != DevStatusAccepted &&
+		status.Status != DevStatusRejected {
+		return ErrIncorrectStatus
+	} else {
+		return nil
+	}
+}
