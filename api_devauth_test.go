@@ -16,6 +16,7 @@ package main
 import (
 	"crypto/rsa"
 	"encoding/json"
+	"errors"
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/ant0ine/go-json-rest/rest/test"
 	mtest "github.com/mendersoftware/deviceauth/test"
@@ -222,4 +223,110 @@ func TestApiDevAuthSubmitAuthReq(t *testing.T) {
 		recorded.CodeIs(tc.code)
 		recorded.BodyIs(tc.body)
 	}
+}
+
+func TestApiDevAuthUpdateStatusDevice(t *testing.T) {
+	devs := map[string]struct {
+		dev *Device
+		err error
+	}{
+		"foo": {
+			dev: &Device{
+				Id:     "foo",
+				PubKey: "foobar",
+				Status: "accepted",
+				IdData: "deadcafe",
+			},
+			err: nil,
+		},
+		"bar": {
+			dev: nil,
+			err: errors.New("processing failed"),
+		},
+	}
+
+	mockaction := func(id string) error {
+		d, ok := devs[id]
+		if ok == false {
+			return ErrDevNotFound
+		}
+		if d.err != nil {
+			return d.err
+		}
+		return nil
+	}
+	devauth := MockDevAuth{
+		mockAcceptDevice: mockaction,
+		mockRejectDevice: mockaction,
+	}
+
+	apih := makeMockApiHandler(t, &devauth)
+	// enforce specific field naming in errors returned by API
+	rest.ErrorFieldName = "error"
+
+	accstatus := DevAuthApiStatus{"accepted"}
+	rejstatus := DevAuthApiStatus{"rejected"}
+
+	tcases := []struct {
+		req     *http.Request
+		code    int
+		body    string
+		headers map[string]string
+	}{
+		{
+			req: test.MakeSimpleRequest("PUT",
+				"http://1.2.3.4/api/0.1.0/devices/foo/status", nil),
+			code: 400,
+			body: RestError("failed to decode status data: JSON payload is empty"),
+		},
+		{
+			req: test.MakeSimpleRequest("PUT",
+				"http://1.2.3.4/api/0.1.0/devices/foo/status",
+				DevAuthApiStatus{"foo"}),
+			code: 400,
+			body: RestError("incorrect device status"),
+		},
+		{
+			req: test.MakeSimpleRequest("PUT",
+				"http://1.2.3.4/api/0.1.0/devices/foo/status",
+				accstatus),
+			code: 303,
+			headers: map[string]string{
+				"Location": "http://1.2.3.4/api/0.1.0/devices/foo",
+			},
+		},
+		{
+			req: test.MakeSimpleRequest("PUT",
+				"http://1.2.3.4/api/0.1.0/devices/bar/status",
+				accstatus),
+			code: 500,
+			body: RestError(devs["bar"].err.Error()),
+		},
+		{
+			req: test.MakeSimpleRequest("PUT",
+				"http://1.2.3.4/api/0.1.0/devices/baz/status",
+				accstatus),
+			code: 404,
+			body: RestError(ErrDevNotFound.Error()),
+		},
+		{
+			req: test.MakeSimpleRequest("PUT",
+				"http://1.2.3.4/api/0.1.0/devices/foo/status",
+				rejstatus),
+			code: 303,
+			headers: map[string]string{
+				"Location": "http://1.2.3.4/api/0.1.0/devices/foo",
+			},
+		},
+	}
+
+	for _, tc := range tcases {
+		recorded := test.RunRequest(t, apih, tc.req)
+		recorded.CodeIs(tc.code)
+		recorded.BodyIs(tc.body)
+		for h, v := range tc.headers {
+			recorded.HeaderIs(h, v)
+		}
+	}
+
 }

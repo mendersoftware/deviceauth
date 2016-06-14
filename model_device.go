@@ -17,6 +17,12 @@ import (
 	"time"
 )
 
+const (
+	DevStatusAccepted = "accepted"
+	DevStatusRejected = "rejected"
+	DevStatusPending  = "pending"
+)
+
 // note: fields with underscores need the 'bson' decorator
 // otherwise the underscore will be removed upon write to mongo
 type Device struct {

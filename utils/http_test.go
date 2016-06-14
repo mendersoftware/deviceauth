@@ -11,36 +11,24 @@
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
-
 package utils
 
 import (
 	"github.com/ant0ine/go-json-rest/rest"
-	"io/ioutil"
-	"net/url"
-	"strings"
+	"github.com/stretchr/testify/assert"
+	"net/http"
+	"testing"
 )
 
-func ReadBodyRaw(r *rest.Request) ([]byte, error) {
-	content, err := ioutil.ReadAll(r.Body)
-	r.Body.Close()
-	if err != nil {
-		return nil, err
-	}
+func TestBuildURL(t *testing.T) {
 
-	return content, nil
-}
+	hr, _ := http.NewRequest("PUT", "http://1.2.3.4:9999/foo/bar", nil)
+	r := &rest.Request{Request: hr}
 
-// build URL using request 'r' and template, replace path params with
-// elements from 'params' using lexical match as in strings.Replace()
-func BuildURL(r *rest.Request, template string, params map[string]string) *url.URL {
-	url := r.BaseUrl()
+	u := BuildURL(r, "/api/:id/some/:status/:bar", map[string]string{
+		":id":     "1",
+		":status": "foo",
+	})
 
-	path := template
-	for k, v := range params {
-		path = strings.Replace(path, k, v, -1)
-	}
-	url.Path = path
-
-	return url
+	assert.Equal(t, "http://1.2.3.4:9999/api/1/some/foo/:bar", u.String())
 }
