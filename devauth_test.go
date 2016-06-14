@@ -14,6 +14,7 @@
 package main
 
 import (
+	"errors"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -241,5 +242,73 @@ func TestSubmitAuthRequest(t *testing.T) {
 
 		assert.Equal(t, tc.res, res)
 		assert.Equal(t, tc.err, err)
+	}
+}
+
+func TestAcceptDevice(t *testing.T) {
+	testCases := []struct {
+		dbErr string
+	}{
+		{
+			dbErr: "",
+		},
+		{
+			dbErr: "failed to update device",
+		},
+	}
+
+	for _, tc := range testCases {
+		db := MockDataStore{
+			mockUpdateDevice: func(d *Device) error {
+				if tc.dbErr != "" {
+					return errors.New(tc.dbErr)
+				}
+
+				return nil
+			},
+		}
+
+		devauth := NewDevAuth(&db)
+		err := devauth.AcceptDevice("dummyid")
+
+		if tc.dbErr != "" {
+			assert.Equal(t, ErrDevAuthInternal, err)
+		} else {
+			assert.NoError(t, err)
+		}
+	}
+}
+
+func TestRejectDevice(t *testing.T) {
+	testCases := []struct {
+		dbErr string
+	}{
+		{
+			dbErr: "",
+		},
+		{
+			dbErr: "failed to update device",
+		},
+	}
+
+	for _, tc := range testCases {
+		db := MockDataStore{
+			mockUpdateDevice: func(d *Device) error {
+				if tc.dbErr != "" {
+					return errors.New(tc.dbErr)
+				}
+
+				return nil
+			},
+		}
+
+		devauth := NewDevAuth(&db)
+		err := devauth.RejectDevice("dummyid")
+
+		if tc.dbErr != "" {
+			assert.Equal(t, ErrDevAuthInternal, err)
+		} else {
+			assert.NoError(t, err)
+		}
 	}
 }

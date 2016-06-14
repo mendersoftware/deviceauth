@@ -18,6 +18,7 @@ import (
 	"github.com/pkg/errors"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
+	"time"
 )
 
 const (
@@ -121,4 +122,36 @@ func (db *DataStoreMongo) AddDevice(d *Device) error {
 	}
 
 	return nil
+}
+
+func (db *DataStoreMongo) UpdateDevice(d *Device) error {
+	s := db.session.Copy()
+	defer s.Close()
+
+	c := s.DB(DbName).C(DbDevicesColl)
+
+	updev := makeUpdate(d)
+	update := bson.M{"$set": updev}
+
+	if err := c.UpdateId(d.Id, update); err != nil {
+		return errors.Wrap(err, "failed to update device")
+	}
+
+	return nil
+}
+
+func makeUpdate(d *Device) *Device {
+	updev := &Device{}
+
+	if d.PubKey != "" {
+		updev.PubKey = d.PubKey
+	}
+
+	if d.Status != "" {
+		updev.Status = d.Status
+	}
+
+	updev.UpdatedTs = time.Now()
+
+	return updev
 }

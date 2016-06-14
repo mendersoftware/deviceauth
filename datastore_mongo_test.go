@@ -463,3 +463,72 @@ func compareDevices(expected *Device, actual *Device, t *testing.T) {
 func compareTime(expected time.Time, actual time.Time, t *testing.T) {
 	assert.Equal(t, expected.Unix(), actual.Unix())
 }
+
+func TestUpdateDevice(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestUpdateDevice in short mode.")
+	}
+	time.Local = time.UTC
+
+	now := time.Now()
+
+	d, err := getDb()
+	assert.NoError(t, err, "failed to get db")
+
+	err = wipe(d)
+	assert.NoError(t, err, "failed to wipe data")
+
+	err = setUp(d, "devices_input.json", "")
+	assert.NoError(t, err, "failed to setup input data")
+
+	//test status updates
+	testCases := []struct {
+		id     string
+		status string
+		outErr string
+	}{
+		{
+			id:     "0001",
+			status: DevStatusAccepted,
+			outErr: "",
+		},
+		{
+			id:     "0002",
+			status: DevStatusRejected,
+			outErr: "",
+		},
+		{
+			id:     "0003",
+			status: DevStatusRejected,
+			outErr: "failed to update device: not found",
+		},
+	}
+
+	for _, tc := range testCases {
+		updev := &Device{Id: tc.id, Status: tc.status}
+
+		err = d.UpdateDevice(updev)
+		if tc.outErr != "" {
+			assert.EqualError(t, err, tc.outErr)
+		} else {
+			assert.NoError(t, err)
+
+			//verify
+			s := d.session.Copy()
+			defer s.Close()
+
+			var found Device
+
+			c := s.DB(DbName).C(DbDevicesColl)
+
+			err = c.FindId(tc.id).One(&found)
+			assert.NoError(t, err, "failed to find device")
+
+			//check all fields for equality - except UpdatedTs
+			assert.Equal(t, tc.status, found.Status)
+
+			//check UpdatedTs was updated
+			assert.InEpsilon(t, now.Unix(), found.UpdatedTs.Unix(), 10)
+		}
+	}
+}
