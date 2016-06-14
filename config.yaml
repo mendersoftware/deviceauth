@@ -1,3 +1,4 @@
 # Config file placeholder
 
 #mongo: mongo-device-auth
+#devadm_url_add: "http://mender-device-adm:8080/api/0.1.0/devices"

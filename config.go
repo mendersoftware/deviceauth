@@ -26,6 +26,9 @@ const (
 
 	SettingDb        = "mongo"
 	SettingDbDefault = "mongo-device-auth"
+
+	SettingDevAdmUrlAdd        = "devadm_url_add"
+	SettingDevAdmUrlAddDefault = "http://devauth:8080/api/0.1.0/devices"
 )
 
 var (
