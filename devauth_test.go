@@ -49,6 +49,8 @@ func TestSubmitAuthRequest(t *testing.T) {
 		addDeviceErr  error
 		addAuthReqErr error
 
+		devAdmErr error
+
 		res string
 		err error
 	}{
@@ -69,6 +71,8 @@ func TestSubmitAuthRequest(t *testing.T) {
 
 			addDeviceErr:  nil,
 			addAuthReqErr: nil,
+
+			devAdmErr: nil,
 
 			res: "dummytoken",
 			err: nil,
@@ -91,6 +95,8 @@ func TestSubmitAuthRequest(t *testing.T) {
 			addDeviceErr:  nil,
 			addAuthReqErr: nil,
 
+			devAdmErr: nil,
+
 			res: "",
 			err: ErrDevAuthUnauthorized,
 		},
@@ -111,6 +117,8 @@ func TestSubmitAuthRequest(t *testing.T) {
 
 			addDeviceErr:  nil,
 			addAuthReqErr: nil,
+
+			devAdmErr: nil,
 
 			res: "",
 			err: ErrDevAuthUnauthorized,
@@ -133,6 +141,8 @@ func TestSubmitAuthRequest(t *testing.T) {
 			addDeviceErr:  nil,
 			addAuthReqErr: nil,
 
+			devAdmErr: nil,
+
 			res: "",
 			err: ErrDevAuthUnauthorized,
 		},
@@ -153,6 +163,8 @@ func TestSubmitAuthRequest(t *testing.T) {
 
 			addDeviceErr:  nil,
 			addAuthReqErr: nil,
+
+			devAdmErr: nil,
 
 			res: "",
 			err: ErrDevAuthUnauthorized,
@@ -175,6 +187,8 @@ func TestSubmitAuthRequest(t *testing.T) {
 			addDeviceErr:  nil,
 			addAuthReqErr: nil,
 
+			devAdmErr: nil,
+
 			res: "",
 			err: ErrDevAuthUnauthorized,
 		},
@@ -196,8 +210,33 @@ func TestSubmitAuthRequest(t *testing.T) {
 			addDeviceErr:  nil,
 			addAuthReqErr: nil,
 
+			devAdmErr: nil,
+
 			res: "",
 			err: ErrDevAuthUnauthorized,
+		},
+		{
+			//new device - admission error
+			inReq: req,
+
+			devStatus: DevStatusAccepted,
+
+			getDevByIdKey: "",
+			getDevByIdErr: ErrDevNotFound,
+
+			getDevByKeyId:  "",
+			getDevByKeyErr: ErrDevNotFound,
+
+			getAuthReqsSeqNo: 125,
+			getAuthReqsErr:   nil,
+
+			addDeviceErr:  nil,
+			addAuthReqErr: nil,
+
+			devAdmErr: errors.New("failed to add device"),
+
+			res: "",
+			err: ErrDevAuthInternal,
 		},
 	}
 
@@ -237,7 +276,13 @@ func TestSubmitAuthRequest(t *testing.T) {
 			},
 		}
 
-		devauth := NewDevAuth(&db)
+		c := MockDevAdmClient{
+			mockAddDevice: func(dev *Device) error {
+				return tc.devAdmErr
+			},
+		}
+
+		devauth := NewDevAuth(&db, &c)
 		res, err := devauth.SubmitAuthRequest(&req)
 
 		assert.Equal(t, tc.res, res)
@@ -268,7 +313,7 @@ func TestAcceptDevice(t *testing.T) {
 			},
 		}
 
-		devauth := NewDevAuth(&db)
+		devauth := NewDevAuth(&db, nil)
 		err := devauth.AcceptDevice("dummyid")
 
 		if tc.dbErr != "" {
@@ -302,7 +347,7 @@ func TestRejectDevice(t *testing.T) {
 			},
 		}
 
-		devauth := NewDevAuth(&db)
+		devauth := NewDevAuth(&db, nil)
 		err := devauth.RejectDevice("dummyid")
 
 		if tc.dbErr != "" {
