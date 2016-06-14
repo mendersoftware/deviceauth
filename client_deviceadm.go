@@ -36,13 +36,17 @@ type DevAdmClientConfig struct {
 	Timeout time.Duration
 }
 
+type DevAdmClientI interface {
+	AddDevice(dev *Device) error
+}
+
 type DevAdmClient struct {
 	client http.Client
 	log    *log.Logger
 	conf   DevAdmClientConfig
 }
 
-func (d *DevAdmClient) AddDevice(dev Device) error {
+func (d *DevAdmClient) AddDevice(dev *Device) error {
 	d.log.Debugf("add device %s for admission", dev.Id)
 
 	AdmReqJson, err := json.Marshal(AdmReq{

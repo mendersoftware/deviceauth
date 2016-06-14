@@ -38,7 +38,7 @@ func TestDevAdmClientReqSuccess(t *testing.T) {
 		AddDeviceUrl: addDevUrl,
 	})
 
-	err := c.AddDevice(Device{})
+	err := c.AddDevice(&Device{})
 	assert.NoError(t, err, "expected no errors")
 }
 
@@ -51,7 +51,7 @@ func TestDevAdmClientReqFail(t *testing.T) {
 		AddDeviceUrl: addDevUrl,
 	})
 
-	err := c.AddDevice(Device{})
+	err := c.AddDevice(&Device{})
 	assert.NoError(t, err, "expected an error")
 }
 
@@ -60,7 +60,7 @@ func TestDevAdmClientReqNoHost(t *testing.T) {
 		AddDeviceUrl: "http://somehost:1234/devices",
 	})
 
-	err := c.AddDevice(Device{})
+	err := c.AddDevice(&Device{})
 
 	assert.Error(t, err, "expected an error")
 }
@@ -92,7 +92,7 @@ func TestDevAdmClientTImeout(t *testing.T) {
 	})
 
 	t1 := time.Now()
-	err := c.AddDevice(Device{})
+	err := c.AddDevice(&Device{})
 	t2 := time.Now()
 
 	// let the responder know we're done
