@@ -13,29 +13,10 @@
 //    limitations under the License.
 package main
 
-import (
-	"github.com/mendersoftware/deviceauth/config"
-)
+type MockDevAdmClient struct {
+	mockAddDevice func(dev *Device) error
+}
 
-const (
-	SettingListen        = "listen"
-	SettingListenDefault = ":8080"
-
-	SettingMiddleware        = "middleware"
-	SettingMiddlewareDefault = EnvProd
-
-	SettingDb        = "mongo"
-	SettingDbDefault = "mongo-device-auth"
-
-	SettingDevAdmUrlAdd        = "devadm_url_add"
-	SettingDevAdmUrlAddDefault = "http://devauth:8080/api/0.1.0/devices"
-)
-
-var (
-	configValidators = []config.Validator{}
-	configDefaults   = []config.Default{
-		{SettingListen, SettingListenDefault},
-		{SettingMiddleware, SettingMiddlewareDefault},
-		{SettingDb, SettingDbDefault},
-	}
-)
+func (c *MockDevAdmClient) AddDevice(dev *Device) error {
+	return c.mockAddDevice(dev)
+}

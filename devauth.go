@@ -41,16 +41,18 @@ type DevAuthApp interface {
 
 type DevAuth struct {
 	db DataStore
+	c  DevAdmClientI
 }
 
-func NewDevAuth(d DataStore) DevAuthApp {
-	return &DevAuth{db: d}
+func NewDevAuth(d DataStore, c DevAdmClientI) DevAuthApp {
+	return &DevAuth{db: d, c: c}
 }
 
 func (d *DevAuth) SubmitAuthRequest(r *AuthReq) (string, error) {
 	id := utils.CreateDevId(r.IdData)
 
 	//check if device exists with the same id+key
+	//TODO at some point add key rotation handling (same id, different key)
 	dev, err := d.findMatchingDevice(id, r.PubKey)
 	if err != nil {
 		return "", err
@@ -65,6 +67,11 @@ func (d *DevAuth) SubmitAuthRequest(r *AuthReq) (string, error) {
 	} else {
 		//new device - create in 'pending' state
 		dev = NewDevice(id, r.IdData, r.PubKey, r.TenantToken)
+
+		if err := d.c.AddDevice(dev); err != nil {
+			//TODO log admission error
+			return "", ErrDevAuthInternal
+		}
 	}
 
 	//save auth req
