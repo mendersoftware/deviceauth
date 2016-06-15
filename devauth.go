@@ -14,6 +14,7 @@
 package main
 
 import (
+	"github.com/mendersoftware/deviceauth/log"
 	"github.com/mendersoftware/deviceauth/utils"
 	"github.com/pkg/errors"
 	"time"
@@ -40,12 +41,15 @@ type DevAuthApp interface {
 }
 
 type DevAuth struct {
-	db DataStore
-	c  DevAdmClientI
+	db  DataStore
+	c   DevAdmClientI
+	log *log.Logger
 }
 
 func NewDevAuth(d DataStore, c DevAdmClientI) DevAuthApp {
-	return &DevAuth{db: d, c: c}
+	return &DevAuth{db: d,
+		c:   c,
+		log: log.New("devauth")}
 }
 
 func (d *DevAuth) SubmitAuthRequest(r *AuthReq) (string, error) {
@@ -55,6 +59,8 @@ func (d *DevAuth) SubmitAuthRequest(r *AuthReq) (string, error) {
 	//TODO at some point add key rotation handling (same id, different key)
 	dev, err := d.findMatchingDevice(id, r.PubKey)
 	if err != nil {
+		d.log.Errorf("find matching device error: %v", err)
+
 		return "", err
 	}
 
@@ -62,6 +68,7 @@ func (d *DevAuth) SubmitAuthRequest(r *AuthReq) (string, error) {
 	if dev != nil {
 		err = d.verifySeqNo(id, r.SeqNo)
 		if err != nil {
+			d.log.Errorf("verify seq no error: %v", err)
 			return "", err
 		}
 	} else {
@@ -69,7 +76,7 @@ func (d *DevAuth) SubmitAuthRequest(r *AuthReq) (string, error) {
 		dev = NewDevice(id, r.IdData, r.PubKey, r.TenantToken)
 
 		if err := d.c.AddDevice(dev); err != nil {
-			//TODO log admission error
+			d.log.Errorf("devadm add device error: %v", err)
 			return "", ErrDevAuthInternal
 		}
 	}
@@ -80,7 +87,7 @@ func (d *DevAuth) SubmitAuthRequest(r *AuthReq) (string, error) {
 	r.Status = dev.Status
 	err = d.db.AddAuthReq(r)
 	if err != nil {
-		//TODO log db err
+		d.log.Errorf("db add auth req error: %v", err)
 		return "", ErrDevAuthInternal
 	}
 
@@ -97,13 +104,13 @@ func (d *DevAuth) findMatchingDevice(id, key string) (*Device, error) {
 	//find devs by id and key, compare results
 	devi, err := d.db.GetDeviceById(id)
 	if err != nil && err != ErrDevNotFound {
-		//TODO log db err
+		d.log.Errorf("db get device by id error: %v", err)
 		return nil, ErrDevAuthInternal
 	}
 
 	devk, err := d.db.GetDeviceByKey(key)
 	if err != nil && err != ErrDevNotFound {
-		//TODO log db err
+		d.log.Errorf("db get device by key error: %v", err)
 		return nil, ErrDevAuthInternal
 	}
 
@@ -127,7 +134,7 @@ func (d *DevAuth) findMatchingDevice(id, key string) (*Device, error) {
 func (d *DevAuth) verifySeqNo(dev_id string, seq_no uint64) error {
 	r, err := d.db.GetAuthRequests(dev_id, 0, 1)
 	if err != nil {
-		//TODO log db err
+		d.log.Errorf("db get auth requests error: %v", err)
 		return ErrDevAuthInternal
 	}
 
@@ -156,7 +163,7 @@ func (d *DevAuth) AcceptDevice(dev_id string) error {
 	updev := &Device{Id: dev_id, Status: DevStatusAccepted}
 
 	if err := d.db.UpdateDevice(updev); err != nil {
-		//TODO log db err
+		d.log.Errorf("db update device error: %v", err)
 		return ErrDevAuthInternal
 	}
 
@@ -167,7 +174,7 @@ func (d *DevAuth) RejectDevice(dev_id string) error {
 	updev := &Device{Id: dev_id, Status: DevStatusRejected}
 
 	if err := d.db.UpdateDevice(updev); err != nil {
-		//TODO log db err
+		d.log.Errorf("db update device error: %v", err)
 		return ErrDevAuthInternal
 	}
 
