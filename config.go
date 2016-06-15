@@ -37,5 +37,6 @@ var (
 		{SettingListen, SettingListenDefault},
 		{SettingMiddleware, SettingMiddlewareDefault},
 		{SettingDb, SettingDbDefault},
+		{SettingDevAdmUrlAdd, SettingDevAdmUrlAddDefault},
 	}
 )
