@@ -75,6 +75,11 @@ func (d *DevAuth) SubmitAuthRequest(r *AuthReq) (string, error) {
 		//new device - create in 'pending' state
 		dev = NewDevice(id, r.IdData, r.PubKey, r.TenantToken)
 
+		if err := d.db.AddDevice(dev); err != nil {
+			d.log.Errorf("db add device error: %v", err)
+			return "", ErrDevAuthInternal
+		}
+
 		if err := d.c.AddDevice(dev); err != nil {
 			d.log.Errorf("devadm add device error: %v", err)
 			return "", ErrDevAuthInternal
