@@ -66,7 +66,7 @@ func TestSubmitAuthRequest(t *testing.T) {
 			getDevByKeyId:  devId,
 			getDevByKeyErr: nil,
 
-			getAuthReqsSeqNo: 125,
+			getAuthReqsSeqNo: 122,
 			getAuthReqsErr:   nil,
 
 			addDeviceErr:  nil,
@@ -89,7 +89,7 @@ func TestSubmitAuthRequest(t *testing.T) {
 			getDevByKeyId:  devId,
 			getDevByKeyErr: nil,
 
-			getAuthReqsSeqNo: 125,
+			getAuthReqsSeqNo: 122,
 			getAuthReqsErr:   nil,
 
 			addDeviceErr:  nil,
@@ -112,7 +112,7 @@ func TestSubmitAuthRequest(t *testing.T) {
 			getDevByKeyId:  devId,
 			getDevByKeyErr: nil,
 
-			getAuthReqsSeqNo: 125,
+			getAuthReqsSeqNo: 122,
 			getAuthReqsErr:   nil,
 
 			addDeviceErr:  nil,
@@ -135,7 +135,7 @@ func TestSubmitAuthRequest(t *testing.T) {
 			getDevByKeyId:  "anotherid",
 			getDevByKeyErr: nil,
 
-			getAuthReqsSeqNo: 125,
+			getAuthReqsSeqNo: 122,
 			getAuthReqsErr:   nil,
 
 			addDeviceErr:  nil,
@@ -158,7 +158,7 @@ func TestSubmitAuthRequest(t *testing.T) {
 			getDevByKeyId:  devId,
 			getDevByKeyErr: nil,
 
-			getAuthReqsSeqNo: 125,
+			getAuthReqsSeqNo: 122,
 			getAuthReqsErr:   nil,
 
 			addDeviceErr:  nil,
@@ -181,7 +181,7 @@ func TestSubmitAuthRequest(t *testing.T) {
 			getDevByKeyId:  devId,
 			getDevByKeyErr: nil,
 
-			getAuthReqsSeqNo: 122,
+			getAuthReqsSeqNo: 124,
 			getAuthReqsErr:   nil,
 
 			addDeviceErr:  nil,
@@ -227,7 +227,7 @@ func TestSubmitAuthRequest(t *testing.T) {
 			getDevByKeyId:  "",
 			getDevByKeyErr: ErrDevNotFound,
 
-			getAuthReqsSeqNo: 125,
+			getAuthReqsSeqNo: 122,
 			getAuthReqsErr:   nil,
 
 			addDeviceErr:  nil,
