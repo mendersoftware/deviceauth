@@ -144,7 +144,7 @@ func (d *DevAuth) verifySeqNo(dev_id string, seq_no uint64) error {
 	}
 
 	if r != nil {
-		if seq_no >= r[0].SeqNo {
+		if seq_no <= r[0].SeqNo {
 			return ErrDevAuthUnauthorized
 		}
 	}
