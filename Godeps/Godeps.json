@@ -15,18 +15,18 @@
 		},
 		{
 			"ImportPath": "github.com/ant0ine/go-json-rest/rest",
-			"Comment": "v3.3.1-5-gcfd0da1",
-			"Rev": "cfd0da14df1db088980175e1c3c7e77c11b90718"
+			"Comment": "v3.3.1-8-g3a807d6",
+			"Rev": "3a807d6d8d36e0f9175d6c292030fce09bcbb2db"
 		},
 		{
 			"ImportPath": "github.com/ant0ine/go-json-rest/rest/test",
-			"Comment": "v3.3.1-5-gcfd0da1",
-			"Rev": "cfd0da14df1db088980175e1c3c7e77c11b90718"
+			"Comment": "v3.3.1-8-g3a807d6",
+			"Rev": "3a807d6d8d36e0f9175d6c292030fce09bcbb2db"
 		},
 		{
 			"ImportPath": "github.com/ant0ine/go-json-rest/rest/trie",
-			"Comment": "v3.3.1-5-gcfd0da1",
-			"Rev": "cfd0da14df1db088980175e1c3c7e77c11b90718"
+			"Comment": "v3.3.1-8-g3a807d6",
+			"Rev": "3a807d6d8d36e0f9175d6c292030fce09bcbb2db"
 		},
 		{
 			"ImportPath": "github.com/davecgh/go-spew/spew",
