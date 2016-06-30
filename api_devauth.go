@@ -157,7 +157,9 @@ func (d *DevAuthHandler) GetDeviceTokenHandler(w rest.ResponseWriter, r *rest.Re
 
 func (d *DevAuthHandler) UpdateTokenHandler(w rest.ResponseWriter, r *rest.Request) {}
 
-func (d *DevAuthHandler) VerifyTokenHandler(w rest.ResponseWriter, r *rest.Request) {}
+func (d *DevAuthHandler) VerifyTokenHandler(w rest.ResponseWriter, r *rest.Request) {
+	w.WriteHeader(http.StatusOK)
+}
 
 func (d *DevAuthHandler) UpdateDeviceStatusHandler(w rest.ResponseWriter, r *rest.Request) {
 	devid := r.PathParam("id")
