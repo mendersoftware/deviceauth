@@ -1,7 +1,7 @@
 {
 	"ImportPath": "github.com/mendersoftware/deviceauth",
 	"GoVersion": "go1.6",
-	"GodepVersion": "v65",
+	"GodepVersion": "v74",
 	"Deps": [
 		{
 			"ImportPath": "github.com/BurntSushi/toml",
@@ -85,6 +85,10 @@
 		{
 			"ImportPath": "github.com/mitchellh/mapstructure",
 			"Rev": "d2dd0262208475919e1a362f675cfc0e7c10e905"
+		},
+		{
+			"ImportPath": "github.com/mendersoftware/mendertesting",
+			"Rev": "40e58a0eb46a0a0010b2ef202b166488a0230f70"
 		},
 		{
 			"ImportPath": "github.com/pkg/errors",
