@@ -41,4 +41,11 @@ type DataStore interface {
 	// updates a single device selected via d.Id
 	// updates only set fields
 	UpdateDevice(d *Device) error
+
+	// adds JWT to database
+	AddToken(t *Token) error
+
+	// retrieves JWT from database using JWT Id and device Id
+	// returns ErrTokenNotFound if token not found
+	GetToken(jti string) (*Token, error)
 }
