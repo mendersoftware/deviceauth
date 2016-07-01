@@ -45,10 +45,18 @@ func RunServer(c config.Reader) error {
 		return errors.Wrap(err, "database connection failed")
 	}
 
+	jwtAgentConf := JWTAgentConfig{
+		ServerPrivKeyPath: c.GetString(SettingServerPrivKeyPath),
+		Issuer:            c.GetString(SettingJWTIssuer),
+	}
 	clientConf := DevAdmClientConfig{
 		AddDeviceUrl: c.GetString(SettingDevAdmUrlAdd),
 	}
-	devauth := NewDevAuth(d, NewDevAdmClient(clientConf))
+	jwt, err := NewJWTAgent(jwtAgentConf)
+	if err != nil {
+		return errors.Wrap(err, "cannot create JWT agent")
+	}
+	devauth := NewDevAuth(d, NewDevAdmClient(clientConf), jwt)
 
 	api, err := SetupAPI(c.GetString(SettingMiddleware))
 	if err != nil {

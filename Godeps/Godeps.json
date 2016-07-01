@@ -33,6 +33,11 @@
 			"Rev": "5215b55f46b2b919f50a1df0eaa5886afe4e3b3d"
 		},
 		{
+			"ImportPath": "github.com/dgrijalva/jwt-go",
+			"Comment": "v2.6.0",
+			"Rev": "a2c85815a77d0f951e33ba4db5ae93629a1530af"
+		},
+		{
 			"ImportPath": "github.com/hashicorp/hcl",
 			"Rev": "2604f3bda7e8960c1be1063709e7d7f0765048d0"
 		},
@@ -98,6 +103,11 @@
 		{
 			"ImportPath": "github.com/pmezard/go-difflib/difflib",
 			"Rev": "792786c7400a136282c1664665ae0a8db921c6c2"
+		},
+		{
+			"ImportPath": "github.com/satori/go.uuid",
+			"Comment": "v1.1.0",
+			"Rev": "879c5887cd475cd7864858769793b2ceb0d44feb"
 		},
 		{
 			"ImportPath": "github.com/spf13/cast",

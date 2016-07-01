@@ -13,24 +13,17 @@
 //    limitations under the License.
 package main
 
-const (
-	TokenStatusActive   = "active"
-	TokenStatusExpired  = "expired"
-	TokenStatusRejected = "rejected"
-)
-
-type Token struct {
-	Id     string `json:"id"`
-	DevId  string `json:"dev_id"`
-	Token  string `json:"token"`
-	Status string `json:"status"`
+type MockJWTAgent struct {
+	mockGenerateTokenSignRS256 func(devId string,
+		expiration int64) (*Token, error)
+	mockValidateTokenSignRS256 func(token string) (bool, error)
 }
 
-func NewToken(id string, dev_id string, token string) *Token {
-	return &Token{
-		Id:     id,
-		DevId:  dev_id,
-		Token:  token,
-		Status: TokenStatusActive,
-	}
+func (jwt *MockJWTAgent) GenerateTokenSignRS256(devId string,
+	expiration int64) (*Token, error) {
+	return jwt.mockGenerateTokenSignRS256(devId, expiration)
+}
+
+func (jwt *MockJWTAgent) ValidateTokenSignRS256(token string) (bool, error) {
+	return jwt.mockValidateTokenSignRS256(token)
 }
