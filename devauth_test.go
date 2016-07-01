@@ -274,6 +274,14 @@ func TestSubmitAuthRequest(t *testing.T) {
 			mockAddDevice: func(d *Device) error {
 				return tc.addDeviceErr
 			},
+
+			mockAddToken: func(t *Token) error {
+				return nil
+			},
+
+			mockGetToken: func(jti string) (*Token, error) {
+				return nil, nil
+			},
 		}
 
 		c := MockDevAdmClient{
@@ -282,7 +290,17 @@ func TestSubmitAuthRequest(t *testing.T) {
 			},
 		}
 
-		devauth := NewDevAuth(&db, &c)
+		jwt := MockJWTAgent{
+			mockGenerateTokenSignRS256: func(devId string,
+				exp int64) (*Token, error) {
+				return NewToken("", devId, "dummytoken"), nil
+			},
+			mockValidateTokenSignRS256: func(token string) (bool, error) {
+				return true, nil
+			},
+		}
+
+		devauth := NewDevAuth(&db, &c, &jwt)
 		res, err := devauth.SubmitAuthRequest(&req)
 
 		assert.Equal(t, tc.res, res)
@@ -313,7 +331,7 @@ func TestAcceptDevice(t *testing.T) {
 			},
 		}
 
-		devauth := NewDevAuth(&db, nil)
+		devauth := NewDevAuth(&db, nil, nil)
 		err := devauth.AcceptDevice("dummyid")
 
 		if tc.dbErr != "" {
@@ -347,7 +365,7 @@ func TestRejectDevice(t *testing.T) {
 			},
 		}
 
-		devauth := NewDevAuth(&db, nil)
+		devauth := NewDevAuth(&db, nil, nil)
 		err := devauth.RejectDevice("dummyid")
 
 		if tc.dbErr != "" {
