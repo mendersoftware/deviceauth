@@ -25,6 +25,7 @@ const (
 	DbName        = "deviceauth"
 	DbDevicesColl = "devices"
 	DbAuthReqColl = "auth_requests"
+	DbTokensColl  = "tokens"
 )
 
 type DataStoreMongo struct {
@@ -138,6 +139,39 @@ func (db *DataStoreMongo) UpdateDevice(d *Device) error {
 	}
 
 	return nil
+}
+
+func (db *DataStoreMongo) AddToken(t *Token) error {
+	s := db.session.Copy()
+	defer s.Close()
+
+	c := s.DB(DbName).C(DbTokensColl)
+
+	if err := c.Insert(t); err != nil {
+		return errors.Wrap(err, "failed to store token")
+	}
+
+	return nil
+}
+
+func (db *DataStoreMongo) GetToken(jti string) (*Token, error) {
+	s := db.session.Copy()
+	defer s.Close()
+	c := s.DB(DbName).C(DbTokensColl)
+
+	res := Token{}
+
+	err := c.FindId(jti).One(&res)
+
+	if err != nil {
+		if err == mgo.ErrNotFound {
+			return nil, ErrDevNotFound
+		} else {
+			return nil, errors.Wrap(err, "failed to fetch token")
+		}
+	}
+
+	return &res, nil
 }
 
 func makeUpdate(d *Device) *Device {

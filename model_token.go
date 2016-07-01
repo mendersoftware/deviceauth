@@ -20,10 +20,10 @@ const (
 )
 
 type Token struct {
-	Id     string `json:"id"`
-	DevId  string `json:"dev_id"`
-	Token  string `json:"token"`
-	Status string `json:"status"`
+	Id     string `json:"id" bson:"_id"`
+	DevId  string `json:"dev_id" bson:"dev_id,omitempty"`
+	Token  string `json:"token" bson:"token,omitempty"`
+	Status string `json:"status" bson:"status,omitempty"`
 }
 
 func NewToken(id string, dev_id string, token string) *Token {
