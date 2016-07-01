@@ -25,6 +25,13 @@ var (
 	ErrDevAuthInternal     = errors.New("dev auth: internal error")
 )
 
+// TODO:
+// Expiration Timeout should be moved to database
+// Do we need Expiration Timeout per device?
+const (
+	defaultExpirationTimeout = 3600
+)
+
 // this device auth service interface
 type DevAuthApp interface {
 	SubmitAuthRequest(r *AuthReq) (string, error)
@@ -43,12 +50,14 @@ type DevAuthApp interface {
 type DevAuth struct {
 	db  DataStore
 	c   DevAdmClientI
+	jwt JWTAgentApp
 	log *log.Logger
 }
 
-func NewDevAuth(d DataStore, c DevAdmClientI) DevAuthApp {
+func NewDevAuth(d DataStore, c DevAdmClientI, jwt JWTAgentApp) DevAuthApp {
 	return &DevAuth{db: d,
 		c:   c,
+		jwt: jwt,
 		log: log.New("devauth")}
 }
 
@@ -98,7 +107,16 @@ func (d *DevAuth) SubmitAuthRequest(r *AuthReq) (string, error) {
 
 	//return according to dev status
 	if dev.Status == DevStatusAccepted {
-		return "dummytoken", nil
+		token, err := d.jwt.GenerateTokenSignRS256(id,
+			defaultExpirationTimeout)
+		if err != nil {
+			return "", ErrDevAuthInternal
+		} else {
+			if err := d.db.AddToken(token); err != nil {
+				return "", ErrDevAuthInternal
+			}
+			return token.Token, nil
+		}
 	} else {
 		return "", ErrDevAuthUnauthorized
 	}
