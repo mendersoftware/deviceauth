@@ -13,8 +13,24 @@
 //    limitations under the License.
 package main
 
+const (
+	TokenStatusActive   = "active"
+	TokenStatusExpired  = "expired"
+	TokenStatusRejected = "rejected"
+)
+
 type Token struct {
 	Id     string `json:"id"`
+	DevId  string `json:"dev_id"`
 	Token  string `json:"token"`
 	Status string `json:"status"`
+}
+
+func NewToken(id string, dev_id string, token string) *Token {
+	return &Token{
+		Id:     id,
+		DevId:  dev_id,
+		Token:  token,
+		Status: TokenStatusActive,
+	}
 }
