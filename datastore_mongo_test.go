@@ -46,7 +46,8 @@ func getDb() (*DataStoreMongo, error) {
 	return d, nil
 }
 
-func setUp(db *DataStoreMongo, devs_dataset, authreqs_dataset string) error {
+func setUp(db *DataStoreMongo, devs_dataset,
+	authreqs_dataset string, tokens_dataset string) error {
 	s := db.session.Copy()
 	defer s.Close()
 
@@ -59,6 +60,13 @@ func setUp(db *DataStoreMongo, devs_dataset, authreqs_dataset string) error {
 
 	if authreqs_dataset != "" {
 		err := setUpAuthReqs(authreqs_dataset, s)
+		if err != nil {
+			return err
+		}
+	}
+
+	if tokens_dataset != "" {
+		err := setUpTokens(tokens_dataset, s)
 		if err != nil {
 			return err
 		}
@@ -103,6 +111,24 @@ func setUpAuthReqs(dataset string, s *mgo.Session) error {
 	return nil
 }
 
+func setUpTokens(dataset string, s *mgo.Session) error {
+	tokens, err := parseTokens(dataset)
+	if err != nil {
+		return err
+	}
+
+	c := s.DB(DbName).C(DbTokensColl)
+
+	for _, t := range tokens {
+		err = c.Insert(t)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func wipe(db *DataStoreMongo) error {
 	s := db.session.Copy()
 	defer s.Close()
@@ -115,6 +141,13 @@ func wipe(db *DataStoreMongo) error {
 	}
 
 	c = s.DB(DbName).C(DbAuthReqColl)
+
+	_, err = c.RemoveAll(nil)
+	if err != nil {
+		return err
+	}
+
+	c = s.DB(DbName).C(DbTokensColl)
 
 	_, err = c.RemoveAll(nil)
 	if err != nil {
@@ -165,6 +198,31 @@ func parseAuthReqs(dataset string) ([]AuthReq, error) {
 	return reqs, nil
 }
 
+func parseTokens(dataset string) ([]Token, error) {
+	f, err := os.Open(filepath.Join(testDataFolder, dataset))
+	if err != nil {
+		return nil, err
+	}
+
+	var tokens []Token
+
+	j := json.NewDecoder(f)
+	if err = j.Decode(&tokens); err != nil {
+		return nil, err
+	}
+
+	return tokens, nil
+}
+
+func parseToken(dataset string) (*Token, error) {
+	res, err := parseTokens(dataset)
+	if err != nil {
+		return nil, err
+	}
+
+	return &res[0], nil
+}
+
 // test funcs
 func TestGetDeviceById(t *testing.T) {
 	if testing.Short() {
@@ -184,7 +242,7 @@ func TestGetDeviceById(t *testing.T) {
 	err = wipe(d)
 	assert.NoError(t, err, "failed to wipe data")
 
-	err = setUp(d, "devices_input.json", "")
+	err = setUp(d, "devices_input.json", "", "")
 	assert.NoError(t, err, "failed to setup input data")
 
 	testCases := []struct {
@@ -243,7 +301,7 @@ func TestGetDeviceByKey(t *testing.T) {
 	err = wipe(d)
 	assert.NoError(t, err, "failed to wipe data")
 
-	err = setUp(d, "devices_input.json", "")
+	err = setUp(d, "devices_input.json", "", "")
 	assert.NoError(t, err, "failed to setup input data")
 
 	testCases := []struct {
@@ -305,7 +363,7 @@ func TestGetAuthRequests(t *testing.T) {
 	err = wipe(d)
 	assert.NoError(t, err, "failed to wipe data")
 
-	err = setUp(d, "", "auth_reqs_input.json")
+	err = setUp(d, "", "auth_reqs_input.json", "")
 	assert.NoError(t, err, "failed to setup input data")
 
 	testCases := []struct {
@@ -478,7 +536,7 @@ func TestUpdateDevice(t *testing.T) {
 	err = wipe(d)
 	assert.NoError(t, err, "failed to wipe data")
 
-	err = setUp(d, "devices_input.json", "")
+	err = setUp(d, "devices_input.json", "", "")
 	assert.NoError(t, err, "failed to setup input data")
 
 	//test status updates
@@ -530,5 +588,96 @@ func TestUpdateDevice(t *testing.T) {
 			//check UpdatedTs was updated
 			assert.InEpsilon(t, now.Unix(), found.UpdatedTs.Unix(), 10)
 		}
+	}
+}
+
+func TestAddToken(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestAddToken in short mode.")
+	}
+
+	//setup
+	token := Token{
+		Id:     "123",
+		DevId:  "devId",
+		Token:  "token",
+		Status: "status",
+	}
+
+	d, err := getDb()
+	assert.NoError(t, err, "failed to get db")
+
+	err = d.AddToken(&token)
+	assert.NoError(t, err, "failed to add token")
+
+	//verify
+	s := d.session.Copy()
+	defer s.Close()
+
+	var found Token
+
+	c := s.DB(DbName).C(DbTokensColl)
+
+	err = c.FindId(token.Id).One(&found)
+	assert.NoError(t, err, "failed to find token")
+	assert.Equal(t, found.Id, token.Id)
+	assert.Equal(t, found.DevId, token.DevId)
+	assert.Equal(t, found.Token, token.Token)
+	assert.Equal(t, found.Status, token.Status)
+
+}
+
+func TestGetToken(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestGetToken in short mode.")
+	}
+
+	d, err := getDb()
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+
+	//setup
+	err = wipe(d)
+	assert.NoError(t, err, "failed to wipe data")
+
+	err = setUp(d, "", "", "tokens.json")
+	assert.NoError(t, err, "failed to setup input data")
+
+	testCases := []struct {
+		tokenId  string
+		expected string
+	}{
+		{
+			tokenId:  "0001",
+			expected: "token_expected_1.json",
+		},
+		{
+			tokenId:  "0002",
+			expected: "token_expected_2.json",
+		},
+		{
+			tokenId:  "0003",
+			expected: "",
+		},
+	}
+
+	for _, tc := range testCases {
+		var expected *Token
+
+		if tc.expected != "" {
+			expected, err = parseToken(tc.expected)
+			assert.NoError(t, err, "failed to parse %s", tc.expected)
+			assert.NotNil(t, expected)
+		}
+
+		dev, err := d.GetToken(tc.tokenId)
+		if expected != nil {
+			assert.NoError(t, err, "failed to get token")
+		} else {
+			assert.Equal(t, ErrDevNotFound, err)
+		}
+
+		assert.Equal(t, expected, dev)
 	}
 }

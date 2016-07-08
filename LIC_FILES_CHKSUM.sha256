@@ -27,6 +27,9 @@ feb6d17a0e7a64e5ab0f7e2b0e0ee3e69c1a6396626fd554dc0cddaa06851b44  vendor/github.
 402f39eed8a1851385d0703999aa9f23d067c2ea3e15c63c074e389cbf8f8f8f  vendor/github.com/stretchr/testify/LICENSE
 402f39eed8a1851385d0703999aa9f23d067c2ea3e15c63c074e389cbf8f8f8f  vendor/github.com/stretchr/testify/LICENCE.txt
 3525392c6db3b804af76980b2c560ee9ec1abdadd907d76a26091df7c78f3a25  vendor/github.com/davecgh/go-spew/LICENSE
+f71d43124a8b70fbaef7c835d1639e89a7acdb252b05dda35652247902880724  vendor/github.com/dgrijalva/jwt-go/LICENSE
+f56f51f3aac08674202e9c399e4f32e733c12953c09e15464b0cc3227ac442c0  vendor/github.com/satori/go.uuid/LICENSE
+
 #
 # Basically MIT (but with a "colorful" language!)
 7637386b5f81e8a719ca336233149005e5fa28b5e6054ea7b67de49355b0ad40  vendor/github.com/BurntSushi/toml/COPYING
