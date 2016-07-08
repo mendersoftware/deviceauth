@@ -282,6 +282,10 @@ func TestSubmitAuthRequest(t *testing.T) {
 			mockGetToken: func(jti string) (*Token, error) {
 				return nil, nil
 			},
+
+			mockDeleteToken: func(jti string) error {
+				return nil
+			},
 		}
 
 		c := MockDevAdmClient{
