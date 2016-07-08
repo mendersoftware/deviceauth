@@ -15,13 +15,13 @@ package main
 
 type MockJWTAgent struct {
 	mockGenerateTokenSignRS256 func(devId string) (*Token, error)
-	mockValidateTokenSignRS256 func(token string) (bool, error)
+	mockValidateTokenSignRS256 func(token string) (string, error)
 }
 
 func (jwt *MockJWTAgent) GenerateTokenSignRS256(devId string) (*Token, error) {
 	return jwt.mockGenerateTokenSignRS256(devId)
 }
 
-func (jwt *MockJWTAgent) ValidateTokenSignRS256(token string) (bool, error) {
+func (jwt *MockJWTAgent) ValidateTokenSignRS256(token string) (string, error) {
 	return jwt.mockValidateTokenSignRS256(token)
 }
