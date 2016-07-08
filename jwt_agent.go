@@ -24,6 +24,11 @@ import (
 	"time"
 )
 
+var (
+	ErrTokenExpired = errors.New("jwt: token expired")
+	ErrTokenInvalid = errors.New("jwt: token ivalid")
+)
+
 // Token field names
 const (
 	issuerClaim     = "iss"
@@ -49,14 +54,14 @@ type JWTAgentConfig struct {
 }
 
 type JWTAgent struct {
-	key        *rsa.PrivateKey
+	privKey    *rsa.PrivateKey
 	issuer     string
 	expTimeout int64
 }
 
 type JWTAgentApp interface {
 	GenerateTokenSignRS256(devId string) (*Token, error)
-	ValidateTokenSignRS256(token string) (bool, error)
+	ValidateTokenSignRS256(token string) (string, error)
 }
 
 // Generates JWT token signed using RS256
@@ -73,16 +78,42 @@ func (j *JWTAgent) GenerateTokenSignRS256(devId string) (*Token, error) {
 	// Create the token
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
 	// Sign and get the complete encoded token as a string
-	tokenString, err := token.SignedString(j.key)
+	tokenString, err := token.SignedString(j.privKey)
 	if err != nil {
 		return nil, errors.Wrap(err, ErrMsgCreateTokenFailed)
 	}
 	return NewToken(jti, devId, tokenString), nil
 }
 
-// TODO: stub only
-func (j *JWTAgent) ValidateTokenSignRS256(tokenString string) (bool, error) {
-	return true, nil
+// Validates token.
+// Returns jti and nil if token is valid or "" and error otherwise
+func (j *JWTAgent) ValidateTokenSignRS256(tokenString string) (string, error) {
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
+			return nil, errors.New("Unexpected signing method: " + token.Method.Alg())
+		}
+		// TODO:
+		// do we need different keys for different tokens (groups, tenants)?
+		// if yes, keys will be stored in database not in files
+		// and API for placing keys in database will be needed
+		return &j.privKey.PublicKey, nil
+	})
+
+	if err != nil {
+		if vErr, ok := err.(*jwt.ValidationError); ok {
+			if (vErr.Errors & jwt.ValidationErrorExpired) != 0 {
+				return "", ErrTokenExpired
+			}
+		}
+		return "", errors.Wrap(err, "token invalid")
+	}
+
+	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		if jtiStr, ok := claims[jwtIdClaim].(string); ok {
+			return jtiStr, nil
+		}
+	}
+	return "", errors.New("Token invalid")
 }
 
 func getRSAPrivKey(privKeyPath string) (*rsa.PrivateKey, error) {
@@ -117,7 +148,7 @@ func NewJWTAgent(c JWTAgentConfig) (*JWTAgent, error) {
 		return nil, err
 	}
 	return &JWTAgent{
-		key:        priv,
+		privKey:    priv,
 		issuer:     c.Issuer,
 		expTimeout: c.ExpirationTimeout,
 	}, nil
