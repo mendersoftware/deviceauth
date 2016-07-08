@@ -47,7 +47,7 @@ func RunServer(c config.Reader) error {
 
 	jwtAgentConf := JWTAgentConfig{
 		ServerPrivKeyPath: c.GetString(SettingServerPrivKeyPath),
-		ExpirationTimeout: uint64(c.GetInt(SettingJWTExpirationTimeout)),
+		ExpirationTimeout: int64(c.GetInt(SettingJWTExpirationTimeout)),
 		Issuer:            c.GetString(SettingJWTIssuer),
 	}
 	clientConf := DevAdmClientConfig{

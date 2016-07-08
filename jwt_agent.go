@@ -43,7 +43,7 @@ type JWTAgentConfig struct {
 	// path to server private key
 	ServerPrivKeyPath string
 	// expiration timeout in seconds
-	ExpirationTimeout uint64
+	ExpirationTimeout int64
 	// token issuer
 	Issuer string
 }
@@ -51,7 +51,7 @@ type JWTAgentConfig struct {
 type JWTAgent struct {
 	key        *rsa.PrivateKey
 	issuer     string
-	expTimeout uint64
+	expTimeout int64
 }
 
 type JWTAgentApp interface {
@@ -61,14 +61,17 @@ type JWTAgentApp interface {
 
 // Generates JWT token signed using RS256
 func (j *JWTAgent) GenerateTokenSignRS256(devId string) (*Token, error) {
-	// Create the token
-	token := jwt.New(jwt.SigningMethodRS256)
-	// Set claims
-	token.Claims[issuerClaim] = j.issuer
-	token.Claims[subjectClaim] = devId
-	token.Claims[expirationClaim] = uint64(time.Now().Unix()) + j.expTimeout
+	// Generate token ID
 	jti := generateTokenId()
-	token.Claims[jwtIdClaim] = jti
+	// Set claims
+	claims := jwt.StandardClaims{
+		Issuer:    j.issuer,
+		ExpiresAt: time.Now().Unix() + j.expTimeout,
+		Subject:   devId,
+		Id:        jti,
+	}
+	// Create the token
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
 	// Sign and get the complete encoded token as a string
 	tokenString, err := token.SignedString(j.key)
 	if err != nil {
