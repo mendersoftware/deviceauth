@@ -74,12 +74,10 @@ func TestGenerateTokenSignRS256(t *testing.T) {
 	testCases := []struct {
 		privKeyPath string
 		devId       string
-		status      string
 	}{
 		{
 			privKeyPath: "testdata/private.pem",
 			devId:       "deviceId",
-			status:      TokenStatusActive,
 		},
 	}
 	for _, tc := range testCases {
@@ -92,6 +90,5 @@ func TestGenerateTokenSignRS256(t *testing.T) {
 		token, err := jwt.GenerateTokenSignRS256(tc.devId)
 		assert.NoError(t, err)
 		assert.Equal(t, tc.devId, token.DevId)
-		assert.Equal(t, tc.status, TokenStatusActive)
 	}
 }

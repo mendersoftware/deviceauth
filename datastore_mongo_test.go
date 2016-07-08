@@ -598,10 +598,9 @@ func TestAddToken(t *testing.T) {
 
 	//setup
 	token := Token{
-		Id:     "123",
-		DevId:  "devId",
-		Token:  "token",
-		Status: "status",
+		Id:    "123",
+		DevId: "devId",
+		Token: "token",
 	}
 
 	d, err := getDb()
@@ -623,7 +622,6 @@ func TestAddToken(t *testing.T) {
 	assert.Equal(t, found.Id, token.Id)
 	assert.Equal(t, found.DevId, token.DevId)
 	assert.Equal(t, found.Token, token.Token)
-	assert.Equal(t, found.Status, token.Status)
 
 }
 

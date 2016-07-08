@@ -13,24 +13,16 @@
 //    limitations under the License.
 package main
 
-const (
-	TokenStatusActive   = "active"
-	TokenStatusExpired  = "expired"
-	TokenStatusRejected = "rejected"
-)
-
 type Token struct {
-	Id     string `json:"id" bson:"_id"`
-	DevId  string `json:"dev_id" bson:"dev_id,omitempty"`
-	Token  string `json:"token" bson:"token,omitempty"`
-	Status string `json:"status" bson:"status,omitempty"`
+	Id    string `json:"id" bson:"_id"`
+	DevId string `json:"dev_id" bson:"dev_id,omitempty"`
+	Token string `json:"token" bson:"token,omitempty"`
 }
 
 func NewToken(id string, dev_id string, token string) *Token {
 	return &Token{
-		Id:     id,
-		DevId:  dev_id,
-		Token:  token,
-		Status: TokenStatusActive,
+		Id:    id,
+		DevId: dev_id,
+		Token: token,
 	}
 }
