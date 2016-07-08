@@ -305,25 +305,17 @@ paths:
           schema:
             $ref: '#/definitions/Error'
   /tokens/{id}:
-    put:
-      summary: Change the token's state (e.g. revoke)
+    delete:
+      summary: Delete token
       parameters:
         - name: id
           in: path
           description: Unique token identifier.
           required: true
           type: string
-        - name: token
-          in: body
-          description: Token descriptor.
-          required: true
-          schema:
-            $ref: "#/definitions/TokenDescriptor"
       responses:
-        200:
-          description: Token successfully updated.
-        400:
-          description: Missing/malformed request params.
+        204:
+          description: Token successfully deleted.
         404:
           description: Token not found.
           schema:
