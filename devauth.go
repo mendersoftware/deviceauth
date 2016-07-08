@@ -207,8 +207,8 @@ func (*DevAuth) GetDeviceToken(dev_id string) (*Token, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (*DevAuth) RevokeToken(token_id string) error {
-	return errors.New("not implemented")
+func (d *DevAuth) RevokeToken(token_id string) error {
+	return d.db.DeleteToken(token_id)
 }
 
 func (d *DevAuth) VerifyToken(token string) error {

@@ -62,7 +62,7 @@ func (d *DevAuthHandler) GetApp() (rest.App, error) {
 
 		rest.Get(uriDeviceToken, d.GetDeviceTokenHandler),
 
-		rest.Put(uriToken, d.UpdateTokenHandler),
+		rest.Delete(uriToken, d.DeleteTokenHandler),
 
 		rest.Post(uriTokenVerify, d.VerifyTokenHandler),
 
@@ -156,7 +156,19 @@ func (d *DevAuthHandler) UpdateDeviceHandler(w rest.ResponseWriter, r *rest.Requ
 
 func (d *DevAuthHandler) GetDeviceTokenHandler(w rest.ResponseWriter, r *rest.Request) {}
 
-func (d *DevAuthHandler) UpdateTokenHandler(w rest.ResponseWriter, r *rest.Request) {}
+func (d *DevAuthHandler) DeleteTokenHandler(w rest.ResponseWriter, r *rest.Request) {
+	tokenId := r.PathParam("id")
+	err := d.DevAuth.RevokeToken(tokenId)
+	if err != nil {
+		if err == ErrTokenNotFound {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		rest.Error(w, ErrDevAuthInternal.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
 
 func (d *DevAuthHandler) VerifyTokenHandler(w rest.ResponseWriter, r *rest.Request) {
 	const authHeaderName = "Authorization"
