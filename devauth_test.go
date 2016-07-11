@@ -286,6 +286,10 @@ func TestSubmitAuthRequest(t *testing.T) {
 			mockDeleteToken: func(jti string) error {
 				return nil
 			},
+
+			mockDeleteTokenByDevId: func(dev_id string) error {
+				return nil
+			},
 		}
 
 		c := MockDevAdmClient{
@@ -347,13 +351,24 @@ func TestAcceptDevice(t *testing.T) {
 
 func TestRejectDevice(t *testing.T) {
 	testCases := []struct {
-		dbErr string
+		dbErr            string
+		dbDelDevTokenErr error
 	}{
 		{
-			dbErr: "",
+			dbErr:            "",
+			dbDelDevTokenErr: nil,
 		},
 		{
-			dbErr: "failed to update device",
+			dbErr:            "failed to update device",
+			dbDelDevTokenErr: nil,
+		},
+		{
+			dbErr:            "",
+			dbDelDevTokenErr: ErrTokenNotFound,
+		},
+		{
+			dbErr:            "",
+			dbDelDevTokenErr: ErrDevAuthInternal,
 		},
 	}
 
@@ -366,12 +381,15 @@ func TestRejectDevice(t *testing.T) {
 
 				return nil
 			},
+			mockDeleteTokenByDevId: func(dev_id string) error {
+				return tc.dbDelDevTokenErr
+			},
 		}
 
 		devauth := NewDevAuth(&db, nil, nil)
 		err := devauth.RejectDevice("dummyid")
 
-		if tc.dbErr != "" {
+		if tc.dbErr != "" || (tc.dbDelDevTokenErr != nil && tc.dbDelDevTokenErr != ErrTokenNotFound) {
 			assert.Equal(t, ErrDevAuthInternal, err)
 		} else {
 			assert.NoError(t, err)
