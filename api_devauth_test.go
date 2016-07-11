@@ -404,3 +404,48 @@ func TestApiDevAuthVerifyToken(t *testing.T) {
 	}
 
 }
+
+func TestApiDevAuthDeleteToken(t *testing.T) {
+	// enforce specific field naming in errors returned by API
+	rest.ErrorFieldName = "error"
+
+	tcases := []struct {
+		req  *http.Request
+		code int
+		body string
+		err  error
+	}{
+		{
+			req: test.MakeSimpleRequest("DELETE",
+				"http://1.2.3.4/api/0.1.0/tokens/foo", nil),
+			code: http.StatusNoContent,
+			err:  nil,
+		},
+		{
+			req: test.MakeSimpleRequest("DELETE",
+				"http://1.2.3.4/api/0.1.0/tokens/foo", nil),
+			code: http.StatusNotFound,
+			err:  ErrTokenNotFound,
+		},
+		{
+			req: test.MakeSimpleRequest("DELETE",
+				"http://1.2.3.4/api/0.1.0/tokens/foo", nil),
+			code: http.StatusInternalServerError,
+			body: RestError(ErrDevAuthInternal.Error()),
+			err:  ErrDevAuthInternal,
+		},
+	}
+
+	for _, tc := range tcases {
+		devauth := MockDevAuth{
+			mockRevokeToken: func(tokenId string) error {
+				return tc.err
+			},
+		}
+		apih := makeMockApiHandler(t, &devauth)
+		recorded := test.RunRequest(t, apih, tc.req)
+		recorded.CodeIs(tc.code)
+		recorded.BodyIs(tc.body)
+	}
+
+}
