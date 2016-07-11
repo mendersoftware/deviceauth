@@ -14,15 +14,16 @@
 package main
 
 type MockDataStore struct {
-	mockGetAuthRequests func(device_id string, skip, limit int) ([]AuthReq, error)
-	mockGetDeviceById   func(id string) (*Device, error)
-	mockGetDeviceByKey  func(key string) (*Device, error)
-	mockAddAuthReq      func(r *AuthReq) error
-	mockAddDevice       func(r *Device) error
-	mockUpdateDevice    func(d *Device) error
-	mockAddToken        func(t *Token) error
-	mockGetToken        func(jti string) (*Token, error)
-	mockDeleteToken     func(jti string) error
+	mockGetAuthRequests    func(device_id string, skip, limit int) ([]AuthReq, error)
+	mockGetDeviceById      func(id string) (*Device, error)
+	mockGetDeviceByKey     func(key string) (*Device, error)
+	mockAddAuthReq         func(r *AuthReq) error
+	mockAddDevice          func(r *Device) error
+	mockUpdateDevice       func(d *Device) error
+	mockAddToken           func(t *Token) error
+	mockGetToken           func(jti string) (*Token, error)
+	mockDeleteToken        func(jti string) error
+	mockDeleteTokenByDevId func(dev_id string) error
 }
 
 func (db *MockDataStore) GetAuthRequests(dev_id string, skip, limit int) ([]AuthReq, error) {
@@ -59,4 +60,8 @@ func (db *MockDataStore) GetToken(jti string) (*Token, error) {
 
 func (db *MockDataStore) DeleteToken(jti string) error {
 	return db.mockDeleteToken(jti)
+}
+
+func (db *MockDataStore) DeleteTokenByDevId(dev_id string) error {
+	return db.mockDeleteTokenByDevId(dev_id)
 }

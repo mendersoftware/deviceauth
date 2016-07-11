@@ -190,11 +190,11 @@ func (db *DataStoreMongo) DeleteToken(jti string) error {
 	return nil
 }
 
-func (db *DataStoreMongo) DeleteDevToken(dev_id string) error {
+func (db *DataStoreMongo) DeleteTokenByDevId(devId string) error {
 	s := db.session.Copy()
 	defer s.Close()
 	c := s.DB(DbName).C(DbTokensColl)
-	err := c.Remove(bson.M{"dev_id": dev_id})
+	err := c.Remove(bson.M{"dev_id": devId})
 
 	if err != nil {
 		if err == mgo.ErrNotFound {
