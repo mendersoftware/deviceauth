@@ -21,6 +21,7 @@ type MockDevAuth struct {
 	mockSubmitAuthRequest func(r *AuthReq) (string, error)
 	mockAcceptDevice      func(dev_id string) error
 	mockRejectDevice      func(dev_id string) error
+	mockVerifyToken       func(token string) error
 }
 
 func (mda *MockDevAuth) SubmitAuthRequest(r *AuthReq) (string, error) {
@@ -55,6 +56,6 @@ func (mda *MockDevAuth) RevokeToken(token_id string) error {
 	return errors.New("not implemented")
 }
 
-func (mda *MockDevAuth) VerifyToken(token string) (bool, error) {
-	return false, errors.New("not implemented")
+func (mda *MockDevAuth) VerifyToken(token string) error {
+	return mda.mockVerifyToken(token)
 }

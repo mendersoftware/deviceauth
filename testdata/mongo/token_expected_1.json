@@ -2,7 +2,6 @@
     {
         "id": "0001",
         "dev_id": "dev_id_1",
-        "token": "test_token_1",
-        "status": "test_status_1"
+        "token": "test_token_1"
     }
 ]

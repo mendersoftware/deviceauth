@@ -44,7 +44,7 @@ type DevAuthApp interface {
 	GetDeviceToken(dev_id string) (*Token, error)
 
 	RevokeToken(token_id string) error
-	VerifyToken(token string) (bool, error)
+	VerifyToken(token string) error
 }
 
 type DevAuth struct {
@@ -211,6 +211,35 @@ func (*DevAuth) RevokeToken(token_id string) error {
 	return errors.New("not implemented")
 }
 
-func (*DevAuth) VerifyToken(token string) (bool, error) {
-	return false, errors.New("not implemented")
+func (d *DevAuth) VerifyToken(token string) error {
+	// validate signature and claims
+	jti, err := d.jwt.ValidateTokenSignRS256(token)
+	if err != nil {
+		if err == ErrTokenExpired {
+			d.log.Errorf("Token %s expired: %v", jti, err)
+			err := d.db.DeleteToken(jti)
+			if err == ErrTokenNotFound {
+				d.log.Errorf("Token with jti: %s not found", jti)
+				return err
+			}
+			if err != nil {
+				d.log.Errorf("Cannot delete token with jti: %s : %s", jti, err)
+				return ErrDevAuthInternal
+			}
+			return ErrTokenExpired
+		}
+		d.log.Errorf("Token invalid: %v", err)
+		return ErrTokenInvalid
+	}
+	// check if token is in the system
+	_, err = d.db.GetToken(jti)
+	if err == ErrTokenNotFound {
+		d.log.Errorf("Token with jti: %s not found", jti)
+		return err
+	}
+	if err != nil {
+		d.log.Errorf("Cannot get token with id: %s from database: %s", jti, err)
+		return ErrDevAuthInternal
+	}
+	return nil
 }

@@ -282,6 +282,10 @@ func TestSubmitAuthRequest(t *testing.T) {
 			mockGetToken: func(jti string) (*Token, error) {
 				return nil, nil
 			},
+
+			mockDeleteToken: func(jti string) error {
+				return nil
+			},
 		}
 
 		c := MockDevAdmClient{
@@ -294,8 +298,8 @@ func TestSubmitAuthRequest(t *testing.T) {
 			mockGenerateTokenSignRS256: func(devId string) (*Token, error) {
 				return NewToken("", devId, "dummytoken"), nil
 			},
-			mockValidateTokenSignRS256: func(token string) (bool, error) {
-				return true, nil
+			mockValidateTokenSignRS256: func(token string) (string, error) {
+				return "", nil
 			},
 		}
 

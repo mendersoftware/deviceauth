@@ -20,7 +20,9 @@ import (
 
 var (
 	// device not found
-	ErrDevNotFound = errors.New("not found")
+	ErrDevNotFound = errors.New("device not found")
+	// device not found
+	ErrTokenNotFound = errors.New("token not found")
 )
 
 type DataStore interface {
@@ -48,4 +50,7 @@ type DataStore interface {
 	// retrieves JWT from database using JWT Id and device Id
 	// returns ErrTokenNotFound if token not found
 	GetToken(jti string) (*Token, error)
+
+	// deletes token
+	DeleteToken(jti string) error
 }

@@ -598,10 +598,9 @@ func TestAddToken(t *testing.T) {
 
 	//setup
 	token := Token{
-		Id:     "123",
-		DevId:  "devId",
-		Token:  "token",
-		Status: "status",
+		Id:    "123",
+		DevId: "devId",
+		Token: "token",
 	}
 
 	d, err := getDb()
@@ -623,7 +622,6 @@ func TestAddToken(t *testing.T) {
 	assert.Equal(t, found.Id, token.Id)
 	assert.Equal(t, found.DevId, token.DevId)
 	assert.Equal(t, found.Token, token.Token)
-	assert.Equal(t, found.Status, token.Status)
 
 }
 
@@ -671,13 +669,58 @@ func TestGetToken(t *testing.T) {
 			assert.NotNil(t, expected)
 		}
 
-		dev, err := d.GetToken(tc.tokenId)
+		token, err := d.GetToken(tc.tokenId)
 		if expected != nil {
 			assert.NoError(t, err, "failed to get token")
 		} else {
-			assert.Equal(t, ErrDevNotFound, err)
+			assert.Equal(t, ErrTokenNotFound, err)
 		}
 
-		assert.Equal(t, expected, dev)
+		assert.Equal(t, expected, token)
+	}
+}
+
+func TestDeleteToken(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestDeleteToken in short mode.")
+	}
+
+	d, err := getDb()
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+
+	//setup
+	err = wipe(d)
+	assert.NoError(t, err, "failed to wipe data")
+
+	err = setUp(d, "", "", "tokens.json")
+	assert.NoError(t, err, "failed to setup input data")
+
+	testCases := []struct {
+		tokenId string
+		err     bool
+	}{
+		{
+			tokenId: "0001",
+			err:     false,
+		},
+		{
+			tokenId: "0002",
+			err:     false,
+		},
+		{
+			tokenId: "0003",
+			err:     true,
+		},
+	}
+
+	for _, tc := range testCases {
+		err := d.DeleteToken(tc.tokenId)
+		if tc.err {
+			assert.Equal(t, ErrTokenNotFound, err)
+		} else {
+			assert.NoError(t, err, "failed to delete token")
+		}
 	}
 }

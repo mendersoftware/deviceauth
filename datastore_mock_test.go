@@ -22,6 +22,7 @@ type MockDataStore struct {
 	mockUpdateDevice    func(d *Device) error
 	mockAddToken        func(t *Token) error
 	mockGetToken        func(jti string) (*Token, error)
+	mockDeleteToken     func(jti string) error
 }
 
 func (db *MockDataStore) GetAuthRequests(dev_id string, skip, limit int) ([]AuthReq, error) {
@@ -54,4 +55,8 @@ func (db *MockDataStore) AddToken(t *Token) error {
 
 func (db *MockDataStore) GetToken(jti string) (*Token, error) {
 	return db.mockGetToken(jti)
+}
+
+func (db *MockDataStore) DeleteToken(jti string) error {
+	return db.mockDeleteToken(jti)
 }

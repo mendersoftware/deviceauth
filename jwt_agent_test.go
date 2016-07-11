@@ -18,6 +18,7 @@ import (
 	"github.com/mendersoftware/deviceauth/test"
 	"github.com/stretchr/testify/assert"
 	"testing"
+	"time"
 )
 
 func TestNewJWTAgent(t *testing.T) {
@@ -64,7 +65,7 @@ func TestNewJWTAgent(t *testing.T) {
 			assert.EqualError(t, err, tc.err)
 		} else {
 			assert.NoError(t, err)
-			assert.Equal(t, tc.privKey, jwt.key)
+			assert.Equal(t, tc.privKey, jwt.privKey)
 			assert.Equal(t, tc.issuer, jwt.issuer)
 		}
 	}
@@ -74,24 +75,68 @@ func TestGenerateTokenSignRS256(t *testing.T) {
 	testCases := []struct {
 		privKeyPath string
 		devId       string
-		status      string
 	}{
 		{
 			privKeyPath: "testdata/private.pem",
 			devId:       "deviceId",
-			status:      TokenStatusActive,
 		},
 	}
 	for _, tc := range testCases {
 		c := JWTAgentConfig{
 			ServerPrivKeyPath: tc.privKeyPath,
 			Issuer:            "Mender",
+			ExpirationTimeout: 1,
 		}
 		jwt, err := NewJWTAgent(c)
 		assert.NoError(t, err)
 		token, err := jwt.GenerateTokenSignRS256(tc.devId)
 		assert.NoError(t, err)
 		assert.Equal(t, tc.devId, token.DevId)
-		assert.Equal(t, tc.status, TokenStatusActive)
+	}
+}
+
+func TestValidateTokenSignRS256(t *testing.T) {
+	testCases := []struct {
+		privKeyPath string
+		devId       string
+		expiration  int64
+		err         error
+		delay       int64
+	}{
+		{
+			privKeyPath: "testdata/private.pem",
+			devId:       "deviceId",
+			expiration:  time.Now().Unix() + 123,
+			err:         nil,
+		},
+		{
+			privKeyPath: "testdata/private.pem",
+			devId:       "deviceId",
+			expiration:  0,
+			err:         ErrTokenExpired,
+			delay:       1,
+		},
+	}
+	for _, tc := range testCases {
+		c := JWTAgentConfig{
+			ServerPrivKeyPath: tc.privKeyPath,
+			Issuer:            "Mender",
+			ExpirationTimeout: tc.expiration,
+		}
+		jwt, err := NewJWTAgent(c)
+		assert.NoError(t, err)
+		token, err := jwt.GenerateTokenSignRS256(tc.devId)
+		assert.NoError(t, err)
+		assert.Equal(t, tc.devId, token.DevId)
+		if tc.err == ErrTokenExpired {
+			time.Sleep(time.Second * time.Duration(tc.delay))
+		}
+		_, err = jwt.ValidateTokenSignRS256(token.Token)
+		if tc.err != nil {
+			assert.EqualError(t, err, tc.err.Error())
+		} else {
+			assert.NoError(t, err)
+		}
+		// assert jit is uuid v4?
 	}
 }

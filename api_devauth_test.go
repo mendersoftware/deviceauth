@@ -330,3 +330,77 @@ func TestApiDevAuthUpdateStatusDevice(t *testing.T) {
 	}
 
 }
+
+func TestApiDevAuthVerifyToken(t *testing.T) {
+	// enforce specific field naming in errors returned by API
+	rest.ErrorFieldName = "error"
+
+	tcases := []struct {
+		req     *http.Request
+		code    int
+		body    string
+		headers map[string]string
+		err     error
+	}{
+		{
+			req: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/0.1.0/tokens/verify", nil),
+			code: http.StatusUnauthorized,
+			body: RestError(ErrNoAuthHeader.Error()),
+			err:  nil,
+		},
+		{
+			req: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/0.1.0/tokens/verify", nil),
+			code: 200,
+			headers: map[string]string{
+				"authorization": "dummytoken",
+			},
+			err: nil,
+		},
+		{
+			req: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/0.1.0/tokens/verify", nil),
+			code: http.StatusForbidden,
+			headers: map[string]string{
+				"authorization": "dummytoken",
+			},
+			err: ErrTokenExpired,
+		},
+		{
+			req: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/0.1.0/tokens/verify", nil),
+			code: http.StatusUnauthorized,
+			headers: map[string]string{
+				"authorization": "dummytoken",
+			},
+			err: ErrTokenInvalid,
+		},
+		{
+			req: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/0.1.0/tokens/verify", nil),
+			code: 500,
+			body: RestError(ErrDevAuthInternal.Error()),
+			headers: map[string]string{
+				"authorization": "dummytoken",
+			},
+			err: ErrDevAuthInternal,
+		},
+	}
+
+	for _, tc := range tcases {
+		devauth := MockDevAuth{
+			mockVerifyToken: func(token string) error {
+				return tc.err
+			},
+		}
+		apih := makeMockApiHandler(t, &devauth)
+		if len(tc.headers) > 0 {
+			tc.req.Header.Set("authorization", tc.headers["authorization"])
+		}
+		recorded := test.RunRequest(t, apih, tc.req)
+		recorded.CodeIs(tc.code)
+		recorded.BodyIs(tc.body)
+	}
+
+}

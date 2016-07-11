@@ -35,6 +35,7 @@ const (
 
 var (
 	ErrIncorrectStatus = errors.New("incorrect device status")
+	ErrNoAuthHeader    = errors.New("no authorization header")
 )
 
 type DevAuthHandler struct {
@@ -158,7 +159,24 @@ func (d *DevAuthHandler) GetDeviceTokenHandler(w rest.ResponseWriter, r *rest.Re
 func (d *DevAuthHandler) UpdateTokenHandler(w rest.ResponseWriter, r *rest.Request) {}
 
 func (d *DevAuthHandler) VerifyTokenHandler(w rest.ResponseWriter, r *rest.Request) {
-	w.WriteHeader(http.StatusOK)
+	const authHeaderName = "Authorization"
+	if len(r.Header) <= 0 || len(r.Header[authHeaderName]) <= 0 {
+		rest.Error(w, ErrNoAuthHeader.Error(), http.StatusUnauthorized)
+		return
+	}
+	AuthHeader := r.Header[authHeaderName]
+	err := d.DevAuth.VerifyToken(AuthHeader[0])
+	switch err {
+	case nil:
+		w.WriteHeader(http.StatusOK)
+	case ErrTokenExpired:
+		w.WriteHeader(http.StatusForbidden)
+	case ErrTokenNotFound, ErrTokenInvalid:
+		w.WriteHeader(http.StatusUnauthorized)
+	default:
+		rest.Error(w, err.Error(), http.StatusInternalServerError)
+		w.WriteHeader(http.StatusInternalServerError)
+	}
 }
 
 func (d *DevAuthHandler) UpdateDeviceStatusHandler(w rest.ResponseWriter, r *rest.Request) {

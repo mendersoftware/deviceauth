@@ -31,7 +31,7 @@ const (
 	SettingDevAdmUrlAddDefault = "http://mender-device-adm:8080/api/0.1.0/devices"
 
 	SettingServerPrivKeyPath        = "server_priv_key_path"
-	SettingServerPrivKeyPathDefault = "/etc/rsa/priv.pem"
+	SettingServerPrivKeyPathDefault = "/etc/rsa/private.pem"
 
 	SettingJWTIssuer        = "jwt_issuer"
 	SettingJWTIssuerDefault = "Mender"
