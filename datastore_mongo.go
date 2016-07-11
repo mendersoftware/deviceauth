@@ -190,6 +190,23 @@ func (db *DataStoreMongo) DeleteToken(jti string) error {
 	return nil
 }
 
+func (db *DataStoreMongo) DeleteDevToken(dev_id string) error {
+	s := db.session.Copy()
+	defer s.Close()
+	c := s.DB(DbName).C(DbTokensColl)
+	err := c.Remove(bson.M{"dev_id": dev_id})
+
+	if err != nil {
+		if err == mgo.ErrNotFound {
+			return ErrTokenNotFound
+		} else {
+			return errors.Wrap(err, "failed to remove token")
+		}
+	}
+
+	return nil
+}
+
 func makeUpdate(d *Device) *Device {
 	updev := &Device{}
 
