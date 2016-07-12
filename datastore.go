@@ -53,4 +53,7 @@ type DataStore interface {
 
 	// deletes token
 	DeleteToken(jti string) error
+
+	// deletes device token
+	DeleteTokenByDevId(dev_id string) error
 }

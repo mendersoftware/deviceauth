@@ -724,3 +724,48 @@ func TestDeleteToken(t *testing.T) {
 		}
 	}
 }
+
+func TestDeleteTokenByDevId(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestDeleteTokenByDevId in short mode.")
+	}
+
+	d, err := getDb()
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+
+	//setup
+	err = wipe(d)
+	assert.NoError(t, err, "failed to wipe data")
+
+	err = setUp(d, "", "", "tokens.json")
+	assert.NoError(t, err, "failed to setup input data")
+
+	testCases := []struct {
+		devId string
+		err   bool
+	}{
+		{
+			devId: "dev_id_1",
+			err:   false,
+		},
+		{
+			devId: "dev_id_2",
+			err:   false,
+		},
+		{
+			devId: "dev_id_3",
+			err:   true,
+		},
+	}
+
+	for _, tc := range testCases {
+		err := d.DeleteTokenByDevId(tc.devId)
+		if tc.err {
+			assert.Equal(t, ErrTokenNotFound, err)
+		} else {
+			assert.NoError(t, err, "failed to delete token")
+		}
+	}
+}

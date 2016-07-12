@@ -193,6 +193,14 @@ func (d *DevAuth) AcceptDevice(dev_id string) error {
 }
 
 func (d *DevAuth) RejectDevice(dev_id string) error {
+	// delete device token
+	err := d.db.DeleteTokenByDevId(dev_id)
+	if err != nil && err != ErrTokenNotFound {
+		d.log.Errorf("db delete device token error: %v", err)
+		return ErrDevAuthInternal
+	}
+
+	// update device status
 	updev := &Device{Id: dev_id, Status: DevStatusRejected}
 
 	if err := d.db.UpdateDevice(updev); err != nil {
@@ -207,8 +215,9 @@ func (*DevAuth) GetDeviceToken(dev_id string) (*Token, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (*DevAuth) RevokeToken(token_id string) error {
-	return errors.New("not implemented")
+func (d *DevAuth) RevokeToken(token_id string) error {
+	d.log.Warnf("Revoke token with jti: %s", token_id)
+	return d.db.DeleteToken(token_id)
 }
 
 func (d *DevAuth) VerifyToken(token string) error {
