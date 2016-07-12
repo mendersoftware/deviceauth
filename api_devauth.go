@@ -19,6 +19,7 @@ import (
 	"github.com/mendersoftware/deviceauth/utils"
 	"github.com/pkg/errors"
 	"net/http"
+	"strings"
 )
 
 const (
@@ -171,13 +172,12 @@ func (d *DevAuthHandler) DeleteTokenHandler(w rest.ResponseWriter, r *rest.Reque
 }
 
 func (d *DevAuthHandler) VerifyTokenHandler(w rest.ResponseWriter, r *rest.Request) {
-	const authHeaderName = "Authorization"
-	if len(r.Header) <= 0 || len(r.Header[authHeaderName]) <= 0 {
+	tokenStr, err := extractToken(r.Header)
+	if err != nil {
 		rest.Error(w, ErrNoAuthHeader.Error(), http.StatusUnauthorized)
-		return
 	}
-	AuthHeader := r.Header[authHeaderName]
-	err := d.DevAuth.VerifyToken(AuthHeader[0])
+	// verify token
+	err = d.DevAuth.VerifyToken(tokenStr)
 	switch err {
 	case nil:
 		w.WriteHeader(http.StatusOK)
@@ -240,4 +240,16 @@ func statusValidate(status *DevAuthApiStatus) error {
 	} else {
 		return nil
 	}
+}
+
+// extracts JWT from authorization header
+func extractToken(header http.Header) (string, error) {
+	const authHeaderName = "Authorization"
+	authHeader := header.Get(authHeaderName)
+	if authHeader == "" {
+		return "", ErrNoAuthHeader
+	}
+	tokenStr := strings.Replace(authHeader, "Bearer", "", 1)
+	tokenStr = strings.Replace(tokenStr, "bearer", "", 1)
+	return strings.TrimSpace(tokenStr), nil
 }
