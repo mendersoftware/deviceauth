@@ -117,6 +117,7 @@ func SetupMiddleware(api *rest.Api, mwtype string) error {
 
 		// Allowed headers
 		AllowedHeaders: []string{
+			"Accept",
 			"Allow",
 			"Content-Type",
 			"Origin",
