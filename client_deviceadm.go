@@ -17,6 +17,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"github.com/mendersoftware/deviceauth/log"
+	"github.com/mendersoftware/deviceauth/requestid"
 	"github.com/pkg/errors"
 	"net/http"
 	"time"
@@ -37,16 +38,15 @@ type DevAdmClientConfig struct {
 }
 
 type DevAdmClientI interface {
-	AddDevice(dev *Device) error
+	AddDevice(dev *Device, client requestid.ApiRequester) error
 }
 
 type DevAdmClient struct {
-	client http.Client
-	log    *log.Logger
-	conf   DevAdmClientConfig
+	log  *log.Logger
+	conf DevAdmClientConfig
 }
 
-func (d *DevAdmClient) AddDevice(dev *Device) error {
+func (d *DevAdmClient) AddDevice(dev *Device, client requestid.ApiRequester) error {
 	d.log.Debugf("add device %s for admission", dev.Id)
 
 	AdmReqJson, err := json.Marshal(AdmReq{
@@ -68,7 +68,7 @@ func (d *DevAdmClient) AddDevice(dev *Device) error {
 
 	req.Header.Set("Content-Type", "application/json")
 
-	rsp, err := d.client.Do(req)
+	rsp, err := client.Do(req)
 	if err != nil {
 		return errors.Wrapf(err, "failed to add device")
 	}
@@ -87,10 +87,6 @@ func NewDevAdmClient(c DevAdmClientConfig) *DevAdmClient {
 	}
 
 	return &DevAdmClient{
-		client: http.Client{
-			// request timeout
-			Timeout: c.Timeout,
-		},
 		log:  log.New("devadm-client"),
 		conf: c,
 	}
