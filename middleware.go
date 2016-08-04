@@ -21,6 +21,7 @@ import (
 
 	"github.com/ant0ine/go-json-rest/rest"
 	dlog "github.com/mendersoftware/deviceauth/log"
+	"github.com/mendersoftware/deviceauth/requestid"
 )
 
 const (
@@ -48,6 +49,7 @@ var (
 		// The expected Content-Type is 'application/json'
 		// if the content is non-null
 		&rest.ContentTypeCheckerMiddleware{},
+		&requestid.RequestIdMiddleware{},
 	}
 
 	DefaultProdStack = []rest.Middleware{
@@ -70,6 +72,7 @@ var (
 		// The expected Content-Type is 'application/json'
 		// if the content is non-null
 		&rest.ContentTypeCheckerMiddleware{},
+		&requestid.RequestIdMiddleware{},
 	}
 
 	middlewareMap = map[string][]rest.Middleware{

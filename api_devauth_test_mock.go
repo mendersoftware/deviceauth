@@ -15,18 +15,25 @@ package main
 
 import (
 	"errors"
+	"github.com/mendersoftware/deviceauth/requestid"
 )
 
 type MockDevAuth struct {
-	mockSubmitAuthRequest func(r *AuthReq) (string, error)
-	mockAcceptDevice      func(dev_id string) error
-	mockRejectDevice      func(dev_id string) error
-	mockVerifyToken       func(token string) error
-	mockRevokeToken       func(tokenId string) error
+	mockSubmitAuthRequest           func(r *AuthReq) (string, error)
+	mockSubmitAuthRequestWithClient func(r *AuthReq, c requestid.ApiRequester) (string, error)
+	mockAcceptDevice                func(dev_id string) error
+	mockRejectDevice                func(dev_id string) error
+	mockVerifyToken                 func(token string) error
+	mockRevokeToken                 func(tokenId string) error
+	mockWithContext                 func(ctx *RequestContext) DevAuthApp
 }
 
 func (mda *MockDevAuth) SubmitAuthRequest(r *AuthReq) (string, error) {
 	return mda.mockSubmitAuthRequest(r)
+}
+
+func (mda *MockDevAuth) SubmitAuthRequestWithClient(r *AuthReq, c requestid.ApiRequester) (string, error) {
+	return mda.mockSubmitAuthRequestWithClient(r, c)
 }
 
 func (mda *MockDevAuth) GetAuthRequests(dev_id string) ([]AuthReq, error) {
@@ -59,4 +66,7 @@ func (mda *MockDevAuth) RevokeToken(tokenId string) error {
 
 func (mda *MockDevAuth) VerifyToken(token string) error {
 	return mda.mockVerifyToken(token)
+}
+func (mda *MockDevAuth) WithContext(ctx *RequestContext) DevAuthApp {
+	return mda.mockWithContext(ctx)
 }

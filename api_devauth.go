@@ -128,7 +128,8 @@ func (d *DevAuthHandler) SubmitAuthRequestHandler(w rest.ResponseWriter, r *rest
 		return
 	}
 
-	token, err := d.DevAuth.SubmitAuthRequest(&authreq)
+	ctx := ContextFromRequest(r)
+	token, err := d.DevAuth.WithContext(ctx).SubmitAuthRequest(&authreq)
 	switch err {
 	case ErrDevAuthUnauthorized:
 		rest.Error(w,

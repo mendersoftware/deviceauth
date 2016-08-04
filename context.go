@@ -14,13 +14,16 @@
 package main
 
 import (
+	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/mendersoftware/deviceauth/requestid"
 )
 
-type MockDevAdmClient struct {
-	mockAddDevice func(dev *Device, client requestid.ApiRequester) error
+type RequestContext struct {
+	ReqId string
 }
 
-func (c *MockDevAdmClient) AddDevice(dev *Device, client requestid.ApiRequester) error {
-	return c.mockAddDevice(dev, client)
+func ContextFromRequest(r *rest.Request) *RequestContext {
+	return &RequestContext{
+		ReqId: requestid.GetReqId(r),
+	}
 }

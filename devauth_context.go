@@ -17,10 +17,12 @@ import (
 	"github.com/mendersoftware/deviceauth/requestid"
 )
 
-type MockDevAdmClient struct {
-	mockAddDevice func(dev *Device, client requestid.ApiRequester) error
+type DevAuthWithContext struct {
+	DevAuth
+	ctx *RequestContext
 }
 
-func (c *MockDevAdmClient) AddDevice(dev *Device, client requestid.ApiRequester) error {
-	return c.mockAddDevice(dev, client)
+func (d *DevAuthWithContext) SubmitAuthRequest(r *AuthReq) (string, error) {
+	client := requestid.NewTrackingApiClient(d.ctx.ReqId)
+	return d.SubmitAuthRequestWithClient(r, client)
 }

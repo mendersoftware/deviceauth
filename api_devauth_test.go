@@ -217,6 +217,11 @@ func TestApiDevAuthSubmitAuthReq(t *testing.T) {
 				return tc.devAuthToken, nil
 			},
 		}
+
+		devauth.mockWithContext = func(ctx *RequestContext) DevAuthApp {
+			return &devauth
+		}
+
 		apih := makeMockApiHandler(t, &devauth)
 
 		recorded := test.RunRequest(t, apih, tc.req)

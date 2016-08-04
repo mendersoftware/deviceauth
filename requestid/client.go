@@ -11,16 +11,34 @@
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
-package main
+package requestid
 
 import (
-	"github.com/mendersoftware/deviceauth/requestid"
+	"net/http"
 )
 
-type MockDevAdmClient struct {
-	mockAddDevice func(dev *Device, client requestid.ApiRequester) error
+type ApiRequester interface {
+	Do(r *http.Request) (*http.Response, error)
 }
 
-func (c *MockDevAdmClient) AddDevice(dev *Device, client requestid.ApiRequester) error {
-	return c.mockAddDevice(dev, client)
+// TrackingApiClient wrapper for http.Client
+// for sending http requests to outside services with a given request id
+type TrackingApiClient struct {
+	http.Client
+	reqid string
+}
+
+func NewTrackingApiClient(reqid string) *TrackingApiClient {
+	return &TrackingApiClient{
+		http.Client{},
+		reqid,
+	}
+}
+
+// do send a request with a request id
+func (a *TrackingApiClient) Do(r *http.Request) (*http.Response, error) {
+	if r.Header.Get(RequestIdHeader) == "" {
+		r.Header.Set(RequestIdHeader, a.reqid)
+	}
+	return a.Client.Do(r)
 }

@@ -11,16 +11,18 @@
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
-package main
+package requestid
 
 import (
-	"github.com/mendersoftware/deviceauth/requestid"
+	"github.com/ant0ine/go-json-rest/rest"
 )
 
-type MockDevAdmClient struct {
-	mockAddDevice func(dev *Device, client requestid.ApiRequester) error
-}
+// GetReqId helper for retrieving current request Id
+func GetReqId(r *rest.Request) string {
+	reqid := r.Env[RequestIdHeader]
+	if reqid != nil {
+		return reqid.(string)
+	}
 
-func (c *MockDevAdmClient) AddDevice(dev *Device, client requestid.ApiRequester) error {
-	return c.mockAddDevice(dev, client)
+	return ""
 }

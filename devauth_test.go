@@ -15,6 +15,7 @@ package main
 
 import (
 	"errors"
+	"github.com/mendersoftware/deviceauth/requestid"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -293,7 +294,7 @@ func TestSubmitAuthRequest(t *testing.T) {
 		}
 
 		c := MockDevAdmClient{
-			mockAddDevice: func(dev *Device) error {
+			mockAddDevice: func(dev *Device, c requestid.ApiRequester) error {
 				return tc.devAdmErr
 			},
 		}
