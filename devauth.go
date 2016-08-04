@@ -45,6 +45,7 @@ type DevAuthApp interface {
 
 	RevokeToken(token_id string) error
 	VerifyToken(token string) error
+	WithContext(c *RequestContext) DevAuthApp
 }
 
 type DevAuth struct {
@@ -251,4 +252,11 @@ func (d *DevAuth) VerifyToken(token string) error {
 		return ErrDevAuthInternal
 	}
 	return nil
+}
+
+func (d *DevAuth) WithContext(ctx *RequestContext) DevAuthApp {
+	return &DevAuthWithContext{
+		*d,
+		ctx,
+	}
 }
