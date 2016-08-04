@@ -15,8 +15,10 @@ package main
 
 import (
 	"github.com/mendersoftware/deviceauth/log"
+	"github.com/mendersoftware/deviceauth/requestid"
 	"github.com/mendersoftware/deviceauth/utils"
 	"github.com/pkg/errors"
+	"net/http"
 	"time"
 )
 
@@ -35,6 +37,7 @@ const (
 // this device auth service interface
 type DevAuthApp interface {
 	SubmitAuthRequest(r *AuthReq) (string, error)
+	SubmitAuthRequestWithClient(r *AuthReq, client requestid.ApiRequester) (string, error)
 	GetAuthRequests(dev_id string) ([]AuthReq, error)
 
 	GetDevices(skip, limit int, tenant_token, status string) ([]Device, error)
@@ -63,6 +66,10 @@ func NewDevAuth(d DataStore, c DevAdmClientI, jwt JWTAgentApp) DevAuthApp {
 }
 
 func (d *DevAuth) SubmitAuthRequest(r *AuthReq) (string, error) {
+	return d.SubmitAuthRequestWithClient(r, &http.Client{})
+}
+
+func (d *DevAuth) SubmitAuthRequestWithClient(r *AuthReq, client requestid.ApiRequester) (string, error) {
 	id := utils.CreateDevId(r.IdData)
 
 	//check if device exists with the same id+key
@@ -90,7 +97,7 @@ func (d *DevAuth) SubmitAuthRequest(r *AuthReq) (string, error) {
 			return "", ErrDevAuthInternal
 		}
 
-		if err := d.c.AddDevice(dev); err != nil {
+		if err := d.c.AddDevice(dev, client); err != nil {
 			d.log.Errorf("devadm add device error: %v", err)
 			return "", ErrDevAuthInternal
 		}

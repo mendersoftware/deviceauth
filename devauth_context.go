@@ -23,6 +23,6 @@ type DevAuthWithContext struct {
 }
 
 func (d *DevAuthWithContext) SubmitAuthRequest(r *AuthReq) (string, error) {
-	//TODO: create a requester with correct req id and call devauth
-	return "", errors.New("not implemented")
+	client := requestid.NewTrackingApiClient(d.ctx.ReqId)
+	return d.SubmitAuthRequestWithClient(r, client)
 }
