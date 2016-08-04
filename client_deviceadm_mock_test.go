@@ -13,10 +13,14 @@
 //    limitations under the License.
 package main
 
+import (
+	"github.com/mendersoftware/deviceauth/requestid"
+)
+
 type MockDevAdmClient struct {
-	mockAddDevice func(dev *Device) error
+	mockAddDevice func(dev *Device, client requestid.ApiRequester) error
 }
 
-func (c *MockDevAdmClient) AddDevice(dev *Device) error {
-	return c.mockAddDevice(dev)
+func (c *MockDevAdmClient) AddDevice(dev *Device, client requestid.ApiRequester) error {
+	return c.mockAddDevice(dev, client)
 }
