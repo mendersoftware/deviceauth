@@ -15,10 +15,26 @@ package main
 
 import (
 	"errors"
+	"github.com/mendersoftware/deviceauth/config"
+	"github.com/mendersoftware/deviceauth/log"
 	"github.com/mendersoftware/deviceauth/requestid"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
+
+func TestGetDevAuth(t *testing.T) {
+	//this will ping the db, so it;s a 'long' test
+	if testing.Short() {
+		t.Skip("skipping TestGetDevAuth in short mode.")
+	}
+
+	config.SetDefaults(config.Config, configDefaults)
+	config.Config.Set(SettingServerPrivKeyPath, "testdata/private.pem")
+	d, err := GetDevAuth(config.Config, log.New(log.Ctx{}))
+	assert.NoError(t, err)
+	assert.NotNil(t, d)
+
+}
 
 func TestSubmitAuthRequest(t *testing.T) {
 	req := AuthReq{

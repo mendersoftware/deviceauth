@@ -21,6 +21,7 @@ import (
 	"github.com/ant0ine/go-json-rest/rest/test"
 	"github.com/mendersoftware/deviceauth/config"
 	"github.com/mendersoftware/deviceauth/log"
+	"github.com/mendersoftware/deviceauth/requestid"
 	mtest "github.com/mendersoftware/deviceauth/test"
 	"github.com/stretchr/testify/assert"
 	"net/http"
@@ -41,6 +42,8 @@ func makeMockApiHandler(t *testing.T, f DevAuthFactory) http.Handler {
 	assert.NoError(t, err)
 
 	api := rest.NewApi()
+	api.Use(
+		&requestid.RequestIdMiddleware{})
 	api.SetApp(app)
 
 	return api.MakeHandler()
