@@ -11,48 +11,75 @@
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
+
+// Package log provides a thin wrapper over logrus, with a definition
+// of a global root logger, its setup functions and convenience wrappers.
+//
+// The wrappers are introduced to reduce verbosity:
+// - logrus.Fields becomes log.Ctx
+// - logrus.WithFields becomes log.F(), defined on a Logger type
+//
+// The usage scenario in a multilayer app is as follows:
+// - a new Logger is created in the upper layer with an initial context (request id, api method...)
+// - it is passed to lower layer which automatically includes the context, and can further enrich it
+// - result - logs across layers are tied together with a common context
+//
+// Note on concurrency:
+// - all Loggers in fact point to the single base log, which serializes logging with its mutexes
+// - all context is copied - each layer operates on an independent copy
+
 package log
 
 import (
 	"github.com/Sirupsen/logrus"
 )
 
-type Logger struct {
-	logrus.Logger
-	Module string
-}
-
 var (
-	loggerBase = logrus.New()
+	// log is a global logger instance
+	log = logrus.New()
 )
 
-func Setup(debug bool) {
-	if debug == true {
-		loggerBase.Level = logrus.DebugLevel
-	} else {
-		loggerBase.Level = logrus.InfoLevel
-	}
+// ContextLogger interface for components which support
+// logging with context, via setting a logger to an exisiting one,
+// thereby inheriting its context.
+type ContextLogger interface {
+	UseLog(l *Logger)
+}
 
-	loggerBase.Formatter = &logrus.TextFormatter{
+// init initializes the global logger to sane defaults.
+func init() {
+	log.Formatter = &logrus.TextFormatter{
 		FullTimestamp: true,
 	}
+	log.Level = logrus.InfoLevel
 }
 
-// return new logger with Module set to `name`
-func New(name string) *Logger {
-	logger := Logger{
-		// inherit config from standard logger
-		Logger: *loggerBase,
-		Module: name,
+// Setup allows to override the global logger setup.
+func Setup(debug bool) {
+	if debug == true {
+		log.Level = logrus.DebugLevel
 	}
-
-	return &logger
 }
 
-// return new logrus.Entry with field 'module' filled with module name
-// (as passed to New())
-func (l *Logger) WithFields(fields logrus.Fields) *logrus.Entry {
-	fields["module"] = l.Module
+// Ctx short for log context, alias for the more verbose logrus.Fields.
+type Ctx map[string]interface{}
 
-	return l.Logger.WithFields(fields)
+// Logger is a wrapper for logrus.Entry.
+type Logger struct {
+	*logrus.Entry
+}
+
+// New returns a new Logger with a given context.
+func New(ctx Ctx) *Logger {
+	return &Logger{log.WithFields(logrus.Fields(ctx))}
+}
+
+// F returns a new Logger enriched with new context fields.
+// It's a less verbose wrapper over logrus.WithFields.
+func (l *Logger) F(ctx Ctx) *Logger {
+	return &Logger{l.Entry.WithFields(logrus.Fields(ctx))}
+}
+
+func (l *Logger) Level() logrus.Level {
+	return l.Entry.Logger.Level
 }

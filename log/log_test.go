@@ -15,59 +15,56 @@ package log
 
 import (
 	"github.com/Sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestNew(t *testing.T) {
-	l := New("foo")
-
-	if l.Module != "foo" {
-		t.Fatalf("incorrect module, expected foo, got %s", l.Module)
-	}
+	l := New(Ctx{"foo": "bar"})
+	assert.NotNil(t, l)
 }
 
 func TestSetup(t *testing.T) {
 	// setup with debug on
 	Setup(false)
 
-	l := New("foo")
+	l := New(Ctx{"foo": "bar"})
 
-	if l.Level != logrus.InfoLevel {
+	if l.Level() != logrus.InfoLevel {
 		t.Fatalf("expected info level")
 	}
 
 	Setup(true)
 
-	l = New("foo")
+	l = New(Ctx{"foo": "bar"})
 
-	if l.Level != logrus.DebugLevel {
+	if l.Level() != logrus.DebugLevel {
 		t.Fatalf("expected debug level")
 	}
-
 }
 
 func TestWithFields(t *testing.T) {
 
 	Setup(false)
 
-	l := New("foo")
+	l := New(Ctx{})
 
 	exp := map[string]interface{}{
 		"bar":    1,
 		"baz":    "cafe",
 		"module": "foo",
 	}
-	e := l.WithFields(logrus.Fields{
+	l = l.F(Ctx{
 		"bar": exp["bar"],
 		"baz": exp["baz"],
 	})
 
-	if len(e.Data) != len(exp) {
+	if len(l.Data) != len(exp)-1 {
 		t.Fatalf("log fields number mismatch: expected %v got %v",
-			len(exp), len(e.Data))
+			len(exp), len(l.Data))
 	}
 
-	for k, v := range e.Data {
+	for k, v := range l.Data {
 		ev, ok := exp[k]
 		if ok != true {
 			t.Fatalf("unexpected key: %s", k)
