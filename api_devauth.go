@@ -16,6 +16,7 @@ package main
 import (
 	"encoding/json"
 	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/mendersoftware/deviceauth/config"
 	"github.com/mendersoftware/deviceauth/log"
 	"github.com/mendersoftware/deviceauth/requestid"
 	"github.com/mendersoftware/deviceauth/utils"
@@ -45,16 +46,18 @@ var (
 	ErrNoAuthHeader    = errors.New("no authorization header")
 )
 
+type DevAuthFactory func(c config.Reader, l *log.Logger) (DevAuthApp, error)
+
 type DevAuthHandler struct {
-	DevAuth DevAuthApp
+	createDevAuth DevAuthFactory
 }
 
 type DevAuthApiStatus struct {
 	Status string `json:"status"`
 }
 
-func NewDevAuthApiHandler(devauth DevAuthApp) ApiHandler {
-	return &DevAuthHandler{devauth}
+func NewDevAuthApiHandler(daf DevAuthFactory) ApiHandler {
+	return &DevAuthHandler{daf}
 }
 
 func (d *DevAuthHandler) GetApp() (rest.App, error) {
@@ -92,6 +95,17 @@ func (d *DevAuthHandler) SubmitAuthRequestHandler(w rest.ResponseWriter, r *rest
 		LogModule:  "api_devauth",
 		LogReqId:   requestid.GetReqId(r),
 		LogApiCall: "SubmitAuthRequestHandler"})
+
+	da, err := d.createDevAuth(config.Config, l)
+	if err != nil {
+		msg := "internal error"
+		err = errors.Wrap(err, msg)
+		rest.Error(w,
+			msg,
+			http.StatusBadRequest)
+		l.F(log.Ctx{LogHttpCode: http.StatusInternalServerError}).
+			Error(err.Error())
+	}
 
 	var authreq AuthReq
 
@@ -138,7 +152,7 @@ func (d *DevAuthHandler) SubmitAuthRequestHandler(w rest.ResponseWriter, r *rest
 	}
 
 	ctx := ContextFromRequest(r)
-	token, err := d.DevAuth.WithContext(ctx).SubmitAuthRequest(&authreq)
+	token, err := da.WithContext(ctx).SubmitAuthRequest(&authreq)
 	switch err {
 	case ErrDevAuthUnauthorized:
 		msg := "unauthorized"
@@ -179,8 +193,20 @@ func (d *DevAuthHandler) DeleteTokenHandler(w rest.ResponseWriter, r *rest.Reque
 		LogReqId:   requestid.GetReqId(r),
 		LogApiCall: "DeleteTokenHandler"})
 
+	da, err := d.createDevAuth(config.Config, l)
+	if err != nil {
+		msg := "internal error"
+		err = errors.Wrap(err, msg)
+		rest.Error(w,
+			msg,
+			http.StatusBadRequest)
+		l.F(log.Ctx{LogHttpCode: http.StatusInternalServerError}).
+			Error(err.Error())
+	}
+
 	tokenId := r.PathParam("id")
-	err := d.DevAuth.RevokeToken(tokenId)
+
+	err = da.RevokeToken(tokenId)
 	if err != nil {
 		if err == ErrTokenNotFound {
 			l.F(log.Ctx{LogHttpCode: http.StatusNotFound}).
@@ -203,6 +229,17 @@ func (d *DevAuthHandler) VerifyTokenHandler(w rest.ResponseWriter, r *rest.Reque
 		LogReqId:   requestid.GetReqId(r),
 		LogApiCall: "VerifyTokenHandler"})
 
+	da, err := d.createDevAuth(config.Config, l)
+	if err != nil {
+		msg := "internal error"
+		err = errors.Wrap(err, msg)
+		rest.Error(w,
+			msg,
+			http.StatusBadRequest)
+		l.F(log.Ctx{LogHttpCode: http.StatusInternalServerError}).
+			Error(err.Error())
+	}
+
 	tokenStr, err := extractToken(r.Header)
 	if err != nil {
 		rest.Error(w, ErrNoAuthHeader.Error(), http.StatusUnauthorized)
@@ -210,7 +247,7 @@ func (d *DevAuthHandler) VerifyTokenHandler(w rest.ResponseWriter, r *rest.Reque
 			Error(ErrNoAuthHeader.Error())
 	}
 	// verify token
-	err = d.DevAuth.VerifyToken(tokenStr)
+	err = da.VerifyToken(tokenStr)
 	code := http.StatusOK
 	if err != nil {
 		switch err {
@@ -236,10 +273,21 @@ func (d *DevAuthHandler) UpdateDeviceStatusHandler(w rest.ResponseWriter, r *res
 		LogReqId:   requestid.GetReqId(r),
 		LogApiCall: "UpdateDeviceStatusHandler"})
 
+	da, err := d.createDevAuth(config.Config, l)
+	if err != nil {
+		msg := "internal error"
+		err = errors.Wrap(err, msg)
+		rest.Error(w,
+			msg,
+			http.StatusBadRequest)
+		l.F(log.Ctx{LogHttpCode: http.StatusInternalServerError}).
+			Error(err.Error())
+	}
+
 	devid := r.PathParam("id")
 
 	var status DevAuthApiStatus
-	err := r.DecodeJsonPayload(&status)
+	err = r.DecodeJsonPayload(&status)
 	if err != nil {
 		err = errors.Wrap(err, "failed to decode status data")
 		rest.Error(w,
@@ -258,9 +306,9 @@ func (d *DevAuthHandler) UpdateDeviceStatusHandler(w rest.ResponseWriter, r *res
 	}
 
 	if status.Status == DevStatusAccepted {
-		err = d.DevAuth.AcceptDevice(devid)
+		err = da.AcceptDevice(devid)
 	} else if status.Status == DevStatusRejected {
-		err = d.DevAuth.RejectDevice(devid)
+		err = da.RejectDevice(devid)
 	}
 	if err != nil {
 		code := http.StatusInternalServerError
