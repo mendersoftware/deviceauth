@@ -163,6 +163,8 @@ func (d *DevAuthHandler) SubmitAuthRequestHandler(w rest.ResponseWriter, r *rest
 			Error(errors.Wrap(err, "unauthorized"))
 		return
 	case nil:
+		l.F(log.Ctx{LogHttpCode: http.StatusOK}).
+			Info("ok")
 		w.(http.ResponseWriter).Write([]byte(token))
 		return
 	default:
@@ -220,6 +222,8 @@ func (d *DevAuthHandler) DeleteTokenHandler(w rest.ResponseWriter, r *rest.Reque
 		return
 	}
 
+	l.F(log.Ctx{LogHttpCode: http.StatusNoContent}).
+		Info("ok")
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -262,6 +266,9 @@ func (d *DevAuthHandler) VerifyTokenHandler(w rest.ResponseWriter, r *rest.Reque
 
 		l.F(log.Ctx{LogHttpCode: code}).
 			Error(err.Error())
+	} else {
+		l.F(log.Ctx{LogHttpCode: code}).
+			Info("ok")
 	}
 
 	w.WriteHeader(code)
@@ -322,6 +329,9 @@ func (d *DevAuthHandler) UpdateDeviceStatusHandler(w rest.ResponseWriter, r *res
 	devurl := utils.BuildURL(r, uriDevice, map[string]string{
 		":id": devid,
 	})
+
+	l.F(log.Ctx{LogHttpCode: http.StatusSeeOther}).
+		Info("ok")
 	w.Header().Add("Location", devurl.String())
 	w.WriteHeader(http.StatusSeeOther)
 }
