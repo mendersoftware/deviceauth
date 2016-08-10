@@ -18,6 +18,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/mendersoftware/deviceauth/log"
 	"github.com/pkg/errors"
 	"github.com/satori/go.uuid"
 	"io/ioutil"
@@ -57,11 +58,13 @@ type JWTAgent struct {
 	privKey    *rsa.PrivateKey
 	issuer     string
 	expTimeout int64
+	log        *log.Logger
 }
 
 type JWTAgentApp interface {
 	GenerateTokenSignRS256(devId string) (*Token, error)
 	ValidateTokenSignRS256(token string) (string, error)
+	log.ContextLogger
 }
 
 // Generates JWT token signed using RS256
@@ -116,6 +119,10 @@ func (j *JWTAgent) ValidateTokenSignRS256(tokenString string) (string, error) {
 	return "", errors.New("Token invalid")
 }
 
+func (j *JWTAgent) UseLog(l *log.Logger) {
+	j.log = l.F(log.Ctx{LogModule: "jwt_agent"})
+}
+
 func getRSAPrivKey(privKeyPath string) (*rsa.PrivateKey, error) {
 	// read key from file
 	pemData, err := ioutil.ReadFile(privKeyPath)
@@ -151,5 +158,6 @@ func NewJWTAgent(c JWTAgentConfig) (*JWTAgent, error) {
 		privKey:    priv,
 		issuer:     c.Issuer,
 		expTimeout: c.ExpirationTimeout,
+		log:        log.New(log.Ctx{LogModule: "jwt_agent"}),
 	}, nil
 }

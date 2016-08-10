@@ -15,9 +15,12 @@
 package main
 
 import (
+	"github.com/mendersoftware/deviceauth/config"
+	"github.com/mendersoftware/deviceauth/log"
 	"github.com/pkg/errors"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
+	"sync"
 	"time"
 )
 
@@ -28,21 +31,52 @@ const (
 	DbTokensColl  = "tokens"
 )
 
+var (
+	// masterSession is a master session to be copied on demand
+	// This is the preferred pattern with mgo (for common conn pool management, etc.)
+	masterSession *mgo.Session
+
+	// once ensures mgoMaster is created only once
+	once sync.Once
+)
+
 type DataStoreMongo struct {
 	session *mgo.Session
+	log     *log.Logger
+}
+
+func GetDataStoreMongo(c config.Reader, l *log.Logger) (*DataStoreMongo, error) {
+	d, err := NewDataStoreMongo(c.GetString(SettingDb))
+	if err != nil {
+		return nil, errors.Wrap(err, "database connection failed")
+	}
+	d.UseLog(l)
+
+	return d, nil
 }
 
 func NewDataStoreMongo(host string) (*DataStoreMongo, error) {
-	s, err := mgo.Dial(host)
+	//init master session
+	var err error
+	once.Do(func() {
+		masterSession, err = mgo.Dial(host)
+	})
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to open mgo session")
+		return nil, errors.New("failed to open mgo session")
 	}
-	return &DataStoreMongo{session: s}, nil
+
+	db := &DataStoreMongo{
+		session: masterSession,
+		log:     log.New(log.Ctx{LogModule: "datastore_mongo"}),
+	}
+
+	return db, nil
 }
 
 func (db *DataStoreMongo) GetAuthRequests(dev_id string, skip, limit int) ([]AuthReq, error) {
 	s := db.session.Copy()
 	defer s.Close()
+
 	c := s.DB(DbName).C(DbAuthReqColl)
 
 	res := []AuthReq{}
@@ -61,6 +95,7 @@ func (db *DataStoreMongo) GetAuthRequests(dev_id string, skip, limit int) ([]Aut
 func (db *DataStoreMongo) GetDeviceById(id string) (*Device, error) {
 	s := db.session.Copy()
 	defer s.Close()
+
 	c := s.DB(DbName).C(DbDevicesColl)
 
 	res := Device{}
@@ -81,6 +116,7 @@ func (db *DataStoreMongo) GetDeviceById(id string) (*Device, error) {
 func (db *DataStoreMongo) GetDeviceByKey(key string) (*Device, error) {
 	s := db.session.Copy()
 	defer s.Close()
+
 	c := s.DB(DbName).C(DbDevicesColl)
 
 	filter := bson.M{"pubkey": key}
@@ -103,7 +139,7 @@ func (db *DataStoreMongo) AddAuthReq(r *AuthReq) error {
 	s := db.session.Copy()
 	defer s.Close()
 
-	c := s.DB(DbName).C(DbAuthReqColl)
+	c := db.session.DB(DbName).C(DbAuthReqColl)
 
 	if err := c.Insert(r); err != nil {
 		return errors.Wrap(err, "failed to store auth req")
@@ -157,6 +193,7 @@ func (db *DataStoreMongo) AddToken(t *Token) error {
 func (db *DataStoreMongo) GetToken(jti string) (*Token, error) {
 	s := db.session.Copy()
 	defer s.Close()
+
 	c := s.DB(DbName).C(DbTokensColl)
 
 	res := Token{}
@@ -177,7 +214,8 @@ func (db *DataStoreMongo) GetToken(jti string) (*Token, error) {
 func (db *DataStoreMongo) DeleteToken(jti string) error {
 	s := db.session.Copy()
 	defer s.Close()
-	c := s.DB(DbName).C(DbTokensColl)
+
+	c := db.session.DB(DbName).C(DbTokensColl)
 	err := c.RemoveId(jti)
 	if err != nil {
 		if err == mgo.ErrNotFound {
@@ -193,7 +231,8 @@ func (db *DataStoreMongo) DeleteToken(jti string) error {
 func (db *DataStoreMongo) DeleteTokenByDevId(devId string) error {
 	s := db.session.Copy()
 	defer s.Close()
-	c := s.DB(DbName).C(DbTokensColl)
+
+	c := db.session.DB(DbName).C(DbTokensColl)
 	err := c.Remove(bson.M{"dev_id": devId})
 
 	if err != nil {
@@ -221,4 +260,8 @@ func makeUpdate(d *Device) *Device {
 	updev.UpdatedTs = time.Now()
 
 	return updev
+}
+
+func (db *DataStoreMongo) UseLog(l *log.Logger) {
+	db.log = l.F(log.Ctx{LogModule: "datastore_mongo"})
 }

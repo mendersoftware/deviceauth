@@ -36,7 +36,7 @@ import (
 
 var (
 	// log is a global logger instance
-	log = logrus.New()
+	Log = logrus.New()
 )
 
 // ContextLogger interface for components which support
@@ -48,16 +48,16 @@ type ContextLogger interface {
 
 // init initializes the global logger to sane defaults.
 func init() {
-	log.Formatter = &logrus.TextFormatter{
+	Log.Formatter = &logrus.TextFormatter{
 		FullTimestamp: true,
 	}
-	log.Level = logrus.InfoLevel
+	Log.Level = logrus.InfoLevel
 }
 
 // Setup allows to override the global logger setup.
 func Setup(debug bool) {
 	if debug == true {
-		log.Level = logrus.DebugLevel
+		Log.Level = logrus.DebugLevel
 	}
 }
 
@@ -71,7 +71,7 @@ type Logger struct {
 
 // New returns a new Logger with a given context.
 func New(ctx Ctx) *Logger {
-	return &Logger{log.WithFields(logrus.Fields(ctx))}
+	return &Logger{Log.WithFields(logrus.Fields(ctx))}
 }
 
 // F returns a new Logger enriched with new context fields.
