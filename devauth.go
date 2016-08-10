@@ -62,7 +62,7 @@ func NewDevAuth(d DataStore, c DevAdmClientI, jwt JWTAgentApp) DevAuthApp {
 	return &DevAuth{db: d,
 		c:   c,
 		jwt: jwt,
-		log: log.New("devauth")}
+		log: log.New(log.Ctx{LogModule: "devauth"})}
 }
 
 func (d *DevAuth) SubmitAuthRequest(r *AuthReq) (string, error) {

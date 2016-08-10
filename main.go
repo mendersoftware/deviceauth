@@ -41,7 +41,7 @@ func main() {
 
 	log.Setup(debug)
 
-	l := log.New("main")
+	l := log.New(log.Ctx{LogModule: "main"})
 
 	conf, err := HandleConfigFile(configPath)
 	if err != nil {

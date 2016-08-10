@@ -87,7 +87,7 @@ func NewDevAdmClient(c DevAdmClientConfig) *DevAdmClient {
 	}
 
 	return &DevAdmClient{
-		log:  log.New("devadm-client"),
+		log:  log.New(log.Ctx{LogModule: "devadm-client"}),
 		conf: c,
 	}
 }

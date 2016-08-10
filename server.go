@@ -38,7 +38,7 @@ func SetupAPI(stacktype string) (*rest.Api, error) {
 
 func RunServer(c config.Reader) error {
 
-	l := log.New("server")
+	l := log.New(log.Ctx{LogModule: "server"})
 
 	d, err := NewDataStoreMongo(c.GetString(SettingDb))
 	if err != nil {
