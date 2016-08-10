@@ -13,6 +13,10 @@
 //    limitations under the License.
 package main
 
+import (
+	"github.com/mendersoftware/deviceauth/log"
+)
+
 type MockJWTAgent struct {
 	mockGenerateTokenSignRS256 func(devId string) (*Token, error)
 	mockValidateTokenSignRS256 func(token string) (string, error)
@@ -24,4 +28,8 @@ func (jwt *MockJWTAgent) GenerateTokenSignRS256(devId string) (*Token, error) {
 
 func (jwt *MockJWTAgent) ValidateTokenSignRS256(token string) (string, error) {
 	return jwt.mockValidateTokenSignRS256(token)
+}
+
+func (db *MockJWTAgent) UseLog(l *log.Logger) {
+	//nop
 }

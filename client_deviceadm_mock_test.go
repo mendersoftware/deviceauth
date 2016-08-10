@@ -14,6 +14,7 @@
 package main
 
 import (
+	"github.com/mendersoftware/deviceauth/log"
 	"github.com/mendersoftware/deviceauth/requestid"
 )
 
@@ -23,4 +24,8 @@ type MockDevAdmClient struct {
 
 func (c *MockDevAdmClient) AddDevice(dev *Device, client requestid.ApiRequester) error {
 	return c.mockAddDevice(dev, client)
+}
+
+func (db *MockDevAdmClient) UseLog(l *log.Logger) {
+	//nop
 }

@@ -13,6 +13,10 @@
 //    limitations under the License.
 package main
 
+import (
+	"github.com/mendersoftware/deviceauth/log"
+)
+
 type MockDataStore struct {
 	mockGetAuthRequests    func(device_id string, skip, limit int) ([]AuthReq, error)
 	mockGetDeviceById      func(id string) (*Device, error)
@@ -24,6 +28,7 @@ type MockDataStore struct {
 	mockGetToken           func(jti string) (*Token, error)
 	mockDeleteToken        func(jti string) error
 	mockDeleteTokenByDevId func(dev_id string) error
+	mockSet                func(l log.Logger)
 }
 
 func (db *MockDataStore) GetAuthRequests(dev_id string, skip, limit int) ([]AuthReq, error) {
@@ -64,4 +69,8 @@ func (db *MockDataStore) DeleteToken(jti string) error {
 
 func (db *MockDataStore) DeleteTokenByDevId(dev_id string) error {
 	return db.mockDeleteTokenByDevId(dev_id)
+}
+
+func (db *MockDataStore) UseLog(l *log.Logger) {
+	//nop
 }
