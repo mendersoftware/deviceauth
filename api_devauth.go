@@ -16,6 +16,8 @@ package main
 import (
 	"encoding/json"
 	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/mendersoftware/deviceauth/log"
+	"github.com/mendersoftware/deviceauth/requestid"
 	"github.com/mendersoftware/deviceauth/utils"
 	"github.com/pkg/errors"
 	"net/http"
@@ -32,6 +34,10 @@ const (
 	uriDeviceStatus = "/api/0.1.0/devices/:id/status"
 
 	HdrAuthReqSign = "X-MEN-Signature"
+
+	LogReqId    = "request_id"
+	LogApiCall  = "api_call"
+	LogHttpCode = "http_code"
 )
 
 var (
@@ -82,6 +88,11 @@ func (d *DevAuthHandler) GetApp() (rest.App, error) {
 }
 
 func (d *DevAuthHandler) SubmitAuthRequestHandler(w rest.ResponseWriter, r *rest.Request) {
+	l := log.New(log.Ctx{
+		LogModule:  "api_devauth",
+		LogReqId:   requestid.GetReqId(r),
+		LogApiCall: "SubmitAuthRequestHandler"})
+
 	var authreq AuthReq
 
 	//validate req body by reading raw content manually
@@ -89,42 +100,40 @@ func (d *DevAuthHandler) SubmitAuthRequestHandler(w rest.ResponseWriter, r *rest
 	//unmarshal and close it)
 	body, err := utils.ReadBodyRaw(r)
 	if err != nil {
-		rest.Error(w,
-			errors.Wrap(err, "failed to decode auth request").Error(),
-			http.StatusBadRequest)
+		err = errors.Wrap(err, "failed to decode auth request")
+		restErrWithLog(w, l, err, http.StatusBadRequest)
 		return
 	}
 
 	err = json.Unmarshal(body, &authreq)
 	if err != nil {
-		rest.Error(w,
-			errors.Wrap(err, "failed to decode auth request").Error(),
-			http.StatusBadRequest)
+		err = errors.Wrap(err, "failed to decode auth request")
+		restErrWithLog(w, l, err, http.StatusBadRequest)
 		return
 	}
 
 	err = authreq.Validate()
 	if err != nil {
-		rest.Error(w,
-			errors.Wrap(err, "invalid auth request").Error(),
-			http.StatusBadRequest)
+		err = errors.Wrap(err, "invalid auth request")
+		restErrWithLog(w, l, err, http.StatusBadRequest)
 		return
 	}
 
 	//verify signature
 	signature := r.Header.Get(HdrAuthReqSign)
 	if signature == "" {
-		rest.Error(w,
-			"missing request signature header",
-			http.StatusBadRequest)
+		restErrWithLog(w, l, errors.New("missing request signature header"), http.StatusBadRequest)
 		return
 	}
 
 	err = utils.VerifyAuthReqSign(signature, authreq.PubKey, body)
 	if err != nil {
+		msg := "signature verification failed"
 		rest.Error(w,
-			"signature verification failed",
+			msg,
 			http.StatusUnauthorized)
+		l.F(log.Ctx{LogHttpCode: http.StatusUnauthorized}).
+			Error(errors.Wrap(err, msg))
 		return
 	}
 
@@ -132,20 +141,26 @@ func (d *DevAuthHandler) SubmitAuthRequestHandler(w rest.ResponseWriter, r *rest
 	token, err := d.DevAuth.WithContext(ctx).SubmitAuthRequest(&authreq)
 	switch err {
 	case ErrDevAuthUnauthorized:
+		msg := "unauthorized"
 		rest.Error(w,
-			"unauthorized",
+			msg,
 			http.StatusUnauthorized)
+		l.F(log.Ctx{LogHttpCode: http.StatusUnauthorized}).
+			Error(errors.Wrap(err, "unauthorized"))
 		return
 	case nil:
 		w.(http.ResponseWriter).Write([]byte(token))
 		return
 	default:
+		msg := "internal error"
 		rest.Error(w,
-			"internal error",
+			msg,
 			http.StatusInternalServerError)
+		err = errors.Wrap(err, msg)
+		l.F(log.Ctx{LogHttpCode: http.StatusInternalServerError}).
+			Error(err)
 		return
 	}
-
 }
 
 func (d *DevAuthHandler) GetAuthRequestsHandler(w rest.ResponseWriter, r *rest.Request) {}
@@ -159,53 +174,86 @@ func (d *DevAuthHandler) UpdateDeviceHandler(w rest.ResponseWriter, r *rest.Requ
 func (d *DevAuthHandler) GetDeviceTokenHandler(w rest.ResponseWriter, r *rest.Request) {}
 
 func (d *DevAuthHandler) DeleteTokenHandler(w rest.ResponseWriter, r *rest.Request) {
+	l := log.New(log.Ctx{
+		LogModule:  "api_devauth",
+		LogReqId:   requestid.GetReqId(r),
+		LogApiCall: "DeleteTokenHandler"})
+
 	tokenId := r.PathParam("id")
 	err := d.DevAuth.RevokeToken(tokenId)
 	if err != nil {
 		if err == ErrTokenNotFound {
+			l.F(log.Ctx{LogHttpCode: http.StatusNotFound}).
+				Error(err.Error())
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
+		l.F(log.Ctx{LogHttpCode: http.StatusInternalServerError}).
+			Error(ErrDevAuthInternal.Error())
 		rest.Error(w, ErrDevAuthInternal.Error(), http.StatusInternalServerError)
 		return
 	}
+
 	w.WriteHeader(http.StatusNoContent)
 }
 
 func (d *DevAuthHandler) VerifyTokenHandler(w rest.ResponseWriter, r *rest.Request) {
+	l := log.New(log.Ctx{
+		LogModule:  "api_devauth",
+		LogReqId:   requestid.GetReqId(r),
+		LogApiCall: "VerifyTokenHandler"})
+
 	tokenStr, err := extractToken(r.Header)
 	if err != nil {
 		rest.Error(w, ErrNoAuthHeader.Error(), http.StatusUnauthorized)
+		l.F(log.Ctx{LogHttpCode: http.StatusUnauthorized}).
+			Error(ErrNoAuthHeader.Error())
 	}
 	// verify token
 	err = d.DevAuth.VerifyToken(tokenStr)
-	switch err {
-	case nil:
-		w.WriteHeader(http.StatusOK)
-	case ErrTokenExpired:
-		w.WriteHeader(http.StatusForbidden)
-	case ErrTokenNotFound, ErrTokenInvalid:
-		w.WriteHeader(http.StatusUnauthorized)
-	default:
-		rest.Error(w, err.Error(), http.StatusInternalServerError)
-		w.WriteHeader(http.StatusInternalServerError)
+	code := http.StatusOK
+	if err != nil {
+		switch err {
+		case ErrTokenExpired:
+			code = http.StatusForbidden
+		case ErrTokenNotFound, ErrTokenInvalid:
+			code = http.StatusUnauthorized
+		default:
+			code = http.StatusInternalServerError
+			rest.Error(w, err.Error(), code)
+		}
+
+		l.F(log.Ctx{LogHttpCode: code}).
+			Error(err.Error())
 	}
+
+	w.WriteHeader(code)
 }
 
 func (d *DevAuthHandler) UpdateDeviceStatusHandler(w rest.ResponseWriter, r *rest.Request) {
+	l := log.New(log.Ctx{
+		LogModule:  "api_devauth",
+		LogReqId:   requestid.GetReqId(r),
+		LogApiCall: "UpdateDeviceStatusHandler"})
+
 	devid := r.PathParam("id")
 
 	var status DevAuthApiStatus
 	err := r.DecodeJsonPayload(&status)
 	if err != nil {
+		err = errors.Wrap(err, "failed to decode status data")
 		rest.Error(w,
-			errors.Wrap(err, "failed to decode status data").Error(),
+			err.Error(),
 			http.StatusBadRequest)
+		l.F(log.Ctx{LogHttpCode: http.StatusBadRequest}).
+			Error(err.Error())
 		return
 	}
 
 	if err = statusValidate(&status); err != nil {
 		rest.Error(w, err.Error(), http.StatusBadRequest)
+		l.F(log.Ctx{LogHttpCode: http.StatusBadRequest}).
+			Error(err)
 		return
 	}
 
@@ -219,7 +267,7 @@ func (d *DevAuthHandler) UpdateDeviceStatusHandler(w rest.ResponseWriter, r *res
 		if err == ErrDevNotFound {
 			code = http.StatusNotFound
 		}
-		rest.Error(w, err.Error(), code)
+		restErrWithLog(w, l, err, code)
 		return
 	}
 
@@ -228,6 +276,11 @@ func (d *DevAuthHandler) UpdateDeviceStatusHandler(w rest.ResponseWriter, r *res
 	})
 	w.Header().Add("Location", devurl.String())
 	w.WriteHeader(http.StatusSeeOther)
+}
+
+func restErrWithLog(w rest.ResponseWriter, l *log.Logger, e error, code int) {
+	rest.Error(w, e.Error(), code)
+	l.F(log.Ctx{LogHttpCode: code}).Error(e.Error())
 }
 
 // Validate status.
