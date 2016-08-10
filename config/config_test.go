@@ -52,7 +52,6 @@ func NewMockWriter() *MockConfigWriter {
 }
 
 func TestValidateConfig(t *testing.T) {
-
 	err := errors.New("test error")
 
 	testList := []struct {

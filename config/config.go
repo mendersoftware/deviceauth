@@ -14,7 +14,36 @@
 
 package config
 
-import "time"
+import (
+	"github.com/pkg/errors"
+	"github.com/spf13/viper"
+	"time"
+)
+
+var (
+	Config = viper.New()
+)
+
+func FromConfigFile(filePath string,
+	defaults []Default,
+	configValidators ...Validator) error {
+	Config.SetConfigFile(filePath)
+
+	// Set default values for config
+	SetDefaults(Config, defaults)
+
+	// Find and read the config file
+	if err := Config.ReadInConfig(); err != nil {
+		return errors.Wrap(err, "failed to read configuration")
+	}
+
+	// Validate config
+	if err := ValidateConfig(Config, configValidators...); err != nil {
+		return errors.Wrap(err, "failed to validate configuration")
+	}
+
+	return nil
+}
 
 type Reader interface {
 	Get(key string) interface{}
