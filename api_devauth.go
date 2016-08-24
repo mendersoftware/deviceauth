@@ -174,7 +174,7 @@ func (d *DevAuthHandler) SubmitAuthRequestHandler(w rest.ResponseWriter, r *rest
 			http.StatusInternalServerError)
 		err = errors.Wrap(err, msg)
 		l.F(log.Ctx{LogHttpCode: http.StatusInternalServerError}).
-			Error(err)
+			Error(err.Error())
 		return
 	}
 }
@@ -217,8 +217,8 @@ func (d *DevAuthHandler) DeleteTokenHandler(w rest.ResponseWriter, r *rest.Reque
 			return
 		}
 		l.F(log.Ctx{LogHttpCode: http.StatusInternalServerError}).
-			Error(ErrDevAuthInternal.Error())
-		rest.Error(w, ErrDevAuthInternal.Error(), http.StatusInternalServerError)
+			Error(err)
+		rest.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
