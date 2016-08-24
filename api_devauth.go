@@ -98,13 +98,7 @@ func (d *DevAuthHandler) SubmitAuthRequestHandler(w rest.ResponseWriter, r *rest
 
 	da, err := d.createDevAuth(config.Config, l)
 	if err != nil {
-		msg := "internal error"
-		err = errors.Wrap(err, msg)
-		rest.Error(w,
-			msg,
-			http.StatusBadRequest)
-		l.F(log.Ctx{LogHttpCode: http.StatusInternalServerError}).
-			Error(err.Error())
+		restErrWithLogInternal(w, l, err)
 	}
 
 	var authreq AuthReq
@@ -142,12 +136,7 @@ func (d *DevAuthHandler) SubmitAuthRequestHandler(w rest.ResponseWriter, r *rest
 
 	err = utils.VerifyAuthReqSign(signature, authreq.PubKey, body)
 	if err != nil {
-		msg := "signature verification failed"
-		rest.Error(w,
-			msg,
-			http.StatusUnauthorized)
-		l.F(log.Ctx{LogHttpCode: http.StatusUnauthorized}).
-			Error(errors.Wrap(err, msg))
+		restErrWithLogMsg(w, l, err, http.StatusUnauthorized, "signature verification failed")
 		return
 	}
 
@@ -155,12 +144,7 @@ func (d *DevAuthHandler) SubmitAuthRequestHandler(w rest.ResponseWriter, r *rest
 	token, err := da.WithContext(ctx).SubmitAuthRequest(&authreq)
 	switch err {
 	case ErrDevAuthUnauthorized:
-		msg := "unauthorized"
-		rest.Error(w,
-			msg,
-			http.StatusUnauthorized)
-		l.F(log.Ctx{LogHttpCode: http.StatusUnauthorized}).
-			Error(errors.Wrap(err, "unauthorized"))
+		restErrWithLogMsg(w, l, err, http.StatusUnauthorized, "unauthorized")
 		return
 	case nil:
 		l.F(log.Ctx{LogHttpCode: http.StatusOK}).
@@ -168,13 +152,7 @@ func (d *DevAuthHandler) SubmitAuthRequestHandler(w rest.ResponseWriter, r *rest
 		w.(http.ResponseWriter).Write([]byte(token))
 		return
 	default:
-		msg := "internal error"
-		rest.Error(w,
-			msg,
-			http.StatusInternalServerError)
-		err = errors.Wrap(err, msg)
-		l.F(log.Ctx{LogHttpCode: http.StatusInternalServerError}).
-			Error(err.Error())
+		restErrWithLogInternal(w, l, err)
 		return
 	}
 }
@@ -197,13 +175,7 @@ func (d *DevAuthHandler) DeleteTokenHandler(w rest.ResponseWriter, r *rest.Reque
 
 	da, err := d.createDevAuth(config.Config, l)
 	if err != nil {
-		msg := "internal error"
-		err = errors.Wrap(err, msg)
-		rest.Error(w,
-			msg,
-			http.StatusBadRequest)
-		l.F(log.Ctx{LogHttpCode: http.StatusInternalServerError}).
-			Error(err.Error())
+		restErrWithLogInternal(w, l, err)
 	}
 
 	tokenId := r.PathParam("id")
@@ -216,9 +188,7 @@ func (d *DevAuthHandler) DeleteTokenHandler(w rest.ResponseWriter, r *rest.Reque
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		l.F(log.Ctx{LogHttpCode: http.StatusInternalServerError}).
-			Error(err)
-		rest.Error(w, "internal error", http.StatusInternalServerError)
+		restErrWithLogInternal(w, l, err)
 		return
 	}
 
@@ -235,20 +205,12 @@ func (d *DevAuthHandler) VerifyTokenHandler(w rest.ResponseWriter, r *rest.Reque
 
 	da, err := d.createDevAuth(config.Config, l)
 	if err != nil {
-		msg := "internal error"
-		err = errors.Wrap(err, msg)
-		rest.Error(w,
-			msg,
-			http.StatusBadRequest)
-		l.F(log.Ctx{LogHttpCode: http.StatusInternalServerError}).
-			Error(err.Error())
+		restErrWithLogInternal(w, l, err)
 	}
 
 	tokenStr, err := extractToken(r.Header)
 	if err != nil {
-		rest.Error(w, ErrNoAuthHeader.Error(), http.StatusUnauthorized)
-		l.F(log.Ctx{LogHttpCode: http.StatusUnauthorized}).
-			Error(ErrNoAuthHeader.Error())
+		restErrWithLog(w, l, ErrNoAuthHeader, http.StatusUnauthorized)
 	}
 	// verify token
 	err = da.VerifyToken(tokenStr)
@@ -261,7 +223,7 @@ func (d *DevAuthHandler) VerifyTokenHandler(w rest.ResponseWriter, r *rest.Reque
 			code = http.StatusUnauthorized
 		default:
 			code = http.StatusInternalServerError
-			rest.Error(w, err.Error(), code)
+			rest.Error(w, "internal error", code)
 		}
 
 		l.F(log.Ctx{LogHttpCode: code}).
@@ -282,13 +244,7 @@ func (d *DevAuthHandler) UpdateDeviceStatusHandler(w rest.ResponseWriter, r *res
 
 	da, err := d.createDevAuth(config.Config, l)
 	if err != nil {
-		msg := "internal error"
-		err = errors.Wrap(err, msg)
-		rest.Error(w,
-			msg,
-			http.StatusBadRequest)
-		l.F(log.Ctx{LogHttpCode: http.StatusInternalServerError}).
-			Error(err.Error())
+		restErrWithLogInternal(w, l, err)
 	}
 
 	devid := r.PathParam("id")
@@ -297,18 +253,12 @@ func (d *DevAuthHandler) UpdateDeviceStatusHandler(w rest.ResponseWriter, r *res
 	err = r.DecodeJsonPayload(&status)
 	if err != nil {
 		err = errors.Wrap(err, "failed to decode status data")
-		rest.Error(w,
-			err.Error(),
-			http.StatusBadRequest)
-		l.F(log.Ctx{LogHttpCode: http.StatusBadRequest}).
-			Error(err.Error())
+		restErrWithLog(w, l, err, http.StatusBadRequest)
 		return
 	}
 
 	if err = statusValidate(&status); err != nil {
-		rest.Error(w, err.Error(), http.StatusBadRequest)
-		l.F(log.Ctx{LogHttpCode: http.StatusBadRequest}).
-			Error(err)
+		restErrWithLog(w, l, err, http.StatusBadRequest)
 		return
 	}
 
@@ -318,11 +268,11 @@ func (d *DevAuthHandler) UpdateDeviceStatusHandler(w rest.ResponseWriter, r *res
 		err = da.RejectDevice(devid)
 	}
 	if err != nil {
-		code := http.StatusInternalServerError
 		if err == ErrDevNotFound {
-			code = http.StatusNotFound
+			restErrWithLog(w, l, err, http.StatusNotFound)
+		} else {
+			restErrWithLogInternal(w, l, err)
 		}
-		restErrWithLog(w, l, err, code)
 		return
 	}
 
@@ -336,9 +286,25 @@ func (d *DevAuthHandler) UpdateDeviceStatusHandler(w rest.ResponseWriter, r *res
 	w.WriteHeader(http.StatusSeeOther)
 }
 
+// return selected http code + error message directly taken from error
+// log error
 func restErrWithLog(w rest.ResponseWriter, l *log.Logger, e error, code int) {
-	rest.Error(w, e.Error(), code)
-	l.F(log.Ctx{LogHttpCode: code}).Error(e.Error())
+	restErrWithLogMsg(w, l, e, code, e.Error())
+}
+
+// return http 500, with an "internal error" message
+// log full error
+func restErrWithLogInternal(w rest.ResponseWriter, l *log.Logger, e error) {
+	msg := "internal error"
+	e = errors.Wrap(e, msg)
+	restErrWithLogMsg(w, l, e, http.StatusInternalServerError, msg)
+}
+
+// return an error code with an overriden message (to avoid exposing the details)
+// log full error
+func restErrWithLogMsg(w rest.ResponseWriter, l *log.Logger, e error, code int, msg string) {
+	rest.Error(w, msg, code)
+	l.F(log.Ctx{LogHttpCode: code}).Error(errors.Wrap(e, msg).Error())
 }
 
 // Validate status.
