@@ -92,7 +92,6 @@ func (d *DevAuthHandler) GetApp() (rest.App, error) {
 
 func (d *DevAuthHandler) SubmitAuthRequestHandler(w rest.ResponseWriter, r *rest.Request) {
 	l := log.New(log.Ctx{
-		LogModule:  "api_devauth",
 		LogReqId:   requestid.GetReqId(r),
 		LogApiCall: "SubmitAuthRequestHandler"})
 
@@ -169,7 +168,6 @@ func (d *DevAuthHandler) GetDeviceTokenHandler(w rest.ResponseWriter, r *rest.Re
 
 func (d *DevAuthHandler) DeleteTokenHandler(w rest.ResponseWriter, r *rest.Request) {
 	l := log.New(log.Ctx{
-		LogModule:  "api_devauth",
 		LogReqId:   requestid.GetReqId(r),
 		LogApiCall: "DeleteTokenHandler"})
 
@@ -199,7 +197,6 @@ func (d *DevAuthHandler) DeleteTokenHandler(w rest.ResponseWriter, r *rest.Reque
 
 func (d *DevAuthHandler) VerifyTokenHandler(w rest.ResponseWriter, r *rest.Request) {
 	l := log.New(log.Ctx{
-		LogModule:  "api_devauth",
 		LogReqId:   requestid.GetReqId(r),
 		LogApiCall: "VerifyTokenHandler"})
 
@@ -238,7 +235,6 @@ func (d *DevAuthHandler) VerifyTokenHandler(w rest.ResponseWriter, r *rest.Reque
 
 func (d *DevAuthHandler) UpdateDeviceStatusHandler(w rest.ResponseWriter, r *rest.Request) {
 	l := log.New(log.Ctx{
-		LogModule:  "api_devauth",
 		LogReqId:   requestid.GetReqId(r),
 		LogApiCall: "UpdateDeviceStatusHandler"})
 

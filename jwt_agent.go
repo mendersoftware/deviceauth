@@ -120,7 +120,7 @@ func (j *JWTAgent) ValidateTokenSignRS256(tokenString string) (string, error) {
 }
 
 func (j *JWTAgent) UseLog(l *log.Logger) {
-	j.log = l.F(log.Ctx{LogModule: "jwt_agent"})
+	j.log = l.F(log.Ctx{})
 }
 
 func getRSAPrivKey(privKeyPath string) (*rsa.PrivateKey, error) {
@@ -158,6 +158,6 @@ func NewJWTAgent(c JWTAgentConfig) (*JWTAgent, error) {
 		privKey:    priv,
 		issuer:     c.Issuer,
 		expTimeout: c.ExpirationTimeout,
-		log:        log.New(log.Ctx{LogModule: "jwt_agent"}),
+		log:        log.New(log.Ctx{}),
 	}, nil
 }

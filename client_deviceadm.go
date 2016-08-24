@@ -83,11 +83,11 @@ func (d *DevAdmClient) AddDevice(dev *Device, client requestid.ApiRequester) err
 }
 
 func (d *DevAdmClient) UseLog(l *log.Logger) {
-	d.log = l.F(log.Ctx{LogModule: "client_deviceadm"})
+	d.log = l.F(log.Ctx{})
 }
 
 func GetDevAdmClient(c DevAdmClientConfig, l *log.Logger) *DevAdmClient {
-	l = l.F(log.Ctx{LogModule: "client_deviceadm"})
+	l = l.F(log.Ctx{})
 	client := NewDevAdmClient(c)
 	client.UseLog(l)
 	return client
@@ -99,7 +99,7 @@ func NewDevAdmClient(c DevAdmClientConfig) *DevAdmClient {
 	}
 
 	return &DevAdmClient{
-		log:  log.New(log.Ctx{LogModule: "client_deviceadm"}),
+		log:  log.New(log.Ctx{}),
 		conf: c,
 	}
 }

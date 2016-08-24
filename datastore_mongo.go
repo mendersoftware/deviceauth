@@ -67,7 +67,7 @@ func NewDataStoreMongo(host string) (*DataStoreMongo, error) {
 
 	db := &DataStoreMongo{
 		session: masterSession,
-		log:     log.New(log.Ctx{LogModule: "datastore_mongo"}),
+		log:     log.New(log.Ctx{}),
 	}
 
 	return db, nil
@@ -263,5 +263,5 @@ func makeUpdate(d *Device) *Device {
 }
 
 func (db *DataStoreMongo) UseLog(l *log.Logger) {
-	db.log = l.F(log.Ctx{LogModule: "datastore_mongo"})
+	db.log = l.F(log.Ctx{})
 }

@@ -38,7 +38,7 @@ func SetupAPI(stacktype string) (*rest.Api, error) {
 
 func RunServer(c config.Reader) error {
 
-	l := log.New(log.Ctx{LogModule: "server"})
+	l := log.New(log.Ctx{})
 
 	api, err := SetupAPI(c.GetString(SettingMiddleware))
 	if err != nil {

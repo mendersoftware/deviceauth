@@ -63,8 +63,6 @@ type DevAuth struct {
 // GetDevAuth factory func returning a new DevAuth based on the
 // given config
 func GetDevAuth(c config.Reader, l *log.Logger) (DevAuthApp, error) {
-	l = l.F(log.Ctx{LogModule: "devauth"})
-
 	db, err := GetDataStoreMongo(c, l)
 	if err != nil {
 		return nil, errors.Wrap(err, "database connection failed")
@@ -95,7 +93,7 @@ func NewDevAuth(d DataStore, c DevAdmClientI, jwt JWTAgentApp) DevAuthApp {
 	return &DevAuth{db: d,
 		c:   c,
 		jwt: jwt,
-		log: log.New(log.Ctx{LogModule: "devauth"})}
+		log: log.New(log.Ctx{})}
 }
 
 func (d *DevAuth) SubmitAuthRequest(r *AuthReq) (string, error) {
@@ -291,5 +289,5 @@ func (d *DevAuth) WithContext(ctx *RequestContext) DevAuthApp {
 }
 
 func (d *DevAuth) UseLog(l *log.Logger) {
-	d.log = l.F(log.Ctx{LogModule: "devauth"})
+	d.log = l.F(log.Ctx{})
 }

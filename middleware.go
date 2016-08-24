@@ -82,8 +82,7 @@ var (
 )
 
 func SetupMiddleware(api *rest.Api, mwtype string) error {
-
-	l := dlog.New(dlog.Ctx{LogModule: "middleware"})
+	l := dlog.New(dlog.Ctx{})
 
 	l.Infof("setting up %s middleware", mwtype)
 
