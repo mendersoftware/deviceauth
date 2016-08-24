@@ -32,6 +32,8 @@ package log
 
 import (
 	"github.com/Sirupsen/logrus"
+	"path"
+	"runtime"
 )
 
 var (
@@ -52,6 +54,7 @@ func init() {
 		FullTimestamp: true,
 	}
 	Log.Level = logrus.InfoLevel
+	Log.Hooks.Add(ContextHook{})
 }
 
 // Setup allows to override the global logger setup.
@@ -82,4 +85,23 @@ func (l *Logger) F(ctx Ctx) *Logger {
 
 func (l *Logger) Level() logrus.Level {
 	return l.Entry.Logger.Level
+}
+
+type ContextHook struct {
+}
+
+func (hook ContextHook) Levels() []logrus.Level {
+	return logrus.AllLevels
+}
+
+func (hook ContextHook) Fire(entry *logrus.Entry) error {
+	if pc, file, line, ok := runtime.Caller(6); ok {
+		funcName := runtime.FuncForPC(pc).Name()
+
+		entry.Data["file"] = path.Base(file)
+		entry.Data["func"] = path.Base(funcName)
+		entry.Data["line"] = line
+	}
+
+	return nil
 }
