@@ -34,6 +34,14 @@ func (mw *RequestIdMiddleware) MiddlewareFunc(h rest.HandlerFunc) rest.HandlerFu
 
 		r.Env[RequestIdHeader] = reqId
 
+		// enrich log context
+		logger := r.Env[requestlog.ReqLog]
+		if logger != nil {
+			logger := logger.(*log.Logger)
+			logger = logger.F(log.Ctx{"request_id": reqId})
+			r.Env[requestlog.ReqLog] = logger
+		}
+
 		//return the reuqest ID in response too, the client can log it
 		//for end-to-end req tracing
 		w.Header().Add(RequestIdHeader, reqId)
