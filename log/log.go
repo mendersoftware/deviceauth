@@ -34,6 +34,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"path"
 	"runtime"
+	"strings"
 )
 
 var (
@@ -95,12 +96,21 @@ func (hook ContextHook) Levels() []logrus.Level {
 }
 
 func (hook ContextHook) Fire(entry *logrus.Entry) error {
-	if pc, file, line, ok := runtime.Caller(6); ok {
-		funcName := runtime.FuncForPC(pc).Name()
+	//'skip' = 6 is the default call stack skip, which
+	//works ootb when Error(), Warn(), etc. are called
+	//for Errorf(), Warnf(), etc. - we have to skip 1 lvl up
+	for skip := 6; skip < 8; skip++ {
+		if pc, file, line, ok := runtime.Caller(skip); ok {
+			funcName := runtime.FuncForPC(pc).Name()
 
-		entry.Data["file"] = path.Base(file)
-		entry.Data["func"] = path.Base(funcName)
-		entry.Data["line"] = line
+			//detect if we're still in logrus (formatting funcs)
+			if !strings.Contains(funcName, "github.com/Sirupsen/logrus") {
+				entry.Data["file"] = path.Base(file)
+				entry.Data["func"] = path.Base(funcName)
+				entry.Data["line"] = line
+				break
+			}
+		}
 	}
 
 	return nil
