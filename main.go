@@ -17,8 +17,6 @@ import (
 	"flag"
 	"github.com/mendersoftware/deviceauth/config"
 	"github.com/mendersoftware/deviceauth/log"
-	"github.com/pkg/errors"
-	"github.com/spf13/viper"
 )
 
 func main() {
@@ -41,41 +39,20 @@ func main() {
 
 	log.Setup(debug)
 
-	l := log.New("main")
+	l := log.New(log.Ctx{})
 
-	conf, err := HandleConfigFile(configPath)
+	err := config.FromConfigFile(configPath, configDefaults)
 	if err != nil {
 		l.Fatalf("error loading configuration: %s", err)
 	}
 
 	if devSetup == true {
 		l.Infof("setting up development configuration")
-		conf.Set(SettingMiddleware, EnvDev)
+		config.Config.Set(SettingMiddleware, EnvDev)
 	}
 
 	l.Printf("Device Authentication Service, version %s starting up",
 		CreateVersionString())
 
-	l.Fatal(RunServer(conf))
-}
-
-func HandleConfigFile(filePath string) (config.Handler, error) {
-
-	c := viper.New()
-	c.SetConfigFile(filePath)
-
-	// Set default values for config
-	config.SetDefaults(c, configDefaults)
-
-	// Find and read the config file
-	if err := c.ReadInConfig(); err != nil {
-		return nil, errors.Wrap(err, "failed to read configuration")
-	}
-
-	// Validate config
-	if err := config.ValidateConfig(c, configValidators...); err != nil {
-		return nil, errors.Wrap(err, "failed to validate configuration")
-	}
-
-	return c, nil
+	l.Fatal(RunServer(config.Config))
 }

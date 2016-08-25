@@ -15,6 +15,8 @@ package main
 
 import (
 	"encoding/json"
+	"github.com/mendersoftware/deviceauth/log"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -31,12 +33,18 @@ const (
 	TestMongoDefault = "127.0.0.1:27017"
 )
 
-// db and test management funcs
-func getDb() (*DataStoreMongo, error) {
+func getTestMongoAddr() string {
 	addr := TestMongoDefault
 	if env := os.Getenv(TestMongoEnv); env != "" {
 		addr = env
 	}
+
+	return addr
+}
+
+// db and test management funcs
+func getDb() (*DataStoreMongo, error) {
+	addr := getTestMongoAddr()
 
 	d, err := NewDataStoreMongo(addr)
 	if err != nil {
@@ -224,6 +232,23 @@ func parseToken(dataset string) (*Token, error) {
 }
 
 // test funcs
+func TestGetDataStoreMongo(t *testing.T) {
+	v := viper.New()
+
+	addr := getTestMongoAddr()
+	v.SetDefault(SettingDb, addr)
+
+	d1, err := GetDataStoreMongo(v, log.New(log.Ctx{}))
+	assert.NoError(t, err)
+	assert.NotNil(t, d1)
+
+	//verify that DBs share the master session
+	d2, err := GetDataStoreMongo(v, log.New(log.Ctx{}))
+	assert.NoError(t, err)
+	assert.NotNil(t, d2)
+	assert.Equal(t, d1.session, d2.session)
+}
+
 func TestGetDeviceById(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping TestGetDeviceById in short mode.")

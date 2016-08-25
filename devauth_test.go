@@ -15,10 +15,26 @@ package main
 
 import (
 	"errors"
+	"github.com/mendersoftware/deviceauth/config"
+	"github.com/mendersoftware/deviceauth/log"
 	"github.com/mendersoftware/deviceauth/requestid"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
+
+func TestGetDevAuth(t *testing.T) {
+	//this will ping the db, so it;s a 'long' test
+	if testing.Short() {
+		t.Skip("skipping TestGetDevAuth in short mode.")
+	}
+
+	config.SetDefaults(config.Config, configDefaults)
+	config.Config.Set(SettingServerPrivKeyPath, "testdata/private.pem")
+	d, err := GetDevAuth(config.Config, log.New(log.Ctx{}))
+	assert.NoError(t, err)
+	assert.NotNil(t, d)
+
+}
 
 func TestSubmitAuthRequest(t *testing.T) {
 	req := AuthReq{
@@ -237,7 +253,7 @@ func TestSubmitAuthRequest(t *testing.T) {
 			devAdmErr: errors.New("failed to add device"),
 
 			res: "",
-			err: ErrDevAuthInternal,
+			err: errors.New("devadm add device error: failed to add device"),
 		},
 	}
 
@@ -312,19 +328,25 @@ func TestSubmitAuthRequest(t *testing.T) {
 		res, err := devauth.SubmitAuthRequest(&req)
 
 		assert.Equal(t, tc.res, res)
-		assert.Equal(t, tc.err, err)
+		if tc.err != nil {
+			assert.EqualError(t, err, tc.err.Error())
+		}
 	}
 }
 
 func TestAcceptDevice(t *testing.T) {
 	testCases := []struct {
 		dbErr string
+
+		outErr string
 	}{
 		{
-			dbErr: "",
+			dbErr:  "",
+			outErr: "",
 		},
 		{
-			dbErr: "failed to update device",
+			dbErr:  "failed to update device",
+			outErr: "db update device error: failed to update device",
 		},
 	}
 
@@ -343,7 +365,7 @@ func TestAcceptDevice(t *testing.T) {
 		err := devauth.AcceptDevice("dummyid")
 
 		if tc.dbErr != "" {
-			assert.Equal(t, ErrDevAuthInternal, err)
+			assert.EqualError(t, err, tc.outErr)
 		} else {
 			assert.NoError(t, err)
 		}
@@ -354,6 +376,8 @@ func TestRejectDevice(t *testing.T) {
 	testCases := []struct {
 		dbErr            string
 		dbDelDevTokenErr error
+
+		outErr string
 	}{
 		{
 			dbErr:            "",
@@ -362,14 +386,17 @@ func TestRejectDevice(t *testing.T) {
 		{
 			dbErr:            "failed to update device",
 			dbDelDevTokenErr: nil,
+			outErr:           "db update device error: failed to update device",
 		},
 		{
 			dbErr:            "",
 			dbDelDevTokenErr: ErrTokenNotFound,
+			outErr:           "db delete device token error: token not found",
 		},
 		{
 			dbErr:            "",
-			dbDelDevTokenErr: ErrDevAuthInternal,
+			dbDelDevTokenErr: errors.New("some error"),
+			outErr:           "db delete device token error: some error",
 		},
 	}
 
@@ -391,7 +418,7 @@ func TestRejectDevice(t *testing.T) {
 		err := devauth.RejectDevice("dummyid")
 
 		if tc.dbErr != "" || (tc.dbDelDevTokenErr != nil && tc.dbDelDevTokenErr != ErrTokenNotFound) {
-			assert.Equal(t, ErrDevAuthInternal, err)
+			assert.EqualError(t, err, tc.outErr)
 		} else {
 			assert.NoError(t, err)
 		}

@@ -38,33 +38,14 @@ func SetupAPI(stacktype string) (*rest.Api, error) {
 
 func RunServer(c config.Reader) error {
 
-	l := log.New("server")
-
-	d, err := NewDataStoreMongo(c.GetString(SettingDb))
-	if err != nil {
-		return errors.Wrap(err, "database connection failed")
-	}
-
-	jwtAgentConf := JWTAgentConfig{
-		ServerPrivKeyPath: c.GetString(SettingServerPrivKeyPath),
-		ExpirationTimeout: int64(c.GetInt(SettingJWTExpirationTimeout)),
-		Issuer:            c.GetString(SettingJWTIssuer),
-	}
-	clientConf := DevAdmClientConfig{
-		AddDeviceUrl: c.GetString(SettingDevAdmUrlAdd),
-	}
-	jwt, err := NewJWTAgent(jwtAgentConf)
-	if err != nil {
-		return errors.Wrap(err, "cannot create JWT agent")
-	}
-	devauth := NewDevAuth(d, NewDevAdmClient(clientConf), jwt)
+	l := log.New(log.Ctx{})
 
 	api, err := SetupAPI(c.GetString(SettingMiddleware))
 	if err != nil {
 		return errors.Wrap(err, "API setup failed")
 	}
 
-	devauthapi := NewDevAuthApiHandler(devauth)
+	devauthapi := NewDevAuthApiHandler(GetDevAuth)
 
 	apph, err := devauthapi.GetApp()
 	if err != nil {

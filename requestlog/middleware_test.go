@@ -11,21 +11,29 @@
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
-package main
+package requestlog
 
 import (
-	"github.com/mendersoftware/deviceauth/log"
-	"github.com/mendersoftware/deviceauth/requestid"
+	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/ant0ine/go-json-rest/rest/test"
+	"github.com/stretchr/testify/assert"
+	"testing"
 )
 
-type MockDevAdmClient struct {
-	mockAddDevice func(dev *Device, client requestid.ApiRequester) error
-}
+func TestRequestLogMiddleware(t *testing.T) {
+	api := rest.NewApi()
 
-func (c *MockDevAdmClient) AddDevice(dev *Device, client requestid.ApiRequester) error {
-	return c.mockAddDevice(dev, client)
-}
+	api.Use(&RequestLogMiddleware{})
 
-func (db *MockDevAdmClient) UseLog(l *log.Logger) {
-	//nop
+	api.SetApp(rest.AppSimple(func(w rest.ResponseWriter, r *rest.Request) {
+		log := r.Env[ReqLog]
+		assert.NotNil(t, log)
+		w.WriteJson(map[string]string{"foo": "bar"})
+	}))
+
+	handler := api.MakeHandler()
+
+	req := test.MakeSimpleRequest("GET", "http://localhost/", nil)
+
+	_ = test.RunRequest(t, handler, req)
 }

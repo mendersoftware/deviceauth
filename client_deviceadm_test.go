@@ -14,6 +14,7 @@
 package main
 
 import (
+	"github.com/mendersoftware/deviceauth/log"
 	"github.com/stretchr/testify/assert"
 	"net/http"
 	"net/http/httptest"
@@ -27,6 +28,12 @@ func newMockServer(status int) *httptest.Server {
 		w.WriteHeader(status)
 	}))
 
+}
+
+func TestGetDevAdmClient(t *testing.T) {
+	c := GetDevAdmClient(DevAdmClientConfig{AddDeviceUrl: "/foo"},
+		log.New(log.Ctx{}))
+	assert.NotNil(t, c)
 }
 
 func TestDevAdmClientReqSuccess(t *testing.T) {

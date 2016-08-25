@@ -14,6 +14,7 @@
 package main
 
 import (
+	"github.com/mendersoftware/deviceauth/config"
 	"github.com/mendersoftware/deviceauth/log"
 	"github.com/mendersoftware/deviceauth/requestid"
 	"github.com/mendersoftware/deviceauth/utils"
@@ -24,7 +25,6 @@ import (
 
 var (
 	ErrDevAuthUnauthorized = errors.New("dev auth: unauthorized")
-	ErrDevAuthInternal     = errors.New("dev auth: internal error")
 )
 
 // TODO:
@@ -49,6 +49,8 @@ type DevAuthApp interface {
 	RevokeToken(token_id string) error
 	VerifyToken(token string) error
 	WithContext(c *RequestContext) DevAuthApp
+
+	log.ContextLogger
 }
 
 type DevAuth struct {
@@ -58,11 +60,40 @@ type DevAuth struct {
 	log *log.Logger
 }
 
+// GetDevAuth factory func returning a new DevAuth based on the
+// given config
+func GetDevAuth(c config.Reader, l *log.Logger) (DevAuthApp, error) {
+	db, err := GetDataStoreMongo(c, l)
+	if err != nil {
+		return nil, errors.Wrap(err, "database connection failed")
+	}
+
+	jwtAgentConf := JWTAgentConfig{
+		ServerPrivKeyPath: c.GetString(SettingServerPrivKeyPath),
+		ExpirationTimeout: int64(c.GetInt(SettingJWTExpirationTimeout)),
+		Issuer:            c.GetString(SettingJWTIssuer),
+	}
+
+	clientConf := DevAdmClientConfig{
+		AddDeviceUrl: c.GetString(SettingDevAdmUrlAdd),
+	}
+
+	jwt, err := NewJWTAgent(jwtAgentConf)
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot create JWT agent")
+	}
+
+	devauth := NewDevAuth(db, NewDevAdmClient(clientConf), jwt)
+	devauth.UseLog(l)
+
+	return devauth, nil
+}
+
 func NewDevAuth(d DataStore, c DevAdmClientI, jwt JWTAgentApp) DevAuthApp {
 	return &DevAuth{db: d,
 		c:   c,
 		jwt: jwt,
-		log: log.New("devauth")}
+		log: log.New(log.Ctx{})}
 }
 
 func (d *DevAuth) SubmitAuthRequest(r *AuthReq) (string, error) {
@@ -93,13 +124,11 @@ func (d *DevAuth) SubmitAuthRequestWithClient(r *AuthReq, client requestid.ApiRe
 		dev = NewDevice(id, r.IdData, r.PubKey, r.TenantToken)
 
 		if err := d.db.AddDevice(dev); err != nil {
-			d.log.Errorf("db add device error: %v", err)
-			return "", ErrDevAuthInternal
+			return "", errors.Wrap(err, "db add device error")
 		}
 
 		if err := d.c.AddDevice(dev, client); err != nil {
-			d.log.Errorf("devadm add device error: %v", err)
-			return "", ErrDevAuthInternal
+			return "", errors.Wrap(err, "devadm add device error")
 		}
 	}
 
@@ -109,19 +138,18 @@ func (d *DevAuth) SubmitAuthRequestWithClient(r *AuthReq, client requestid.ApiRe
 	r.Status = dev.Status
 	err = d.db.AddAuthReq(r)
 	if err != nil {
-		d.log.Errorf("db add auth req error: %v", err)
-		return "", ErrDevAuthInternal
+		return "", errors.Wrap(err, "db add auth req error")
 	}
 
 	//return according to dev status
 	if dev.Status == DevStatusAccepted {
 		token, err := d.jwt.GenerateTokenSignRS256(id)
 		if err != nil {
-			return "", ErrDevAuthInternal
+			return "", errors.Wrap(err, "generate token error")
 		}
 
 		if err := d.db.AddToken(token); err != nil {
-			return "", ErrDevAuthInternal
+			return "", errors.Wrap(err, "add token error")
 		}
 		return token.Token, nil
 	} else {
@@ -134,14 +162,12 @@ func (d *DevAuth) findMatchingDevice(id, key string) (*Device, error) {
 	//find devs by id and key, compare results
 	devi, err := d.db.GetDeviceById(id)
 	if err != nil && err != ErrDevNotFound {
-		d.log.Errorf("db get device by id error: %v", err)
-		return nil, ErrDevAuthInternal
+		return nil, errors.Wrap(err, "db get device by id error")
 	}
 
 	devk, err := d.db.GetDeviceByKey(key)
 	if err != nil && err != ErrDevNotFound {
-		d.log.Errorf("db get device by key error: %v", err)
-		return nil, ErrDevAuthInternal
+		return nil, errors.Wrap(err, "db get device by key error")
 	}
 
 	//cases:
@@ -164,8 +190,7 @@ func (d *DevAuth) findMatchingDevice(id, key string) (*Device, error) {
 func (d *DevAuth) verifySeqNo(dev_id string, seq_no uint64) error {
 	r, err := d.db.GetAuthRequests(dev_id, 0, 1)
 	if err != nil {
-		d.log.Errorf("db get auth requests error: %v", err)
-		return ErrDevAuthInternal
+		return errors.Wrap(err, "db get auth requests error")
 	}
 
 	if r != nil {
@@ -193,8 +218,7 @@ func (d *DevAuth) AcceptDevice(dev_id string) error {
 	updev := &Device{Id: dev_id, Status: DevStatusAccepted}
 
 	if err := d.db.UpdateDevice(updev); err != nil {
-		d.log.Errorf("db update device error: %v", err)
-		return ErrDevAuthInternal
+		return errors.Wrap(err, "db update device error")
 	}
 
 	return nil
@@ -204,16 +228,14 @@ func (d *DevAuth) RejectDevice(dev_id string) error {
 	// delete device token
 	err := d.db.DeleteTokenByDevId(dev_id)
 	if err != nil && err != ErrTokenNotFound {
-		d.log.Errorf("db delete device token error: %v", err)
-		return ErrDevAuthInternal
+		return errors.Wrap(err, "db delete device token error")
 	}
 
 	// update device status
 	updev := &Device{Id: dev_id, Status: DevStatusRejected}
 
 	if err := d.db.UpdateDevice(updev); err != nil {
-		d.log.Errorf("db update device error: %v", err)
-		return ErrDevAuthInternal
+		return errors.Wrap(err, "db update device error")
 	}
 
 	return nil
@@ -240,8 +262,7 @@ func (d *DevAuth) VerifyToken(token string) error {
 				return err
 			}
 			if err != nil {
-				d.log.Errorf("Cannot delete token with jti: %s : %s", jti, err)
-				return ErrDevAuthInternal
+				return errors.Wrapf(err, "Cannot delete token with jti: %s : %s", jti, err)
 			}
 			return ErrTokenExpired
 		}
@@ -255,8 +276,7 @@ func (d *DevAuth) VerifyToken(token string) error {
 		return err
 	}
 	if err != nil {
-		d.log.Errorf("Cannot get token with id: %s from database: %s", jti, err)
-		return ErrDevAuthInternal
+		return errors.Wrapf(err, "Cannot get token with id: %s from database: %s", jti, err)
 	}
 	return nil
 }
@@ -266,4 +286,8 @@ func (d *DevAuth) WithContext(ctx *RequestContext) DevAuthApp {
 		*d,
 		ctx,
 	}
+}
+
+func (d *DevAuth) UseLog(l *log.Logger) {
+	d.log = l.F(log.Ctx{})
 }

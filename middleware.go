@@ -20,8 +20,10 @@ import (
 	"os"
 
 	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/mendersoftware/deviceauth/accesslog"
 	dlog "github.com/mendersoftware/deviceauth/log"
 	"github.com/mendersoftware/deviceauth/requestid"
+	"github.com/mendersoftware/deviceauth/requestlog"
 )
 
 const (
@@ -33,7 +35,8 @@ var (
 	DefaultDevStack = []rest.Middleware{
 
 		// logging
-		&rest.AccessLogApacheMiddleware{},
+		&requestlog.RequestLogMiddleware{},
+		&accesslog.AccessLogMiddleware{},
 		&rest.TimerMiddleware{},
 		&rest.RecorderMiddleware{},
 
@@ -55,6 +58,8 @@ var (
 	DefaultProdStack = []rest.Middleware{
 
 		// logging
+		&requestlog.RequestLogMiddleware{},
+		&accesslog.AccessLogMiddleware{},
 		&rest.AccessLogJsonMiddleware{
 			// No prefix or other fields, entire output is JSON encoded and could break it.
 			Logger: log.New(os.Stderr, "", 0),
@@ -82,8 +87,7 @@ var (
 )
 
 func SetupMiddleware(api *rest.Api, mwtype string) error {
-
-	l := dlog.New("middleware")
+	l := dlog.New(dlog.Ctx{})
 
 	l.Infof("setting up %s middleware", mwtype)
 

@@ -15,6 +15,7 @@ package main
 
 import (
 	"errors"
+	"github.com/mendersoftware/deviceauth/log"
 	"github.com/mendersoftware/deviceauth/requestid"
 )
 
@@ -69,4 +70,8 @@ func (mda *MockDevAuth) VerifyToken(token string) error {
 }
 func (mda *MockDevAuth) WithContext(ctx *RequestContext) DevAuthApp {
 	return mda.mockWithContext(ctx)
+}
+
+func (mda *MockDevAuth) UseLog(log *log.Logger) {
+	//nop
 }

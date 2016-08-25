@@ -15,12 +15,14 @@ package requestid
 
 import (
 	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/mendersoftware/deviceauth/log"
+	"github.com/mendersoftware/deviceauth/requestlog"
 	"github.com/satori/go.uuid"
 )
 
 const RequestIdHeader = "X-MEN-RequestID"
 
-// RequestIdMiddleware sets the X-MEN-RequestID header if it's not present
+// RequestIdMiddleware sets the X-MEN-RequestID header if it's not present, and and adds the request id to the request's logger's context.
 type RequestIdMiddleware struct {
 }
 
@@ -33,6 +35,14 @@ func (mw *RequestIdMiddleware) MiddlewareFunc(h rest.HandlerFunc) rest.HandlerFu
 		}
 
 		r.Env[RequestIdHeader] = reqId
+
+		// enrich log context
+		logger := r.Env[requestlog.ReqLog]
+		if logger != nil {
+			logger := logger.(*log.Logger)
+			logger = logger.F(log.Ctx{"request_id": reqId})
+			r.Env[requestlog.ReqLog] = logger
+		}
 
 		//return the reuqest ID in response too, the client can log it
 		//for end-to-end req tracing

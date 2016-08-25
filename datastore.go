@@ -16,6 +16,7 @@ package main
 
 import (
 	"errors"
+	"github.com/mendersoftware/deviceauth/log"
 )
 
 var (
@@ -56,4 +57,6 @@ type DataStore interface {
 
 	// deletes device token
 	DeleteTokenByDevId(dev_id string) error
+
+	log.ContextLogger
 }

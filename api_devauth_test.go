@@ -19,6 +19,10 @@ import (
 	"errors"
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/ant0ine/go-json-rest/rest/test"
+	"github.com/mendersoftware/deviceauth/config"
+	"github.com/mendersoftware/deviceauth/log"
+	"github.com/mendersoftware/deviceauth/requestid"
+	"github.com/mendersoftware/deviceauth/requestlog"
 	mtest "github.com/mendersoftware/deviceauth/test"
 	"github.com/stretchr/testify/assert"
 	"net/http"
@@ -30,8 +34,8 @@ func RestError(status string) string {
 	return string(msg)
 }
 
-func makeMockApiHandler(t *testing.T, mocka *MockDevAuth) http.Handler {
-	handlers := NewDevAuthApiHandler(mocka)
+func makeMockApiHandler(t *testing.T, f DevAuthFactory) http.Handler {
+	handlers := NewDevAuthApiHandler(f)
 	assert.NotNil(t, handlers)
 
 	app, err := handlers.GetApp()
@@ -39,6 +43,10 @@ func makeMockApiHandler(t *testing.T, mocka *MockDevAuth) http.Handler {
 	assert.NoError(t, err)
 
 	api := rest.NewApi()
+	api.Use(
+		&requestlog.RequestLogMiddleware{},
+		&requestid.RequestIdMiddleware{},
+	)
 	api.SetApp(app)
 
 	return api.MakeHandler()
@@ -222,7 +230,11 @@ func TestApiDevAuthSubmitAuthReq(t *testing.T) {
 			return &devauth
 		}
 
-		apih := makeMockApiHandler(t, &devauth)
+		factory := func(c config.Reader, l *log.Logger) (DevAuthApp, error) {
+			return &devauth, nil
+		}
+
+		apih := makeMockApiHandler(t, factory)
 
 		recorded := test.RunRequest(t, apih, tc.req)
 		recorded.CodeIs(tc.code)
@@ -265,7 +277,11 @@ func TestApiDevAuthUpdateStatusDevice(t *testing.T) {
 		mockRejectDevice: mockaction,
 	}
 
-	apih := makeMockApiHandler(t, &devauth)
+	factory := func(c config.Reader, l *log.Logger) (DevAuthApp, error) {
+		return &devauth, nil
+	}
+
+	apih := makeMockApiHandler(t, factory)
 	// enforce specific field naming in errors returned by API
 	rest.ErrorFieldName = "error"
 
@@ -305,7 +321,7 @@ func TestApiDevAuthUpdateStatusDevice(t *testing.T) {
 				"http://1.2.3.4/api/0.1.0/devices/bar/status",
 				accstatus),
 			code: 500,
-			body: RestError(devs["bar"].err.Error()),
+			body: RestError("internal error"),
 		},
 		{
 			req: test.MakeSimpleRequest("PUT",
@@ -385,11 +401,11 @@ func TestApiDevAuthVerifyToken(t *testing.T) {
 			req: test.MakeSimpleRequest("POST",
 				"http://1.2.3.4/api/0.1.0/tokens/verify", nil),
 			code: 500,
-			body: RestError(ErrDevAuthInternal.Error()),
+			body: RestError("internal error"),
 			headers: map[string]string{
 				"authorization": "dummytoken",
 			},
-			err: ErrDevAuthInternal,
+			err: errors.New("some error that will only be logged"),
 		},
 	}
 
@@ -399,7 +415,10 @@ func TestApiDevAuthVerifyToken(t *testing.T) {
 				return tc.err
 			},
 		}
-		apih := makeMockApiHandler(t, &devauth)
+		factory := func(c config.Reader, l *log.Logger) (DevAuthApp, error) {
+			return &devauth, nil
+		}
+		apih := makeMockApiHandler(t, factory)
 		if len(tc.headers) > 0 {
 			tc.req.Header.Set("authorization", tc.headers["authorization"])
 		}
@@ -436,8 +455,8 @@ func TestApiDevAuthDeleteToken(t *testing.T) {
 			req: test.MakeSimpleRequest("DELETE",
 				"http://1.2.3.4/api/0.1.0/tokens/foo", nil),
 			code: http.StatusInternalServerError,
-			body: RestError(ErrDevAuthInternal.Error()),
-			err:  ErrDevAuthInternal,
+			body: RestError("internal error"),
+			err:  errors.New("some error that will only be logged"),
 		},
 	}
 
@@ -447,7 +466,10 @@ func TestApiDevAuthDeleteToken(t *testing.T) {
 				return tc.err
 			},
 		}
-		apih := makeMockApiHandler(t, &devauth)
+		factory := func(c config.Reader, l *log.Logger) (DevAuthApp, error) {
+			return &devauth, nil
+		}
+		apih := makeMockApiHandler(t, factory)
 		recorded := test.RunRequest(t, apih, tc.req)
 		recorded.CodeIs(tc.code)
 		recorded.BodyIs(tc.body)

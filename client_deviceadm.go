@@ -39,6 +39,7 @@ type DevAdmClientConfig struct {
 
 type DevAdmClientI interface {
 	AddDevice(dev *Device, client requestid.ApiRequester) error
+	log.ContextLogger
 }
 
 type DevAdmClient struct {
@@ -81,13 +82,24 @@ func (d *DevAdmClient) AddDevice(dev *Device, client requestid.ApiRequester) err
 	return nil
 }
 
+func (d *DevAdmClient) UseLog(l *log.Logger) {
+	d.log = l.F(log.Ctx{})
+}
+
+func GetDevAdmClient(c DevAdmClientConfig, l *log.Logger) *DevAdmClient {
+	l = l.F(log.Ctx{})
+	client := NewDevAdmClient(c)
+	client.UseLog(l)
+	return client
+}
+
 func NewDevAdmClient(c DevAdmClientConfig) *DevAdmClient {
 	if c.Timeout == 0 {
 		c.Timeout = defaultDevAdmReqTimeout
 	}
 
 	return &DevAdmClient{
-		log:  log.New("devadm-client"),
+		log:  log.New(log.Ctx{}),
 		conf: c,
 	}
 }
