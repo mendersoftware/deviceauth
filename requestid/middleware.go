@@ -15,12 +15,14 @@ package requestid
 
 import (
 	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/mendersoftware/deviceauth/log"
+	"github.com/mendersoftware/deviceauth/requestlog"
 	"github.com/satori/go.uuid"
 )
 
 const RequestIdHeader = "X-MEN-RequestID"
 
-// RequestIdMiddleware sets the X-MEN-RequestID header if it's not present
+// RequestIdMiddleware sets the X-MEN-RequestID header if it's not present, and and adds the request id to the request's logger's context.
 type RequestIdMiddleware struct {
 }
 
