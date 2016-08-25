@@ -22,6 +22,7 @@ import (
 	"github.com/ant0ine/go-json-rest/rest"
 	dlog "github.com/mendersoftware/deviceauth/log"
 	"github.com/mendersoftware/deviceauth/requestid"
+	"github.com/mendersoftware/deviceauth/requestlog"
 )
 
 const (
@@ -33,6 +34,7 @@ var (
 	DefaultDevStack = []rest.Middleware{
 
 		// logging
+		&requestlog.RequestLogMiddleware{},
 		&rest.AccessLogApacheMiddleware{},
 		&rest.TimerMiddleware{},
 		&rest.RecorderMiddleware{},
@@ -55,6 +57,7 @@ var (
 	DefaultProdStack = []rest.Middleware{
 
 		// logging
+		&requestlog.RequestLogMiddleware{},
 		&rest.AccessLogJsonMiddleware{
 			// No prefix or other fields, entire output is JSON encoded and could break it.
 			Logger: log.New(os.Stderr, "", 0),

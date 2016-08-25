@@ -18,7 +18,7 @@ import (
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/mendersoftware/deviceauth/config"
 	"github.com/mendersoftware/deviceauth/log"
-	"github.com/mendersoftware/deviceauth/requestid"
+	"github.com/mendersoftware/deviceauth/requestlog"
 	"github.com/mendersoftware/deviceauth/utils"
 	"github.com/pkg/errors"
 	"net/http"
@@ -36,8 +36,6 @@ const (
 
 	HdrAuthReqSign = "X-MEN-Signature"
 
-	LogReqId    = "request_id"
-	LogApiCall  = "api_call"
 	LogHttpCode = "http_code"
 )
 
@@ -91,9 +89,7 @@ func (d *DevAuthHandler) GetApp() (rest.App, error) {
 }
 
 func (d *DevAuthHandler) SubmitAuthRequestHandler(w rest.ResponseWriter, r *rest.Request) {
-	l := log.New(log.Ctx{
-		LogReqId:   requestid.GetReqId(r),
-		LogApiCall: "SubmitAuthRequestHandler"})
+	l := requestlog.GetRequestLogger(r.Env)
 
 	da, err := d.createDevAuth(config.Config, l)
 	if err != nil {
@@ -167,9 +163,7 @@ func (d *DevAuthHandler) UpdateDeviceHandler(w rest.ResponseWriter, r *rest.Requ
 func (d *DevAuthHandler) GetDeviceTokenHandler(w rest.ResponseWriter, r *rest.Request) {}
 
 func (d *DevAuthHandler) DeleteTokenHandler(w rest.ResponseWriter, r *rest.Request) {
-	l := log.New(log.Ctx{
-		LogReqId:   requestid.GetReqId(r),
-		LogApiCall: "DeleteTokenHandler"})
+	l := requestlog.GetRequestLogger(r.Env)
 
 	da, err := d.createDevAuth(config.Config, l)
 	if err != nil {
@@ -196,9 +190,7 @@ func (d *DevAuthHandler) DeleteTokenHandler(w rest.ResponseWriter, r *rest.Reque
 }
 
 func (d *DevAuthHandler) VerifyTokenHandler(w rest.ResponseWriter, r *rest.Request) {
-	l := log.New(log.Ctx{
-		LogReqId:   requestid.GetReqId(r),
-		LogApiCall: "VerifyTokenHandler"})
+	l := requestlog.GetRequestLogger(r.Env)
 
 	da, err := d.createDevAuth(config.Config, l)
 	if err != nil {
@@ -234,9 +226,7 @@ func (d *DevAuthHandler) VerifyTokenHandler(w rest.ResponseWriter, r *rest.Reque
 }
 
 func (d *DevAuthHandler) UpdateDeviceStatusHandler(w rest.ResponseWriter, r *rest.Request) {
-	l := log.New(log.Ctx{
-		LogReqId:   requestid.GetReqId(r),
-		LogApiCall: "UpdateDeviceStatusHandler"})
+	l := requestlog.GetRequestLogger(r.Env)
 
 	da, err := d.createDevAuth(config.Config, l)
 	if err != nil {

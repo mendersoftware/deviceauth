@@ -22,6 +22,7 @@ import (
 	"github.com/mendersoftware/deviceauth/config"
 	"github.com/mendersoftware/deviceauth/log"
 	"github.com/mendersoftware/deviceauth/requestid"
+	"github.com/mendersoftware/deviceauth/requestlog"
 	mtest "github.com/mendersoftware/deviceauth/test"
 	"github.com/stretchr/testify/assert"
 	"net/http"
@@ -43,7 +44,9 @@ func makeMockApiHandler(t *testing.T, f DevAuthFactory) http.Handler {
 
 	api := rest.NewApi()
 	api.Use(
-		&requestid.RequestIdMiddleware{})
+		&requestlog.RequestLogMiddleware{},
+		&requestid.RequestIdMiddleware{},
+	)
 	api.SetApp(app)
 
 	return api.MakeHandler()
