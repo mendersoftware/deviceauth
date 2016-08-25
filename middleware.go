@@ -20,6 +20,7 @@ import (
 	"os"
 
 	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/mendersoftware/deviceauth/accesslog"
 	dlog "github.com/mendersoftware/deviceauth/log"
 	"github.com/mendersoftware/deviceauth/requestid"
 	"github.com/mendersoftware/deviceauth/requestlog"
@@ -35,7 +36,7 @@ var (
 
 		// logging
 		&requestlog.RequestLogMiddleware{},
-		&rest.AccessLogApacheMiddleware{},
+		&accesslog.AccessLogMiddleware{},
 		&rest.TimerMiddleware{},
 		&rest.RecorderMiddleware{},
 
@@ -58,6 +59,7 @@ var (
 
 		// logging
 		&requestlog.RequestLogMiddleware{},
+		&accesslog.AccessLogMiddleware{},
 		&rest.AccessLogJsonMiddleware{
 			// No prefix or other fields, entire output is JSON encoded and could break it.
 			Logger: log.New(os.Stderr, "", 0),
