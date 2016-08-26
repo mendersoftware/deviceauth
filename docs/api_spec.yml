@@ -1,6 +1,6 @@
 swagger: '2.0'
 info:
-  title: Mender Device Identity API
+  title: Mender Device Authentication API
   description: |
     API for device identity management and device auth request handling.
 
