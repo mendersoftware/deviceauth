@@ -248,7 +248,7 @@ paths:
             $ref: '#/definitions/Error'
   /devices/{id}/status:
     put:
-      description: Update device admission state
+      summary: Update device admission state
       parameters:
         - name: id
           in: path
