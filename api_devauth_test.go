@@ -341,7 +341,8 @@ func TestApiDevAuthUpdateStatusDevice(t *testing.T) {
 		},
 	}
 
-	for _, tc := range tcases {
+	for idx, tc := range tcases {
+		t.Logf("running %d", idx)
 		recorded := test.RunRequest(t, apih, tc.req)
 		recorded.CodeIs(tc.code)
 		recorded.BodyIs(tc.body)
