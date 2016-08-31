@@ -30,6 +30,9 @@ const (
 	SettingDevAdmUrlAdd        = "devadm_url_add"
 	SettingDevAdmUrlAddDefault = "http://mender-device-adm:8080/api/0.1.0/devices"
 
+	SettingInventoryUrlAdd        = "inventory_url_add"
+	SettingInventoryUrlAddDefault = "http://mender-inventory:8080/api/0.1.0/devices"
+
 	SettingServerPrivKeyPath        = "server_priv_key_path"
 	SettingServerPrivKeyPathDefault = "/etc/rsa/private.pem"
 
