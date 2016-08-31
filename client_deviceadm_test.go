@@ -22,14 +22,6 @@ import (
 	"time"
 )
 
-// return mock http server returning status code 'status'
-func newMockServer(status int) *httptest.Server {
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(status)
-	}))
-
-}
-
 func TestGetDevAdmClient(t *testing.T) {
 	c := GetDevAdmClient(DevAdmClientConfig{AddDeviceUrl: "/foo"},
 		log.New(log.Ctx{}))
