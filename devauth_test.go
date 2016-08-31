@@ -309,7 +309,13 @@ func TestSubmitAuthRequest(t *testing.T) {
 			},
 		}
 
-		c := MockDevAdmClient{
+		cda := MockDevAdmClient{
+			mockAddDevice: func(dev *Device, c requestid.ApiRequester) error {
+				return tc.devAdmErr
+			},
+		}
+
+		cdi := MockInventoryClient{
 			mockAddDevice: func(dev *Device, c requestid.ApiRequester) error {
 				return tc.devAdmErr
 			},
@@ -324,7 +330,7 @@ func TestSubmitAuthRequest(t *testing.T) {
 			},
 		}
 
-		devauth := NewDevAuth(&db, &c, &jwt)
+		devauth := NewDevAuth(&db, &cda, &cdi, &jwt)
 		res, err := devauth.SubmitAuthRequest(&req)
 
 		assert.Equal(t, tc.res, res)
@@ -336,35 +342,49 @@ func TestSubmitAuthRequest(t *testing.T) {
 
 func TestAcceptDevice(t *testing.T) {
 	testCases := []struct {
-		dbErr string
+		dbErr  error
+		invErr error
 
 		outErr string
 	}{
 		{
-			dbErr:  "",
-			outErr: "",
+			dbErr: nil,
 		},
 		{
-			dbErr:  "failed to update device",
+			dbErr:  errors.New("failed to update device"),
 			outErr: "db update device error: failed to update device",
+		},
+		{
+			dbErr:  errors.New("inventory failed"),
+			outErr: "db update device error: inventory failed",
 		},
 	}
 
-	for _, tc := range testCases {
+	for idx, tc := range testCases {
+		t.Logf("running %v", idx)
 		db := MockDataStore{
 			mockUpdateDevice: func(d *Device) error {
-				if tc.dbErr != "" {
-					return errors.New(tc.dbErr)
+				if tc.dbErr != nil {
+					return tc.dbErr
 				}
 
 				return nil
 			},
 		}
 
-		devauth := NewDevAuth(&db, nil, nil)
+		inv := MockInventoryClient{
+			mockAddDevice: func(d *Device, client requestid.ApiRequester) error {
+				if tc.invErr != nil {
+					return tc.invErr
+				}
+				return nil
+			},
+		}
+
+		devauth := NewDevAuth(&db, nil, &inv, nil)
 		err := devauth.AcceptDevice("dummyid")
 
-		if tc.dbErr != "" {
+		if tc.outErr != "" {
 			assert.EqualError(t, err, tc.outErr)
 		} else {
 			assert.NoError(t, err)
@@ -414,7 +434,7 @@ func TestRejectDevice(t *testing.T) {
 			},
 		}
 
-		devauth := NewDevAuth(&db, nil, nil)
+		devauth := NewDevAuth(&db, nil, nil, nil)
 		err := devauth.RejectDevice("dummyid")
 
 		if tc.dbErr != "" || (tc.dbDelDevTokenErr != nil && tc.dbDelDevTokenErr != ErrTokenNotFound) {
