@@ -37,7 +37,6 @@ const (
 // this device auth service interface
 type DevAuthApp interface {
 	SubmitAuthRequest(r *AuthReq) (string, error)
-	SubmitAuthRequestWithClient(r *AuthReq, client requestid.ApiRequester) (string, error)
 	GetAuthRequests(dev_id string) ([]AuthReq, error)
 
 	GetDevices(skip, limit int, tenant_token, status string) ([]Device, error)
