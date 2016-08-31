@@ -22,7 +22,6 @@ type DevAuthWithContext struct {
 	ctx *RequestContext
 }
 
-func (d *DevAuthWithContext) SubmitAuthRequest(r *AuthReq) (string, error) {
-	client := requestid.NewTrackingApiClient(d.ctx.ReqId)
-	return d.SubmitAuthRequestWithClient(r, client)
+func (d *DevAuthWithContext) contextClientGetter() requestid.ApiRequester {
+	return requestid.NewTrackingApiClient(d.ctx.ReqId)
 }

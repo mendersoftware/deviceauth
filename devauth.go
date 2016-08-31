@@ -34,6 +34,13 @@ const (
 	defaultExpirationTimeout = 3600
 )
 
+// helper for obtaining API clients
+type ApiClientGetter func() requestid.ApiRequester
+
+func simpleApiClientGetter() requestid.ApiRequester {
+	return &http.Client{}
+}
+
 // this device auth service interface
 type DevAuthApp interface {
 	SubmitAuthRequest(r *AuthReq) (string, error)
@@ -55,11 +62,12 @@ type DevAuthApp interface {
 }
 
 type DevAuth struct {
-	db      DataStore
-	cDevAdm DevAdmClientI
-	cInv    InventoryClientI
-	jwt     JWTAgentApp
-	log     *log.Logger
+	db           DataStore
+	cDevAdm      DevAdmClientI
+	cInv         InventoryClientI
+	jwt          JWTAgentApp
+	log          *log.Logger
+	clientGetter ApiClientGetter
 }
 
 // GetDevAuth factory func returning a new DevAuth based on the
@@ -99,16 +107,17 @@ func GetDevAuth(c config.Reader, l *log.Logger) (DevAuthApp, error) {
 
 func NewDevAuth(d DataStore, cda DevAdmClientI, ci InventoryClientI, jwt JWTAgentApp) DevAuthApp {
 	return &DevAuth{
-		db:      d,
-		cDevAdm: cda,
-		cInv:    ci,
-		jwt:     jwt,
-		log:     log.New(log.Ctx{}),
+		db:           d,
+		cDevAdm:      cda,
+		cInv:         ci,
+		jwt:          jwt,
+		log:          log.New(log.Ctx{}),
+		clientGetter: simpleApiClientGetter,
 	}
 }
 
 func (d *DevAuth) SubmitAuthRequest(r *AuthReq) (string, error) {
-	return d.SubmitAuthRequestWithClient(r, &http.Client{})
+	return d.SubmitAuthRequestWithClient(r, d.clientGetter())
 }
 
 func (d *DevAuth) SubmitAuthRequestWithClient(r *AuthReq, client requestid.ApiRequester) (string, error) {
@@ -169,7 +178,7 @@ func (d *DevAuth) SubmitAuthRequestWithClient(r *AuthReq, client requestid.ApiRe
 }
 
 func (d *DevAuth) SubmitInventoryDevice(dev Device) error {
-	return d.SubmitInventoryDeviceWithClient(dev, &http.Client{})
+	return d.SubmitInventoryDeviceWithClient(dev, d.clientGetter())
 }
 
 func (d *DevAuth) SubmitInventoryDeviceWithClient(dev Device, client requestid.ApiRequester) error {
@@ -309,10 +318,12 @@ func (d *DevAuth) VerifyToken(token string) error {
 }
 
 func (d *DevAuth) WithContext(ctx *RequestContext) DevAuthApp {
-	return &DevAuthWithContext{
+	dwc := &DevAuthWithContext{
 		*d,
 		ctx,
 	}
+	dwc.clientGetter = dwc.contextClientGetter
+	return dwc
 }
 
 func (d *DevAuth) UseLog(l *log.Logger) {
