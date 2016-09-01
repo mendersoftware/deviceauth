@@ -55,6 +55,13 @@ func GetDataStoreMongo(c config.Reader, l *log.Logger) (*DataStoreMongo, error) 
 	return d, nil
 }
 
+func NewDataStoreMongoWithSession(session *mgo.Session) *DataStoreMongo {
+	return &DataStoreMongo{
+		session: session,
+		log:     log.New(log.Ctx{}),
+	}
+}
+
 func NewDataStoreMongo(host string) (*DataStoreMongo, error) {
 	//init master session
 	var err error
@@ -65,10 +72,7 @@ func NewDataStoreMongo(host string) (*DataStoreMongo, error) {
 		return nil, errors.New("failed to open mgo session")
 	}
 
-	db := &DataStoreMongo{
-		session: masterSession,
-		log:     log.New(log.Ctx{}),
-	}
+	db := NewDataStoreMongoWithSession(masterSession)
 
 	return db, nil
 }
