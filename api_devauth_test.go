@@ -276,6 +276,9 @@ func TestApiDevAuthUpdateStatusDevice(t *testing.T) {
 		mockAcceptDevice: mockaction,
 		mockRejectDevice: mockaction,
 	}
+	devauth.mockWithContext = func(ctx *RequestContext) DevAuthApp {
+		return &devauth
+	}
 
 	factory := func(c config.Reader, l *log.Logger) (DevAuthApp, error) {
 		return &devauth, nil

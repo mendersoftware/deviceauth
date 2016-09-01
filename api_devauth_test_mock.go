@@ -22,6 +22,7 @@ import (
 type MockDevAuth struct {
 	mockSubmitAuthRequest           func(r *AuthReq) (string, error)
 	mockSubmitAuthRequestWithClient func(r *AuthReq, c requestid.ApiRequester) (string, error)
+	mockSubmitInventoryDevice       func(d Device) error
 	mockAcceptDevice                func(dev_id string) error
 	mockRejectDevice                func(dev_id string) error
 	mockVerifyToken                 func(token string) error
@@ -35,6 +36,10 @@ func (mda *MockDevAuth) SubmitAuthRequest(r *AuthReq) (string, error) {
 
 func (mda *MockDevAuth) SubmitAuthRequestWithClient(r *AuthReq, c requestid.ApiRequester) (string, error) {
 	return mda.mockSubmitAuthRequestWithClient(r, c)
+}
+
+func (mda *MockDevAuth) SubmitInventoryDevice(d Device) error {
+	return mda.mockSubmitInventoryDevice(d)
 }
 
 func (mda *MockDevAuth) GetAuthRequests(dev_id string) ([]AuthReq, error) {
