@@ -44,3 +44,14 @@ func BuildURL(r *rest.Request, template string, params map[string]string) *url.U
 
 	return url
 }
+
+func JoinURL(base, url string) string {
+	if strings.HasPrefix(url, "/") {
+		url = url[1:]
+	}
+	if !strings.HasSuffix(base, "/") {
+		base = base + "/"
+	}
+	return base + url
+
+}
