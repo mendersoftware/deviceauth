@@ -18,21 +18,22 @@ import (
 	"encoding/json"
 	"github.com/mendersoftware/deviceauth/log"
 	"github.com/mendersoftware/deviceauth/requestid"
+	"github.com/mendersoftware/deviceauth/utils"
 	"github.com/pkg/errors"
 	"net/http"
 	"time"
 )
 
 const (
-	// default devices endpoint
-	defaultDevAdmDevicesUri = "/devices"
+	// devices endpoint
+	DevAdmDevicesUri = "/api/0.1.0/devices"
 	// default request timeout, 10s?
 	defaultDevAdmReqTimeout = time.Duration(10) * time.Second
 )
 
 type DevAdmClientConfig struct {
 	// device add URL
-	AddDeviceUrl string
+	DevAdmAddr string
 	// request timeout
 	Timeout time.Duration
 }
@@ -62,7 +63,9 @@ func (d *DevAdmClient) AddDevice(dev *Device, client requestid.ApiRequester) err
 	contentReader := bytes.NewReader(AdmReqJson)
 
 	req, err := http.NewRequest(
-		http.MethodPost, d.conf.AddDeviceUrl, contentReader)
+		http.MethodPost,
+		utils.JoinURL(d.conf.DevAdmAddr, DevAdmDevicesUri),
+		contentReader)
 	if err != nil {
 		return errors.Wrapf(err, "failed to create request")
 	}

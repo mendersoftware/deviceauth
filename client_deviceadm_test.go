@@ -23,7 +23,7 @@ import (
 )
 
 func TestGetDevAdmClient(t *testing.T) {
-	c := GetDevAdmClient(DevAdmClientConfig{AddDeviceUrl: "/foo"},
+	c := GetDevAdmClient(DevAdmClientConfig{DevAdmAddr: "localhost:3333"},
 		log.New(log.Ctx{}))
 	assert.NotNil(t, c)
 }
@@ -32,31 +32,31 @@ func TestDevAdmClientReqSuccess(t *testing.T) {
 	s, rd := newMockServer(http.StatusCreated)
 	defer s.Close()
 
-	addDevUrl := s.URL + "/devices"
 	c := NewDevAdmClient(DevAdmClientConfig{
-		AddDeviceUrl: addDevUrl,
+		DevAdmAddr: s.URL,
 	})
 
 	err := c.AddDevice(&Device{}, &http.Client{})
 	assert.NoError(t, err, "expected no errors")
+	assert.Equal(t, DevAdmDevicesUri, rd.url.Path)
 }
 
 func TestDevAdmClientReqFail(t *testing.T) {
 	s, rd := newMockServer(http.StatusBadRequest)
 	defer s.Close()
 
-	addDevUrl := s.URL + "/devices"
 	c := NewDevAdmClient(DevAdmClientConfig{
-		AddDeviceUrl: addDevUrl,
+		DevAdmAddr: s.URL,
 	})
 
 	err := c.AddDevice(&Device{}, &http.Client{})
 	assert.Error(t, err, "expected an error")
+	assert.Equal(t, DevAdmDevicesUri, rd.url.Path)
 }
 
 func TestDevAdmClientReqNoHost(t *testing.T) {
 	c := NewDevAdmClient(DevAdmClientConfig{
-		AddDeviceUrl: "http://somehost:1234/devices",
+		DevAdmAddr: "http://somehost:1234",
 	})
 
 	err := c.AddDevice(&Device{}, &http.Client{})
@@ -87,7 +87,7 @@ func TestDevAdmClientTImeout(t *testing.T) {
 
 	addDevUrl := s.URL + "/devices"
 	c := NewDevAdmClient(DevAdmClientConfig{
-		AddDeviceUrl: addDevUrl,
+		DevAdmAddr: addDevUrl,
 	})
 
 	t1 := time.Now()
