@@ -29,7 +29,7 @@ func TestGetDevAdmClient(t *testing.T) {
 }
 
 func TestDevAdmClientReqSuccess(t *testing.T) {
-	s := newMockServer(http.StatusCreated)
+	s, rd := newMockServer(http.StatusCreated)
 	defer s.Close()
 
 	addDevUrl := s.URL + "/devices"
@@ -42,7 +42,7 @@ func TestDevAdmClientReqSuccess(t *testing.T) {
 }
 
 func TestDevAdmClientReqFail(t *testing.T) {
-	s := newMockServer(http.StatusBadRequest)
+	s, rd := newMockServer(http.StatusBadRequest)
 	defer s.Close()
 
 	addDevUrl := s.URL + "/devices"
