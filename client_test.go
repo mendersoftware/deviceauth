@@ -17,12 +17,14 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 )
 
 type testReqData struct {
 	reqBody []byte
 	headers http.Header
 	err     error
+	url     *url.URL
 }
 
 // return mock http server returning status code 'status'
@@ -32,6 +34,7 @@ func newMockServer(status int) (*httptest.Server, *testReqData) {
 		defer r.Body.Close()
 		rdata.reqBody, rdata.err = ioutil.ReadAll(r.Body)
 		rdata.headers = r.Header
+		rdata.url = r.URL
 		w.WriteHeader(status)
 	}))
 	return srv, rdata
