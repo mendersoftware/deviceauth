@@ -18,13 +18,19 @@ import (
 	"encoding/json"
 	"github.com/mendersoftware/deviceauth/log"
 	"github.com/mendersoftware/deviceauth/requestid"
+	"github.com/mendersoftware/deviceauth/utils"
 	"github.com/pkg/errors"
 	"net/http"
 )
 
+const (
+	// devices endpoint
+	InventoryDevicesUri = "/api/0.1.0/devices"
+)
+
 type InventoryClientConfig struct {
-	// device add URL
-	AddDeviceUrl string
+	// inventory service address
+	InventoryAddr string
 }
 
 type InventoryClientI interface {
@@ -54,7 +60,9 @@ func (ic *InventoryClient) AddDevice(dev *Device, client requestid.ApiRequester)
 	contentReader := bytes.NewReader(ireq)
 
 	req, err := http.NewRequest(
-		http.MethodPost, ic.conf.AddDeviceUrl, contentReader)
+		http.MethodPost,
+		utils.JoinURL(ic.conf.InventoryAddr, InventoryDevicesUri),
+		contentReader)
 	if err != nil {
 		return errors.Wrapf(err, "failed to create request")
 	}

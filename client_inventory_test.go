@@ -23,7 +23,7 @@ import (
 )
 
 func TestInventoryClientGet(t *testing.T) {
-	c := GetInventoryClient(InventoryClientConfig{AddDeviceUrl: "/foo"},
+	c := NewInventoryClientWithLogger(InventoryClientConfig{InventoryAddr: "http://foo"},
 		log.New(log.Ctx{}))
 	assert.NotNil(t, c)
 }
@@ -66,9 +66,8 @@ func TestInventoryClient(t *testing.T) {
 		t.Logf("testing %v %s", tc.status, tc.expReq)
 		s, rd := newMockServer(tc.status)
 
-		addDevUrl := s.URL + "/devices"
 		c := NewInventoryClient(InventoryClientConfig{
-			AddDeviceUrl: addDevUrl,
+			InventoryAddr: s.URL,
 		})
 
 		err := c.AddDevice(&Device{Id: "1234"}, &http.Client{})
@@ -77,6 +76,7 @@ func TestInventoryClient(t *testing.T) {
 		} else {
 			assert.NoError(t, err)
 			assert.JSONEq(t, tc.expReq, string(rd.reqBody))
+			assert.Equal(t, InventoryDevicesUri, rd.url.Path)
 		}
 		s.Close()
 	}
