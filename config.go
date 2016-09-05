@@ -50,6 +50,7 @@ var (
 		{SettingMiddleware, SettingMiddlewareDefault},
 		{SettingDb, SettingDbDefault},
 		{SettingDevAdmUrlAdd, SettingDevAdmUrlAddDefault},
+		{SettingInventoryUrlAdd, SettingInventoryUrlAddDefault},
 		{SettingServerPrivKeyPath, SettingServerPrivKeyPathDefault},
 		{SettingJWTIssuer, SettingJWTIssuerDefault},
 		{SettingJWTExpirationTimeout, SettingJWTExpirationTimeoutDefault},
