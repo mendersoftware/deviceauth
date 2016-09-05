@@ -87,7 +87,7 @@ func (ic *InventoryClient) UseLog(l *log.Logger) {
 	ic.log = l.F(log.Ctx{})
 }
 
-func GetInventoryClient(c InventoryClientConfig, l *log.Logger) *InventoryClient {
+func NewInventoryClientWithLogger(c InventoryClientConfig, l *log.Logger) *InventoryClient {
 	l = l.F(log.Ctx{})
 	client := NewInventoryClient(c)
 	client.UseLog(l)
