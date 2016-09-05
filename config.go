@@ -27,11 +27,11 @@ const (
 	SettingDb        = "mongo"
 	SettingDbDefault = "mongo-device-auth"
 
-	SettingDevAdmUrlAdd        = "devadm_url_add"
-	SettingDevAdmUrlAddDefault = "http://mender-device-adm:8080/api/0.1.0/devices"
+	SettingDevAdmAddr        = "devadm_addr"
+	SettingDevAdmAddrDefault = "http://mender-device-adm:8080/"
 
-	SettingInventoryUrlAdd        = "inventory_url_add"
-	SettingInventoryUrlAddDefault = "http://mender-inventory:8080/api/0.1.0/devices"
+	SettingInventoryAddr        = "inventory_addr"
+	SettingInventoryAddrDefault = "http://mender-inventory:8080/"
 
 	SettingServerPrivKeyPath        = "server_priv_key_path"
 	SettingServerPrivKeyPathDefault = "/etc/rsa/private.pem"
@@ -49,8 +49,8 @@ var (
 		{SettingListen, SettingListenDefault},
 		{SettingMiddleware, SettingMiddlewareDefault},
 		{SettingDb, SettingDbDefault},
-		{SettingDevAdmUrlAdd, SettingDevAdmUrlAddDefault},
-		{SettingInventoryUrlAdd, SettingInventoryUrlAddDefault},
+		{SettingDevAdmAddr, SettingDevAdmAddrDefault},
+		{SettingInventoryAddr, SettingInventoryAddrDefault},
 		{SettingServerPrivKeyPath, SettingServerPrivKeyPathDefault},
 		{SettingJWTIssuer, SettingJWTIssuerDefault},
 		{SettingJWTExpirationTimeout, SettingJWTExpirationTimeoutDefault},

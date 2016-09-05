@@ -85,10 +85,10 @@ func GetDevAuth(c config.Reader, l *log.Logger) (DevAuthApp, error) {
 	}
 
 	devAdmClientConf := DevAdmClientConfig{
-		AddDeviceUrl: c.GetString(SettingDevAdmUrlAdd),
+		DevAdmAddr: c.GetString(SettingDevAdmAddr),
 	}
 	invClientConf := InventoryClientConfig{
-		AddDeviceUrl: c.GetString(SettingInventoryUrlAdd),
+		InventoryAddr: c.GetString(SettingInventoryAddr),
 	}
 
 	jwt, err := NewJWTAgent(jwtAgentConf)
