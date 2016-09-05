@@ -37,7 +37,7 @@ func TestGetDevAdmClient(t *testing.T) {
 }
 
 func TestDevAdmClientReqSuccess(t *testing.T) {
-	s := newMockServer(200)
+	s := newMockServer(http.StatusCreated)
 	defer s.Close()
 
 	addDevUrl := s.URL + "/devices"
@@ -50,7 +50,7 @@ func TestDevAdmClientReqSuccess(t *testing.T) {
 }
 
 func TestDevAdmClientReqFail(t *testing.T) {
-	s := newMockServer(400)
+	s := newMockServer(http.StatusBadRequest)
 	defer s.Close()
 
 	addDevUrl := s.URL + "/devices"
@@ -59,7 +59,7 @@ func TestDevAdmClientReqFail(t *testing.T) {
 	})
 
 	err := c.AddDevice(&Device{}, &http.Client{})
-	assert.NoError(t, err, "expected an error")
+	assert.Error(t, err, "expected an error")
 }
 
 func TestDevAdmClientReqNoHost(t *testing.T) {
