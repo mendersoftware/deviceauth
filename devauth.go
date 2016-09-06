@@ -46,8 +46,6 @@ type DevAuthApp interface {
 	SubmitAuthRequest(r *AuthReq) (string, error)
 	GetAuthRequests(dev_id string) ([]AuthReq, error)
 
-	SubmitInventoryDevice(d Device) error
-
 	GetDevices(skip, limit int, tenant_token, status string) ([]Device, error)
 	GetDevice(dev_id string) (*Device, error)
 	AcceptDevice(dev_id string) error
