@@ -276,6 +276,9 @@ func TestApiDevAuthUpdateStatusDevice(t *testing.T) {
 		mockAcceptDevice: mockaction,
 		mockRejectDevice: mockaction,
 	}
+	devauth.mockWithContext = func(ctx *RequestContext) DevAuthApp {
+		return &devauth
+	}
 
 	factory := func(c config.Reader, l *log.Logger) (DevAuthApp, error) {
 		return &devauth, nil
@@ -341,7 +344,8 @@ func TestApiDevAuthUpdateStatusDevice(t *testing.T) {
 		},
 	}
 
-	for _, tc := range tcases {
+	for idx, tc := range tcases {
+		t.Logf("running %d", idx)
 		recorded := test.RunRequest(t, apih, tc.req)
 		recorded.CodeIs(tc.code)
 		recorded.BodyIs(tc.body)

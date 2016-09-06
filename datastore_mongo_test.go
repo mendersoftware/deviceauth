@@ -15,8 +15,6 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/mendersoftware/deviceauth/log"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -33,25 +31,10 @@ const (
 	TestMongoDefault = "127.0.0.1:27017"
 )
 
-func getTestMongoAddr() string {
-	addr := TestMongoDefault
-	if env := os.Getenv(TestMongoEnv); env != "" {
-		addr = env
-	}
-
-	return addr
-}
-
 // db and test management funcs
-func getDb() (*DataStoreMongo, error) {
-	addr := getTestMongoAddr()
-
-	d, err := NewDataStoreMongo(addr)
-	if err != nil {
-		return nil, err
-	}
-
-	return d, nil
+func getDb() *DataStoreMongo {
+	db.Wipe()
+	return NewDataStoreMongoWithSession(db.Session())
 }
 
 func setUp(db *DataStoreMongo, devs_dataset,
@@ -137,34 +120,6 @@ func setUpTokens(dataset string, s *mgo.Session) error {
 	return nil
 }
 
-func wipe(db *DataStoreMongo) error {
-	s := db.session.Copy()
-	defer s.Close()
-
-	c := s.DB(DbName).C(DbDevicesColl)
-
-	_, err := c.RemoveAll(nil)
-	if err != nil {
-		return err
-	}
-
-	c = s.DB(DbName).C(DbAuthReqColl)
-
-	_, err = c.RemoveAll(nil)
-	if err != nil {
-		return err
-	}
-
-	c = s.DB(DbName).C(DbTokensColl)
-
-	_, err = c.RemoveAll(nil)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func parseDevs(dataset string) ([]Device, error) {
 	f, err := os.Open(filepath.Join(testDataFolder, dataset))
 	if err != nil {
@@ -231,24 +186,6 @@ func parseToken(dataset string) (*Token, error) {
 	return &res[0], nil
 }
 
-// test funcs
-func TestGetDataStoreMongo(t *testing.T) {
-	v := viper.New()
-
-	addr := getTestMongoAddr()
-	v.SetDefault(SettingDb, addr)
-
-	d1, err := GetDataStoreMongo(v, log.New(log.Ctx{}))
-	assert.NoError(t, err)
-	assert.NotNil(t, d1)
-
-	//verify that DBs share the master session
-	d2, err := GetDataStoreMongo(v, log.New(log.Ctx{}))
-	assert.NoError(t, err)
-	assert.NotNil(t, d2)
-	assert.Equal(t, d1.session, d2.session)
-}
-
 func TestGetDeviceById(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping TestGetDeviceById in short mode.")
@@ -258,16 +195,10 @@ func TestGetDeviceById(t *testing.T) {
 	// (always get UTC instead of e.g. CEST)
 	time.Local = time.UTC
 
-	d, err := getDb()
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
+	d := getDb()
+	defer d.session.Close()
 
-	//setup
-	err = wipe(d)
-	assert.NoError(t, err, "failed to wipe data")
-
-	err = setUp(d, "devices_input.json", "", "")
+	err := setUp(d, "devices_input.json", "", "")
 	assert.NoError(t, err, "failed to setup input data")
 
 	testCases := []struct {
@@ -317,16 +248,10 @@ func TestGetDeviceByKey(t *testing.T) {
 	// (always get UTC instead of e.g. CEST)
 	time.Local = time.UTC
 
-	d, err := getDb()
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
+	d := getDb()
+	defer d.session.Close()
 
-	//setup
-	err = wipe(d)
-	assert.NoError(t, err, "failed to wipe data")
-
-	err = setUp(d, "devices_input.json", "", "")
+	err := setUp(d, "devices_input.json", "", "")
 	assert.NoError(t, err, "failed to setup input data")
 
 	testCases := []struct {
@@ -379,16 +304,10 @@ func TestGetAuthRequests(t *testing.T) {
 	// (always get UTC instead of e.g. CEST)
 	time.Local = time.UTC
 
-	d, err := getDb()
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
+	d := getDb()
+	defer d.session.Close()
 
-	//setup
-	err = wipe(d)
-	assert.NoError(t, err, "failed to wipe data")
-
-	err = setUp(d, "", "auth_reqs_input.json", "")
+	err := setUp(d, "", "auth_reqs_input.json", "")
 	assert.NoError(t, err, "failed to setup input data")
 
 	testCases := []struct {
@@ -458,10 +377,10 @@ func TestAddAuthReq(t *testing.T) {
 		Status:      "pending",
 	}
 
-	d, err := getDb()
-	assert.NoError(t, err, "failed to get db")
+	d := getDb()
+	defer d.session.Close()
 
-	err = d.AddAuthReq(&req)
+	err := d.AddAuthReq(&req)
 	assert.NoError(t, err, "failed to add auth req")
 
 	//verify
@@ -507,10 +426,10 @@ func TestAddDevice(t *testing.T) {
 		UpdatedTs:   time.Now(),
 	}
 
-	d, err := getDb()
-	assert.NoError(t, err, "failed to get db")
+	d := getDb()
+	defer d.session.Close()
 
-	err = d.AddDevice(&dev)
+	err := d.AddDevice(&dev)
 	assert.NoError(t, err, "failed to add device")
 
 	//verify
@@ -555,13 +474,10 @@ func TestUpdateDevice(t *testing.T) {
 
 	now := time.Now()
 
-	d, err := getDb()
-	assert.NoError(t, err, "failed to get db")
+	d := getDb()
+	defer d.session.Close()
 
-	err = wipe(d)
-	assert.NoError(t, err, "failed to wipe data")
-
-	err = setUp(d, "devices_input.json", "", "")
+	err := setUp(d, "devices_input.json", "", "")
 	assert.NoError(t, err, "failed to setup input data")
 
 	//test status updates
@@ -628,10 +544,10 @@ func TestAddToken(t *testing.T) {
 		Token: "token",
 	}
 
-	d, err := getDb()
-	assert.NoError(t, err, "failed to get db")
+	d := getDb()
+	defer d.session.Close()
 
-	err = d.AddToken(&token)
+	err := d.AddToken(&token)
 	assert.NoError(t, err, "failed to add token")
 
 	//verify
@@ -655,16 +571,10 @@ func TestGetToken(t *testing.T) {
 		t.Skip("skipping TestGetToken in short mode.")
 	}
 
-	d, err := getDb()
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
+	d := getDb()
+	defer d.session.Close()
 
-	//setup
-	err = wipe(d)
-	assert.NoError(t, err, "failed to wipe data")
-
-	err = setUp(d, "", "", "tokens.json")
+	err := setUp(d, "", "", "tokens.json")
 	assert.NoError(t, err, "failed to setup input data")
 
 	testCases := []struct {
@@ -710,16 +620,10 @@ func TestDeleteToken(t *testing.T) {
 		t.Skip("skipping TestDeleteToken in short mode.")
 	}
 
-	d, err := getDb()
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
+	d := getDb()
+	defer d.session.Close()
 
-	//setup
-	err = wipe(d)
-	assert.NoError(t, err, "failed to wipe data")
-
-	err = setUp(d, "", "", "tokens.json")
+	err := setUp(d, "", "", "tokens.json")
 	assert.NoError(t, err, "failed to setup input data")
 
 	testCases := []struct {
@@ -755,16 +659,10 @@ func TestDeleteTokenByDevId(t *testing.T) {
 		t.Skip("skipping TestDeleteTokenByDevId in short mode.")
 	}
 
-	d, err := getDb()
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
+	d := getDb()
+	defer d.session.Close()
 
-	//setup
-	err = wipe(d)
-	assert.NoError(t, err, "failed to wipe data")
-
-	err = setUp(d, "", "", "tokens.json")
+	err := setUp(d, "", "", "tokens.json")
 	assert.NoError(t, err, "failed to setup input data")
 
 	testCases := []struct {

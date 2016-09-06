@@ -34,10 +34,16 @@ const (
 	defaultExpirationTimeout = 3600
 )
 
+// helper for obtaining API clients
+type ApiClientGetter func() requestid.ApiRequester
+
+func simpleApiClientGetter() requestid.ApiRequester {
+	return &http.Client{}
+}
+
 // this device auth service interface
 type DevAuthApp interface {
 	SubmitAuthRequest(r *AuthReq) (string, error)
-	SubmitAuthRequestWithClient(r *AuthReq, client requestid.ApiRequester) (string, error)
 	GetAuthRequests(dev_id string) ([]AuthReq, error)
 
 	GetDevices(skip, limit int, tenant_token, status string) ([]Device, error)
@@ -54,10 +60,12 @@ type DevAuthApp interface {
 }
 
 type DevAuth struct {
-	db  DataStore
-	c   DevAdmClientI
-	jwt JWTAgentApp
-	log *log.Logger
+	db           DataStore
+	cDevAdm      DevAdmClientI
+	cInv         InventoryClientI
+	jwt          JWTAgentApp
+	log          *log.Logger
+	clientGetter ApiClientGetter
 }
 
 // GetDevAuth factory func returning a new DevAuth based on the
@@ -74,8 +82,11 @@ func GetDevAuth(c config.Reader, l *log.Logger) (DevAuthApp, error) {
 		Issuer:            c.GetString(SettingJWTIssuer),
 	}
 
-	clientConf := DevAdmClientConfig{
-		AddDeviceUrl: c.GetString(SettingDevAdmUrlAdd),
+	devAdmClientConf := DevAdmClientConfig{
+		DevAdmAddr: c.GetString(SettingDevAdmAddr),
+	}
+	invClientConf := InventoryClientConfig{
+		InventoryAddr: c.GetString(SettingInventoryAddr),
 	}
 
 	jwt, err := NewJWTAgent(jwtAgentConf)
@@ -83,21 +94,28 @@ func GetDevAuth(c config.Reader, l *log.Logger) (DevAuthApp, error) {
 		return nil, errors.Wrap(err, "cannot create JWT agent")
 	}
 
-	devauth := NewDevAuth(db, NewDevAdmClient(clientConf), jwt)
+	devauth := NewDevAuth(db,
+		NewDevAdmClient(devAdmClientConf),
+		NewInventoryClient(invClientConf),
+		jwt)
 	devauth.UseLog(l)
 
 	return devauth, nil
 }
 
-func NewDevAuth(d DataStore, c DevAdmClientI, jwt JWTAgentApp) DevAuthApp {
-	return &DevAuth{db: d,
-		c:   c,
-		jwt: jwt,
-		log: log.New(log.Ctx{})}
+func NewDevAuth(d DataStore, cda DevAdmClientI, ci InventoryClientI, jwt JWTAgentApp) DevAuthApp {
+	return &DevAuth{
+		db:           d,
+		cDevAdm:      cda,
+		cInv:         ci,
+		jwt:          jwt,
+		log:          log.New(log.Ctx{}),
+		clientGetter: simpleApiClientGetter,
+	}
 }
 
 func (d *DevAuth) SubmitAuthRequest(r *AuthReq) (string, error) {
-	return d.SubmitAuthRequestWithClient(r, &http.Client{})
+	return d.SubmitAuthRequestWithClient(r, d.clientGetter())
 }
 
 func (d *DevAuth) SubmitAuthRequestWithClient(r *AuthReq, client requestid.ApiRequester) (string, error) {
@@ -127,7 +145,7 @@ func (d *DevAuth) SubmitAuthRequestWithClient(r *AuthReq, client requestid.ApiRe
 			return "", errors.Wrap(err, "db add device error")
 		}
 
-		if err := d.c.AddDevice(dev, client); err != nil {
+		if err := d.cDevAdm.AddDevice(dev, client); err != nil {
 			return "", errors.Wrap(err, "devadm add device error")
 		}
 	}
@@ -155,6 +173,18 @@ func (d *DevAuth) SubmitAuthRequestWithClient(r *AuthReq, client requestid.ApiRe
 	} else {
 		return "", ErrDevAuthUnauthorized
 	}
+}
+
+func (d *DevAuth) SubmitInventoryDevice(dev Device) error {
+	return d.SubmitInventoryDeviceWithClient(dev, d.clientGetter())
+}
+
+func (d *DevAuth) SubmitInventoryDeviceWithClient(dev Device, client requestid.ApiRequester) error {
+	err := d.cInv.AddDevice(&dev, client)
+	if err != nil {
+		return errors.Wrap(err, "failed to add device to inventory")
+	}
+	return nil
 }
 
 // try to get an existing device, while checking for mismatched pubkey/id pairs
@@ -216,6 +246,10 @@ func (*DevAuth) GetDevice(dev_id string) (*Device, error) {
 
 func (d *DevAuth) AcceptDevice(dev_id string) error {
 	updev := &Device{Id: dev_id, Status: DevStatusAccepted}
+
+	if err := d.SubmitInventoryDevice(*updev); err != nil {
+		return errors.Wrap(err, "inventory device add error")
+	}
 
 	if err := d.db.UpdateDevice(updev); err != nil {
 		return errors.Wrap(err, "db update device error")
@@ -282,10 +316,12 @@ func (d *DevAuth) VerifyToken(token string) error {
 }
 
 func (d *DevAuth) WithContext(ctx *RequestContext) DevAuthApp {
-	return &DevAuthWithContext{
+	dwc := &DevAuthWithContext{
 		*d,
 		ctx,
 	}
+	dwc.clientGetter = dwc.contextClientGetter
+	return dwc
 }
 
 func (d *DevAuth) UseLog(l *log.Logger) {

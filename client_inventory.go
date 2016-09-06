@@ -21,50 +21,47 @@ import (
 	"github.com/mendersoftware/deviceauth/utils"
 	"github.com/pkg/errors"
 	"net/http"
-	"time"
 )
 
 const (
 	// devices endpoint
-	DevAdmDevicesUri = "/api/0.1.0/devices"
-	// default request timeout, 10s?
-	defaultDevAdmReqTimeout = time.Duration(10) * time.Second
+	InventoryDevicesUri = "/api/0.1.0/devices"
 )
 
-type DevAdmClientConfig struct {
-	// device add URL
-	DevAdmAddr string
-	// request timeout
-	Timeout time.Duration
+type InventoryClientConfig struct {
+	// inventory service address
+	InventoryAddr string
 }
 
-type DevAdmClientI interface {
+type InventoryClientI interface {
 	AddDevice(dev *Device, client requestid.ApiRequester) error
 	log.ContextLogger
 }
 
-type DevAdmClient struct {
+type InventoryClient struct {
 	log  *log.Logger
-	conf DevAdmClientConfig
+	conf InventoryClientConfig
 }
 
-func (d *DevAdmClient) AddDevice(dev *Device, client requestid.ApiRequester) error {
-	d.log.Debugf("add device %s for admission", dev.Id)
+type InventoryAddReq struct {
+	Id string `json:"id"`
+}
 
-	AdmReqJson, err := json.Marshal(AdmReq{
-		Id:     dev.Id,
-		IdData: dev.IdData,
-		PubKey: dev.PubKey,
+func (ic *InventoryClient) AddDevice(dev *Device, client requestid.ApiRequester) error {
+	ic.log.Debugf("add device %s to inventory", dev.Id)
+
+	ireq, err := json.Marshal(InventoryAddReq{
+		Id: dev.Id,
 	})
 	if err != nil {
 		return errors.Wrapf(err, "failed to prepare device admission request")
 	}
 
-	contentReader := bytes.NewReader(AdmReqJson)
+	contentReader := bytes.NewReader(ireq)
 
 	req, err := http.NewRequest(
 		http.MethodPost,
-		utils.JoinURL(d.conf.DevAdmAddr, DevAdmDevicesUri),
+		utils.JoinURL(ic.conf.InventoryAddr, InventoryDevicesUri),
 		contentReader)
 	if err != nil {
 		return errors.Wrapf(err, "failed to create request")
@@ -78,30 +75,35 @@ func (d *DevAdmClient) AddDevice(dev *Device, client requestid.ApiRequester) err
 	}
 	defer rsp.Body.Close()
 
-	if rsp.StatusCode != http.StatusCreated {
-		return errors.Errorf(
+	switch rsp.StatusCode {
+	case http.StatusConflict:
+		ic.log.Warnf("inventory entry for device %s already exists", dev.Id)
+	case http.StatusCreated:
+		ic.log.Infof("inventory entry for device %s created", dev.Id)
+	default:
+		ic.log.Errorf("failed to create inventory entry for device")
+		if err == nil {
+			err = errors.New("unexpected response status")
+		}
+		return errors.Wrapf(err,
 			"device add request failed with status %v", rsp.Status)
 	}
 	return nil
 }
 
-func (d *DevAdmClient) UseLog(l *log.Logger) {
-	d.log = l.F(log.Ctx{})
+func (ic *InventoryClient) UseLog(l *log.Logger) {
+	ic.log = l.F(log.Ctx{})
 }
 
-func GetDevAdmClient(c DevAdmClientConfig, l *log.Logger) *DevAdmClient {
+func NewInventoryClientWithLogger(c InventoryClientConfig, l *log.Logger) *InventoryClient {
 	l = l.F(log.Ctx{})
-	client := NewDevAdmClient(c)
+	client := NewInventoryClient(c)
 	client.UseLog(l)
 	return client
 }
 
-func NewDevAdmClient(c DevAdmClientConfig) *DevAdmClient {
-	if c.Timeout == 0 {
-		c.Timeout = defaultDevAdmReqTimeout
-	}
-
-	return &DevAdmClient{
+func NewInventoryClient(c InventoryClientConfig) *InventoryClient {
+	return &InventoryClient{
 		log:  log.New(log.Ctx{}),
 		conf: c,
 	}

@@ -14,14 +14,28 @@
 package main
 
 import (
-	"github.com/mendersoftware/deviceauth/requestid"
+	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 )
 
-type DevAuthWithContext struct {
-	DevAuth
-	ctx *RequestContext
+type testReqData struct {
+	reqBody []byte
+	headers http.Header
+	err     error
+	url     *url.URL
 }
 
-func (d *DevAuthWithContext) contextClientGetter() requestid.ApiRequester {
-	return requestid.NewTrackingApiClient(d.ctx.ReqId)
+// return mock http server returning status code 'status'
+func newMockServer(status int) (*httptest.Server, *testReqData) {
+	rdata := &testReqData{}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+		rdata.reqBody, rdata.err = ioutil.ReadAll(r.Body)
+		rdata.headers = r.Header
+		rdata.url = r.URL
+		w.WriteHeader(status)
+	}))
+	return srv, rdata
 }

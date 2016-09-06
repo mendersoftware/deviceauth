@@ -28,12 +28,31 @@ func TestGetDevAuth(t *testing.T) {
 		t.Skip("skipping TestGetDevAuth in short mode.")
 	}
 
+	// GetDevAuth will initialize data store that tries to connect to a DB
+	// specified in configuration. Since we are using dbtest, an on demand DB will
+	// be started. However we still need to figure out the address the test
+	// instance is listening on, so that we can set it in DevAuth configuration.
+	// configuration.
+	session := db.Session()
+	defer session.Close()
+	dbs := session.LiveServers()
+	assert.Len(t, dbs, 1)
+
+	dbaddr := dbs[0]
+	t.Logf("test db address: %s", dbaddr)
+
 	config.SetDefaults(config.Config, configDefaults)
+	config.Config.Set(SettingDb, dbaddr)
 	config.Config.Set(SettingServerPrivKeyPath, "testdata/private.pem")
 	d, err := GetDevAuth(config.Config, log.New(log.Ctx{}))
+	// we expect the test to fail as there's no locally running DB
 	assert.NoError(t, err)
 	assert.NotNil(t, d)
 
+	// cleanup DB session
+	da, _ := d.(*DevAuth)
+	mdb, _ := da.db.(*DataStoreMongo)
+	mdb.session.Close()
 }
 
 func TestSubmitAuthRequest(t *testing.T) {
@@ -309,7 +328,13 @@ func TestSubmitAuthRequest(t *testing.T) {
 			},
 		}
 
-		c := MockDevAdmClient{
+		cda := MockDevAdmClient{
+			mockAddDevice: func(dev *Device, c requestid.ApiRequester) error {
+				return tc.devAdmErr
+			},
+		}
+
+		cdi := MockInventoryClient{
 			mockAddDevice: func(dev *Device, c requestid.ApiRequester) error {
 				return tc.devAdmErr
 			},
@@ -324,7 +349,7 @@ func TestSubmitAuthRequest(t *testing.T) {
 			},
 		}
 
-		devauth := NewDevAuth(&db, &c, &jwt)
+		devauth := NewDevAuth(&db, &cda, &cdi, &jwt)
 		res, err := devauth.SubmitAuthRequest(&req)
 
 		assert.Equal(t, tc.res, res)
@@ -336,35 +361,49 @@ func TestSubmitAuthRequest(t *testing.T) {
 
 func TestAcceptDevice(t *testing.T) {
 	testCases := []struct {
-		dbErr string
+		dbErr  error
+		invErr error
 
 		outErr string
 	}{
 		{
-			dbErr:  "",
-			outErr: "",
+			dbErr: nil,
 		},
 		{
-			dbErr:  "failed to update device",
+			dbErr:  errors.New("failed to update device"),
 			outErr: "db update device error: failed to update device",
+		},
+		{
+			dbErr:  errors.New("inventory failed"),
+			outErr: "db update device error: inventory failed",
 		},
 	}
 
-	for _, tc := range testCases {
+	for idx, tc := range testCases {
+		t.Logf("running %v", idx)
 		db := MockDataStore{
 			mockUpdateDevice: func(d *Device) error {
-				if tc.dbErr != "" {
-					return errors.New(tc.dbErr)
+				if tc.dbErr != nil {
+					return tc.dbErr
 				}
 
 				return nil
 			},
 		}
 
-		devauth := NewDevAuth(&db, nil, nil)
+		inv := MockInventoryClient{
+			mockAddDevice: func(d *Device, client requestid.ApiRequester) error {
+				if tc.invErr != nil {
+					return tc.invErr
+				}
+				return nil
+			},
+		}
+
+		devauth := NewDevAuth(&db, nil, &inv, nil)
 		err := devauth.AcceptDevice("dummyid")
 
-		if tc.dbErr != "" {
+		if tc.outErr != "" {
 			assert.EqualError(t, err, tc.outErr)
 		} else {
 			assert.NoError(t, err)
@@ -414,7 +453,7 @@ func TestRejectDevice(t *testing.T) {
 			},
 		}
 
-		devauth := NewDevAuth(&db, nil, nil)
+		devauth := NewDevAuth(&db, nil, nil, nil)
 		err := devauth.RejectDevice("dummyid")
 
 		if tc.dbErr != "" || (tc.dbDelDevTokenErr != nil && tc.dbDelDevTokenErr != ErrTokenNotFound) {

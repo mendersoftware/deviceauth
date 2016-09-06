@@ -249,7 +249,8 @@ func (d *DevAuthHandler) UpdateDeviceStatusHandler(w rest.ResponseWriter, r *res
 	}
 
 	if status.Status == DevStatusAccepted {
-		err = da.AcceptDevice(devid)
+		ctx := ContextFromRequest(r)
+		err = da.WithContext(ctx).AcceptDevice(devid)
 	} else if status.Status == DevStatusRejected {
 		err = da.RejectDevice(devid)
 	}

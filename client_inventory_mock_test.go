@@ -14,14 +14,18 @@
 package main
 
 import (
+	"github.com/mendersoftware/deviceauth/log"
 	"github.com/mendersoftware/deviceauth/requestid"
 )
 
-type DevAuthWithContext struct {
-	DevAuth
-	ctx *RequestContext
+type MockInventoryClient struct {
+	mockAddDevice func(dev *Device, client requestid.ApiRequester) error
 }
 
-func (d *DevAuthWithContext) contextClientGetter() requestid.ApiRequester {
-	return requestid.NewTrackingApiClient(d.ctx.ReqId)
+func (c *MockInventoryClient) AddDevice(dev *Device, client requestid.ApiRequester) error {
+	return c.mockAddDevice(dev, client)
+}
+
+func (db *MockInventoryClient) UseLog(l *log.Logger) {
+	//nop
 }

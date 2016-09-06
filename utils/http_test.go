@@ -32,3 +32,11 @@ func TestBuildURL(t *testing.T) {
 
 	assert.Equal(t, "http://1.2.3.4:9999/api/1/some/foo/:bar", u.String())
 }
+
+func TestJoinURL(t *testing.T) {
+	assert.Equal(t, "http://foo:123/bar/baz", JoinURL("http://foo:123/bar", "baz"))
+	assert.Equal(t, "http://foo:123/bar/baz", JoinURL("http://foo:123/bar/", "baz"))
+	assert.Equal(t, "http://foo:123/bar/baz", JoinURL("http://foo:123/bar/", "baz"))
+	assert.Equal(t, "http://foo:123/bar/baz", JoinURL("http://foo:123/bar", "/baz"))
+	assert.Equal(t, "http://foo:123/bar/baz", JoinURL("http://foo:123/bar", "baz"))
+}

@@ -1,7 +1,7 @@
 {
 	"ImportPath": "github.com/mendersoftware/deviceauth",
 	"GoVersion": "go1.6",
-	"GodepVersion": "v74",
+	"GodepVersion": "v73",
 	"Deps": [
 		{
 			"ImportPath": "github.com/BurntSushi/toml",
@@ -150,6 +150,11 @@
 			"Rev": "b6e2fa371e64216a45e61072a96d4e3859f169da"
 		},
 		{
+			"ImportPath": "gopkg.in/mgo.v2/dbtest",
+			"Comment": "r2016.02.04-1-gb6e2fa3",
+			"Rev": "b6e2fa371e64216a45e61072a96d4e3859f169da"
+		},
+		{
 			"ImportPath": "gopkg.in/mgo.v2/internal/sasl",
 			"Comment": "r2016.02.04-1-gb6e2fa3",
 			"Rev": "b6e2fa371e64216a45e61072a96d4e3859f169da"
@@ -158,6 +163,10 @@
 			"ImportPath": "gopkg.in/mgo.v2/internal/scram",
 			"Comment": "r2016.02.04-1-gb6e2fa3",
 			"Rev": "b6e2fa371e64216a45e61072a96d4e3859f169da"
+		},
+		{
+			"ImportPath": "gopkg.in/tomb.v2",
+			"Rev": "14b3d72120e8d10ea6e6b7f87f7175734b1faab8"
 		},
 		{
 			"ImportPath": "gopkg.in/yaml.v2",
