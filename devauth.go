@@ -223,7 +223,7 @@ func (d *DevAuth) verifySeqNo(dev_id string, seq_no uint64) error {
 		return errors.Wrap(err, "db get auth requests error")
 	}
 
-	if r != nil {
+	if len(r) > 0 {
 		if seq_no <= r[0].SeqNo {
 			return ErrDevAuthUnauthorized
 		}
