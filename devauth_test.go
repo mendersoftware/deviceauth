@@ -274,13 +274,43 @@ func TestSubmitAuthRequest(t *testing.T) {
 			res: "",
 			err: errors.New("devadm add device error: failed to add device"),
 		},
+		{
+			//device exists in DB but has not sent any requests yet?
+			inReq: req,
+
+			devStatus: DevStatusPending,
+
+			getDevByIdKey: "pubkey",
+			getDevByIdErr: nil,
+
+			getDevByKeyId:  devId,
+			getDevByKeyErr: nil,
+
+			getAuthReqsSeqNo: 0, // invoke nil case
+			getAuthReqsErr:   nil,
+
+			addDeviceErr:  nil,
+			addAuthReqErr: nil,
+
+			devAdmErr: nil,
+
+			res: "",
+			err: ErrDevAuthUnauthorized,
+		},
 	}
 
-	for _, tc := range testCases {
+	for tcidx, tc := range testCases {
+		t.Logf("tc: %d", tcidx)
+
 		db := MockDataStore{
 			mockGetAuthRequests: func(device_id string, skip, limit int) ([]AuthReq, error) {
 				if tc.getAuthReqsErr != nil {
 					return nil, tc.getAuthReqsErr
+				}
+
+				if tc.getAuthReqsSeqNo == 0 {
+					// trigger empty slice
+					return []AuthReq{}, nil
 				}
 				return []AuthReq{AuthReq{SeqNo: tc.getAuthReqsSeqNo}}, nil
 			},
