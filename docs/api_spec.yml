@@ -219,6 +219,7 @@ paths:
         - pending -> accepted
         - pending -> rejected
         - rejected -> accepted
+        - accepted -> rejected
       parameters:
         - name: id
           in: path
