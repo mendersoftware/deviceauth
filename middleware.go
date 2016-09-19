@@ -137,6 +137,7 @@ func SetupMiddleware(api *rest.Api, mwtype string) error {
 		// Headers that can be exposed to JS
 		AccessControlExposeHeaders: []string{
 			"Location",
+			"Link",
 		},
 	})
 
