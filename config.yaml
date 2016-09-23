@@ -1,5 +1,13 @@
-# Config file placeholder
-
 #mongo: mongo-device-auth
 #devadm_url_add: "http://mender-device-adm:8080/api/0.1.0/devices"
 #server_priv_key_path: "/etc/rsa/private.pem"
+
+# HTTP Server middleware environment
+# Available values:
+#   dev
+#       development environment
+#   prod
+#       production environment
+#
+# Defaults to: prod
+middleware: dev
