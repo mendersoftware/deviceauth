@@ -1,4 +1,6 @@
 [![Build Status](https://travis-ci.com/mendersoftware/deviceauth.svg?token=rx8YqsZ2ZyaopcMPmDmo&branch=master)](https://travis-ci.com/mendersoftware/deviceauth)
+[![codecov](https://codecov.io/gh/mendersoftware/deviceauth/branch/master/graph/badge.svg)](https://codecov.io/gh/mendersoftware/deviceauth)
+[![Go Report Card](https://goreportcard.com/badge/github.com/mendersoftware/deviceauth)](https://goreportcard.com/report/github.com/mendersoftware/deviceauth)
 
 Mender: Device Authentication Service
 ==============================================
