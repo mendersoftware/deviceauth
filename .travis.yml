@@ -99,7 +99,7 @@ before_script:
     - go vet `go list ./... | grep -v /vendor/`
 
     # Fail builds when the cyclomatic complexity reaches 15 or more
-    - gocyclo -over 15 `find . -iname '*.go' | grep -v 'Godeps' | grep -v /vendor/ | grep -v '_test.go'`
+    - gocyclo -over 15 `find . -iname '*.go' | grep -v /vendor/ | grep -v '_test.go'`
 
     # Verify that the Swagger docs are valid
     - swagger validate docs/*.yml
@@ -110,11 +110,11 @@ before_script:
 
 script:
     # go list supply import paths for all sub directories.
-    # Exclude Godeps directory, we don't want to run tests and coverage for all dependencies every time,
+    # Exclude vendor direcotry, we don't want to run tests and coverage for all dependencies every time,
     # also including their coverage may introduce to much noice. Concentrate on the coverage of local packages.
     # Execute go test on every local subpackage (resolved as dependencies) and generate covreage report for each.
     # Test packages pararell (xargs -P)
-    - go list ./... | grep -v Godeps | grep -v /vendor/ | xargs -n1 -I {} -P 4 go test -v -covermode=count -coverprofile=../../../{}/coverage.txt {}
+    - go list ./... | grep -v /vendor/ | xargs -n1 -I {} -P 4 go test -v -covermode=atomic -coverprofile=../../../{}/coverage.txt {}
 
     # Insert build information into compiled binary using ldflags
     - CGO_ENABLED=0 go build -ldflags "-X main.Commit=`echo $TRAVIS_COMMIT` -X main.Tag=`echo $TRAVIS_TAG` -X main.Branch=`echo $TRAVIS_BRANCH` -X main.BuildNumber=`echo $TRAVIS_BUILD_NUMBER`"
@@ -123,7 +123,6 @@ script:
     - sudo docker build -t $DOCKER_REPOSITORY .
 
 after_success:
-
     # Integrate with https://codecov.io
     - bash <(curl -s https://codecov.io/bash)
 
