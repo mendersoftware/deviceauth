@@ -89,7 +89,7 @@
 		},
 		{
 			"ImportPath": "github.com/mendersoftware/mendertesting",
-			"Rev": "61c1243422ae83902d59267c1f3cff3443a14d20"
+			"Rev": "bc995f337d2788cbc9faca2af6f527007953e687"
 		},
 		{
 			"ImportPath": "github.com/mitchellh/mapstructure",
