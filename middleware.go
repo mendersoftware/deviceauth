@@ -34,7 +34,7 @@ var (
 
 		// logging
 		&requestlog.RequestLogMiddleware{},
-		&accesslog.AccessLogMiddleware{},
+		&accesslog.AccessLogMiddleware{Format: accesslog.SimpleLogFormat},
 		&rest.TimerMiddleware{},
 		&rest.RecorderMiddleware{},
 
@@ -57,7 +57,7 @@ var (
 
 		// logging
 		&requestlog.RequestLogMiddleware{},
-		&accesslog.AccessLogMiddleware{},
+		&accesslog.AccessLogMiddleware{Format: accesslog.SimpleLogFormat},
 		&rest.TimerMiddleware{},
 		&rest.RecorderMiddleware{},
 
