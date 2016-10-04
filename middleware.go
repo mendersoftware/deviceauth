@@ -15,9 +15,7 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"net/http"
-	"os"
 
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/mendersoftware/deviceauth/accesslog"
@@ -36,7 +34,7 @@ var (
 
 		// logging
 		&requestlog.RequestLogMiddleware{},
-		&accesslog.AccessLogMiddleware{},
+		&accesslog.AccessLogMiddleware{Format: accesslog.SimpleLogFormat},
 		&rest.TimerMiddleware{},
 		&rest.RecorderMiddleware{},
 
@@ -59,11 +57,7 @@ var (
 
 		// logging
 		&requestlog.RequestLogMiddleware{},
-		&accesslog.AccessLogMiddleware{},
-		&rest.AccessLogJsonMiddleware{
-			// No prefix or other fields, entire output is JSON encoded and could break it.
-			Logger: log.New(os.Stderr, "", 0),
-		},
+		&accesslog.AccessLogMiddleware{Format: accesslog.SimpleLogFormat},
 		&rest.TimerMiddleware{},
 		&rest.RecorderMiddleware{},
 
