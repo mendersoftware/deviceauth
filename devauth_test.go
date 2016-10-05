@@ -391,21 +391,24 @@ func TestSubmitAuthRequest(t *testing.T) {
 
 func TestAcceptDevice(t *testing.T) {
 	testCases := []struct {
-		dbErr  error
-		invErr error
+		dbUpdateErr error
+		dbGetErr    error
+		invErr      error
 
 		outErr string
 	}{
+		{},
 		{
-			dbErr: nil,
+			dbGetErr: ErrDevNotFound,
+			outErr:   ErrDevNotFound.Error(),
 		},
 		{
-			dbErr:  errors.New("failed to update device"),
-			outErr: "db update device error: failed to update device",
+			dbUpdateErr: errors.New("failed to update device"),
+			outErr:      "db update device error: failed to update device",
 		},
 		{
-			dbErr:  errors.New("inventory failed"),
-			outErr: "db update device error: inventory failed",
+			invErr: errors.New("inventory failed"),
+			outErr: "inventory device add error: failed to add device to inventory: inventory failed",
 		},
 	}
 
@@ -413,11 +416,18 @@ func TestAcceptDevice(t *testing.T) {
 		t.Logf("running %v", idx)
 		db := MockDataStore{
 			mockUpdateDevice: func(d *Device) error {
-				if tc.dbErr != nil {
-					return tc.dbErr
+				if tc.dbUpdateErr != nil {
+					return tc.dbUpdateErr
 				}
 
 				return nil
+			},
+			mockGetDeviceById: func(id string) (*Device, error) {
+				if tc.dbGetErr != nil {
+					return nil, tc.dbGetErr
+				}
+
+				return &Device{Id: id, Status: "pending"}, nil
 			},
 		}
 

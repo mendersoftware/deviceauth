@@ -247,6 +247,13 @@ func (*DevAuth) GetDevice(dev_id string) (*Device, error) {
 func (d *DevAuth) AcceptDevice(dev_id string) error {
 	updev := &Device{Id: dev_id, Status: DevStatusAccepted}
 
+	if _, err := d.db.GetDeviceById(dev_id); err != nil {
+		if err == ErrDevNotFound {
+			return err
+		}
+		return errors.Wrap(err, "db get device error")
+	}
+
 	if err := d.SubmitInventoryDevice(*updev); err != nil {
 		return errors.Wrap(err, "inventory device add error")
 	}
