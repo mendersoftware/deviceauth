@@ -239,6 +239,10 @@ func TestApiDevAuthSubmitAuthReq(t *testing.T) {
 		recorded := test.RunRequest(t, apih, tc.req)
 		recorded.CodeIs(tc.code)
 		recorded.BodyIs(tc.body)
+
+		if tc.code == http.StatusOK {
+			assert.Equal(t, "application/jwt", recorded.Recorder.HeaderMap.Get("Content-Type"))
+		}
 	}
 }
 

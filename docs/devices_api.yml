@@ -51,7 +51,7 @@ paths:
             * 'sub' - subject (auto-generated device ID)
             * 'jti' - token's unique identifier (tracked for the purpose of revocation)
           examples:
-              application/json:  eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.
+              application/jwt:   eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.
                                  eyJleHAiOjE0NzYxMTkxMzYsImp0aSI6Ijg1NGIzMTA5LTQ4NjItNGEyNS1h
                                  MWZiLWYxMTE2MWNlN2E4NCIsImlzcyI6Ik1lbmRlciIsInN1YiI6IjlmNzM2
                                  YmNiMjhiZmFhOTg5YjVmNWUxNDA5ZGJmMGVhYzdhNjYxMjZiNjMyZDAzYWYwZ
