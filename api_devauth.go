@@ -143,6 +143,7 @@ func (d *DevAuthHandler) SubmitAuthRequestHandler(w rest.ResponseWriter, r *rest
 		return
 	case nil:
 		w.(http.ResponseWriter).Write([]byte(token))
+		w.Header().Set("Content-Type", "application/jwt")
 		return
 	default:
 		restErrWithLogInternal(w, l, err)
