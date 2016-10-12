@@ -35,8 +35,6 @@ const (
 	uriDeviceStatus = "/api/0.1.0/devices/:id/status"
 
 	HdrAuthReqSign = "X-MEN-Signature"
-
-	LogHttpCode = "http_code"
 )
 
 var (
@@ -206,9 +204,10 @@ func (d *DevAuthHandler) VerifyTokenHandler(w rest.ResponseWriter, r *rest.Reque
 		case ErrTokenNotFound, ErrTokenInvalid:
 			code = http.StatusUnauthorized
 		default:
-			code = http.StatusInternalServerError
-			rest.Error(w, "internal error", code)
+			restErrWithLogInternal(w, l, err)
+			return
 		}
+		l.F(log.Ctx{}).Error(err)
 	}
 
 	w.WriteHeader(code)
@@ -278,7 +277,7 @@ func restErrWithLogInternal(w rest.ResponseWriter, l *log.Logger, e error) {
 // log full error
 func restErrWithLogMsg(w rest.ResponseWriter, l *log.Logger, e error, code int, msg string) {
 	rest.Error(w, msg, code)
-	l.F(log.Ctx{LogHttpCode: code}).Error(errors.Wrap(e, msg).Error())
+	l.F(log.Ctx{}).Error(errors.Wrap(e, msg).Error())
 }
 
 // Validate status.
