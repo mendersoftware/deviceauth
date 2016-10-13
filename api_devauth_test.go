@@ -30,8 +30,16 @@ import (
 )
 
 func RestError(status string) string {
-	msg, _ := json.Marshal(map[string]string{"error": status})
+	msg, _ := json.Marshal(map[string]interface{}{"error": status, "request_id": "test"})
 	return string(msg)
+}
+
+func runTestRequest(t *testing.T, handler http.Handler, req *http.Request, code int, body string) *test.Recorded {
+	req.Header.Add(requestid.RequestIdHeader, "test")
+	recorded := test.RunRequest(t, handler, req)
+	recorded.CodeIs(code)
+	recorded.BodyIs(body)
+	return recorded
 }
 
 func makeMockApiHandler(t *testing.T, f DevAuthFactory) http.Handler {
@@ -236,10 +244,7 @@ func TestApiDevAuthSubmitAuthReq(t *testing.T) {
 
 		apih := makeMockApiHandler(t, factory)
 
-		recorded := test.RunRequest(t, apih, tc.req)
-		recorded.CodeIs(tc.code)
-		recorded.BodyIs(tc.body)
-
+		recorded := runTestRequest(t, apih, tc.req, tc.code, tc.body)
 		if tc.code == http.StatusOK {
 			assert.Equal(t, "application/jwt", recorded.Recorder.HeaderMap.Get("Content-Type"))
 		}
@@ -350,9 +355,7 @@ func TestApiDevAuthUpdateStatusDevice(t *testing.T) {
 
 	for idx, tc := range tcases {
 		t.Logf("running %d", idx)
-		recorded := test.RunRequest(t, apih, tc.req)
-		recorded.CodeIs(tc.code)
-		recorded.BodyIs(tc.body)
+		recorded := runTestRequest(t, apih, tc.req, tc.code, tc.body)
 		for h, v := range tc.headers {
 			recorded.HeaderIs(h, v)
 		}
@@ -430,9 +433,7 @@ func TestApiDevAuthVerifyToken(t *testing.T) {
 		if len(tc.headers) > 0 {
 			tc.req.Header.Set("authorization", tc.headers["authorization"])
 		}
-		recorded := test.RunRequest(t, apih, tc.req)
-		recorded.CodeIs(tc.code)
-		recorded.BodyIs(tc.body)
+		runTestRequest(t, apih, tc.req, tc.code, tc.body)
 	}
 
 }
@@ -478,9 +479,7 @@ func TestApiDevAuthDeleteToken(t *testing.T) {
 			return &devauth, nil
 		}
 		apih := makeMockApiHandler(t, factory)
-		recorded := test.RunRequest(t, apih, tc.req)
-		recorded.CodeIs(tc.code)
-		recorded.BodyIs(tc.body)
+		runTestRequest(t, apih, tc.req, tc.code, tc.body)
 	}
 
 }
