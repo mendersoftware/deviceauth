@@ -41,6 +41,15 @@ func main() {
 
 	l := log.New(log.Ctx{})
 
+	HandleConfigFile(configPath, devSetup, l)
+
+	l.Printf("Device Authentication Service, version %s starting up",
+		CreateVersionString())
+
+	l.Fatal(RunServer(config.Config))
+}
+
+func HandleConfigFile(configPath string, devSetup bool, l *log.Logger) {
 	err := config.FromConfigFile(configPath, configDefaults)
 	if err != nil {
 		l.Fatalf("error loading configuration: %s", err)
@@ -51,8 +60,7 @@ func main() {
 		config.Config.Set(SettingMiddleware, EnvDev)
 	}
 
-	l.Printf("Device Authentication Service, version %s starting up",
-		CreateVersionString())
-
-	l.Fatal(RunServer(config.Config))
+	// Enable setting conig values by environment variables
+	config.Config.SetEnvPrefix("DEVICEAUTH")
+	config.Config.AutomaticEnv()
 }
