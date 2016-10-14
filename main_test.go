@@ -16,5 +16,5 @@ package main
 import "testing"
 
 func TestHandleConfigFile(t *testing.T) {
-    HandleConfigFile("", false, nil)
+	HandleConfigFile("", false, nil)
 }
