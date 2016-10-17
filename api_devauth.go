@@ -242,6 +242,8 @@ func (d *DevAuthHandler) UpdateDeviceStatusHandler(w rest.ResponseWriter, r *res
 		err = da.WithContext(ctx).AcceptDevice(devid)
 	} else if status.Status == DevStatusRejected {
 		err = da.RejectDevice(devid)
+	} else if status.Status == DevStatusPending {
+		err = da.ResetDevice(devid)
 	}
 	if err != nil {
 		if err == ErrDevNotFound {
@@ -292,9 +294,11 @@ func restErrWithLogMsg(w rest.ResponseWriter, r *rest.Request, l *log.Logger, e 
 // Expected statuses:
 // - "accepted"
 // - "rejected"
+// - "pending"
 func statusValidate(status *DevAuthApiStatus) error {
 	if status.Status != DevStatusAccepted &&
-		status.Status != DevStatusRejected {
+		status.Status != DevStatusRejected &&
+		status.Status != DevStatusPending {
 		return ErrIncorrectStatus
 	} else {
 		return nil
