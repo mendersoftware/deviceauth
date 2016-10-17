@@ -17,11 +17,7 @@ paths:
       description: |
         Sets the status of a given device to the selected value.
 
-        Valid transitions:
-        * 'pending' -> 'accepted'
-        * 'pending' -> 'rejected'
-        * 'accepted' -> 'rejected'
-        * 'rejected' -> 'accepted'
+        All possible transitions are valid.
 
       parameters:
         - name: id
