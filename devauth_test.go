@@ -503,3 +503,56 @@ func TestRejectDevice(t *testing.T) {
 		}
 	}
 }
+
+func TestResetDevice(t *testing.T) {
+	testCases := []struct {
+		dbErr            string
+		dbDelDevTokenErr error
+
+		outErr string
+	}{
+		{
+			dbErr:            "",
+			dbDelDevTokenErr: nil,
+		},
+		{
+			dbErr:            "failed to update device",
+			dbDelDevTokenErr: nil,
+			outErr:           "db update device error: failed to update device",
+		},
+		{
+			dbErr:            "",
+			dbDelDevTokenErr: ErrTokenNotFound,
+			outErr:           "db delete device token error: token not found",
+		},
+		{
+			dbErr:            "",
+			dbDelDevTokenErr: errors.New("some error"),
+			outErr:           "db delete device token error: some error",
+		},
+	}
+
+	for _, tc := range testCases {
+		db := MockDataStore{
+			mockUpdateDevice: func(d *Device) error {
+				if tc.dbErr != "" {
+					return errors.New(tc.dbErr)
+				}
+
+				return nil
+			},
+			mockDeleteTokenByDevId: func(dev_id string) error {
+				return tc.dbDelDevTokenErr
+			},
+		}
+
+		devauth := NewDevAuth(&db, nil, nil, nil)
+		err := devauth.ResetDevice("dummyid")
+
+		if tc.dbErr != "" || (tc.dbDelDevTokenErr != nil && tc.dbDelDevTokenErr != ErrTokenNotFound) {
+			assert.EqualError(t, err, tc.outErr)
+		} else {
+			assert.NoError(t, err)
+		}
+	}
+}

@@ -50,6 +50,7 @@ type DevAuthApp interface {
 	GetDevice(dev_id string) (*Device, error)
 	AcceptDevice(dev_id string) error
 	RejectDevice(dev_id string) error
+	ResetDevice(dev_id string) error
 	GetDeviceToken(dev_id string) (*Token, error)
 
 	RevokeToken(token_id string) error
@@ -274,6 +275,23 @@ func (d *DevAuth) RejectDevice(dev_id string) error {
 
 	// update device status
 	updev := &Device{Id: dev_id, Status: DevStatusRejected}
+
+	if err := d.db.UpdateDevice(updev); err != nil {
+		return errors.Wrap(err, "db update device error")
+	}
+
+	return nil
+}
+
+func (d *DevAuth) ResetDevice(dev_id string) error {
+	// delete device token
+	err := d.db.DeleteTokenByDevId(dev_id)
+	if err != nil && err != ErrTokenNotFound {
+		return errors.Wrap(err, "db delete device token error")
+	}
+
+	// update device status
+	updev := &Device{Id: dev_id, Status: DevStatusPending}
 
 	if err := d.db.UpdateDevice(updev); err != nil {
 		return errors.Wrap(err, "db update device error")
