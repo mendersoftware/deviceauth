@@ -27,14 +27,16 @@ var (
 func FromConfigFile(filePath string,
 	defaults []Default,
 	configValidators ...Validator) error {
-	Config.SetConfigFile(filePath)
 
 	// Set default values for config
 	SetDefaults(Config, defaults)
 
 	// Find and read the config file
-	if err := Config.ReadInConfig(); err != nil {
-		return errors.Wrap(err, "failed to read configuration")
+	if filePath != "" {
+		Config.SetConfigFile(filePath)
+		if err := Config.ReadInConfig(); err != nil {
+			return errors.Wrap(err, "failed to read configuration")
+		}
 	}
 
 	// Validate config
