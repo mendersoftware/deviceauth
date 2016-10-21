@@ -24,6 +24,7 @@ type MockDevAuth struct {
 	mockSubmitAuthRequestWithClient func(r *AuthReq, c requestid.ApiRequester) (string, error)
 	mockAcceptDevice                func(dev_id string) error
 	mockRejectDevice                func(dev_id string) error
+	mockResetDevice                 func(dev_id string) error
 	mockVerifyToken                 func(token string) error
 	mockRevokeToken                 func(tokenId string) error
 	mockWithContext                 func(ctx *RequestContext) DevAuthApp
@@ -55,6 +56,10 @@ func (mda *MockDevAuth) AcceptDevice(dev_id string) error {
 
 func (mda *MockDevAuth) RejectDevice(dev_id string) error {
 	return mda.mockRejectDevice(dev_id)
+}
+
+func (mda *MockDevAuth) ResetDevice(dev_id string) error {
+	return mda.mockResetDevice(dev_id)
 }
 
 func (mda *MockDevAuth) GetDeviceToken(dev_id string) (*Token, error) {

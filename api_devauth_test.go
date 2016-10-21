@@ -284,6 +284,7 @@ func TestApiDevAuthUpdateStatusDevice(t *testing.T) {
 	devauth := MockDevAuth{
 		mockAcceptDevice: mockaction,
 		mockRejectDevice: mockaction,
+		mockResetDevice:  mockaction,
 	}
 	devauth.mockWithContext = func(ctx *RequestContext) DevAuthApp {
 		return &devauth
@@ -299,6 +300,7 @@ func TestApiDevAuthUpdateStatusDevice(t *testing.T) {
 
 	accstatus := DevAuthApiStatus{"accepted"}
 	rejstatus := DevAuthApiStatus{"rejected"}
+	penstatus := DevAuthApiStatus{"pending"}
 
 	tcases := []struct {
 		req     *http.Request
@@ -346,6 +348,15 @@ func TestApiDevAuthUpdateStatusDevice(t *testing.T) {
 			req: test.MakeSimpleRequest("PUT",
 				"http://1.2.3.4/api/0.1.0/devices/foo/status",
 				rejstatus),
+			code: 303,
+			headers: map[string]string{
+				"Location": "http://1.2.3.4/api/0.1.0/devices/foo",
+			},
+		},
+		{
+			req: test.MakeSimpleRequest("PUT",
+				"http://1.2.3.4/api/0.1.0/devices/foo/status",
+				penstatus),
 			code: 303,
 			headers: map[string]string{
 				"Location": "http://1.2.3.4/api/0.1.0/devices/foo",

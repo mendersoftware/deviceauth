@@ -26,7 +26,7 @@ import (
 
 const (
 	// devices endpoint
-	DevAdmDevicesUri = "/api/0.1.0/devices"
+	DevAdmDevicesUri = "/api/0.1.0/devices/"
 	// default request timeout, 10s?
 	defaultDevAdmReqTimeout = time.Duration(10) * time.Second
 )
@@ -52,7 +52,6 @@ func (d *DevAdmClient) AddDevice(dev *Device, client requestid.ApiRequester) err
 	d.log.Debugf("add device %s for admission", dev.Id)
 
 	AdmReqJson, err := json.Marshal(AdmReq{
-		Id:     dev.Id,
 		IdData: dev.IdData,
 		PubKey: dev.PubKey,
 	})
@@ -63,8 +62,8 @@ func (d *DevAdmClient) AddDevice(dev *Device, client requestid.ApiRequester) err
 	contentReader := bytes.NewReader(AdmReqJson)
 
 	req, err := http.NewRequest(
-		http.MethodPost,
-		utils.JoinURL(d.conf.DevAdmAddr, DevAdmDevicesUri),
+		http.MethodPut,
+		utils.JoinURL(d.conf.DevAdmAddr, DevAdmDevicesUri+dev.Id),
 		contentReader)
 	if err != nil {
 		return errors.Wrapf(err, "failed to create request")
