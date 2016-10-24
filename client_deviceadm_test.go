@@ -29,7 +29,7 @@ func TestGetDevAdmClient(t *testing.T) {
 }
 
 func TestDevAdmClientReqSuccess(t *testing.T) {
-	s, rd := newMockServer(http.StatusCreated)
+	s, rd := newMockServer(http.StatusNoContent)
 	defer s.Close()
 
 	c := NewDevAdmClient(DevAdmClientConfig{
