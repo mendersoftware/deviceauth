@@ -77,7 +77,7 @@ func (d *DevAdmClient) AddDevice(dev *Device, client requestid.ApiRequester) err
 	}
 	defer rsp.Body.Close()
 
-	if rsp.StatusCode != http.StatusCreated {
+	if rsp.StatusCode != http.StatusNoContent {
 		return errors.Errorf(
 			"device add request failed with status %v", rsp.Status)
 	}
