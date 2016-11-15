@@ -1,0 +1,12 @@
+#!/bin/bash
+
+set -e
+
+DIR=$1
+
+[ -n "$DIR" ] || {
+    echo "usage: $(basename $0) <path-to-docker-dir>"
+    exit 1
+}
+
+(cd $DIR && docker build -t testing .)

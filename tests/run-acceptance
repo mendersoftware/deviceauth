@@ -1,0 +1,55 @@
+#!/bin/bash
+
+set -e
+
+SELFDIR=$(readlink -f $(dirname $0))
+
+usage() {
+    echo "usage: $(basename $0) <path-to-integration> [<file-to-copy>]"
+    echo
+    echo "  Sets up acceptance tests environment and runs tests defined"
+    echo "  in directory:"
+    echo "     $SELFDIR"
+    echo
+    echo "Environment variables:"
+    echo "   NO_CLEANUP - test environment will not be removed if NO_CLEANUP"
+    echo "                is not empty"
+
+}
+
+[ "$1" = "-h" -o "$1" = "--help" ] && {
+    usage
+    exit 0
+}
+
+INTEGRATION_PATH=$1
+
+[ -z "$INTEGRATION_PATH" -o ! -d "$INTEGRATION_PATH" ] && {
+    echo "integration repository path not provided"
+    usage
+    exit 1
+}
+shift
+
+if [ $# -ne 0 ]; then
+    echo "-- copying extra files"
+    for f in $*; do
+        cp -v $f $SELFDIR
+    done
+fi
+
+DEPS=${DEPS:-"mender-device-adm mender-device-auth mender-inventory"}
+
+COMPOSE_CMD="docker-compose -p acceptance-tests -f $INTEGRATION_PATH/docker-compose.yml"
+
+# spin up the environment
+$COMPOSE_CMD up -d $DEPS
+
+# start acceptance tests container
+TESTS_DIR=$SELFDIR \
+         $COMPOSE_CMD -f $SELFDIR/docker-compose.yml run acceptance || failed=1
+
+# fold everything
+[ -z "$NO_CLEANUP" ] && $COMPOSE_CMD down || true
+
+exit $failed
