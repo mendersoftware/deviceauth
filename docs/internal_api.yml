@@ -82,12 +82,11 @@ paths:
 
         Services which intend to use it should be correctly set up in the gateway's configuration.
      parameters:
-       - name: token
-         in: body
+       - name: Authorization
+         in: header
          description: The token in base64-encoded form.
          required: true
-         schema:
-           type: string
+         type: string
      responses:
         200:
             description: The token is valid.
