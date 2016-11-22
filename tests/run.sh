@@ -11,6 +11,8 @@ if [ -n "$1" ]; then
     HOST=$1
 fi
 
+sleep 5
+
 py.test-3 -s --tb=short --api=0.1.0  --host $HOST \
         --spec $DIR/internal_api.yml \
         --verbose --junitxml=$DIR/results.xml \
