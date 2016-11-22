@@ -42,9 +42,6 @@ DEPS=${DEPS:-"mender-device-adm mender-device-auth mender-inventory"}
 
 COMPOSE_CMD="docker-compose -p acceptance-tests -f $INTEGRATION_PATH/docker-compose.yml"
 
-# spin up the environment
-$COMPOSE_CMD up -d $DEPS
-
 # start acceptance tests container
 TESTS_DIR=$SELFDIR \
          $COMPOSE_CMD -f $SELFDIR/docker-compose.yml run acceptance || failed=1
