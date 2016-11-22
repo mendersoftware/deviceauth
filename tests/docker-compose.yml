@@ -1,0 +1,8 @@
+version: '2'
+services:
+    acceptance:
+        image: testing
+        networks:
+            - mender
+        volumes:
+            - "${TESTS_DIR}:/testing"

@@ -122,6 +122,15 @@ script:
     # Build docker image from docker file
     - sudo docker build -t $DOCKER_REPOSITORY .
 
+    # Build acceptance tests container
+    - ./tests/build-acceptance ./tests
+
+    # Clone integration repo. for api testing (purposely after license checking..)
+    - git clone https://github.com/mendersoftware/integration.git
+
+    # Run dependant microservices and the service itself
+    - ./tests/run-acceptance $PWD/integration ./docs/internal_api.yml
+
 after_success:
     # Integrate with https://codecov.io
     - bash <(curl -s https://codecov.io/bash)
