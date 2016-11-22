@@ -5,7 +5,7 @@ set -e
 SELFDIR=$(readlink -f $(dirname $0))
 
 usage() {
-    echo "usage: $(basename $0) <path-to-integration> [<file-to-copy>]"
+    echo "usage: $(basename $0) <path-to-integration> <path-to-acceptance-compose-file>]"
     echo
     echo "  Sets up acceptance tests environment and runs tests defined"
     echo "  in directory:"
@@ -31,20 +31,20 @@ INTEGRATION_PATH=$1
 }
 shift
 
-if [ $# -ne 0 ]; then
-    echo "-- copying extra files"
-    for f in $*; do
-        cp -v $f $SELFDIR
-    done
-fi
+TESTS_COMPOSE_PATH=$1
 
-DEPS=${DEPS:-"mender-device-adm mender-device-auth mender-inventory"}
+[ -z "$TESTS_COMPOSE_PATH" -o ! -f "$TESTS_COMPOSE_PATH" ] && {
+    echo "tests compose path not provided"
+    usage
+    exit 1
+}
+shift
 
 COMPOSE_CMD="docker-compose -p acceptance-tests -f $INTEGRATION_PATH/docker-compose.yml"
+TEST_SERVICE=${TEST_SERVICE:-"acceptance"}
 
 # start acceptance tests container
-TESTS_DIR=$SELFDIR \
-         $COMPOSE_CMD -f $SELFDIR/docker-compose.yml run acceptance || failed=1
+$COMPOSE_CMD -f $TESTS_COMPOSE_PATH run ${TEST_SERVICE} || failed=1
 
 # fold everything
 [ -z "$NO_CLEANUP" ] && $COMPOSE_CMD down || true
