@@ -81,7 +81,7 @@ class TestToken(Client):
         rsp = requests.delete(self.make_api_url('/tokens/{}'.format(tclaims['jti'])))
         assert rsp.status_code == 204
 
-        # successful verification
+        # unsuccessful verification
         rsp = requests.post(verify_url, data='',
                             headers={'Authorization': auth_hdr})
         assert rsp.status_code == 401
