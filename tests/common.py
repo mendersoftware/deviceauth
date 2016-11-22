@@ -57,9 +57,9 @@ class Device(object):
 
 
 class DevAuthorizer(object):
-    def __init__(self):
+    def __init__(self, seqno=None):
         self.tenant_token = "dummy"
-        self.seqno = count(1)
+        self.seqno = seqno or count(1)
 
     def make_req_payload(self, dev):
         """Make auth request for given device. Returns a tuple (payload, signature)"""
