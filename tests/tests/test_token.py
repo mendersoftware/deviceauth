@@ -85,3 +85,44 @@ class TestToken(Client):
         rsp = requests.post(verify_url, data='',
                             headers={'Authorization': auth_hdr})
         assert rsp.status_code == 401
+
+    def test_token_seqnum(self):
+        from itertools import repeat, count
+
+        d = Device()
+        da = DevAuthorizer(seqno=repeat(1))
+        # replace sequence number generator
+
+        url = self.make_api_url("/auth_requests")
+
+        # generate fake identity
+        devid = make_devid(d.identity)
+
+        # poke devauth so that device appears
+        rsp = device_auth_req(url, da, d)
+        assert rsp.status_code == 401
+
+        try:
+            self.accept_device(devid)
+        except bravado.exception.HTTPError as e:
+            assert e.response.status_code == 200
+
+        # device is accepted, but we're going to request a token using the same
+        # sequence number as before
+        rsp = device_auth_req(url, da, d)
+        assert rsp.status_code == 401
+
+        # try again with proper counter now
+        da.seqno = count(next(da.seqno) + 1)
+        rsp = device_auth_req(url, da, d)
+        assert rsp.status_code == 200
+
+        da.parse_rsp_payload(d, rsp.text)
+
+        assert len(d.token) > 0
+        self.log.info("device token: %s", d.token)
+
+        # again, but fix seqno once more
+        da.seqno = repeat(1)
+        rsp = device_auth_req(url, da, d)
+        assert rsp.status_code == 401
