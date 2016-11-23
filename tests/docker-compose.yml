@@ -6,3 +6,7 @@ services:
             - mender
         volumes:
             - "${TESTS_DIR}:/testing"
+        depends_on:
+            - mender-device-adm
+            - mender-device-auth
+            - mender-inventory
