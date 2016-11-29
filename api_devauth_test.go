@@ -17,6 +17,9 @@ import (
 	"crypto/rsa"
 	"encoding/json"
 	"errors"
+	"net/http"
+	"testing"
+
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/ant0ine/go-json-rest/rest/test"
 	"github.com/mendersoftware/deviceauth/config"
@@ -25,8 +28,6 @@ import (
 	"github.com/mendersoftware/deviceauth/requestlog"
 	mtest "github.com/mendersoftware/deviceauth/test"
 	"github.com/stretchr/testify/assert"
-	"net/http"
-	"testing"
 )
 
 func RestError(status string) string {

@@ -15,11 +15,12 @@ package main
 
 import (
 	"errors"
+	"testing"
+
 	"github.com/mendersoftware/deviceauth/config"
 	"github.com/mendersoftware/deviceauth/log"
 	"github.com/mendersoftware/deviceauth/requestid"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestGetDevAuth(t *testing.T) {

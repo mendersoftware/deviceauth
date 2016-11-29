@@ -14,13 +14,14 @@
 package main
 
 import (
+	"net/http"
+	"time"
+
 	"github.com/mendersoftware/deviceauth/config"
 	"github.com/mendersoftware/deviceauth/log"
 	"github.com/mendersoftware/deviceauth/requestid"
 	"github.com/mendersoftware/deviceauth/utils"
 	"github.com/pkg/errors"
-	"net/http"
-	"time"
 )
 
 var (

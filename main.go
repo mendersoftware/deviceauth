@@ -15,6 +15,7 @@ package main
 
 import (
 	"flag"
+
 	"github.com/mendersoftware/deviceauth/config"
 	"github.com/mendersoftware/deviceauth/log"
 )

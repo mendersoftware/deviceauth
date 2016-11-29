@@ -17,12 +17,13 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
+	"io/ioutil"
+	"time"
+
 	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/mendersoftware/deviceauth/log"
 	"github.com/pkg/errors"
 	"github.com/satori/go.uuid"
-	"io/ioutil"
-	"time"
 )
 
 var (

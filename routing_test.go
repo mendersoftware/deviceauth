@@ -14,13 +14,14 @@
 package main
 
 import (
-	"github.com/ant0ine/go-json-rest/rest"
-	rtest "github.com/ant0ine/go-json-rest/rest/test"
-	"github.com/mendersoftware/deviceauth/utils"
 	"net/http"
 	"reflect"
 	"runtime"
 	"testing"
+
+	"github.com/ant0ine/go-json-rest/rest"
+	rtest "github.com/ant0ine/go-json-rest/rest/test"
+	"github.com/mendersoftware/deviceauth/utils"
 )
 
 func TestSupportsMethod(t *testing.T) {

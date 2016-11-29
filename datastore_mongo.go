@@ -15,13 +15,14 @@
 package main
 
 import (
+	"sync"
+	"time"
+
 	"github.com/mendersoftware/deviceauth/config"
 	"github.com/mendersoftware/deviceauth/log"
 	"github.com/pkg/errors"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
-	"sync"
-	"time"
 )
 
 const (

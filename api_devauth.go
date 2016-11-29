@@ -15,6 +15,9 @@ package main
 
 import (
 	"encoding/json"
+	"net/http"
+	"strings"
+
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/mendersoftware/deviceauth/config"
 	"github.com/mendersoftware/deviceauth/log"
@@ -22,8 +25,6 @@ import (
 	"github.com/mendersoftware/deviceauth/requestlog"
 	"github.com/mendersoftware/deviceauth/utils"
 	"github.com/pkg/errors"
-	"net/http"
-	"strings"
 )
 
 const (

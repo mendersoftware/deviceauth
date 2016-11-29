@@ -15,10 +15,11 @@ package main
 
 import (
 	"crypto/rsa"
-	"github.com/mendersoftware/deviceauth/test"
-	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
+
+	"github.com/mendersoftware/deviceauth/test"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNewJWTAgent(t *testing.T) {
