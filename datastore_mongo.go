@@ -18,7 +18,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mendersoftware/deviceauth/config"
 	"github.com/mendersoftware/deviceauth/log"
 	"github.com/pkg/errors"
 	"gopkg.in/mgo.v2"
@@ -46,8 +45,8 @@ type DataStoreMongo struct {
 	log     *log.Logger
 }
 
-func GetDataStoreMongo(c config.Reader, l *log.Logger) (*DataStoreMongo, error) {
-	d, err := NewDataStoreMongo(c.GetString(SettingDb))
+func GetDataStoreMongo(db string, l *log.Logger) (*DataStoreMongo, error) {
+	d, err := NewDataStoreMongo(db)
 	if err != nil {
 		return nil, errors.Wrap(err, "database connection failed")
 	}

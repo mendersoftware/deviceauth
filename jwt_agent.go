@@ -15,9 +15,6 @@ package main
 
 import (
 	"crypto/rsa"
-	"crypto/x509"
-	"encoding/pem"
-	"io/ioutil"
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
@@ -47,8 +44,8 @@ const (
 )
 
 type JWTAgentConfig struct {
-	// path to server private key
-	ServerPrivKeyPath string
+	// server private key
+	PrivateKey *rsa.PrivateKey
 	// expiration timeout in seconds
 	ExpirationTimeout int64
 	// token issuer
@@ -124,41 +121,16 @@ func (j *JWTAgent) UseLog(l *log.Logger) {
 	j.log = l.F(log.Ctx{})
 }
 
-func getRSAPrivKey(privKeyPath string) (*rsa.PrivateKey, error) {
-	// read key from file
-	pemData, err := ioutil.ReadFile(privKeyPath)
-	if err != nil {
-		return nil, errors.Wrap(err, ErrMsgPrivKeyReadFailed)
-	}
-	// decode pem key
-	block, _ := pem.Decode(pemData)
-	if block == nil {
-		return nil, errors.New(ErrMsgPrivKeyNotPEMEncoded)
-	}
-	// check if it is a RSA PRIVATE KEY
-	if got, want := block.Type, "RSA PRIVATE KEY"; got != want {
-		return nil, errors.Errorf(
-			"unknown server private key type; got: %s, want: %s", got, want)
-	}
-	// return parsed key
-	return x509.ParsePKCS1PrivateKey(block.Bytes)
-}
-
 // Generates token Id - actually token Id is a UUID v4
 func generateTokenId() string {
 	return uuid.NewV4().String()
 }
 
-func NewJWTAgent(c JWTAgentConfig) (*JWTAgent, error) {
-	// get RSA private key structure from pem key file
-	priv, err := getRSAPrivKey(c.ServerPrivKeyPath)
-	if err != nil {
-		return nil, err
-	}
+func NewJWTAgent(c JWTAgentConfig) *JWTAgent {
 	return &JWTAgent{
-		privKey:    priv,
+		privKey:    c.PrivateKey,
 		issuer:     c.Issuer,
 		expTimeout: c.ExpirationTimeout,
 		log:        log.New(log.Ctx{}),
-	}, nil
+	}
 }

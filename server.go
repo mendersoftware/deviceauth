@@ -14,6 +14,7 @@
 package main
 
 import (
+	"crypto/rsa"
 	"net/http"
 
 	"github.com/ant0ine/go-json-rest/rest"
@@ -37,16 +38,53 @@ func SetupAPI(stacktype string) (*rest.Api, error) {
 	return api, nil
 }
 
+// DevAuthAppFor returns a factory function that creates DevAuthApp and sets it
+// up using `c` as configuration source and `key` as private key.
+func DevAuthAppFor(c config.Reader, key *rsa.PrivateKey) DevAuthFactory {
+	return func(l *log.Logger) (DevAuthApp, error) {
+		db, err := GetDataStoreMongo(c.GetString(SettingDb), l)
+		if err != nil {
+			return nil, errors.Wrap(err, "database connection failed")
+		}
+
+		jwtHandler := NewJWTAgent(JWTAgentConfig{
+			PrivateKey:        key,
+			ExpirationTimeout: int64(c.GetInt(SettingJWTExpirationTimeout)),
+			Issuer:            c.GetString(SettingJWTIssuer),
+		})
+
+		devAdmClientConf := DevAdmClientConfig{
+			DevAdmAddr: c.GetString(SettingDevAdmAddr),
+		}
+		invClientConf := InventoryClientConfig{
+			InventoryAddr: c.GetString(SettingInventoryAddr),
+		}
+
+		devauth := NewDevAuth(db,
+			NewDevAdmClient(devAdmClientConf),
+			NewInventoryClient(invClientConf),
+			jwtHandler)
+		devauth.UseLog(l)
+
+		return devauth, nil
+	}
+}
+
 func RunServer(c config.Reader) error {
 
 	l := log.New(log.Ctx{})
+
+	privKey, err := loadRSAPrivKey(c.GetString(SettingServerPrivKeyPath))
+	if err != nil {
+		return errors.Wrap(err, "failed to read rsa private key")
+	}
 
 	api, err := SetupAPI(c.GetString(SettingMiddleware))
 	if err != nil {
 		return errors.Wrap(err, "API setup failed")
 	}
 
-	devauthapi := NewDevAuthApiHandler(GetDevAuth)
+	devauthapi := NewDevAuthApiHandler(DevAuthAppFor(c, privKey))
 
 	apph, err := devauthapi.GetApp()
 	if err != nil {
