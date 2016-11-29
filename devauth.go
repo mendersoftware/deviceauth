@@ -14,13 +14,13 @@
 package main
 
 import (
-	"github.com/mendersoftware/deviceauth/config"
+	"net/http"
+	"time"
+
 	"github.com/mendersoftware/deviceauth/log"
 	"github.com/mendersoftware/deviceauth/requestid"
 	"github.com/mendersoftware/deviceauth/utils"
 	"github.com/pkg/errors"
-	"net/http"
-	"time"
 )
 
 var (
@@ -67,41 +67,6 @@ type DevAuth struct {
 	jwt          JWTAgentApp
 	log          *log.Logger
 	clientGetter ApiClientGetter
-}
-
-// GetDevAuth factory func returning a new DevAuth based on the
-// given config
-func GetDevAuth(c config.Reader, l *log.Logger) (DevAuthApp, error) {
-	db, err := GetDataStoreMongo(c, l)
-	if err != nil {
-		return nil, errors.Wrap(err, "database connection failed")
-	}
-
-	jwtAgentConf := JWTAgentConfig{
-		ServerPrivKeyPath: c.GetString(SettingServerPrivKeyPath),
-		ExpirationTimeout: int64(c.GetInt(SettingJWTExpirationTimeout)),
-		Issuer:            c.GetString(SettingJWTIssuer),
-	}
-
-	devAdmClientConf := DevAdmClientConfig{
-		DevAdmAddr: c.GetString(SettingDevAdmAddr),
-	}
-	invClientConf := InventoryClientConfig{
-		InventoryAddr: c.GetString(SettingInventoryAddr),
-	}
-
-	jwt, err := NewJWTAgent(jwtAgentConf)
-	if err != nil {
-		return nil, errors.Wrap(err, "cannot create JWT agent")
-	}
-
-	devauth := NewDevAuth(db,
-		NewDevAdmClient(devAdmClientConf),
-		NewInventoryClient(invClientConf),
-		jwt)
-	devauth.UseLog(l)
-
-	return devauth, nil
 }
 
 func NewDevAuth(d DataStore, cda DevAdmClientI, ci InventoryClientI, jwt JWTAgentApp) DevAuthApp {

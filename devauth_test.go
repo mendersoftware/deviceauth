@@ -15,45 +15,11 @@ package main
 
 import (
 	"errors"
-	"github.com/mendersoftware/deviceauth/config"
-	"github.com/mendersoftware/deviceauth/log"
+	"testing"
+
 	"github.com/mendersoftware/deviceauth/requestid"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
-
-func TestGetDevAuth(t *testing.T) {
-	//this will ping the db, so it;s a 'long' test
-	if testing.Short() {
-		t.Skip("skipping TestGetDevAuth in short mode.")
-	}
-
-	// GetDevAuth will initialize data store that tries to connect to a DB
-	// specified in configuration. Since we are using dbtest, an on demand DB will
-	// be started. However we still need to figure out the address the test
-	// instance is listening on, so that we can set it in DevAuth configuration.
-	// configuration.
-	session := db.Session()
-	defer session.Close()
-	dbs := session.LiveServers()
-	assert.Len(t, dbs, 1)
-
-	dbaddr := dbs[0]
-	t.Logf("test db address: %s", dbaddr)
-
-	config.SetDefaults(config.Config, configDefaults)
-	config.Config.Set(SettingDb, dbaddr)
-	config.Config.Set(SettingServerPrivKeyPath, "testdata/private.pem")
-	d, err := GetDevAuth(config.Config, log.New(log.Ctx{}))
-	// we expect the test to fail as there's no locally running DB
-	assert.NoError(t, err)
-	assert.NotNil(t, d)
-
-	// cleanup DB session
-	da, _ := d.(*DevAuth)
-	mdb, _ := da.db.(*DataStoreMongo)
-	mdb.session.Close()
-}
 
 func TestSubmitAuthRequest(t *testing.T) {
 	req := AuthReq{

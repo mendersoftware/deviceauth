@@ -17,16 +17,16 @@ import (
 	"crypto/rsa"
 	"encoding/json"
 	"errors"
+	"net/http"
+	"testing"
+
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/ant0ine/go-json-rest/rest/test"
-	"github.com/mendersoftware/deviceauth/config"
 	"github.com/mendersoftware/deviceauth/log"
 	"github.com/mendersoftware/deviceauth/requestid"
 	"github.com/mendersoftware/deviceauth/requestlog"
 	mtest "github.com/mendersoftware/deviceauth/test"
 	"github.com/stretchr/testify/assert"
-	"net/http"
-	"testing"
 )
 
 func RestError(status string) string {
@@ -238,7 +238,7 @@ func TestApiDevAuthSubmitAuthReq(t *testing.T) {
 			return &devauth
 		}
 
-		factory := func(c config.Reader, l *log.Logger) (DevAuthApp, error) {
+		factory := func(l *log.Logger) (DevAuthApp, error) {
 			return &devauth, nil
 		}
 
@@ -290,7 +290,7 @@ func TestApiDevAuthUpdateStatusDevice(t *testing.T) {
 		return &devauth
 	}
 
-	factory := func(c config.Reader, l *log.Logger) (DevAuthApp, error) {
+	factory := func(l *log.Logger) (DevAuthApp, error) {
 		return &devauth, nil
 	}
 
@@ -437,7 +437,7 @@ func TestApiDevAuthVerifyToken(t *testing.T) {
 				return tc.err
 			},
 		}
-		factory := func(c config.Reader, l *log.Logger) (DevAuthApp, error) {
+		factory := func(l *log.Logger) (DevAuthApp, error) {
 			return &devauth, nil
 		}
 		apih := makeMockApiHandler(t, factory)
@@ -486,7 +486,7 @@ func TestApiDevAuthDeleteToken(t *testing.T) {
 				return tc.err
 			},
 		}
-		factory := func(c config.Reader, l *log.Logger) (DevAuthApp, error) {
+		factory := func(l *log.Logger) (DevAuthApp, error) {
 			return &devauth, nil
 		}
 		apih := makeMockApiHandler(t, factory)

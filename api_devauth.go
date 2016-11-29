@@ -15,15 +15,15 @@ package main
 
 import (
 	"encoding/json"
+	"net/http"
+	"strings"
+
 	"github.com/ant0ine/go-json-rest/rest"
-	"github.com/mendersoftware/deviceauth/config"
 	"github.com/mendersoftware/deviceauth/log"
 	"github.com/mendersoftware/deviceauth/requestid"
 	"github.com/mendersoftware/deviceauth/requestlog"
 	"github.com/mendersoftware/deviceauth/utils"
 	"github.com/pkg/errors"
-	"net/http"
-	"strings"
 )
 
 const (
@@ -43,7 +43,7 @@ var (
 	ErrNoAuthHeader    = errors.New("no authorization header")
 )
 
-type DevAuthFactory func(c config.Reader, l *log.Logger) (DevAuthApp, error)
+type DevAuthFactory func(l *log.Logger) (DevAuthApp, error)
 
 type DevAuthHandler struct {
 	createDevAuth DevAuthFactory
@@ -90,7 +90,7 @@ func (d *DevAuthHandler) GetApp() (rest.App, error) {
 func (d *DevAuthHandler) SubmitAuthRequestHandler(w rest.ResponseWriter, r *rest.Request) {
 	l := requestlog.GetRequestLogger(r.Env)
 
-	da, err := d.createDevAuth(config.Config, l)
+	da, err := d.createDevAuth(l)
 	if err != nil {
 		restErrWithLogInternal(w, r, l, err)
 	}
@@ -163,7 +163,7 @@ func (d *DevAuthHandler) GetDeviceTokenHandler(w rest.ResponseWriter, r *rest.Re
 func (d *DevAuthHandler) DeleteTokenHandler(w rest.ResponseWriter, r *rest.Request) {
 	l := requestlog.GetRequestLogger(r.Env)
 
-	da, err := d.createDevAuth(config.Config, l)
+	da, err := d.createDevAuth(l)
 	if err != nil {
 		restErrWithLogInternal(w, r, l, err)
 	}
@@ -186,7 +186,7 @@ func (d *DevAuthHandler) DeleteTokenHandler(w rest.ResponseWriter, r *rest.Reque
 func (d *DevAuthHandler) VerifyTokenHandler(w rest.ResponseWriter, r *rest.Request) {
 	l := requestlog.GetRequestLogger(r.Env)
 
-	da, err := d.createDevAuth(config.Config, l)
+	da, err := d.createDevAuth(l)
 	if err != nil {
 		restErrWithLogInternal(w, r, l, err)
 	}
@@ -217,7 +217,7 @@ func (d *DevAuthHandler) VerifyTokenHandler(w rest.ResponseWriter, r *rest.Reque
 func (d *DevAuthHandler) UpdateDeviceStatusHandler(w rest.ResponseWriter, r *rest.Request) {
 	l := requestlog.GetRequestLogger(r.Env)
 
-	da, err := d.createDevAuth(config.Config, l)
+	da, err := d.createDevAuth(l)
 	if err != nil {
 		restErrWithLogInternal(w, r, l, err)
 	}

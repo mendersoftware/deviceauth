@@ -14,12 +14,13 @@
 package main
 
 import (
-	"github.com/mendersoftware/deviceauth/log"
-	"github.com/stretchr/testify/assert"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"github.com/mendersoftware/deviceauth/log"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestGetDevAdmClient(t *testing.T) {

@@ -14,12 +14,12 @@
 package main
 
 import (
+	"net/http"
+	"testing"
+
 	"github.com/mendersoftware/deviceauth/log"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
-
-	"net/http"
-	"testing"
 )
 
 func TestInventoryClientGet(t *testing.T) {

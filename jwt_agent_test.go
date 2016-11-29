@@ -15,80 +15,41 @@ package main
 
 import (
 	"crypto/rsa"
-	"github.com/mendersoftware/deviceauth/test"
-	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
+
+	"github.com/mendersoftware/deviceauth/test"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNewJWTAgent(t *testing.T) {
-	testCases := []struct {
-		privKeyPath string
-		privKey     *rsa.PrivateKey
-		issuer      string
-		err         string
-	}{
-		{
-			privKeyPath: "testdata/private.pem",
-			privKey:     test.LoadPrivKey("testdata/private.pem", t),
-			issuer:      "Mender",
-			err:         "",
-		},
-		{
-			privKeyPath: "wrong_path",
-			privKey:     nil,
-			issuer:      "",
-			err:         ErrMsgPrivKeyReadFailed + ": open wrong_path: no such file or directory",
-		},
-		{
-			privKeyPath: "testdata/private_broken.pem",
-			privKey:     nil,
-			issuer:      "",
-			err:         ErrMsgPrivKeyNotPEMEncoded,
-		},
-		{
-			privKeyPath: "testdata/public.pem",
-			privKey:     nil,
-			issuer:      "",
-			err:         "unknown server private key type; got: PUBLIC KEY, want: RSA PRIVATE KEY",
-		},
+	c := JWTAgentConfig{
+		PrivateKey:        nil,
+		ExpirationTimeout: 1234,
+		Issuer:            "foo",
 	}
 
-	for _, tc := range testCases {
-		c := JWTAgentConfig{
-			ServerPrivKeyPath: tc.privKeyPath,
-			Issuer:            tc.issuer,
-		}
-
-		jwt, err := NewJWTAgent(c)
-		if tc.err != "" {
-			assert.EqualError(t, err, tc.err)
-		} else {
-			assert.NoError(t, err)
-			assert.Equal(t, tc.privKey, jwt.privKey)
-			assert.Equal(t, tc.issuer, jwt.issuer)
-		}
-	}
+	jwt := NewJWTAgent(c)
+	assert.NotNil(t, jwt)
 }
 
 func TestGenerateTokenSignRS256(t *testing.T) {
 	testCases := []struct {
-		privKeyPath string
-		devId       string
+		privKey *rsa.PrivateKey
+		devId   string
 	}{
 		{
-			privKeyPath: "testdata/private.pem",
-			devId:       "deviceId",
+			privKey: test.LoadPrivKey("testdata/private.pem", t),
+			devId:   "deviceId",
 		},
 	}
 	for _, tc := range testCases {
 		c := JWTAgentConfig{
-			ServerPrivKeyPath: tc.privKeyPath,
+			PrivateKey:        tc.privKey,
 			Issuer:            "Mender",
 			ExpirationTimeout: 1,
 		}
-		jwt, err := NewJWTAgent(c)
-		assert.NoError(t, err)
+		jwt := NewJWTAgent(c)
 		token, err := jwt.GenerateTokenSignRS256(tc.devId)
 		assert.NoError(t, err)
 		assert.Equal(t, tc.devId, token.DevId)
@@ -96,35 +57,37 @@ func TestGenerateTokenSignRS256(t *testing.T) {
 }
 
 func TestValidateTokenSignRS256(t *testing.T) {
+
+	key := test.LoadPrivKey("testdata/private.pem", t)
+
 	testCases := []struct {
-		privKeyPath string
-		devId       string
-		expiration  int64
-		err         error
-		delay       int64
+		privKey    *rsa.PrivateKey
+		devId      string
+		expiration int64
+		err        error
+		delay      int64
 	}{
 		{
-			privKeyPath: "testdata/private.pem",
-			devId:       "deviceId",
-			expiration:  time.Now().Unix() + 123,
-			err:         nil,
+			privKey:    key,
+			devId:      "deviceId",
+			expiration: time.Now().Unix() + 123,
+			err:        nil,
 		},
 		{
-			privKeyPath: "testdata/private.pem",
-			devId:       "deviceId",
-			expiration:  0,
-			err:         ErrTokenExpired,
-			delay:       1,
+			privKey:    key,
+			devId:      "deviceId",
+			expiration: 0,
+			err:        ErrTokenExpired,
+			delay:      1,
 		},
 	}
 	for _, tc := range testCases {
 		c := JWTAgentConfig{
-			ServerPrivKeyPath: tc.privKeyPath,
+			PrivateKey:        tc.privKey,
 			Issuer:            "Mender",
 			ExpirationTimeout: tc.expiration,
 		}
-		jwt, err := NewJWTAgent(c)
-		assert.NoError(t, err)
+		jwt := NewJWTAgent(c)
 		token, err := jwt.GenerateTokenSignRS256(tc.devId)
 		assert.NoError(t, err)
 		assert.Equal(t, tc.devId, token.DevId)

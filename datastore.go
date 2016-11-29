@@ -16,6 +16,7 @@ package main
 
 import (
 	"errors"
+
 	"github.com/mendersoftware/deviceauth/log"
 )
 
