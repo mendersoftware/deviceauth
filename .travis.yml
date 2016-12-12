@@ -120,7 +120,7 @@ script:
     - CGO_ENABLED=0 go build -ldflags "-X main.Commit=`echo $TRAVIS_COMMIT` -X main.Tag=`echo $TRAVIS_TAG` -X main.Branch=`echo $TRAVIS_BRANCH` -X main.BuildNumber=`echo $TRAVIS_BUILD_NUMBER`"
 
     # Build docker image from docker file
-    - sudo docker build -t $DOCKER_REPOSITORY .
+    # - sudo docker build -t $DOCKER_REPOSITORY .
 
     # Build acceptance tests container
     - ./tests/build-acceptance ./tests ./docs/internal_api.yml
