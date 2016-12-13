@@ -10,3 +10,6 @@ services:
             - mender-device-adm
             - mender-device-auth
             - mender-inventory
+    mender-device-auth:
+            # built/tagged locally and only used for testing
+            image: mendersoftware/deviceauth
