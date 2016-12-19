@@ -56,13 +56,14 @@ shift
 
 
 [ "$TEST_TYPE" == "acceptance" ] && {
-    COMPOSE_CMD="docker-compose -p acceptance-tests -f $INTEGRATION_PATH/docker-compose.yml"
+    COMPOSE_CMD="docker-compose -p acceptance-tests -f $INTEGRATION_PATH/docker-compose.yml -f $INTEGRATION_PATH/docker-compose.client.yml -f $INTEGRATION_PATH/docker-compose.demo.yml"
     TEST_SERVICE=${TEST_SERVICE:-"acceptance"}
     $COMPOSE_CMD -f $TESTS_COMPOSE_PATH run ${TEST_SERVICE} || failed=1
 }
 
 [ "$TEST_TYPE" == "integration" ] && {
-    COMPOSE_CMD="docker-compose -f $INTEGRATION_PATH/docker-compose.yml"
+    ( cd "$INTEGRATION_PATH" ; bash up -n )
+    COMPOSE_CMD="docker-compose -f $INTEGRATION_PATH/docker-compose.yml -f $INTEGRATION_PATH/docker-compose.client.yml -f $INTEGRATION_PATH/docker-compose.demo.yml"
     $COMPOSE_CMD -f $TESTS_COMPOSE_PATH up -d || failed=1
 }
 

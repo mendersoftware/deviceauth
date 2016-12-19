@@ -12,6 +12,10 @@ go:
     - 1.6
 
 env:
+    matrix:
+        - JOB_TYPE=compile_and_basic_tests
+        - JOB_TYPE=compile_and_integration_tests
+
     global:
         # Should be encrypted or set as private travis variables (in travis settings):
         # AWS_ACCESS_KEY_ID
@@ -64,6 +68,9 @@ env:
         - DEPLOY_REPO=${DEPLOY_REPO_OVERRIDE:-$DEPLOY_REPO_DEFAULT}
         - BUILD_ARTIFATS=${BUILD_ARTIFATS_OVERRIDE:-$BUILD_ARTIFATS_DEFAULT}
 
+
+
+
 before_install:
     # Install code coverage tooling
     - go get -u github.com/axw/gocov/gocov
@@ -115,7 +122,8 @@ script:
     # also including their coverage may introduce to much noice. Concentrate on the coverage of local packages.
     # Execute go test on every local subpackage (resolved as dependencies) and generate covreage report for each.
     # Test packages pararell (xargs -P)
-    - go list ./... | grep -v /vendor/ | xargs -n1 -I {} -P 4 go test -v -covermode=atomic -coverprofile=../../../{}/coverage.txt {}
+
+    - if [ "$JOB_TYPE" = compile_and_basic_tests ]; then go list ./... | grep -v /vendor/ | xargs -n1 -I {} -P 4 go test -v -covermode=atomic -coverprofile=../../../{}/coverage.txt {}; fi
 
     # Insert build information into compiled binary using ldflags
     - CGO_ENABLED=0 go build -ldflags "-X main.Commit=`echo $TRAVIS_COMMIT` -X main.Tag=`echo $TRAVIS_TAG` -X main.Branch=`echo $TRAVIS_BRANCH` -X main.BuildNumber=`echo $TRAVIS_BUILD_NUMBER`"
@@ -124,18 +132,18 @@ script:
     - sudo docker build -t $DOCKER_REPOSITORY .
 
     # Build acceptance tests container
-    - ./tests/build-acceptance ./tests ./docs/internal_api.yml
+    - if [ "$JOB_TYPE" = compile_and_basic_tests ]; then ./tests/build-acceptance ./tests ./docs/internal_api.yml; fi
 
     # Clone integration repo. for api testing (purposely after license checking..)
     - git clone https://github.com/mendersoftware/integration.git
 
     # Run dependant microservices and the tests service itself
-    - TESTS_DIR=$PWD/tests ./tests/run-test-environment "acceptance" $PWD/integration ./tests/docker-compose.yml
+    - if [ "$JOB_TYPE" = compile_and_basic_tests ]; then TESTS_DIR=$PWD/tests ./tests/run-test-environment "acceptance" $PWD/integration ./tests/docker-compose.yml; fi
 
     # Run dependant microservices and the tests service itself
-    - NO_CLEANUP=true TESTS_DIR=$PWD/tests ./tests/run-test-environment "integration" $PWD/integration ./tests/docker-compose-integration.yml &
+    - if [ "$JOB_TYPE" = compile_and_integration_tests ]; then NO_CLEANUP=true TESTS_DIR=$PWD/tests ./tests/run-test-environment "integration" $PWD/integration ./tests/docker-compose-integration.yml & fi
 
-    - cd $PWD/integration/tests && bash run.sh
+    - if [ "$JOB_TYPE" = compile_and_integration_tests ]; then cd $PWD/integration/tests && bash run.sh; fi
 
 after_success:
     # Integrate with https://codecov.io
@@ -237,3 +245,5 @@ deploy:
             repo: $DEPLOY_REPO
             all_branches: true
             condition: $API_DOCS_CHANGED = true
+
+
