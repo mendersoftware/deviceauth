@@ -14,12 +14,13 @@
 package main
 
 import (
-	"github.com/mendersoftware/deviceauth/log"
-	"github.com/stretchr/testify/assert"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"github.com/mendersoftware/deviceauth/log"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestGetDevAdmClient(t *testing.T) {
@@ -29,7 +30,7 @@ func TestGetDevAdmClient(t *testing.T) {
 }
 
 func TestDevAdmClientReqSuccess(t *testing.T) {
-	s, rd := newMockServer(http.StatusCreated)
+	s, rd := newMockServer(http.StatusNoContent)
 	defer s.Close()
 
 	c := NewDevAdmClient(DevAdmClientConfig{

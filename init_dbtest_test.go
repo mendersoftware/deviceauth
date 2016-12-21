@@ -16,11 +16,11 @@ package main
 
 import (
 	"io/ioutil"
+	"log"
 	"os"
 	"testing"
 
 	"gopkg.in/mgo.v2/dbtest"
-	"log"
 )
 
 var db *dbtest.DBServer

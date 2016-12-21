@@ -1,0 +1,15 @@
+version: '2'
+services:
+    acceptance:
+        image: testing
+        networks:
+            - mender
+        volumes:
+            - "${TESTS_DIR}:/testing"
+        depends_on:
+            - mender-device-adm
+            - mender-device-auth
+            - mender-inventory
+    mender-device-auth:
+            # built/tagged locally and only used for testing
+            image: mendersoftware/deviceauth

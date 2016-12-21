@@ -14,8 +14,9 @@
 package main
 
 import (
-	"github.com/ant0ine/go-json-rest/rest"
 	"testing"
+
+	"github.com/ant0ine/go-json-rest/rest"
 )
 
 func TestSetupMiddleware(t *testing.T) {

@@ -16,11 +16,12 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"net/http"
+
 	"github.com/mendersoftware/deviceauth/log"
 	"github.com/mendersoftware/deviceauth/requestid"
 	"github.com/mendersoftware/deviceauth/utils"
 	"github.com/pkg/errors"
-	"net/http"
 )
 
 const (

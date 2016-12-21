@@ -1,0 +1,132 @@
+swagger: '2.0'
+info:
+  version: '0.1.0'
+  title: Device authentication
+  description: |
+      An API for device authentication handling. Not exposed via the API Gateway - intended for internal use only.
+
+basePath: '/api/0.1.0/'
+host: 'mender-device-auth:8080'
+schemes:
+  - http
+
+paths:
+  /devices/{id}/status:
+    put:
+      summary: Update the device's admission status
+      description: |
+        Sets the status of a given device to the selected value.
+
+        All possible transitions are valid.
+
+      parameters:
+        - name: id
+          in: path
+          description: Device identifier.
+          required: true
+          type: string
+        - name: status
+          in: body
+          description: New status.
+          required: true
+          schema:
+            $ref: '#/definitions/Status'
+      responses:
+        303:
+          description: The device status was successfully updated.
+          headers:
+            Location:
+              type: string
+              description: URI of the updated device.
+        400:
+          description: Bad request.
+          schema:
+            $ref: '#/definitions/Error'
+        404:
+          description: The device was not found.
+          schema:
+            $ref: "#/definitions/Error"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/Error"
+  /tokens/{id}:
+    delete:
+      summary: Delete token
+      description: |
+        Deletes the token, effectively revoking it. The device must
+        apply for a new one with a new authentication request.
+        The token 'id' corresponds to the standard 'jti' claim.
+      parameters:
+        - name: id
+          in: path
+          description: Unique token identifier('jti').
+          required: true
+          type: string
+      responses:
+        204:
+          description: The token was successfully deleted.
+        404:
+          description: The token was not found.
+          schema:
+            $ref: '#/definitions/Error'
+        500:
+          description: Internal server error.
+          schema:
+            $ref: '#/definitions/Error'
+  /tokens/verify:
+    post:
+     summary: Check the validity of a token
+     description: |
+        Besides the basic validity check, checks the token expiration time and user-initiated token revocation.
+
+        Services which intend to use it should be correctly set up in the gateway's configuration.
+     parameters:
+       - name: Authorization
+         in: header
+         description: The token in base64-encoded form.
+         required: true
+         type: string
+     responses:
+        200:
+            description: The token is valid.
+        400:
+            description: Missing or malformed request parameters.
+        401:
+            description: Verification failed, authentication should not be granted.
+        403:
+            description: Token has expired - apply for a new one.
+        500:
+            description: Unexpected error.
+            schema:
+              $ref: '#/definitions/Error'
+definitions:
+  Status:
+    description: Admission status of the device.
+    type: object
+    properties:
+      status:
+        type: string
+        enum:
+          - pending
+          - accepted
+          - rejected
+    required:
+      - status
+    example:
+      application/json:
+          status: "accepted"
+  Error:
+    description: Error descriptor.
+    type: object
+    properties:
+      error:
+        description: Description of the error.
+        type: string
+      request_id:
+        description: Request ID (same as in X-MEN-RequestID header).
+        type: string
+    example:
+      application/json:
+          error: "failed to decode device group data: JSON payload is empty"
+          request_id: "f7881e82-0492-49fb-b459-795654e7188a"

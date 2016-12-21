@@ -14,13 +14,13 @@
 package main
 
 import (
-	"github.com/mendersoftware/deviceauth/config"
+	"net/http"
+	"time"
+
 	"github.com/mendersoftware/deviceauth/log"
 	"github.com/mendersoftware/deviceauth/requestid"
 	"github.com/mendersoftware/deviceauth/utils"
 	"github.com/pkg/errors"
-	"net/http"
-	"time"
 )
 
 var (
@@ -50,6 +50,7 @@ type DevAuthApp interface {
 	GetDevice(dev_id string) (*Device, error)
 	AcceptDevice(dev_id string) error
 	RejectDevice(dev_id string) error
+	ResetDevice(dev_id string) error
 	GetDeviceToken(dev_id string) (*Token, error)
 
 	RevokeToken(token_id string) error
@@ -66,41 +67,6 @@ type DevAuth struct {
 	jwt          JWTAgentApp
 	log          *log.Logger
 	clientGetter ApiClientGetter
-}
-
-// GetDevAuth factory func returning a new DevAuth based on the
-// given config
-func GetDevAuth(c config.Reader, l *log.Logger) (DevAuthApp, error) {
-	db, err := GetDataStoreMongo(c, l)
-	if err != nil {
-		return nil, errors.Wrap(err, "database connection failed")
-	}
-
-	jwtAgentConf := JWTAgentConfig{
-		ServerPrivKeyPath: c.GetString(SettingServerPrivKeyPath),
-		ExpirationTimeout: int64(c.GetInt(SettingJWTExpirationTimeout)),
-		Issuer:            c.GetString(SettingJWTIssuer),
-	}
-
-	devAdmClientConf := DevAdmClientConfig{
-		DevAdmAddr: c.GetString(SettingDevAdmAddr),
-	}
-	invClientConf := InventoryClientConfig{
-		InventoryAddr: c.GetString(SettingInventoryAddr),
-	}
-
-	jwt, err := NewJWTAgent(jwtAgentConf)
-	if err != nil {
-		return nil, errors.Wrap(err, "cannot create JWT agent")
-	}
-
-	devauth := NewDevAuth(db,
-		NewDevAdmClient(devAdmClientConf),
-		NewInventoryClient(invClientConf),
-		jwt)
-	devauth.UseLog(l)
-
-	return devauth, nil
 }
 
 func NewDevAuth(d DataStore, cda DevAdmClientI, ci InventoryClientI, jwt JWTAgentApp) DevAuthApp {
@@ -247,6 +213,13 @@ func (*DevAuth) GetDevice(dev_id string) (*Device, error) {
 func (d *DevAuth) AcceptDevice(dev_id string) error {
 	updev := &Device{Id: dev_id, Status: DevStatusAccepted}
 
+	if _, err := d.db.GetDeviceById(dev_id); err != nil {
+		if err == ErrDevNotFound {
+			return err
+		}
+		return errors.Wrap(err, "db get device error")
+	}
+
 	if err := d.SubmitInventoryDevice(*updev); err != nil {
 		return errors.Wrap(err, "inventory device add error")
 	}
@@ -267,6 +240,23 @@ func (d *DevAuth) RejectDevice(dev_id string) error {
 
 	// update device status
 	updev := &Device{Id: dev_id, Status: DevStatusRejected}
+
+	if err := d.db.UpdateDevice(updev); err != nil {
+		return errors.Wrap(err, "db update device error")
+	}
+
+	return nil
+}
+
+func (d *DevAuth) ResetDevice(dev_id string) error {
+	// delete device token
+	err := d.db.DeleteTokenByDevId(dev_id)
+	if err != nil && err != ErrTokenNotFound {
+		return errors.Wrap(err, "db delete device token error")
+	}
+
+	// update device status
+	updev := &Device{Id: dev_id, Status: DevStatusPending}
 
 	if err := d.db.UpdateDevice(updev); err != nil {
 		return errors.Wrap(err, "db update device error")

@@ -17,21 +17,29 @@ import (
 	"crypto/rsa"
 	"encoding/json"
 	"errors"
+	"net/http"
+	"testing"
+
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/ant0ine/go-json-rest/rest/test"
-	"github.com/mendersoftware/deviceauth/config"
 	"github.com/mendersoftware/deviceauth/log"
 	"github.com/mendersoftware/deviceauth/requestid"
 	"github.com/mendersoftware/deviceauth/requestlog"
 	mtest "github.com/mendersoftware/deviceauth/test"
 	"github.com/stretchr/testify/assert"
-	"net/http"
-	"testing"
 )
 
 func RestError(status string) string {
-	msg, _ := json.Marshal(map[string]string{"error": status})
+	msg, _ := json.Marshal(map[string]interface{}{"error": status, "request_id": "test"})
 	return string(msg)
+}
+
+func runTestRequest(t *testing.T, handler http.Handler, req *http.Request, code int, body string) *test.Recorded {
+	req.Header.Add(requestid.RequestIdHeader, "test")
+	recorded := test.RunRequest(t, handler, req)
+	recorded.CodeIs(code)
+	recorded.BodyIs(body)
+	return recorded
 }
 
 func makeMockApiHandler(t *testing.T, f DevAuthFactory) http.Handler {
@@ -230,15 +238,16 @@ func TestApiDevAuthSubmitAuthReq(t *testing.T) {
 			return &devauth
 		}
 
-		factory := func(c config.Reader, l *log.Logger) (DevAuthApp, error) {
+		factory := func(l *log.Logger) (DevAuthApp, error) {
 			return &devauth, nil
 		}
 
 		apih := makeMockApiHandler(t, factory)
 
-		recorded := test.RunRequest(t, apih, tc.req)
-		recorded.CodeIs(tc.code)
-		recorded.BodyIs(tc.body)
+		recorded := runTestRequest(t, apih, tc.req, tc.code, tc.body)
+		if tc.code == http.StatusOK {
+			assert.Equal(t, "application/jwt", recorded.Recorder.HeaderMap.Get("Content-Type"))
+		}
 	}
 }
 
@@ -275,12 +284,13 @@ func TestApiDevAuthUpdateStatusDevice(t *testing.T) {
 	devauth := MockDevAuth{
 		mockAcceptDevice: mockaction,
 		mockRejectDevice: mockaction,
+		mockResetDevice:  mockaction,
 	}
 	devauth.mockWithContext = func(ctx *RequestContext) DevAuthApp {
 		return &devauth
 	}
 
-	factory := func(c config.Reader, l *log.Logger) (DevAuthApp, error) {
+	factory := func(l *log.Logger) (DevAuthApp, error) {
 		return &devauth, nil
 	}
 
@@ -290,6 +300,7 @@ func TestApiDevAuthUpdateStatusDevice(t *testing.T) {
 
 	accstatus := DevAuthApiStatus{"accepted"}
 	rejstatus := DevAuthApiStatus{"rejected"}
+	penstatus := DevAuthApiStatus{"pending"}
 
 	tcases := []struct {
 		req     *http.Request
@@ -342,13 +353,20 @@ func TestApiDevAuthUpdateStatusDevice(t *testing.T) {
 				"Location": "http://1.2.3.4/api/0.1.0/devices/foo",
 			},
 		},
+		{
+			req: test.MakeSimpleRequest("PUT",
+				"http://1.2.3.4/api/0.1.0/devices/foo/status",
+				penstatus),
+			code: 303,
+			headers: map[string]string{
+				"Location": "http://1.2.3.4/api/0.1.0/devices/foo",
+			},
+		},
 	}
 
 	for idx, tc := range tcases {
 		t.Logf("running %d", idx)
-		recorded := test.RunRequest(t, apih, tc.req)
-		recorded.CodeIs(tc.code)
-		recorded.BodyIs(tc.body)
+		recorded := runTestRequest(t, apih, tc.req, tc.code, tc.body)
 		for h, v := range tc.headers {
 			recorded.HeaderIs(h, v)
 		}
@@ -419,16 +437,14 @@ func TestApiDevAuthVerifyToken(t *testing.T) {
 				return tc.err
 			},
 		}
-		factory := func(c config.Reader, l *log.Logger) (DevAuthApp, error) {
+		factory := func(l *log.Logger) (DevAuthApp, error) {
 			return &devauth, nil
 		}
 		apih := makeMockApiHandler(t, factory)
 		if len(tc.headers) > 0 {
 			tc.req.Header.Set("authorization", tc.headers["authorization"])
 		}
-		recorded := test.RunRequest(t, apih, tc.req)
-		recorded.CodeIs(tc.code)
-		recorded.BodyIs(tc.body)
+		runTestRequest(t, apih, tc.req, tc.code, tc.body)
 	}
 
 }
@@ -470,13 +486,11 @@ func TestApiDevAuthDeleteToken(t *testing.T) {
 				return tc.err
 			},
 		}
-		factory := func(c config.Reader, l *log.Logger) (DevAuthApp, error) {
+		factory := func(l *log.Logger) (DevAuthApp, error) {
 			return &devauth, nil
 		}
 		apih := makeMockApiHandler(t, factory)
-		recorded := test.RunRequest(t, apih, tc.req)
-		recorded.CodeIs(tc.code)
-		recorded.BodyIs(tc.body)
+		runTestRequest(t, apih, tc.req, tc.code, tc.body)
 	}
 
 }
