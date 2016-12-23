@@ -1,4 +1,4 @@
-FROM iron/base
+FROM alpine:3.4
 
 COPY ./deviceauth /usr/bin/
 
