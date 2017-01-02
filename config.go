@@ -46,13 +46,13 @@ const (
 var (
 	configValidators = []config.Validator{}
 	configDefaults   = []config.Default{
-		{SettingListen, SettingListenDefault},
-		{SettingMiddleware, SettingMiddlewareDefault},
-		{SettingDb, SettingDbDefault},
-		{SettingDevAdmAddr, SettingDevAdmAddrDefault},
-		{SettingInventoryAddr, SettingInventoryAddrDefault},
-		{SettingServerPrivKeyPath, SettingServerPrivKeyPathDefault},
-		{SettingJWTIssuer, SettingJWTIssuerDefault},
-		{SettingJWTExpirationTimeout, SettingJWTExpirationTimeoutDefault},
+		{Key: SettingListen, Value: SettingListenDefault},
+		{Key: SettingMiddleware, Value: SettingMiddlewareDefault},
+		{Key: SettingDb, Value: SettingDbDefault},
+		{Key: SettingDevAdmAddr, Value: SettingDevAdmAddrDefault},
+		{Key: SettingInventoryAddr, Value: SettingInventoryAddrDefault},
+		{Key: SettingServerPrivKeyPath, Value: SettingServerPrivKeyPathDefault},
+		{Key: SettingJWTIssuer, Value: SettingJWTIssuerDefault},
+		{Key: SettingJWTExpirationTimeout, Value: SettingJWTExpirationTimeoutDefault},
 	}
 )
