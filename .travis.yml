@@ -235,7 +235,6 @@ deploy:
         on:
             repo: $DEPLOY_REPO
 
-
      # Store docs for auto-deployment script
     -
         provider: s3
