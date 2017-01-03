@@ -148,7 +148,7 @@ script:
       fi
 
     - if [ "$JOB_TYPE" = compile_and_integration_tests ]; then
-        cd $PWD/integration/tests && bash run.sh;
+        ( cd $PWD/integration/tests && bash run.sh );
       fi
 
 after_success:
