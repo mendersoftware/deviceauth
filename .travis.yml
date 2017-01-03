@@ -14,7 +14,8 @@ go:
 env:
     matrix:
         - JOB_TYPE=compile_and_basic_tests
-        - JOB_TYPE=compile_and_integration_tests
+        - JOB_TYPE=compile_and_integration_tests_fast
+        - JOB_TYPE=compile_and_integration_tests_slow
 
     global:
         # Should be encrypted or set as private travis variables (in travis settings):
@@ -150,12 +151,16 @@ script:
       fi
 
     # Run dependant microservices and the tests service itself
-    - if [ "$JOB_TYPE" = compile_and_integration_tests ]; then
+    - if [[ "$JOB_TYPE" = compile_and_integration_tests* ]]; then
         NO_CLEANUP=true TESTS_DIR=$PWD/tests ./tests/run-test-environment "integration" $PWD/integration ./tests/docker-compose-integration.yml &
       fi
 
-    - if [ "$JOB_TYPE" = compile_and_integration_tests ]; then
-        ( cd $PWD/integration/tests && bash run.sh );
+    - if [ "$JOB_TYPE" = compile_and_integration_tests_fast ]; then
+        ( cd $PWD/integration/tests && bash run.sh fast );
+      fi
+
+    - if [ "$JOB_TYPE" = compile_and_integration_tests_slow ]; then
+        ( cd $PWD/integration/tests && bash run.sh slow );
       fi
 
 after_success:
