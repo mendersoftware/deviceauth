@@ -134,16 +134,16 @@ script:
     # Build docker image from docker file
     - sudo docker build -t $DOCKER_REPOSITORY .
 
-    # Build acceptance tests container
-    - if [ "$JOB_TYPE" = compile_and_basic_tests ]; then
-        ./tests/build-acceptance ./tests ./docs/internal_api.yml;
-      fi
-
     # Clone integration repo. for api testing (purposely after license checking..)
     - git clone https://github.com/mendersoftware/integration.git
 
     # Move script to testing directory
-    - mv integration/extra/travis-testing/run-test-environment tests
+    - mv integration/extra/travis-testing/* tests/
+
+    # Build acceptance tests container
+    - if [ "$JOB_TYPE" = compile_and_basic_tests ]; then
+        ./tests/build-acceptance ./tests ./docs/internal_api.yml;
+      fi
 
     # Run dependant microservices and the tests service itself
     - if [ "$JOB_TYPE" = compile_and_basic_tests ]; then
