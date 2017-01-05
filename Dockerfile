@@ -1,7 +1,5 @@
 FROM alpine:3.4
 
-COPY ./deviceauth /usr/bin/
-
 RUN mkdir /etc/deviceauth
 COPY ./config.yaml /etc/deviceauth/
 
@@ -9,3 +7,6 @@ COPY ./config.yaml /etc/deviceauth/
 RUN mkdir /etc/deviceauth/rsa
 
 ENTRYPOINT ["/usr/bin/deviceauth", "-config", "/etc/deviceauth/config.yaml"]
+
+COPY ./deviceauth /usr/bin/
+
