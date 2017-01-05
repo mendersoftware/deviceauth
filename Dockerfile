@@ -5,9 +5,7 @@ COPY ./deviceauth /usr/bin/
 RUN mkdir /etc/deviceauth
 COPY ./config.yaml /etc/deviceauth/
 
-# example server private key - only for testing purpose
-# this key will be replaced with proper one later
+# mount your private key at /etc/deviceauth/rsa/private.pem
 RUN mkdir /etc/deviceauth/rsa
-COPY ./testdata/private.pem /etc/deviceauth/rsa/
 
 ENTRYPOINT ["/usr/bin/deviceauth", "-config", "/etc/deviceauth/config.yaml"]
