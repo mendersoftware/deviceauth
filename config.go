@@ -34,7 +34,7 @@ const (
 	SettingInventoryAddrDefault = "http://mender-inventory:8080/"
 
 	SettingServerPrivKeyPath        = "server_priv_key_path"
-	SettingServerPrivKeyPathDefault = "/etc/rsa/private.pem"
+	SettingServerPrivKeyPathDefault = "/etc/deviceauth/rsa/private.pem"
 
 	SettingJWTIssuer        = "jwt_issuer"
 	SettingJWTIssuerDefault = "Mender"
