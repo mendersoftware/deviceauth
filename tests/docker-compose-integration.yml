@@ -2,4 +2,4 @@ version: '2'
 services:
     mender-device-auth:
             # built/tagged locally and only used for testing
-            image: mendersoftware/deviceauth
+            image: mendersoftware/deviceauth:pr
