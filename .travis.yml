@@ -150,17 +150,12 @@ script:
         TESTS_DIR=$PWD/tests ./tests/run-test-environment "acceptance" $PWD/integration ./tests/docker-compose.yml;
       fi
 
-    # Run dependant microservices and the tests service itself
-    - if [[ "$JOB_TYPE" = compile_and_integration_tests* ]]; then
-        NO_CLEANUP=true TESTS_DIR=$PWD/tests ./tests/run-test-environment "integration" $PWD/integration ./tests/docker-compose-integration.yml &
-      fi
-
     - if [ "$JOB_TYPE" = compile_and_integration_tests_fast ]; then
-        ( cd $PWD/integration/tests && bash run.sh fast );
+        ( cd $PWD/integration/tests && bash run.sh --runfast --docker-compose-file=../../tests/docker-compose-integration.yml );
       fi
 
     - if [ "$JOB_TYPE" = compile_and_integration_tests_slow ]; then
-        ( cd $PWD/integration/tests && bash run.sh slow );
+        ( cd $PWD/integration/tests && bash run.sh --runslow --docker-compose-file=../../tests/docker-compose-integration.yml );
       fi
 
 after_success:
