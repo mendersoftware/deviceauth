@@ -254,11 +254,7 @@ func (d *DevAuthHandler) UpdateDeviceStatusHandler(w rest.ResponseWriter, r *res
 		return
 	}
 
-	devurl := utils.BuildURL(r, uriDevice, map[string]string{
-		":id": devid,
-	})
-
-	w.Header().Add("Location", devurl.String())
+	w.Header().Add("Location", "../"+devid)
 	w.WriteHeader(http.StatusSeeOther)
 }
 

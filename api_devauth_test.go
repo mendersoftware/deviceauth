@@ -327,7 +327,7 @@ func TestApiDevAuthUpdateStatusDevice(t *testing.T) {
 				accstatus),
 			code: 303,
 			headers: map[string]string{
-				"Location": "http://1.2.3.4/api/0.1.0/devices/foo",
+				"Location": "../foo",
 			},
 		},
 		{
@@ -350,7 +350,7 @@ func TestApiDevAuthUpdateStatusDevice(t *testing.T) {
 				rejstatus),
 			code: 303,
 			headers: map[string]string{
-				"Location": "http://1.2.3.4/api/0.1.0/devices/foo",
+				"Location": "../foo",
 			},
 		},
 		{
@@ -359,7 +359,7 @@ func TestApiDevAuthUpdateStatusDevice(t *testing.T) {
 				penstatus),
 			code: 303,
 			headers: map[string]string{
-				"Location": "http://1.2.3.4/api/0.1.0/devices/foo",
+				"Location": "../foo",
 			},
 		},
 	}
