@@ -17,7 +17,6 @@ package utils
 import (
 	"github.com/ant0ine/go-json-rest/rest"
 	"io/ioutil"
-	"net/url"
 	"strings"
 )
 
@@ -29,20 +28,6 @@ func ReadBodyRaw(r *rest.Request) ([]byte, error) {
 	}
 
 	return content, nil
-}
-
-// build URL using request 'r' and template, replace path params with
-// elements from 'params' using lexical match as in strings.Replace()
-func BuildURL(r *rest.Request, template string, params map[string]string) *url.URL {
-	url := r.BaseUrl()
-
-	path := template
-	for k, v := range params {
-		path = strings.Replace(path, k, v, -1)
-	}
-	url.Path = path
-
-	return url
 }
 
 func JoinURL(base, url string) string {
