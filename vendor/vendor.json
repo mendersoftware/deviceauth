@@ -1,0 +1,13 @@
+{
+	"comment": "",
+	"ignore": "",
+	"package": [
+		{
+			"checksumSHA1": "AslGZd/VnH8RZgPcgpB+cbxEeKc=",
+			"path": "github.com/mendersoftware/go-lib-micro/mongo/migrate",
+			"revision": "5a7f06d87cc653f59e4cd6de15e711d7b795bb46",
+			"revisionTime": "2017-01-30T12:11:14Z"
+		}
+	],
+	"rootPath": "github.com/mendersoftware/deviceauth"
+}
