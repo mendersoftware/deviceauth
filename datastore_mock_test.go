@@ -15,6 +15,7 @@ package main
 
 import (
 	"github.com/mendersoftware/deviceauth/log"
+	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 )
 
 type MockDataStore struct {
@@ -69,6 +70,11 @@ func (db *MockDataStore) DeleteToken(jti string) error {
 
 func (db *MockDataStore) DeleteTokenByDevId(dev_id string) error {
 	return db.mockDeleteTokenByDevId(dev_id)
+}
+
+func (db *MockDataStore) Migrate(version string, migrations []migrate.Migration) error {
+	// nop
+	return nil
 }
 
 func (db *MockDataStore) UseLog(l *log.Logger) {
