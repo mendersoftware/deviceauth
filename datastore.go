@@ -18,6 +18,7 @@ import (
 	"errors"
 
 	"github.com/mendersoftware/deviceauth/log"
+	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 )
 
 var (
@@ -58,6 +59,9 @@ type DataStore interface {
 
 	// deletes device token
 	DeleteTokenByDevId(dev_id string) error
+
+	// run migrations
+	Migrate(version string, migrations []migrate.Migration) error
 
 	log.ContextLogger
 }
