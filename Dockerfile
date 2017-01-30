@@ -1,5 +1,7 @@
 FROM alpine:3.4
 
+EXPOSE 8080
+
 RUN mkdir /etc/deviceauth
 COPY ./config.yaml /etc/deviceauth/
 
