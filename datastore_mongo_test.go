@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -692,4 +693,48 @@ func TestDeleteTokenByDevId(t *testing.T) {
 			assert.NoError(t, err, "failed to delete token")
 		}
 	}
+}
+
+func TestMigrate(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestMigrate in short mode.")
+	}
+
+	testCases := map[string]struct {
+		version string
+		err     string
+	}{
+		"0.1.0": {
+			version: "0.1.0",
+			err:     "",
+		},
+		"1.2.3": {
+			version: "1.2.3",
+			err:     "",
+		},
+		"0.1 error": {
+			version: "0.1",
+			err:     "failed to parse service version: failed to parse Version: unexpected EOF",
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Logf("case: %s", name)
+
+		db := getDb()
+
+		err := db.Migrate(tc.version, nil)
+		if tc.err == "" {
+			assert.NoError(t, err)
+			var out []migrate.MigrationEntry
+			db.session.DB(DbName).C(migrate.DbMigrationsColl).Find(nil).All(&out)
+			assert.Len(t, out, 1)
+			v, _ := migrate.NewVersion(tc.version)
+			assert.Equal(t, v, out[0].Version)
+		} else {
+			assert.EqualError(t, err, tc.err)
+		}
+		db.session.Close()
+	}
+
 }

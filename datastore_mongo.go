@@ -19,12 +19,14 @@ import (
 	"time"
 
 	"github.com/mendersoftware/deviceauth/log"
+	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	"github.com/pkg/errors"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
 
 const (
+	DbVersion     = "0.1.0"
 	DbName        = "deviceauth"
 	DbDevicesColl = "devices"
 	DbAuthReqColl = "auth_requests"
@@ -245,6 +247,25 @@ func (db *DataStoreMongo) DeleteTokenByDevId(devId string) error {
 		} else {
 			return errors.Wrap(err, "failed to remove token")
 		}
+	}
+
+	return nil
+}
+
+func (db *DataStoreMongo) Migrate(version string, migrations []migrate.Migration) error {
+	m := migrate.DummyMigrator{
+		Session: db.session,
+		Db:      DbName,
+	}
+
+	ver, err := migrate.NewVersion(version)
+	if err != nil {
+		return errors.Wrap(err, "failed to parse service version")
+	}
+
+	err = m.Apply(ver, migrations)
+	if err != nil {
+		return errors.Wrap(err, "failed to apply migrations")
 	}
 
 	return nil
