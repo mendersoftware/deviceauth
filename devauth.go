@@ -90,7 +90,6 @@ func (d *DevAuth) SubmitAuthRequestWithClient(r *AuthReq, client requestid.ApiRe
 	id := utils.CreateDevId(r.IdData)
 
 	//check if device exists with the same id+key
-	//TODO at some point add key rotation handling (same id, different key)
 	dev, err := d.findMatchingDevice(id, r.PubKey)
 	if err != nil {
 		d.log.Errorf("find matching device error: %v", err)
@@ -98,12 +97,49 @@ func (d *DevAuth) SubmitAuthRequestWithClient(r *AuthReq, client requestid.ApiRe
 		return "", err
 	}
 
-	//for existing devices - check auth reqs seq_no
+	//for existing devices - check auth reqs seq_no, keys
 	if dev != nil {
-		err = d.verifySeqNo(id, r.SeqNo)
+		seq, err := d.verifySeqNo(id, r.SeqNo)
 		if err != nil {
 			d.log.Errorf("verify seq no error: %v", err)
 			return "", err
+		}
+
+		// reauthentication needed flag
+		var reauth bool
+
+		if !seq {
+			d.log.Infof("detected sequence number mismatch for device %v",
+				dev.Id)
+			// force reauthentication
+			reauth = true
+		}
+
+		if dev.PubKey != r.PubKey {
+			d.log.Infof("detected key change for device %v", dev.Id)
+			// force reauthentication
+			reauth = true
+			// use new public key
+			dev.PubKey = r.PubKey
+
+		}
+
+		if reauth {
+			// reset device status to pending (since it's used later on)
+			dev.Status = DevStatusPending
+
+			// update device in DB, force status to pending
+			if err := d.db.UpdateDevice(&Device{
+				Id:     dev.Id,
+				PubKey: dev.PubKey,
+				Status: DevStatusPending,
+			}); err != nil {
+				return "", errors.Wrap(err, "db update device error")
+			}
+
+			if err := d.cDevAdm.AddDevice(dev, client); err != nil {
+				return "", errors.Wrap(err, "devadm add device error")
+			}
 		}
 	} else {
 		//new device - create in 'pending' state
@@ -172,9 +208,11 @@ func (d *DevAuth) findMatchingDevice(id, key string) (*Device, error) {
 	//both devs nil - new device
 	//both devs !nil - must compare id/key
 	//other combinations: id/key mismatch
-	if devi == nil && devk == nil {
+	switch {
+
+	case devi == nil && devk == nil:
 		return nil, nil
-	} else if devi != nil && devk != nil {
+	case devi != nil && devk != nil:
 		if devi.Id != devk.Id {
 			return nil, ErrDevAuthIdKeyMismatch
 		}
@@ -184,25 +222,29 @@ func (d *DevAuth) findMatchingDevice(id, key string) (*Device, error) {
 		}
 
 		return devi, nil
+
+	case devi != nil && devk == nil:
+		// key rotation
+		return devi, nil
 	}
 
 	return nil, ErrDevAuthUnauthorized
 }
 
 // check seq_no against the latest auth req of this device
-func (d *DevAuth) verifySeqNo(dev_id string, seq_no uint64) error {
+func (d *DevAuth) verifySeqNo(dev_id string, seq_no uint64) (bool, error) {
 	r, err := d.db.GetAuthRequests(dev_id, 0, 1)
 	if err != nil {
-		return errors.Wrap(err, "db get auth requests error")
+		return false, errors.Wrap(err, "db get auth requests error")
 	}
 
 	if len(r) > 0 {
 		if seq_no <= r[0].SeqNo {
-			return ErrDevAuthUnauthorized
+			return false, nil
 		}
 	}
 
-	return nil
+	return true, nil
 }
 
 func (*DevAuth) GetAuthRequests(dev_id string) ([]AuthReq, error) {
