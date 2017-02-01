@@ -146,7 +146,7 @@ func TestSubmitAuthRequest(t *testing.T) {
 			devAdmErr: nil,
 
 			res: "",
-			err: ErrDevAuthUnauthorized,
+			err: ErrDevAuthIdKeyMismatch,
 		},
 		{
 			//existing device, id duplicate + key mismatch
@@ -169,7 +169,7 @@ func TestSubmitAuthRequest(t *testing.T) {
 			devAdmErr: nil,
 
 			res: "",
-			err: ErrDevAuthUnauthorized,
+			err: ErrDevAuthKeyMismatch,
 		},
 		{
 			//existing, accepted device, but wrong seq_no

@@ -24,7 +24,9 @@ import (
 )
 
 var (
-	ErrDevAuthUnauthorized = errors.New("dev auth: unauthorized")
+	ErrDevAuthUnauthorized  = errors.New("dev auth: unauthorized")
+	ErrDevAuthKeyMismatch   = errors.New("dev auth: device key mismatch")
+	ErrDevAuthIdKeyMismatch = errors.New("dev auth: ID and key mismatch")
 )
 
 // TODO:
@@ -173,10 +175,15 @@ func (d *DevAuth) findMatchingDevice(id, key string) (*Device, error) {
 	if devi == nil && devk == nil {
 		return nil, nil
 	} else if devi != nil && devk != nil {
-		if devi.Id == devk.Id &&
-			devi.PubKey == devk.PubKey {
-			return devi, nil
+		if devi.Id != devk.Id {
+			return nil, ErrDevAuthIdKeyMismatch
 		}
+
+		if devi.PubKey != devk.PubKey {
+			return nil, ErrDevAuthKeyMismatch
+		}
+
+		return devi, nil
 	}
 
 	return nil, ErrDevAuthUnauthorized
