@@ -137,8 +137,10 @@ func (d *DevAuthHandler) SubmitAuthRequestHandler(w rest.ResponseWriter, r *rest
 	ctx := ContextFromRequest(r)
 	token, err := da.WithContext(ctx).SubmitAuthRequest(&authreq)
 	switch err {
-	case ErrDevAuthUnauthorized:
-		restErrWithLogMsg(w, r, l, err, http.StatusUnauthorized, "unauthorized")
+	case ErrDevAuthUnauthorized, ErrDevAuthIdKeyMismatch, ErrDevAuthKeyMismatch:
+		// error is always set to unauthorized, client does not need to
+		// know why
+		restErrWithLogMsg(w, r, l, ErrDevAuthUnauthorized, http.StatusUnauthorized, "unauthorized")
 		return
 	case nil:
 		w.(http.ResponseWriter).Write([]byte(token))
