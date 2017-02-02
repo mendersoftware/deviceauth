@@ -1,12 +1,12 @@
 swagger: '2.0'
 info:
-  version: '0.1'
+  version: '1'
   title: Device authentication
   description: |
     An API for device authentication handling. Intended for use by devices.
 
-basePath: '/api/devices/0.1/authentication'
-host: 'docker.mender.io:8080'
+basePath: '/api/devices/v1/authentication'
+host: 'docker.mender.io'
 schemes:
   - https
 
