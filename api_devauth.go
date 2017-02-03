@@ -28,9 +28,6 @@ import (
 
 const (
 	uriAuthReqs     = "/api/0.1.0/auth_requests"
-	uriDevices      = "/api/0.1.0/devices"
-	uriDevice       = "/api/0.1.0/devices/:id"
-	uriDeviceToken  = "/api/0.1.0/devices/:id/token"
 	uriToken        = "/api/0.1.0/tokens/:id"
 	uriTokenVerify  = "/api/0.1.0/tokens/verify"
 	uriDeviceStatus = "/api/0.1.0/devices/:id/status"
@@ -60,14 +57,6 @@ func NewDevAuthApiHandler(daf DevAuthFactory) ApiHandler {
 func (d *DevAuthHandler) GetApp() (rest.App, error) {
 	routes := []*rest.Route{
 		rest.Post(uriAuthReqs, d.SubmitAuthRequestHandler),
-		rest.Get(uriAuthReqs, d.GetAuthRequestsHandler),
-
-		rest.Get(uriDevices, d.GetDevicesHandler),
-
-		rest.Get(uriDevice, d.GetDeviceHandler),
-		rest.Put(uriDevice, d.UpdateDeviceHandler),
-
-		rest.Get(uriDeviceToken, d.GetDeviceTokenHandler),
 
 		rest.Delete(uriToken, d.DeleteTokenHandler),
 
@@ -151,16 +140,6 @@ func (d *DevAuthHandler) SubmitAuthRequestHandler(w rest.ResponseWriter, r *rest
 		return
 	}
 }
-
-func (d *DevAuthHandler) GetAuthRequestsHandler(w rest.ResponseWriter, r *rest.Request) {}
-
-func (d *DevAuthHandler) GetDevicesHandler(w rest.ResponseWriter, r *rest.Request) {}
-
-func (d *DevAuthHandler) GetDeviceHandler(w rest.ResponseWriter, r *rest.Request) {}
-
-func (d *DevAuthHandler) UpdateDeviceHandler(w rest.ResponseWriter, r *rest.Request) {}
-
-func (d *DevAuthHandler) GetDeviceTokenHandler(w rest.ResponseWriter, r *rest.Request) {}
 
 func (d *DevAuthHandler) DeleteTokenHandler(w rest.ResponseWriter, r *rest.Request) {
 	l := requestlog.GetRequestLogger(r.Env)
