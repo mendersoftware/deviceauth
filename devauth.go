@@ -109,13 +109,16 @@ func (d *DevAuth) SubmitAuthRequestWithClient(r *AuthReq, client requestid.ApiRe
 		//new device - create in 'pending' state
 		dev = NewDevice(id, r.IdData, r.PubKey, r.TenantToken)
 
+		if err := d.cDevAdm.AddDevice(dev, client); err != nil {
+			return "", errors.Wrap(err, "devadm add device error")
+		}
+
+		// add device to database only if it was
+		// successfully added to admission service
 		if err := d.db.AddDevice(dev); err != nil {
 			return "", errors.Wrap(err, "db add device error")
 		}
 
-		if err := d.cDevAdm.AddDevice(dev, client); err != nil {
-			return "", errors.Wrap(err, "devadm add device error")
-		}
 	}
 
 	//save auth req
