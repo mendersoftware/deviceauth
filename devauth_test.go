@@ -322,6 +322,10 @@ func TestSubmitAuthRequest(t *testing.T) {
 			mockDeleteTokenByDevId: func(dev_id string) error {
 				return nil
 			},
+
+			mockUpdateDevice: func(d *Device) error {
+				return nil
+			},
 		}
 
 		cda := MockDevAdmClient{
