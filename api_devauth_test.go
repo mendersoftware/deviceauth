@@ -112,7 +112,6 @@ func TestApiDevAuthSubmitAuthReq(t *testing.T) {
 				map[string]interface{}{
 					"pubkey":       pubkeyStr,
 					"tenant_token": "tenant-0001",
-					"seq_no":       1,
 				},
 				privkey,
 				"",
@@ -128,7 +127,6 @@ func TestApiDevAuthSubmitAuthReq(t *testing.T) {
 				map[string]interface{}{
 					"id_data":      "id-0001",
 					"tenant_token": "tenant-0001",
-					"seq_no":       1,
 				},
 				privkey,
 				"",
@@ -139,29 +137,12 @@ func TestApiDevAuthSubmitAuthReq(t *testing.T) {
 			RestError("invalid auth request: pubkey must be provided"),
 		},
 		{
-			//incomplete body
-			makeAuthReq(
-				map[string]interface{}{
-					"id_data":      "id-0001",
-					"pubkey":       pubkeyStr,
-					"tenant_token": "tenant-0001",
-				},
-				privkey,
-				"",
-				t),
-			"",
-			nil,
-			400,
-			RestError("invalid auth request: seq_no must be provided"),
-		},
-		{
 			//complete body, missing signature header
 			makeAuthReq(
 				map[string]interface{}{
 					"id_data":      "id-0001",
 					"pubkey":       pubkeyStr,
 					"tenant_token": "tenant-0001",
-					"seq_no":       1,
 				},
 				nil,
 				"",
@@ -178,7 +159,6 @@ func TestApiDevAuthSubmitAuthReq(t *testing.T) {
 					"id_data":      "id-0001",
 					"pubkey":       pubkeyStr,
 					"tenant_token": "tenant-0001",
-					"seq_no":       1,
 				},
 				nil,
 				"invalidsignature",
@@ -195,7 +175,6 @@ func TestApiDevAuthSubmitAuthReq(t *testing.T) {
 					"id_data":      "id-0001",
 					"pubkey":       pubkeyStr,
 					"tenant_token": "tenant-0001",
-					"seq_no":       1,
 				},
 				privkey,
 				"",
@@ -212,7 +191,6 @@ func TestApiDevAuthSubmitAuthReq(t *testing.T) {
 					"id_data":      "id-0001",
 					"pubkey":       pubkeyStr,
 					"tenant_token": "tenant-0001",
-					"seq_no":       1,
 				},
 				privkey,
 				"",

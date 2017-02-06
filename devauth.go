@@ -15,7 +15,6 @@ package main
 
 import (
 	"net/http"
-	"time"
 
 	"github.com/mendersoftware/deviceauth/log"
 	"github.com/mendersoftware/deviceauth/requestid"
@@ -29,7 +28,6 @@ var (
 	ErrDevAuthIdKeyMismatch = errors.New("dev auth: ID and key mismatch")
 )
 
-// TODO:
 // Expiration Timeout should be moved to database
 // Do we need Expiration Timeout per device?
 const (
@@ -46,7 +44,6 @@ func simpleApiClientGetter() requestid.ApiRequester {
 // this device auth service interface
 type DevAuthApp interface {
 	SubmitAuthRequest(r *AuthReq) (string, error)
-	GetAuthRequests(dev_id string) ([]AuthReq, error)
 
 	GetDevices(skip, limit int, tenant_token, status string) ([]Device, error)
 	GetDevice(dev_id string) (*Device, error)
@@ -98,14 +95,7 @@ func (d *DevAuth) SubmitAuthRequestWithClient(r *AuthReq, client requestid.ApiRe
 		return "", err
 	}
 
-	//for existing devices - check auth reqs seq_no
-	if dev != nil {
-		err = d.verifySeqNo(id, r.SeqNo)
-		if err != nil {
-			d.log.Errorf("verify seq no error: %v", err)
-			return "", err
-		}
-	} else {
+	if dev == nil {
 		//new device - create in 'pending' state
 		dev = NewDevice(id, r.IdData, r.PubKey, r.TenantToken)
 
@@ -118,15 +108,6 @@ func (d *DevAuth) SubmitAuthRequestWithClient(r *AuthReq, client requestid.ApiRe
 		}
 	}
 
-	//save auth req
-	r.Timestamp = time.Now()
-	r.DeviceId = id
-	r.Status = dev.Status
-	err = d.db.AddAuthReq(r)
-	if err != nil {
-		return "", errors.Wrap(err, "db add auth req error")
-	}
-
 	//return according to dev status
 	if dev.Status == DevStatusAccepted {
 		token, err := d.jwt.GenerateTokenSignRS256(id)
@@ -137,10 +118,11 @@ func (d *DevAuth) SubmitAuthRequestWithClient(r *AuthReq, client requestid.ApiRe
 		if err := d.db.AddToken(token); err != nil {
 			return "", errors.Wrap(err, "add token error")
 		}
+
 		return token.Token, nil
-	} else {
-		return "", ErrDevAuthUnauthorized
 	}
+
+	return "", ErrDevAuthUnauthorized
 }
 
 func (d *DevAuth) SubmitInventoryDevice(dev Device) error {
@@ -188,33 +170,13 @@ func (d *DevAuth) findMatchingDevice(id, key string) (*Device, error) {
 
 	return nil, ErrDevAuthUnauthorized
 }
-
-// check seq_no against the latest auth req of this device
-func (d *DevAuth) verifySeqNo(dev_id string, seq_no uint64) error {
-	r, err := d.db.GetAuthRequests(dev_id, 0, 1)
-	if err != nil {
-		return errors.Wrap(err, "db get auth requests error")
-	}
-
-	if len(r) > 0 {
-		if seq_no <= r[0].SeqNo {
-			return ErrDevAuthUnauthorized
-		}
-	}
-
-	return nil
-}
-
-func (*DevAuth) GetAuthRequests(dev_id string) ([]AuthReq, error) {
-	return nil, errors.New("not implemented")
-}
-
 func (*DevAuth) GetDevices(skip, limit int, tenant_token, status string) ([]Device, error) {
 	return nil, errors.New("not implemented")
 }
 
 func (*DevAuth) GetDevice(dev_id string) (*Device, error) {
 	return nil, errors.New("not implemented")
+
 }
 
 func (d *DevAuth) AcceptDevice(dev_id string) error {
