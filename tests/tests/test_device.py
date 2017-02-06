@@ -48,7 +48,7 @@ class TestDevice(Client):
         try:
             self.accept_device(devid)
         except bravado.exception.HTTPError as e:
-            assert e.response.status_code == 200
+            assert e.response.status_code == 204
 
         # device is accepted, we should get a token now
         rsp = device_auth_req(url, da, d)
@@ -63,7 +63,7 @@ class TestDevice(Client):
         try:
             self.reject_device(devid)
         except bravado.exception.HTTPError as e:
-            assert e.response.status_code == 200
+            assert e.response.status_code == 204
 
         # device is rejected, should get unauthorized
         rsp = device_auth_req(url, da, d)

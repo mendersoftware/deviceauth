@@ -29,7 +29,7 @@ class TestToken(Client):
         try:
             self.accept_device(devid)
         except bravado.exception.HTTPError as e:
-            assert e.response.status_code == 200
+            assert e.response.status_code == 204
 
         # device is accepted, we should get a token now
         rsp = device_auth_req(url, da, d)
@@ -105,7 +105,7 @@ class TestToken(Client):
         try:
             self.accept_device(devid)
         except bravado.exception.HTTPError as e:
-            assert e.response.status_code == 200
+            assert e.response.status_code == 204
 
         # device is accepted, but we're going to request a token using the same
         # sequence number as before

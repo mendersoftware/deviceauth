@@ -32,12 +32,8 @@ paths:
           schema:
             $ref: '#/definitions/Status'
       responses:
-        303:
+        204:
           description: The device status was successfully updated.
-          headers:
-            Location:
-              type: string
-              description: URI of the updated device.
         400:
           description: Bad request.
           schema:

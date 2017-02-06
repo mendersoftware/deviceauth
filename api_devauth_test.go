@@ -303,73 +303,60 @@ func TestApiDevAuthUpdateStatusDevice(t *testing.T) {
 	penstatus := DevAuthApiStatus{"pending"}
 
 	tcases := []struct {
-		req     *http.Request
-		code    int
-		body    string
-		headers map[string]string
+		req  *http.Request
+		code int
+		body string
 	}{
 		{
 			req: test.MakeSimpleRequest("PUT",
 				"http://1.2.3.4/api/0.1.0/devices/foo/status", nil),
-			code: 400,
+			code: http.StatusBadRequest,
 			body: RestError("failed to decode status data: JSON payload is empty"),
 		},
 		{
 			req: test.MakeSimpleRequest("PUT",
 				"http://1.2.3.4/api/0.1.0/devices/foo/status",
 				DevAuthApiStatus{"foo"}),
-			code: 400,
+			code: http.StatusBadRequest,
 			body: RestError("incorrect device status"),
 		},
 		{
 			req: test.MakeSimpleRequest("PUT",
 				"http://1.2.3.4/api/0.1.0/devices/foo/status",
 				accstatus),
-			code: 303,
-			headers: map[string]string{
-				"Location": "../foo",
-			},
+			code: http.StatusNoContent,
 		},
 		{
 			req: test.MakeSimpleRequest("PUT",
 				"http://1.2.3.4/api/0.1.0/devices/bar/status",
 				accstatus),
-			code: 500,
+			code: http.StatusInternalServerError,
 			body: RestError("internal error"),
 		},
 		{
 			req: test.MakeSimpleRequest("PUT",
 				"http://1.2.3.4/api/0.1.0/devices/baz/status",
 				accstatus),
-			code: 404,
+			code: http.StatusNotFound,
 			body: RestError(ErrDevNotFound.Error()),
 		},
 		{
 			req: test.MakeSimpleRequest("PUT",
 				"http://1.2.3.4/api/0.1.0/devices/foo/status",
 				rejstatus),
-			code: 303,
-			headers: map[string]string{
-				"Location": "../foo",
-			},
+			code: http.StatusNoContent,
 		},
 		{
 			req: test.MakeSimpleRequest("PUT",
 				"http://1.2.3.4/api/0.1.0/devices/foo/status",
 				penstatus),
-			code: 303,
-			headers: map[string]string{
-				"Location": "../foo",
-			},
+			code: http.StatusNoContent,
 		},
 	}
 
 	for idx, tc := range tcases {
 		t.Logf("running %d", idx)
-		recorded := runTestRequest(t, apih, tc.req, tc.code, tc.body)
-		for h, v := range tc.headers {
-			recorded.HeaderIs(h, v)
-		}
+		runTestRequest(t, apih, tc.req, tc.code, tc.body)
 	}
 
 }

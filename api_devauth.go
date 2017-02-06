@@ -235,8 +235,7 @@ func (d *DevAuthHandler) UpdateDeviceStatusHandler(w rest.ResponseWriter, r *res
 		return
 	}
 
-	w.Header().Add("Location", "../"+devid)
-	w.WriteHeader(http.StatusSeeOther)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // return selected http code + error message directly taken from error
