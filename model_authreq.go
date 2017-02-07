@@ -27,7 +27,6 @@ type AuthReq struct {
 	DeviceId    string    `json:"device_id" bson:"device_id"`
 	Timestamp   time.Time `json:"ts" bson:"ts"`
 	Status      string    `json:"status"`
-	SeqNo       uint64    `json:"seq_no" bson:"seq_no"`
 }
 
 func (r *AuthReq) Validate() error {
@@ -37,10 +36,6 @@ func (r *AuthReq) Validate() error {
 
 	if r.PubKey == "" {
 		return errors.New("pubkey must be provided")
-	}
-
-	if r.SeqNo == 0 {
-		return errors.New("seq_no must be provided")
 	}
 
 	// not checking tenant token for now - TODO

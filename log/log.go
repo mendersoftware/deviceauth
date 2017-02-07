@@ -31,10 +31,11 @@
 package log
 
 import (
-	"github.com/Sirupsen/logrus"
 	"path"
 	"runtime"
 	"strings"
+
+	"github.com/Sirupsen/logrus"
 )
 
 var (

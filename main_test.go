@@ -13,7 +13,18 @@
 //    limitations under the License.
 package main
 
-import "testing"
+import (
+	"io/ioutil"
+	"testing"
+
+	"github.com/mendersoftware/deviceauth/log"
+)
+
+func init() {
+	// disbale logging thile running unit tests
+	// default application settup couses to mich noice
+	log.Log.Out = ioutil.Discard
+}
 
 func TestHandleConfigFile(t *testing.T) {
 	HandleConfigFile("", false, nil)

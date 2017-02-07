@@ -39,10 +39,6 @@ func (mda *MockDevAuth) SubmitAuthRequestWithClient(r *AuthReq, c requestid.ApiR
 	return mda.mockSubmitAuthRequestWithClient(r, c)
 }
 
-func (mda *MockDevAuth) GetAuthRequests(dev_id string) ([]AuthReq, error) {
-	return nil, errors.New("not implemented")
-}
-
 func (mda *MockDevAuth) GetDevices(skip, limit int, tenant_token, status string) ([]Device, error) {
 	return nil, errors.New("not implemented")
 }

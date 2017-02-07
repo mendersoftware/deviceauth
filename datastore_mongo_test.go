@@ -23,7 +23,6 @@ import (
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
 )
 
 const (
@@ -297,109 +296,6 @@ func TestGetDeviceByKey(t *testing.T) {
 	}
 }
 
-func TestGetAuthRequests(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping TestGetAuthRequests in short mode.")
-	}
-
-	// set this to get reliable time.Time serialization
-	// (always get UTC instead of e.g. CEST)
-	time.Local = time.UTC
-
-	d := getDb()
-	defer d.session.Close()
-
-	err := setUp(d, "", "auth_reqs_input.json", "")
-	assert.NoError(t, err, "failed to setup input data")
-
-	testCases := []struct {
-		deviceId string
-		skip     int
-		limit    int
-		expected string
-	}{
-		{
-			//existing device 1
-			deviceId: "0001",
-			skip:     0,
-			limit:    0,
-			expected: "auth_reqs_expected_1.json",
-		},
-		{
-			//existing device 2
-			deviceId: "0002",
-			skip:     0,
-			limit:    0,
-			expected: "auth_reqs_expected_2.json",
-		},
-		{
-			//existing device 1, skip + limit
-			deviceId: "0001",
-			skip:     1,
-			limit:    1,
-			expected: "auth_reqs_expected_3.json",
-		},
-		{
-			//device doesn't exist
-			deviceId: "0003",
-			expected: "",
-		},
-	}
-
-	for _, tc := range testCases {
-		expected := []AuthReq{}
-
-		if tc.expected != "" {
-			expected, err = parseAuthReqs(tc.expected)
-			assert.NoError(t, err, "failed to parse %s", tc.expected)
-			assert.NotNil(t, expected)
-		}
-
-		reqs, err := d.GetAuthRequests(tc.deviceId, tc.skip, tc.limit)
-		assert.NoError(t, err, "failed to get auth reqs")
-		assert.Equal(t, expected, reqs)
-	}
-}
-
-func TestAddAuthReq(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping TestAddAuthReq in short mode.")
-	}
-
-	time.Local = time.UTC
-
-	//setup
-	req := AuthReq{
-		IdData:      "iddata",
-		TenantToken: "tenant",
-		PubKey:      "pubkey",
-		DeviceId:    "devid",
-		Timestamp:   time.Now(),
-		SeqNo:       123,
-		Status:      "pending",
-	}
-
-	d := getDb()
-	defer d.session.Close()
-
-	err := d.AddAuthReq(&req)
-	assert.NoError(t, err, "failed to add auth req")
-
-	//verify
-	s := d.session.Copy()
-	defer s.Close()
-
-	var found AuthReq
-
-	c := s.DB(DbName).C(DbAuthReqColl)
-
-	filter := bson.M{"id_data": "iddata"}
-	err = c.Find(filter).One(&found)
-	assert.NoError(t, err, "failed to find auth req")
-
-	compareAuthReq(&req, &found, t)
-}
-
 // custom AuthReq comparison with 'compareTime'
 func compareAuthReq(expected *AuthReq, actual *AuthReq, t *testing.T) {
 	assert.Equal(t, expected.IdData, actual.IdData)
@@ -407,7 +303,6 @@ func compareAuthReq(expected *AuthReq, actual *AuthReq, t *testing.T) {
 	assert.Equal(t, expected.PubKey, actual.PubKey)
 	assert.Equal(t, expected.DeviceId, actual.DeviceId)
 	assert.Equal(t, expected.Status, actual.Status)
-	assert.Equal(t, expected.SeqNo, actual.SeqNo)
 	compareTime(expected.Timestamp, actual.Timestamp, t)
 }
 

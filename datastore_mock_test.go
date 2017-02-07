@@ -19,10 +19,8 @@ import (
 )
 
 type MockDataStore struct {
-	mockGetAuthRequests    func(device_id string, skip, limit int) ([]AuthReq, error)
 	mockGetDeviceById      func(id string) (*Device, error)
 	mockGetDeviceByKey     func(key string) (*Device, error)
-	mockAddAuthReq         func(r *AuthReq) error
 	mockAddDevice          func(r *Device) error
 	mockUpdateDevice       func(d *Device) error
 	mockAddToken           func(t *Token) error
@@ -32,20 +30,12 @@ type MockDataStore struct {
 	mockSet                func(l log.Logger)
 }
 
-func (db *MockDataStore) GetAuthRequests(dev_id string, skip, limit int) ([]AuthReq, error) {
-	return db.mockGetAuthRequests(dev_id, skip, limit)
-}
-
 func (db *MockDataStore) GetDeviceById(id string) (*Device, error) {
 	return db.mockGetDeviceById(id)
 }
 
 func (db *MockDataStore) GetDeviceByKey(key string) (*Device, error) {
 	return db.mockGetDeviceByKey(key)
-}
-
-func (db *MockDataStore) AddAuthReq(r *AuthReq) error {
-	return db.mockAddAuthReq(r)
 }
 
 func (db *MockDataStore) AddDevice(d *Device) error {

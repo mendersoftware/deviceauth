@@ -26,7 +26,6 @@ func TestSubmitAuthRequest(t *testing.T) {
 		IdData:      "iddata",
 		TenantToken: "tenant",
 		PubKey:      "pubkey",
-		SeqNo:       123,
 	}
 
 	//precomputed device id for "iddata"
@@ -45,8 +44,7 @@ func TestSubmitAuthRequest(t *testing.T) {
 		getDevByKeyId  string
 		getDevByKeyErr error
 
-		getAuthReqsSeqNo uint64
-		getAuthReqsErr   error
+		getAuthReqsErr error
 
 		addDeviceErr  error
 		addAuthReqErr error
@@ -68,8 +66,7 @@ func TestSubmitAuthRequest(t *testing.T) {
 			getDevByKeyId:  devId,
 			getDevByKeyErr: nil,
 
-			getAuthReqsSeqNo: 122,
-			getAuthReqsErr:   nil,
+			getAuthReqsErr: nil,
 
 			addDeviceErr:  nil,
 			addAuthReqErr: nil,
@@ -91,8 +88,7 @@ func TestSubmitAuthRequest(t *testing.T) {
 			getDevByKeyId:  devId,
 			getDevByKeyErr: nil,
 
-			getAuthReqsSeqNo: 122,
-			getAuthReqsErr:   nil,
+			getAuthReqsErr: nil,
 
 			addDeviceErr:  nil,
 			addAuthReqErr: nil,
@@ -114,8 +110,7 @@ func TestSubmitAuthRequest(t *testing.T) {
 			getDevByKeyId:  devId,
 			getDevByKeyErr: nil,
 
-			getAuthReqsSeqNo: 122,
-			getAuthReqsErr:   nil,
+			getAuthReqsErr: nil,
 
 			addDeviceErr:  nil,
 			addAuthReqErr: nil,
@@ -137,8 +132,7 @@ func TestSubmitAuthRequest(t *testing.T) {
 			getDevByKeyId:  "anotherid",
 			getDevByKeyErr: nil,
 
-			getAuthReqsSeqNo: 122,
-			getAuthReqsErr:   nil,
+			getAuthReqsErr: nil,
 
 			addDeviceErr:  nil,
 			addAuthReqErr: nil,
@@ -160,8 +154,7 @@ func TestSubmitAuthRequest(t *testing.T) {
 			getDevByKeyId:  devId,
 			getDevByKeyErr: nil,
 
-			getAuthReqsSeqNo: 122,
-			getAuthReqsErr:   nil,
+			getAuthReqsErr: nil,
 
 			addDeviceErr:  nil,
 			addAuthReqErr: nil,
@@ -170,29 +163,6 @@ func TestSubmitAuthRequest(t *testing.T) {
 
 			res: "",
 			err: ErrDevAuthKeyMismatch,
-		},
-		{
-			//existing, accepted device, but wrong seq_no
-			inReq: req,
-
-			devStatus: DevStatusAccepted,
-
-			getDevByIdKey: "pubkey",
-			getDevByIdErr: nil,
-
-			getDevByKeyId:  devId,
-			getDevByKeyErr: nil,
-
-			getAuthReqsSeqNo: 124,
-			getAuthReqsErr:   nil,
-
-			addDeviceErr:  nil,
-			addAuthReqErr: nil,
-
-			devAdmErr: nil,
-
-			res: "",
-			err: ErrDevAuthUnauthorized,
 		},
 		{
 			//new device
@@ -206,8 +176,7 @@ func TestSubmitAuthRequest(t *testing.T) {
 			getDevByKeyId:  "",
 			getDevByKeyErr: ErrDevNotFound,
 
-			getAuthReqsSeqNo: 125,
-			getAuthReqsErr:   nil,
+			getAuthReqsErr: nil,
 
 			addDeviceErr:  nil,
 			addAuthReqErr: nil,
@@ -229,8 +198,7 @@ func TestSubmitAuthRequest(t *testing.T) {
 			getDevByKeyId:  "",
 			getDevByKeyErr: ErrDevNotFound,
 
-			getAuthReqsSeqNo: 122,
-			getAuthReqsErr:   nil,
+			getAuthReqsErr: nil,
 
 			addDeviceErr:  nil,
 			addAuthReqErr: nil,
@@ -252,8 +220,7 @@ func TestSubmitAuthRequest(t *testing.T) {
 			getDevByKeyId:  devId,
 			getDevByKeyErr: nil,
 
-			getAuthReqsSeqNo: 0, // invoke nil case
-			getAuthReqsErr:   nil,
+			getAuthReqsErr: nil,
 
 			addDeviceErr:  nil,
 			addAuthReqErr: nil,
@@ -269,18 +236,6 @@ func TestSubmitAuthRequest(t *testing.T) {
 		t.Logf("tc: %d", tcidx)
 
 		db := MockDataStore{
-			mockGetAuthRequests: func(device_id string, skip, limit int) ([]AuthReq, error) {
-				if tc.getAuthReqsErr != nil {
-					return nil, tc.getAuthReqsErr
-				}
-
-				if tc.getAuthReqsSeqNo == 0 {
-					// trigger empty slice
-					return []AuthReq{}, nil
-				}
-				return []AuthReq{AuthReq{SeqNo: tc.getAuthReqsSeqNo}}, nil
-			},
-
 			mockGetDeviceById: func(id string) (*Device, error) {
 				if tc.getDevByIdErr != nil {
 					return nil, tc.getDevByIdErr
@@ -297,10 +252,6 @@ func TestSubmitAuthRequest(t *testing.T) {
 				return &Device{Id: tc.getDevByKeyId,
 					PubKey: key,
 					Status: tc.devStatus}, nil
-			},
-
-			mockAddAuthReq: func(r *AuthReq) error {
-				return tc.addAuthReqErr
 			},
 
 			mockAddDevice: func(d *Device) error {

@@ -14,6 +14,7 @@ go:
 env:
     matrix:
         - JOB_TYPE=compile_and_basic_tests
+        - JOB_TYPE=compile_and_acceptance_tests
         - JOB_TYPE=compile_and_integration_tests_fast
         - JOB_TYPE=compile_and_integration_tests_slow
 
@@ -142,13 +143,10 @@ script:
     # Move script to testing directory
     - mv integration/extra/travis-testing/* tests/
 
-    # Build acceptance tests container
-    - if [ "$JOB_TYPE" = compile_and_basic_tests ]; then
-        ./tests/build-acceptance ./tests ./docs/internal_api.yml;
-      fi
-
     # Run dependant microservices and the tests service itself
-    - if [ "$JOB_TYPE" = compile_and_basic_tests ]; then
+    # Build acceptance tests container
+    - if [ "$JOB_TYPE" = compile_and_acceptance_tests ]; then
+        ./tests/build-acceptance ./tests ./docs/internal_api.yml;
         TESTS_DIR=$PWD/tests ./tests/run-test-environment "acceptance" $PWD/integration ./tests/docker-compose.yml;
       fi
 

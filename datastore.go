@@ -29,9 +29,6 @@ var (
 )
 
 type DataStore interface {
-	// retrieve a history of device's auth requests
-	GetAuthRequests(device_id string, skip, limit int) ([]AuthReq, error)
-
 	// retrieve device by Mender-assigned device ID
 	//returns ErrDevNotFound if device not found
 	GetDeviceById(id string) (*Device, error)
@@ -40,7 +37,6 @@ type DataStore interface {
 	// returns ErrDevNotFound if device not found
 	GetDeviceByKey(key string) (*Device, error)
 
-	AddAuthReq(r *AuthReq) error
 	AddDevice(r *Device) error
 
 	// updates a single device selected via d.Id

@@ -79,25 +79,6 @@ func NewDataStoreMongo(host string) (*DataStoreMongo, error) {
 	return db, nil
 }
 
-func (db *DataStoreMongo) GetAuthRequests(dev_id string, skip, limit int) ([]AuthReq, error) {
-	s := db.session.Copy()
-	defer s.Close()
-
-	c := s.DB(DbName).C(DbAuthReqColl)
-
-	res := []AuthReq{}
-
-	filter := bson.M{"device_id": dev_id}
-
-	err := c.Find(filter).Sort("-ts").Skip(skip).Limit(limit).All(&res)
-
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to fetch device list")
-	}
-
-	return res, nil
-}
-
 func (db *DataStoreMongo) GetDeviceById(id string) (*Device, error) {
 	s := db.session.Copy()
 	defer s.Close()
@@ -139,19 +120,6 @@ func (db *DataStoreMongo) GetDeviceByKey(key string) (*Device, error) {
 	}
 
 	return &res, nil
-}
-
-func (db *DataStoreMongo) AddAuthReq(r *AuthReq) error {
-	s := db.session.Copy()
-	defer s.Close()
-
-	c := db.session.DB(DbName).C(DbAuthReqColl)
-
-	if err := c.Insert(r); err != nil {
-		return errors.Wrap(err, "failed to store auth req")
-	}
-
-	return nil
 }
 
 func (db *DataStoreMongo) AddDevice(d *Device) error {
