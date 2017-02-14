@@ -36,6 +36,9 @@ env:
         # Docker repository name
         - DOCKER_REPOSITORY="mendersoftware/deviceauth"
 
+        # Use correct branch for testing
+        - TEST_BRANCH=$TRAVIS_BRANCH
+
 before_install:
     # Install code coverage tooling
     - go get -u github.com/axw/gocov/gocov
