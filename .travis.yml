@@ -36,6 +36,9 @@ env:
         # Docker repository name
         - DOCKER_REPOSITORY="mendersoftware/deviceauth"
 
+        # Use correct branch for testing
+        - TEST_BRANCH=$TRAVIS_BRANCH
+
 before_install:
     # Install code coverage tooling
     - go get -u github.com/axw/gocov/gocov
@@ -64,6 +67,8 @@ before_script:
     - echo $TRAVIS_BRANCH
     - echo $TRAVIS_BUILD_NUMBER
     - echo $TRAVIS_REPO_SLUG
+
+    - git fetch --tags origin 'refs/heads/*:refs/remotes/origin/*'
 
     # Test if code was formatted with 'go fmt'
     # Command will format code and return modified files
