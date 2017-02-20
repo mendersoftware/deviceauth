@@ -29,6 +29,7 @@ type MockDevAuth struct {
 	mockVerifyToken                 func(token string) error
 	mockRevokeToken                 func(tokenId string) error
 	mockWithContext                 func(ctx *RequestContext) DevAuthApp
+	mockGetDevices                  func(skip, limit uint) ([]Device, error)
 }
 
 func (mda *MockDevAuth) SubmitAuthRequest(r *AuthReq) (string, error) {
@@ -39,8 +40,8 @@ func (mda *MockDevAuth) SubmitAuthRequestWithClient(r *AuthReq, c requestid.ApiR
 	return mda.mockSubmitAuthRequestWithClient(r, c)
 }
 
-func (mda *MockDevAuth) GetDevices(skip, limit int, tenant_token, status string) ([]Device, error) {
-	return nil, errors.New("not implemented")
+func (mda *MockDevAuth) GetDevices(skip, limit uint) ([]Device, error) {
+	return mda.mockGetDevices(skip, limit)
 }
 
 func (mda *MockDevAuth) GetDevice(dev_id string) (*Device, error) {

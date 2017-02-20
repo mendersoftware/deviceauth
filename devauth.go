@@ -45,7 +45,7 @@ func simpleApiClientGetter() requestid.ApiRequester {
 type DevAuthApp interface {
 	SubmitAuthRequest(r *AuthReq) (string, error)
 
-	GetDevices(skip, limit int, tenant_token, status string) ([]Device, error)
+	GetDevices(skip, limit uint) ([]Device, error)
 	GetDevice(dev_id string) (*Device, error)
 	AcceptDevice(dev_id string) error
 	RejectDevice(dev_id string) error
@@ -173,13 +173,17 @@ func (d *DevAuth) findMatchingDevice(id, key string) (*Device, error) {
 
 	return nil, ErrDevAuthUnauthorized
 }
-func (*DevAuth) GetDevices(skip, limit int, tenant_token, status string) ([]Device, error) {
-	return nil, errors.New("not implemented")
+
+func (d *DevAuth) GetDevices(skip, limit uint) ([]Device, error) {
+	return d.db.GetDevices(skip, limit)
 }
 
-func (*DevAuth) GetDevice(dev_id string) (*Device, error) {
-	return nil, errors.New("not implemented")
-
+func (d *DevAuth) GetDevice(devId string) (*Device, error) {
+	dev, err := d.db.GetDeviceById(devId)
+	if err != nil && err != ErrDevNotFound {
+		return nil, errors.Wrap(err, "db get device by id error")
+	}
+	return dev, err
 }
 
 func (d *DevAuth) AcceptDevice(dev_id string) error {

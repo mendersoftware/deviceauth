@@ -37,6 +37,9 @@ type DataStore interface {
 	// returns ErrDevNotFound if device not found
 	GetDeviceByKey(key string) (*Device, error)
 
+	// list devices
+	GetDevices(skip, limit uint) ([]Device, error)
+
 	AddDevice(r *Device) error
 
 	// updates a single device selected via d.Id

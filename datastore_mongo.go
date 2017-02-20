@@ -79,6 +79,21 @@ func NewDataStoreMongo(host string) (*DataStoreMongo, error) {
 	return db, nil
 }
 
+func (db *DataStoreMongo) GetDevices(skip, limit uint) ([]Device, error) {
+	s := db.session.Copy()
+	defer s.Close()
+
+	c := s.DB(DbName).C(DbDevicesColl)
+
+	res := []Device{}
+
+	err := c.Find(nil).Sort("_id").Skip(int(skip)).Limit(int(limit)).All(&res)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to fetch device list")
+	}
+	return res, nil
+}
+
 func (db *DataStoreMongo) GetDeviceById(id string) (*Device, error) {
 	s := db.session.Copy()
 	defer s.Close()

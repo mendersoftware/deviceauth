@@ -23,11 +23,14 @@ import (
 	"github.com/mendersoftware/deviceauth/requestid"
 	"github.com/mendersoftware/deviceauth/requestlog"
 	"github.com/mendersoftware/deviceauth/utils"
+	"github.com/mendersoftware/go-lib-micro/rest_utils"
 	"github.com/pkg/errors"
 )
 
 const (
 	uriAuthReqs     = "/api/0.1.0/auth_requests"
+	uriDevices      = "/api/0.1.0/devices"
+	uriDevice       = "/api/0.1.0/devices/:id"
 	uriToken        = "/api/0.1.0/tokens/:id"
 	uriTokenVerify  = "/api/0.1.0/tokens/verify"
 	uriDeviceStatus = "/api/0.1.0/devices/:id/status"
@@ -57,6 +60,10 @@ func NewDevAuthApiHandler(daf DevAuthFactory) ApiHandler {
 func (d *DevAuthHandler) GetApp() (rest.App, error) {
 	routes := []*rest.Route{
 		rest.Post(uriAuthReqs, d.SubmitAuthRequestHandler),
+
+		rest.Get(uriDevices, d.GetDevicesHandler),
+
+		rest.Get(uriDevice, d.GetDeviceHandler),
 
 		rest.Delete(uriToken, d.DeleteTokenHandler),
 
@@ -138,6 +145,64 @@ func (d *DevAuthHandler) SubmitAuthRequestHandler(w rest.ResponseWriter, r *rest
 	default:
 		restErrWithLogInternal(w, r, l, err)
 		return
+	}
+}
+
+func (d *DevAuthHandler) GetDevicesHandler(w rest.ResponseWriter, r *rest.Request) {
+	l := requestlog.GetRequestLogger(r.Env)
+
+	da, err := d.createDevAuth(l)
+	if err != nil {
+		restErrWithLogInternal(w, r, l, err)
+	}
+
+	page, perPage, err := rest_utils.ParsePagination(r)
+	if err != nil {
+		restErrWithLog(w, r, l, err, http.StatusBadRequest)
+		return
+	}
+
+	skip := (page - 1) * perPage
+	limit := perPage + 1
+	devs, err := da.GetDevices(uint(skip), uint(limit))
+	if err != nil {
+		restErrWithLogInternal(w, r, l, err)
+		return
+	}
+
+	len := len(devs)
+	hasNext := false
+	if uint64(len) > perPage {
+		hasNext = true
+		len = int(perPage)
+	}
+
+	links := rest_utils.MakePageLinkHdrs(r, page, perPage, hasNext)
+
+	for _, l := range links {
+		w.Header().Add("Link", l)
+	}
+	w.WriteJson(devs[:len])
+}
+
+func (d *DevAuthHandler) GetDeviceHandler(w rest.ResponseWriter, r *rest.Request) {
+	l := requestlog.GetRequestLogger(r.Env)
+
+	da, err := d.createDevAuth(l)
+	if err != nil {
+		restErrWithLogInternal(w, r, l, err)
+	}
+
+	devId := r.PathParam("id")
+
+	dev, err := da.GetDevice(devId)
+	switch {
+	case err == ErrDevNotFound:
+		restErrWithLog(w, r, l, err, http.StatusNotFound)
+	case dev != nil:
+		w.WriteJson(dev)
+	default:
+		restErrWithLogInternal(w, r, l, err)
 	}
 }
 

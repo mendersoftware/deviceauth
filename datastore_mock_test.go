@@ -19,6 +19,7 @@ import (
 )
 
 type MockDataStore struct {
+	mockGetDevices         func(skip, limit uint) ([]Device, error)
 	mockGetDeviceById      func(id string) (*Device, error)
 	mockGetDeviceByKey     func(key string) (*Device, error)
 	mockAddDevice          func(r *Device) error
@@ -32,6 +33,10 @@ type MockDataStore struct {
 
 func (db *MockDataStore) GetDeviceById(id string) (*Device, error) {
 	return db.mockGetDeviceById(id)
+}
+
+func (db *MockDataStore) GetDevices(skip, limit uint) ([]Device, error) {
+	return db.mockGetDevices(skip, limit)
 }
 
 func (db *MockDataStore) GetDeviceByKey(key string) (*Device, error) {
