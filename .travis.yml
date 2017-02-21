@@ -48,7 +48,8 @@ before_install:
     - go get -u github.com/fzipp/gocyclo
 
     # Install swagger-cli
-    - sudo apt-get -qq update && sudo apt-get -qq install -y npm e2tools
+    - sudo apt-get -qq update && sudo apt-get -qq install -y e2tools
+
     - sudo npm install -g swagger-cli
 
     # Install yaml python module
