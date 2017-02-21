@@ -26,6 +26,7 @@ import (
 	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/mendersoftware/go-lib-micro/requestid"
 	"github.com/mendersoftware/go-lib-micro/requestlog"
+	"github.com/mendersoftware/go-lib-micro/rest_utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -451,4 +452,141 @@ func TestApiDevAuthDeleteToken(t *testing.T) {
 		runTestRequest(t, apih, tc.req, tc.code, tc.body)
 	}
 
+}
+
+func TestApiGetDevice(t *testing.T) {
+	// enforce specific field naming in errors returned by API
+	rest.ErrorFieldName = "error"
+
+	dev := &Device{
+		Id:     "foo",
+		PubKey: "pubkey",
+		Status: DevStatusPending,
+	}
+	tcases := []struct {
+		req    *http.Request
+		code   int
+		body   string
+		device *Device
+		err    error
+	}{
+		{
+			req: test.MakeSimpleRequest("GET",
+				"http://1.2.3.4/api/0.1.0/devices/foo", nil),
+			code:   http.StatusOK,
+			device: dev,
+			err:    nil,
+			body:   string(asJSON(dev)),
+		},
+		{
+			req: test.MakeSimpleRequest("GET",
+				"http://1.2.3.4/api/0.1.0/devices/bar", nil),
+			code: http.StatusNotFound,
+			err:  ErrDevNotFound,
+			body: RestError("device not found"),
+		},
+	}
+
+	for _, tc := range tcases {
+		devauth := MockDevAuthApp{}
+		devauth.On("GetDevice", mock.AnythingOfType("string")).Return(
+			tc.device, tc.err)
+
+		factory := func(l *log.Logger) (DevAuthApp, error) {
+			return &devauth, nil
+		}
+		apih := makeMockApiHandler(t, factory)
+		runTestRequest(t, apih, tc.req, tc.code, tc.body)
+	}
+}
+
+func TestApiGetDevices(t *testing.T) {
+	// enforce specific field naming in errors returned by API
+	rest.ErrorFieldName = "error"
+
+	devs := []Device{
+		{
+			Id:     "foo",
+			PubKey: "pubkey",
+			Status: DevStatusPending,
+		},
+		{
+			Id:     "bar",
+			PubKey: "pubkey2",
+			Status: DevStatusRejected,
+		},
+		{
+			Id:     "baz",
+			PubKey: "pubkey3",
+			Status: DevStatusRejected,
+		},
+	}
+
+	tcases := []struct {
+		req     *http.Request
+		code    int
+		body    string
+		devices []Device
+		err     error
+		skip    uint
+		limit   uint
+	}{
+		{
+			req: test.MakeSimpleRequest("GET",
+				"http://1.2.3.4/api/0.1.0/devices", nil),
+			code:    http.StatusOK,
+			devices: devs,
+			err:     nil,
+			skip:    0,
+			limit:   rest_utils.PerPageDefault + 1,
+			body:    string(asJSON(devs)),
+		},
+		{
+			req: test.MakeSimpleRequest("GET",
+				"http://1.2.3.4/api/0.1.0/devices", nil),
+			code:    http.StatusOK,
+			devices: []Device{},
+			skip:    0,
+			limit:   rest_utils.PerPageDefault + 1,
+			err:     nil,
+			body:    "[]",
+		},
+		{
+			req: test.MakeSimpleRequest("GET",
+				"http://1.2.3.4/api/0.1.0/devices?page=2&per_page=2", nil),
+			devices: devs,
+			skip:    2,
+			limit:   3,
+			code:    http.StatusOK,
+			// reqquested 2 devices per page, so expect only 2
+			body: string(asJSON(devs[:2])),
+		},
+		{
+			req: test.MakeSimpleRequest("GET",
+				"http://1.2.3.4/api/0.1.0/devices?page=2&per_page=2", nil),
+			skip:  2,
+			limit: 3,
+			code:  http.StatusInternalServerError,
+			err:   errors.New("failed"),
+			body:  RestError("internal error"),
+		},
+	}
+
+	for i, tc := range tcases {
+		t.Logf("tc %v", i)
+		devauth := MockDevAuthApp{}
+		devauth.On("GetDevices", tc.skip, tc.limit).Return(
+			tc.devices, tc.err)
+
+		factory := func(l *log.Logger) (DevAuthApp, error) {
+			return &devauth, nil
+		}
+		apih := makeMockApiHandler(t, factory)
+		runTestRequest(t, apih, tc.req, tc.code, tc.body)
+	}
+}
+
+func asJSON(sth interface{}) []byte {
+	data, _ := json.Marshal(sth)
+	return data
 }
