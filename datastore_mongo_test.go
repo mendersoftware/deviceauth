@@ -232,11 +232,12 @@ func TestGetDeviceById(t *testing.T) {
 		dev, err := d.GetDeviceById(tc.deviceId)
 		if expected != nil {
 			assert.NoError(t, err, "failed to get devices")
+			if assert.NotNil(t, dev) {
+				compareDevices(expected, dev, t)
+			}
 		} else {
 			assert.Equal(t, ErrDevNotFound, err)
 		}
-
-		assert.Equal(t, expected, dev)
 	}
 }
 
@@ -288,11 +289,13 @@ func TestGetDeviceByKey(t *testing.T) {
 		dev, err := d.GetDeviceByKey(tc.deviceKey)
 		if expected != nil {
 			assert.NoError(t, err, "failed to get devices")
+			if assert.NotNil(t, dev) {
+				compareDevices(expected, dev, t)
+			}
 		} else {
 			assert.Equal(t, ErrDevNotFound, err)
 		}
 
-		assert.Equal(t, expected, dev)
 	}
 }
 
