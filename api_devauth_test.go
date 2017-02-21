@@ -27,6 +27,7 @@ import (
 	"github.com/mendersoftware/deviceauth/requestlog"
 	mtest "github.com/mendersoftware/deviceauth/test"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 func RestError(status string) string {
@@ -203,18 +204,17 @@ func TestApiDevAuthSubmitAuthReq(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		devauth := MockDevAuth{
-			mockSubmitAuthRequest: func(r *AuthReq) (string, error) {
+		devauth := MockDevAuthApp{}
+		devauth.On("SubmitAuthRequest", mock.AnythingOfType("*main.AuthReq")).Return(
+			func(r *AuthReq) string {
 				if tc.devAuthErr != nil {
-					return "", tc.devAuthErr
+					return ""
 				}
-				return tc.devAuthToken, nil
+				return tc.devAuthToken
 			},
-		}
+			tc.devAuthErr)
 
-		devauth.mockWithContext = func(ctx *RequestContext) DevAuthApp {
-			return &devauth
-		}
+		devauth.On("WithContext", mock.AnythingOfType("*main.RequestContext")).Return(&devauth)
 
 		factory := func(l *log.Logger) (DevAuthApp, error) {
 			return &devauth, nil
@@ -259,14 +259,11 @@ func TestApiDevAuthUpdateStatusDevice(t *testing.T) {
 		}
 		return nil
 	}
-	devauth := MockDevAuth{
-		mockAcceptDevice: mockaction,
-		mockRejectDevice: mockaction,
-		mockResetDevice:  mockaction,
-	}
-	devauth.mockWithContext = func(ctx *RequestContext) DevAuthApp {
-		return &devauth
-	}
+	devauth := MockDevAuthApp{}
+	devauth.On("AcceptDevice", mock.AnythingOfType("string")).Return(mockaction)
+	devauth.On("RejectDevice", mock.AnythingOfType("string")).Return(mockaction)
+	devauth.On("ResetDevice", mock.AnythingOfType("string")).Return(mockaction)
+	devauth.On("WithContext", mock.AnythingOfType("*main.RequestContext")).Return(&devauth)
 
 	factory := func(l *log.Logger) (DevAuthApp, error) {
 		return &devauth, nil
@@ -397,11 +394,9 @@ func TestApiDevAuthVerifyToken(t *testing.T) {
 	}
 
 	for _, tc := range tcases {
-		devauth := MockDevAuth{
-			mockVerifyToken: func(token string) error {
-				return tc.err
-			},
-		}
+		devauth := MockDevAuthApp{}
+		devauth.On("VerifyToken", mock.AnythingOfType("string")).Return(tc.err)
+
 		factory := func(l *log.Logger) (DevAuthApp, error) {
 			return &devauth, nil
 		}
@@ -446,11 +441,9 @@ func TestApiDevAuthDeleteToken(t *testing.T) {
 	}
 
 	for _, tc := range tcases {
-		devauth := MockDevAuth{
-			mockRevokeToken: func(tokenId string) error {
-				return tc.err
-			},
-		}
+		devauth := MockDevAuthApp{}
+		devauth.On("RevokeToken", mock.AnythingOfType("string")).Return(tc.err)
+
 		factory := func(l *log.Logger) (DevAuthApp, error) {
 			return &devauth, nil
 		}
