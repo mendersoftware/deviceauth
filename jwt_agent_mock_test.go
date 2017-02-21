@@ -14,7 +14,7 @@
 package main
 
 import (
-	"github.com/mendersoftware/deviceauth/log"
+	"github.com/mendersoftware/go-lib-micro/log"
 )
 
 type MockJWTAgent struct {

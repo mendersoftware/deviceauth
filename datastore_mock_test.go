@@ -17,7 +17,7 @@
 
 package main
 
-import log "github.com/mendersoftware/deviceauth/log"
+import log "github.com/mendersoftware/go-lib-micro/log"
 import migrate "github.com/mendersoftware/go-lib-micro/mongo/migrate"
 import mock "github.com/stretchr/testify/mock"
 

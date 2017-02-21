@@ -17,7 +17,7 @@ package main
 import (
 	"errors"
 
-	"github.com/mendersoftware/deviceauth/log"
+	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 )
 

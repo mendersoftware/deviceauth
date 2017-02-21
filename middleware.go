@@ -18,11 +18,11 @@ import (
 	"net/http"
 
 	"github.com/ant0ine/go-json-rest/rest"
-	"github.com/mendersoftware/deviceauth/accesslog"
-	dlog "github.com/mendersoftware/deviceauth/log"
-	"github.com/mendersoftware/deviceauth/requestid"
-	"github.com/mendersoftware/deviceauth/requestlog"
+	"github.com/mendersoftware/go-lib-micro/accesslog"
 	"github.com/mendersoftware/go-lib-micro/customheader"
+	dlog "github.com/mendersoftware/go-lib-micro/log"
+	"github.com/mendersoftware/go-lib-micro/requestid"
+	"github.com/mendersoftware/go-lib-micro/requestlog"
 )
 
 const (

@@ -17,7 +17,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/mendersoftware/deviceauth/log"
+	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 )

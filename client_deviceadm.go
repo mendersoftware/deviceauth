@@ -19,9 +19,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/mendersoftware/deviceauth/log"
-	"github.com/mendersoftware/deviceauth/requestid"
 	"github.com/mendersoftware/deviceauth/utils"
+	"github.com/mendersoftware/go-lib-micro/log"
+	"github.com/mendersoftware/go-lib-micro/requestid"
 	"github.com/pkg/errors"
 )
 

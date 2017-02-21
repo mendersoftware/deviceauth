@@ -18,7 +18,7 @@ import (
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
-	"github.com/mendersoftware/deviceauth/log"
+	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/pkg/errors"
 	"github.com/satori/go.uuid"
 )

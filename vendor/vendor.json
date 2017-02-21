@@ -27,6 +27,12 @@
 			"revisionTime": "2017-02-20T11:32:47Z"
 		},
 		{
+			"checksumSHA1": "TBy4BC8vdb8QenUOK253xKqZ4r8=",
+			"path": "github.com/mendersoftware/go-lib-micro/accesslog",
+			"revision": "7ba01e585c3044ffb1ae5e1662e9e8c8e11fbbe3",
+			"revisionTime": "2017-02-20T11:32:47Z"
+		},
+		{
 			"checksumSHA1": "XvmQkFe1S3yAa451K+06MqPkfyk=",
 			"path": "github.com/mendersoftware/go-lib-micro/customheader",
 			"revision": "7ba01e585c3044ffb1ae5e1662e9e8c8e11fbbe3",

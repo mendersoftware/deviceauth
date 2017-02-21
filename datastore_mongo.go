@@ -18,7 +18,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mendersoftware/deviceauth/log"
+	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	"github.com/pkg/errors"
 	"gopkg.in/mgo.v2"

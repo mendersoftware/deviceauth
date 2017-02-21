@@ -22,10 +22,10 @@ import (
 
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/ant0ine/go-json-rest/rest/test"
-	"github.com/mendersoftware/deviceauth/log"
-	"github.com/mendersoftware/deviceauth/requestid"
-	"github.com/mendersoftware/deviceauth/requestlog"
 	mtest "github.com/mendersoftware/deviceauth/test"
+	"github.com/mendersoftware/go-lib-micro/log"
+	"github.com/mendersoftware/go-lib-micro/requestid"
+	"github.com/mendersoftware/go-lib-micro/requestlog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )

@@ -17,7 +17,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/mendersoftware/deviceauth/requestid"
+	"github.com/mendersoftware/go-lib-micro/requestid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )

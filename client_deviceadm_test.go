@@ -19,7 +19,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mendersoftware/deviceauth/log"
+	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/stretchr/testify/assert"
 )
 
