@@ -19,6 +19,7 @@ import (
 
 	"github.com/mendersoftware/deviceauth/requestid"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 func TestSubmitAuthRequest(t *testing.T) {
@@ -235,45 +236,39 @@ func TestSubmitAuthRequest(t *testing.T) {
 	for tcidx, tc := range testCases {
 		t.Logf("tc: %d", tcidx)
 
-		db := MockDataStore{
-			mockGetDeviceById: func(id string) (*Device, error) {
-				if tc.getDevByIdErr != nil {
-					return nil, tc.getDevByIdErr
+		db := MockDataStore{}
+		db.On("GetDeviceById", mock.AnythingOfType("string")).Return(
+			func(id string) *Device {
+				if tc.getDevByIdErr == nil {
+					return &Device{
+						PubKey: tc.getDevByIdKey,
+						Id:     id,
+						Status: tc.devStatus,
+					}
 				}
-				return &Device{PubKey: tc.getDevByIdKey,
-					Id:     devId,
-					Status: tc.devStatus}, nil
+				return nil
 			},
+			tc.getDevByIdErr)
 
-			mockGetDeviceByKey: func(key string) (*Device, error) {
-				if tc.getDevByKeyErr != nil {
-					return nil, tc.getDevByKeyErr
+		db.On("GetDeviceByKey", mock.AnythingOfType("string")).Return(
+			func(key string) *Device {
+				if tc.getDevByKeyErr == nil {
+					return &Device{
+						Id:     tc.getDevByKeyId,
+						PubKey: key,
+						Status: tc.devStatus,
+					}
 				}
-				return &Device{Id: tc.getDevByKeyId,
-					PubKey: key,
-					Status: tc.devStatus}, nil
-			},
-
-			mockAddDevice: func(d *Device) error {
-				return tc.addDeviceErr
-			},
-
-			mockAddToken: func(t *Token) error {
 				return nil
 			},
+			tc.getDevByKeyErr)
 
-			mockGetToken: func(jti string) (*Token, error) {
-				return nil, nil
-			},
-
-			mockDeleteToken: func(jti string) error {
-				return nil
-			},
-
-			mockDeleteTokenByDevId: func(dev_id string) error {
-				return nil
-			},
-		}
+		db.On("AddDevice", mock.AnythingOfType("*main.Device")).Return(tc.addDeviceErr)
+		db.On("AddToken", mock.AnythingOfType("*main.Token")).Return(nil)
+		db.On("GetToken", mock.AnythingOfType("string")).Return(nil, nil)
+		db.On("DeleteToken", mock.AnythingOfType("string")).Return(nil)
+		db.On("DeleteToken", mock.AnythingOfType("string")).Return(nil)
+		db.On("DeleteTokenByDevId", mock.AnythingOfType("string")).Return(nil)
 
 		cda := MockDevAdmClient{
 			mockAddDevice: func(dev *Device, c requestid.ApiRequester) error {
@@ -331,21 +326,20 @@ func TestAcceptDevice(t *testing.T) {
 
 	for idx, tc := range testCases {
 		t.Logf("running %v", idx)
-		db := MockDataStore{
-			mockUpdateDevice: func(d *Device) error {
-				if tc.dbUpdateErr != nil {
-					return tc.dbUpdateErr
-				}
+		db := MockDataStore{}
+		db.On("UpdateDevice", mock.AnythingOfType("*main.Device")).Return(tc.dbUpdateErr)
 
-				return nil
-			},
-			mockGetDeviceById: func(id string) (*Device, error) {
-				if tc.dbGetErr != nil {
-					return nil, tc.dbGetErr
-				}
-
-				return &Device{Id: id, Status: "pending"}, nil
-			},
+		if tc.dbGetErr != nil {
+			db.On("GetDeviceById", mock.AnythingOfType("string")).Return(nil, tc.dbGetErr)
+		} else {
+			db.On("GetDeviceById", mock.AnythingOfType("string")).Return(
+				func(id string) *Device {
+					return &Device{
+						Id:     id,
+						Status: "pending",
+					}
+				},
+				nil)
 		}
 
 		inv := MockInventoryClient{
@@ -397,18 +391,17 @@ func TestRejectDevice(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		db := MockDataStore{
-			mockUpdateDevice: func(d *Device) error {
+		db := MockDataStore{}
+		db.On("UpdateDevice", mock.AnythingOfType("*main.Device")).Return(
+			func(d *Device) error {
 				if tc.dbErr != "" {
 					return errors.New(tc.dbErr)
 				}
 
 				return nil
-			},
-			mockDeleteTokenByDevId: func(dev_id string) error {
-				return tc.dbDelDevTokenErr
-			},
-		}
+			})
+		db.On("DeleteTokenByDevId", mock.AnythingOfType("string")).Return(
+			tc.dbDelDevTokenErr)
 
 		devauth := NewDevAuth(&db, nil, nil, nil)
 		err := devauth.RejectDevice("dummyid")
@@ -450,18 +443,17 @@ func TestResetDevice(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		db := MockDataStore{
-			mockUpdateDevice: func(d *Device) error {
+		db := MockDataStore{}
+		db.On("UpdateDevice", mock.AnythingOfType("*main.Device")).Return(
+			func(d *Device) error {
 				if tc.dbErr != "" {
 					return errors.New(tc.dbErr)
 				}
 
 				return nil
-			},
-			mockDeleteTokenByDevId: func(dev_id string) error {
-				return tc.dbDelDevTokenErr
-			},
-		}
+			})
+		db.On("DeleteTokenByDevId", mock.AnythingOfType("string")).Return(
+			tc.dbDelDevTokenErr)
 
 		devauth := NewDevAuth(&db, nil, nil, nil)
 		err := devauth.ResetDevice("dummyid")
