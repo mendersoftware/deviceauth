@@ -34,12 +34,12 @@ type InventoryClientConfig struct {
 	InventoryAddr string
 }
 
-type InventoryClientI interface {
+type InventoryClient interface {
 	AddDevice(dev *Device, client requestid.ApiRequester) error
 	log.ContextLogger
 }
 
-type InventoryClient struct {
+type inventoryClient struct {
 	log  *log.Logger
 	conf InventoryClientConfig
 }
@@ -48,7 +48,7 @@ type InventoryAddReq struct {
 	Id string `json:"id"`
 }
 
-func (ic *InventoryClient) AddDevice(dev *Device, client requestid.ApiRequester) error {
+func (ic *inventoryClient) AddDevice(dev *Device, client requestid.ApiRequester) error {
 	ic.log.Debugf("add device %s to inventory", dev.Id)
 
 	ireq, err := json.Marshal(InventoryAddReq{
@@ -92,19 +92,19 @@ func (ic *InventoryClient) AddDevice(dev *Device, client requestid.ApiRequester)
 	return nil
 }
 
-func (ic *InventoryClient) UseLog(l *log.Logger) {
+func (ic *inventoryClient) UseLog(l *log.Logger) {
 	ic.log = l.F(log.Ctx{})
 }
 
-func NewInventoryClientWithLogger(c InventoryClientConfig, l *log.Logger) *InventoryClient {
+func NewInventoryClientWithLogger(c InventoryClientConfig, l *log.Logger) *inventoryClient {
 	l = l.F(log.Ctx{})
 	client := NewInventoryClient(c)
 	client.UseLog(l)
 	return client
 }
 
-func NewInventoryClient(c InventoryClientConfig) *InventoryClient {
-	return &InventoryClient{
+func NewInventoryClient(c InventoryClientConfig) *inventoryClient {
+	return &inventoryClient{
 		log:  log.New(log.Ctx{}),
 		conf: c,
 	}

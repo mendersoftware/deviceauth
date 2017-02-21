@@ -61,14 +61,14 @@ type DevAuthApp interface {
 
 type DevAuth struct {
 	db           DataStore
-	cDevAdm      DevAdmClientI
-	cInv         InventoryClientI
+	cDevAdm      DevAdmClient
+	cInv         InventoryClient
 	jwt          JWTAgentApp
 	log          *log.Logger
 	clientGetter ApiClientGetter
 }
 
-func NewDevAuth(d DataStore, cda DevAdmClientI, ci InventoryClientI, jwt JWTAgentApp) DevAuthApp {
+func NewDevAuth(d DataStore, cda DevAdmClient, ci InventoryClient, jwt JWTAgentApp) DevAuthApp {
 	return &DevAuth{
 		db:           d,
 		cDevAdm:      cda,

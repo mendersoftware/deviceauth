@@ -39,17 +39,17 @@ type DevAdmClientConfig struct {
 	Timeout time.Duration
 }
 
-type DevAdmClientI interface {
+type DevAdmClient interface {
 	AddDevice(dev *Device, client requestid.ApiRequester) error
 	log.ContextLogger
 }
 
-type DevAdmClient struct {
+type devAdmClient struct {
 	log  *log.Logger
 	conf DevAdmClientConfig
 }
 
-func (d *DevAdmClient) AddDevice(dev *Device, client requestid.ApiRequester) error {
+func (d *devAdmClient) AddDevice(dev *Device, client requestid.ApiRequester) error {
 	d.log.Debugf("add device %s for admission", dev.Id)
 
 	AdmReqJson, err := json.Marshal(AdmReq{
@@ -85,23 +85,23 @@ func (d *DevAdmClient) AddDevice(dev *Device, client requestid.ApiRequester) err
 	return nil
 }
 
-func (d *DevAdmClient) UseLog(l *log.Logger) {
+func (d *devAdmClient) UseLog(l *log.Logger) {
 	d.log = l.F(log.Ctx{})
 }
 
-func GetDevAdmClient(c DevAdmClientConfig, l *log.Logger) *DevAdmClient {
+func GetDevAdmClient(c DevAdmClientConfig, l *log.Logger) *devAdmClient {
 	l = l.F(log.Ctx{})
 	client := NewDevAdmClient(c)
 	client.UseLog(l)
 	return client
 }
 
-func NewDevAdmClient(c DevAdmClientConfig) *DevAdmClient {
+func NewDevAdmClient(c DevAdmClientConfig) *devAdmClient {
 	if c.Timeout == 0 {
 		c.Timeout = defaultDevAdmReqTimeout
 	}
 
-	return &DevAdmClient{
+	return &devAdmClient{
 		log:  log.New(log.Ctx{}),
 		conf: c,
 	}
