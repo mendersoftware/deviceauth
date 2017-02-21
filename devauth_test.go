@@ -276,11 +276,10 @@ func TestSubmitAuthRequest(t *testing.T) {
 			},
 		}
 
-		cdi := MockInventoryClient{
-			mockAddDevice: func(dev *Device, c requestid.ApiRequester) error {
-				return tc.devAdmErr
-			},
-		}
+		cdi := MockInventoryClient{}
+		cdi.On("AddDevice", mock.AnythingOfType("*main.Device"),
+			mock.MatchedBy(func(_ requestid.ApiRequester) bool { return true })).
+			Return(tc.devAdmErr)
 
 		jwt := MockJWTAgent{
 			mockGenerateTokenSignRS256: func(devId string) (*Token, error) {
@@ -342,14 +341,10 @@ func TestAcceptDevice(t *testing.T) {
 				nil)
 		}
 
-		inv := MockInventoryClient{
-			mockAddDevice: func(d *Device, client requestid.ApiRequester) error {
-				if tc.invErr != nil {
-					return tc.invErr
-				}
-				return nil
-			},
-		}
+		inv := MockInventoryClient{}
+		inv.On("AddDevice", mock.AnythingOfType("*main.Device"),
+			mock.MatchedBy(func(_ requestid.ApiRequester) bool { return true })).
+			Return(tc.invErr)
 
 		devauth := NewDevAuth(&db, nil, &inv, nil)
 		err := devauth.AcceptDevice("dummyid")
