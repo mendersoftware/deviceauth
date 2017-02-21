@@ -65,7 +65,7 @@ func TestDevAdmClientReqNoHost(t *testing.T) {
 	assert.Error(t, err, "expected an error")
 }
 
-func TestDevAdmClientTImeout(t *testing.T) {
+func TestDevAdmClientTimeout(t *testing.T) {
 
 	if testing.Short() {
 		t.Skip("skipping test in short mode")
