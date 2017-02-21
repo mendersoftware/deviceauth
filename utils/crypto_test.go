@@ -15,9 +15,10 @@ package utils
 
 import (
 	"crypto/rsa"
+	"testing"
+
 	"github.com/mendersoftware/deviceauth/test"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestVerifyAuthReqSign(t *testing.T) {
