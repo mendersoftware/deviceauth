@@ -270,11 +270,10 @@ func TestSubmitAuthRequest(t *testing.T) {
 		db.On("DeleteToken", mock.AnythingOfType("string")).Return(nil)
 		db.On("DeleteTokenByDevId", mock.AnythingOfType("string")).Return(nil)
 
-		cda := MockDevAdmClient{
-			mockAddDevice: func(dev *Device, c requestid.ApiRequester) error {
-				return tc.devAdmErr
-			},
-		}
+		cda := MockDevAdmClient{}
+		cda.On("AddDevice", mock.AnythingOfType("*main.Device"),
+			mock.MatchedBy(func(_ requestid.ApiRequester) bool { return true })).
+			Return(tc.devAdmErr)
 
 		cdi := MockInventoryClient{}
 		cdi.On("AddDevice", mock.AnythingOfType("*main.Device"),
