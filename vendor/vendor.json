@@ -21,6 +21,13 @@
 			"revisionTime": "2017-02-19T23:16:50Z"
 		},
 		{
+			"checksumSHA1": "WRu+mhZ2PfQu27qRr69HVGjtN4Q=",
+			"origin": "github.com/mendersoftware/deviceauth/vendor/github.com/davecgh/go-spew/spew",
+			"path": "github.com/davecgh/go-spew/spew",
+			"revision": "346938d642f2ec3594ed81d874461961cd0faa76",
+			"revisionTime": "2016-10-29T20:57:26Z"
+		},
+		{
 			"checksumSHA1": "IXFSsCKFpB7OwDjUjX1p4kae3/c=",
 			"path": "github.com/mendersoftware/go-lib-micro",
 			"revision": "7ba01e585c3044ffb1ae5e1662e9e8c8e11fbbe3",
@@ -79,6 +86,30 @@
 			"path": "github.com/mendersoftware/mendertesting",
 			"revision": "6f4fb3f6a3bf8c125d0e60c7d093ed1fad9e24a1",
 			"revisionTime": "2017-02-15T17:28:30Z"
+		},
+		{
+			"checksumSHA1": "EO+jcRet/AJ6IY3lBO8l8BLsZWg=",
+			"origin": "github.com/stretchr/testify/vendor/github.com/stretchr/objx",
+			"path": "github.com/stretchr/objx",
+			"revision": "4d4bfba8f1d1027c4fdbe371823030df51419987",
+			"revisionTime": "2017-01-30T11:31:45Z"
+		},
+		{
+			"path": "github.com/stretchr/testify/assert",
+			"revision": "4d4bfba8f1d1027c4fdbe371823030df51419987",
+			"revisionTime": "2017-01-30T11:31:45Z"
+		},
+		{
+			"checksumSHA1": "yHFRFEjU0Sw+rVj4QsarW7X2uEo=",
+			"path": "github.com/stretchr/testify/mock",
+			"revision": "4d4bfba8f1d1027c4fdbe371823030df51419987",
+			"revisionTime": "2017-01-30T11:31:45Z"
+		},
+		{
+			"checksumSHA1": "6kF7mPXIAVaHHZu4qaljLMgeF80=",
+			"path": "github.com/stretchr/testify/require",
+			"revision": "4d4bfba8f1d1027c4fdbe371823030df51419987",
+			"revisionTime": "2017-01-30T11:31:45Z"
 		}
 	],
 	"rootPath": "github.com/mendersoftware/deviceauth"
