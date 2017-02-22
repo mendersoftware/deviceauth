@@ -15,6 +15,8 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"testing"
@@ -631,5 +633,83 @@ func TestMigrate(t *testing.T) {
 		}
 		db.session.Close()
 	}
+}
 
+func randDevStatus() string {
+	statuses := []string{
+		DevStatusAccepted,
+		DevStatusPending,
+		DevStatusRejected,
+	}
+	idx := rand.Int() % len(statuses)
+	return statuses[idx]
+}
+
+func TestGetDevices(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestGetDevices in short mode.")
+	}
+
+	db := getDb()
+	defer db.session.Close()
+
+	// use 100 automatically creted devices
+	const devCount = 100
+
+	devs_list := make([]*Device, 0, devCount)
+
+	// populate DB with a set of devices
+	for i := 0; i < devCount; i++ {
+		dev := &Device{
+			Id:     fmt.Sprintf("foo-%04d", i),
+			PubKey: fmt.Sprintf("pubkey-%04d", i),
+			Status: randDevStatus(),
+		}
+
+		devs_list = append(devs_list, dev)
+		err := db.AddDevice(dev)
+		assert.NoError(t, err)
+	}
+
+	testCases := []struct {
+		skip            uint
+		limit           uint
+		expectedCount   int
+		expectedStartId int
+		expectedEndId   int
+	}{
+		{
+			skip:            10,
+			limit:           5,
+			expectedCount:   5,
+			expectedStartId: 10,
+			expectedEndId:   14,
+		},
+		{
+			// end of the range
+			skip:            devCount - 10,
+			limit:           15,
+			expectedCount:   10,
+			expectedStartId: 90,
+			expectedEndId:   99,
+		},
+		{
+			// whole range
+			skip:            0,
+			limit:           devCount,
+			expectedCount:   devCount,
+			expectedStartId: 0,
+			expectedEndId:   devCount - 1,
+		},
+	}
+
+	for _, tc := range testCases {
+		dbdevs, err := db.GetDevices(tc.skip, tc.limit)
+		assert.NoError(t, err)
+
+		assert.Len(t, dbdevs, tc.expectedCount)
+		for i, dbidx := tc.expectedStartId, 0; i <= tc.expectedEndId; i, dbidx = i+1, dbidx+1 {
+			assert.EqualValues(t, devs_list[i], &dbdevs[dbidx])
+		}
+	}
 }
