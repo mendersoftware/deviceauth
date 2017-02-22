@@ -77,3 +77,23 @@ class Client(SwaggerApiClient):
 
     def verify_token(self, token):
         return self.client.devices.put_devices_id_status(id=devid, status=st).result()
+
+
+class SimpleManagementClient(SwaggerApiClient):
+    spec_option = 'management_spec'
+    log = logging.getLogger('client.ManagementClient')
+
+    def __init__(self):
+        self.setup_swagger()
+
+    def list_devices(self, **kwargs):
+        if 'Authorization' not in kwargs:
+            self.log.debug('appending default authorization header')
+            kwargs['Authorization'] = 'Bearer foo'
+        return self.client.devices.get_devices(**kwargs).result()[0]
+
+    def get_device(self, **kwargs):
+        if 'Authorization' not in kwargs:
+            self.log.debug('appending default authorization header')
+            kwargs['Authorization'] = 'Bearer foo'
+        return self.client.devices.get_devices_id(**kwargs).result()[0]
