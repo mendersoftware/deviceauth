@@ -50,7 +50,7 @@ before_install:
     # Install swagger-cli
     - sudo apt-get -qq update && sudo apt-get -qq install -y e2tools
 
-    - sudo npm install -g swagger-cli
+    - npm install -g swagger-cli
 
     # Install yaml python module
     - pip2.7 install -U --user paramiko fabric PyYAML pytest requests
