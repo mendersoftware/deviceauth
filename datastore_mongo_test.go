@@ -27,9 +27,6 @@ import (
 
 const (
 	testDataFolder = "testdata/mongo"
-
-	TestMongoEnv     = "TEST_MONGO"
-	TestMongoDefault = "127.0.0.1:27017"
 )
 
 // db and test management funcs
