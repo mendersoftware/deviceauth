@@ -26,7 +26,16 @@ API_URL = "http://%s/api/%s/" % \
            pytest.config.getoption("api"))
 
 
-class Client(object):
+class BaseApiClient:
+    api_url = API_URL
+
+    def make_api_url(self, path):
+        return os.path.join(self.api_url,
+                            path if not path.startswith("/") else path[1:])
+
+
+
+class SwaggerApiClient(BaseApiClient):
 
     config = {
         'also_return_response': True,
@@ -36,22 +45,24 @@ class Client(object):
         'use_models': True,
     }
 
+    log = logging.getLogger('client.Client')
+    spec_option = 'spec'
 
-    def setup(self):
-        self.log = logging.getLogger("client.Client")
-        self.api_url = API_URL
+    def setup_swagger(self):
         self.http_client = RequestsClient()
         self.http_client.session.verify = False
 
-        spec = pytest.config.getoption("spec")
+        spec = pytest.config.getoption(self.spec_option)
         self.client = SwaggerClient.from_spec(load_file(spec),
                                               config=self.config,
                                               http_client=self.http_client)
         self.client.swagger_spec.api_url = self.api_url
 
-    def make_api_url(self, path):
-        return os.path.join(self.api_url,
-                            path if not path.startswith("/") else path[1:])
+
+class Client(SwaggerApiClient):
+
+    def setup(self):
+        self.setup_swagger()
 
     def accept_device(self, devid):
         return self.put_device_status(devid, 'accepted')
