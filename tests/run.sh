@@ -11,7 +11,8 @@ if [ -n "$1" ]; then
     HOST=$1
 fi
 
-sleep 5
+# if we're running in a container, wait a little before starting tests
+[ $$ -eq 1 ] && sleep 5
 
 py.test-3 -s --tb=short --api=0.1.0  --host $HOST \
         --spec $DIR/internal_api.yml \
