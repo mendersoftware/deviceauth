@@ -17,6 +17,7 @@ import (
 	"crypto/rsa"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -204,29 +205,31 @@ func TestApiDevAuthSubmitAuthReq(t *testing.T) {
 		},
 	}
 
-	for _, tc := range testCases {
-		devauth := MockDevAuthApp{}
-		devauth.On("SubmitAuthRequest", mock.AnythingOfType("*main.AuthReq")).Return(
-			func(r *AuthReq) string {
-				if tc.devAuthErr != nil {
-					return ""
-				}
-				return tc.devAuthToken
-			},
-			tc.devAuthErr)
+	for i, tc := range testCases {
+		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			devauth := MockDevAuthApp{}
+			devauth.On("SubmitAuthRequest", mock.AnythingOfType("*main.AuthReq")).Return(
+				func(r *AuthReq) string {
+					if tc.devAuthErr != nil {
+						return ""
+					}
+					return tc.devAuthToken
+				},
+				tc.devAuthErr)
 
-		devauth.On("WithContext", mock.AnythingOfType("*main.RequestContext")).Return(&devauth)
+			devauth.On("WithContext", mock.AnythingOfType("*main.RequestContext")).Return(&devauth)
 
-		factory := func(l *log.Logger) (DevAuthApp, error) {
-			return &devauth, nil
-		}
+			factory := func(l *log.Logger) (DevAuthApp, error) {
+				return &devauth, nil
+			}
 
-		apih := makeMockApiHandler(t, factory)
+			apih := makeMockApiHandler(t, factory)
 
-		recorded := runTestRequest(t, apih, tc.req, tc.code, tc.body)
-		if tc.code == http.StatusOK {
-			assert.Equal(t, "application/jwt", recorded.Recorder.HeaderMap.Get("Content-Type"))
-		}
+			recorded := runTestRequest(t, apih, tc.req, tc.code, tc.body)
+			if tc.code == http.StatusOK {
+				assert.Equal(t, "application/jwt", recorded.Recorder.HeaderMap.Get("Content-Type"))
+			}
+		})
 	}
 }
 
@@ -331,8 +334,9 @@ func TestApiDevAuthUpdateStatusDevice(t *testing.T) {
 	}
 
 	for idx, tc := range tcases {
-		t.Logf("running %d", idx)
-		runTestRequest(t, apih, tc.req, tc.code, tc.body)
+		t.Run(fmt.Sprintf("tc %d", idx), func(t *testing.T) {
+			runTestRequest(t, apih, tc.req, tc.code, tc.body)
+		})
 	}
 
 }
@@ -394,18 +398,20 @@ func TestApiDevAuthVerifyToken(t *testing.T) {
 		},
 	}
 
-	for _, tc := range tcases {
-		devauth := MockDevAuthApp{}
-		devauth.On("VerifyToken", mock.AnythingOfType("string")).Return(tc.err)
+	for i, tc := range tcases {
+		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			devauth := MockDevAuthApp{}
+			devauth.On("VerifyToken", mock.AnythingOfType("string")).Return(tc.err)
 
-		factory := func(l *log.Logger) (DevAuthApp, error) {
-			return &devauth, nil
-		}
-		apih := makeMockApiHandler(t, factory)
-		if len(tc.headers) > 0 {
-			tc.req.Header.Set("authorization", tc.headers["authorization"])
-		}
-		runTestRequest(t, apih, tc.req, tc.code, tc.body)
+			factory := func(l *log.Logger) (DevAuthApp, error) {
+				return &devauth, nil
+			}
+			apih := makeMockApiHandler(t, factory)
+			if len(tc.headers) > 0 {
+				tc.req.Header.Set("authorization", tc.headers["authorization"])
+			}
+			runTestRequest(t, apih, tc.req, tc.code, tc.body)
+		})
 	}
 
 }
@@ -441,15 +447,17 @@ func TestApiDevAuthDeleteToken(t *testing.T) {
 		},
 	}
 
-	for _, tc := range tcases {
-		devauth := MockDevAuthApp{}
-		devauth.On("RevokeToken", mock.AnythingOfType("string")).Return(tc.err)
+	for i, tc := range tcases {
+		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			devauth := MockDevAuthApp{}
+			devauth.On("RevokeToken", mock.AnythingOfType("string")).Return(tc.err)
 
-		factory := func(l *log.Logger) (DevAuthApp, error) {
-			return &devauth, nil
-		}
-		apih := makeMockApiHandler(t, factory)
-		runTestRequest(t, apih, tc.req, tc.code, tc.body)
+			factory := func(l *log.Logger) (DevAuthApp, error) {
+				return &devauth, nil
+			}
+			apih := makeMockApiHandler(t, factory)
+			runTestRequest(t, apih, tc.req, tc.code, tc.body)
+		})
 	}
 
 }
@@ -487,16 +495,18 @@ func TestApiGetDevice(t *testing.T) {
 		},
 	}
 
-	for _, tc := range tcases {
-		devauth := MockDevAuthApp{}
-		devauth.On("GetDevice", mock.AnythingOfType("string")).Return(
-			tc.device, tc.err)
+	for i, tc := range tcases {
+		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			devauth := MockDevAuthApp{}
+			devauth.On("GetDevice", mock.AnythingOfType("string")).Return(
+				tc.device, tc.err)
 
-		factory := func(l *log.Logger) (DevAuthApp, error) {
-			return &devauth, nil
-		}
-		apih := makeMockApiHandler(t, factory)
-		runTestRequest(t, apih, tc.req, tc.code, tc.body)
+			factory := func(l *log.Logger) (DevAuthApp, error) {
+				return &devauth, nil
+			}
+			apih := makeMockApiHandler(t, factory)
+			runTestRequest(t, apih, tc.req, tc.code, tc.body)
+		})
 	}
 }
 
@@ -573,16 +583,17 @@ func TestApiGetDevices(t *testing.T) {
 	}
 
 	for i, tc := range tcases {
-		t.Logf("tc %v", i)
-		devauth := MockDevAuthApp{}
-		devauth.On("GetDevices", tc.skip, tc.limit).Return(
-			tc.devices, tc.err)
+		t.Run(fmt.Sprintf("tc %v", i), func(t *testing.T) {
+			devauth := MockDevAuthApp{}
+			devauth.On("GetDevices", tc.skip, tc.limit).Return(
+				tc.devices, tc.err)
 
-		factory := func(l *log.Logger) (DevAuthApp, error) {
-			return &devauth, nil
-		}
-		apih := makeMockApiHandler(t, factory)
-		runTestRequest(t, apih, tc.req, tc.code, tc.body)
+			factory := func(l *log.Logger) (DevAuthApp, error) {
+				return &devauth, nil
+			}
+			apih := makeMockApiHandler(t, factory)
+			runTestRequest(t, apih, tc.req, tc.code, tc.body)
+		})
 	}
 }
 

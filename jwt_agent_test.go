@@ -15,6 +15,7 @@ package main
 
 import (
 	"crypto/rsa"
+	"fmt"
 	"testing"
 	"time"
 
@@ -81,25 +82,27 @@ func TestValidateTokenSignRS256(t *testing.T) {
 			delay:      1,
 		},
 	}
-	for _, tc := range testCases {
-		c := JWTAgentConfig{
-			PrivateKey:        tc.privKey,
-			Issuer:            "Mender",
-			ExpirationTimeout: tc.expiration,
-		}
-		jwt := NewJWTAgent(c)
-		token, err := jwt.GenerateTokenSignRS256(tc.devId)
-		assert.NoError(t, err)
-		assert.Equal(t, tc.devId, token.DevId)
-		if tc.err == ErrTokenExpired {
-			time.Sleep(time.Second * time.Duration(tc.delay))
-		}
-		_, err = jwt.ValidateTokenSignRS256(token.Token)
-		if tc.err != nil {
-			assert.EqualError(t, err, tc.err.Error())
-		} else {
+	for i, tc := range testCases {
+		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			c := JWTAgentConfig{
+				PrivateKey:        tc.privKey,
+				Issuer:            "Mender",
+				ExpirationTimeout: tc.expiration,
+			}
+			jwt := NewJWTAgent(c)
+			token, err := jwt.GenerateTokenSignRS256(tc.devId)
 			assert.NoError(t, err)
-		}
-		// assert jit is uuid v4?
+			assert.Equal(t, tc.devId, token.DevId)
+			if tc.err == ErrTokenExpired {
+				time.Sleep(time.Second * time.Duration(tc.delay))
+			}
+			_, err = jwt.ValidateTokenSignRS256(token.Token)
+			if tc.err != nil {
+				assert.EqualError(t, err, tc.err.Error())
+			} else {
+				assert.NoError(t, err)
+			}
+			// assert jit is uuid v4?
+		})
 	}
 }

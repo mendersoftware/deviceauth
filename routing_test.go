@@ -14,6 +14,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"reflect"
 	"runtime"
@@ -50,10 +51,12 @@ func TestSupportsMethod(t *testing.T) {
 		},
 	}
 
-	for _, tv := range sets {
-		if supportsMethod(tv.method, tv.supported) != tv.exp {
-			t.Errorf("failed case: %+v", tv)
-		}
+	for i, tv := range sets {
+		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			if supportsMethod(tv.method, tv.supported) != tv.exp {
+				t.Errorf("failed case: %+v", tv)
+			}
+		})
 	}
 }
 

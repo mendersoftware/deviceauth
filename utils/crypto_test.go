@@ -15,6 +15,7 @@ package utils
 
 import (
 	"crypto/rsa"
+	"fmt"
 	"testing"
 
 	"github.com/mendersoftware/deviceauth/test"
@@ -64,18 +65,20 @@ func TestVerifyAuthReqSign(t *testing.T) {
 		},
 	}
 
-	for _, tc := range testCases {
-		signed := test.AuthReqSign([]byte(tc.content), tc.privkey, t)
+	for i, tc := range testCases {
+		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			signed := test.AuthReqSign([]byte(tc.content), tc.privkey, t)
 
-		err := VerifyAuthReqSign(string(signed),
-			tc.pubkeyStr,
-			[]byte(tc.content))
+			err := VerifyAuthReqSign(string(signed),
+				tc.pubkeyStr,
+				[]byte(tc.content))
 
-		if tc.err != "" {
-			assert.EqualError(t, err, tc.err)
-		} else {
-			assert.NoError(t, err)
-		}
+			if tc.err != "" {
+				assert.EqualError(t, err, tc.err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
 	}
 }
 

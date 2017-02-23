@@ -15,6 +15,7 @@ package main
 
 import (
 	"crypto/rsa"
+	"fmt"
 	"testing"
 
 	"github.com/mendersoftware/deviceauth/test"
@@ -49,13 +50,15 @@ func TestLoadRsaPrivateKey(t *testing.T) {
 		},
 	}
 
-	for _, tc := range testCases {
-		key, err := loadRSAPrivKey(tc.privKeyPath)
-		if tc.err != "" {
-			assert.EqualError(t, err, tc.err)
-		} else {
-			assert.NoError(t, err)
-			assert.Equal(t, key, tc.privKey)
-		}
+	for i, tc := range testCases {
+		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			key, err := loadRSAPrivKey(tc.privKeyPath)
+			if tc.err != "" {
+				assert.EqualError(t, err, tc.err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, key, tc.privKey)
+			}
+		})
 	}
 }
