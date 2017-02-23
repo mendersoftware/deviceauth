@@ -23,6 +23,8 @@ import (
 )
 
 func TestLoadRsaPrivateKey(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		privKeyPath string
 		privKey     *rsa.PrivateKey
@@ -52,6 +54,8 @@ func TestLoadRsaPrivateKey(t *testing.T) {
 
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			t.Parallel()
+
 			key, err := loadRSAPrivKey(tc.privKeyPath)
 			if tc.err != "" {
 				assert.EqualError(t, err, tc.err)

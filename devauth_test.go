@@ -24,6 +24,8 @@ import (
 )
 
 func TestSubmitAuthRequest(t *testing.T) {
+	t.Parallel()
+
 	req := AuthReq{
 		IdData:      "iddata",
 		TenantToken: "tenant",
@@ -234,8 +236,10 @@ func TestSubmitAuthRequest(t *testing.T) {
 		},
 	}
 
-	for tcidx, tc := range testCases {
+	for tcidx := range testCases {
+		tc := testCases[tcidx]
 		t.Run(fmt.Sprintf("tc: %d", tcidx), func(t *testing.T) {
+			t.Parallel()
 
 			db := MockDataStore{}
 			db.On("GetDeviceById", mock.AnythingOfType("string")).Return(
@@ -302,6 +306,8 @@ func TestSubmitAuthRequest(t *testing.T) {
 }
 
 func TestAcceptDevice(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		dbUpdateErr error
 		dbGetErr    error
@@ -324,8 +330,11 @@ func TestAcceptDevice(t *testing.T) {
 		},
 	}
 
-	for idx, tc := range testCases {
+	for idx := range testCases {
+		tc := testCases[idx]
 		t.Run(fmt.Sprintf("tc %v", idx), func(t *testing.T) {
+			t.Parallel()
+
 			db := MockDataStore{}
 			db.On("UpdateDevice", mock.AnythingOfType("*main.Device")).Return(tc.dbUpdateErr)
 
@@ -360,6 +369,8 @@ func TestAcceptDevice(t *testing.T) {
 }
 
 func TestRejectDevice(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		dbErr            string
 		dbDelDevTokenErr error
@@ -387,8 +398,11 @@ func TestRejectDevice(t *testing.T) {
 		},
 	}
 
-	for i, tc := range testCases {
+	for i := range testCases {
+		tc := testCases[i]
 		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			t.Parallel()
+
 			db := MockDataStore{}
 			db.On("UpdateDevice", mock.AnythingOfType("*main.Device")).Return(
 				func(d *Device) error {
@@ -414,6 +428,8 @@ func TestRejectDevice(t *testing.T) {
 }
 
 func TestResetDevice(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		dbErr            string
 		dbDelDevTokenErr error
@@ -441,8 +457,11 @@ func TestResetDevice(t *testing.T) {
 		},
 	}
 
-	for i, tc := range testCases {
+	for i := range testCases {
+		tc := testCases[i]
 		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			t.Parallel()
+
 			db := MockDataStore{}
 			db.On("UpdateDevice", mock.AnythingOfType("*main.Device")).Return(
 				func(d *Device) error {

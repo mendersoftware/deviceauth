@@ -24,6 +24,8 @@ import (
 )
 
 func TestNewJWTAgent(t *testing.T) {
+	t.Parallel()
+
 	c := JWTAgentConfig{
 		PrivateKey:        nil,
 		ExpirationTimeout: 1234,
@@ -35,6 +37,8 @@ func TestNewJWTAgent(t *testing.T) {
 }
 
 func TestGenerateTokenSignRS256(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		privKey *rsa.PrivateKey
 		devId   string
@@ -58,6 +62,7 @@ func TestGenerateTokenSignRS256(t *testing.T) {
 }
 
 func TestValidateTokenSignRS256(t *testing.T) {
+	t.Parallel()
 
 	key := test.LoadPrivKey("testdata/private.pem", t)
 
@@ -82,8 +87,11 @@ func TestValidateTokenSignRS256(t *testing.T) {
 			delay:      1,
 		},
 	}
-	for i, tc := range testCases {
+	for i := range testCases {
+		tc := testCases[i]
 		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			t.Parallel()
+
 			c := JWTAgentConfig{
 				PrivateKey:        tc.privKey,
 				Issuer:            "Mender",

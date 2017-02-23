@@ -27,5 +27,7 @@ func init() {
 }
 
 func TestHandleConfigFile(t *testing.T) {
+	t.Parallel()
+
 	HandleConfigFile("", false, nil)
 }

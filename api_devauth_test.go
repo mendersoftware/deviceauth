@@ -86,6 +86,8 @@ func makeAuthReq(payload interface{}, key *rsa.PrivateKey, signature string, t *
 }
 
 func TestApiDevAuthSubmitAuthReq(t *testing.T) {
+	t.Parallel()
+
 	// enforce specific field naming in errors returned by API
 	rest.ErrorFieldName = "error"
 
@@ -205,7 +207,8 @@ func TestApiDevAuthSubmitAuthReq(t *testing.T) {
 		},
 	}
 
-	for i, tc := range testCases {
+	for i := range testCases {
+		tc := testCases[i]
 		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
 			devauth := MockDevAuthApp{}
 			devauth.On("SubmitAuthRequest", mock.AnythingOfType("*main.AuthReq")).Return(
@@ -234,6 +237,8 @@ func TestApiDevAuthSubmitAuthReq(t *testing.T) {
 }
 
 func TestApiDevAuthUpdateStatusDevice(t *testing.T) {
+	t.Parallel()
+
 	devs := map[string]struct {
 		dev *Device
 		err error
@@ -333,8 +338,11 @@ func TestApiDevAuthUpdateStatusDevice(t *testing.T) {
 		},
 	}
 
-	for idx, tc := range tcases {
+	for idx := range tcases {
+		tc := tcases[idx]
 		t.Run(fmt.Sprintf("tc %d", idx), func(t *testing.T) {
+			t.Parallel()
+
 			runTestRequest(t, apih, tc.req, tc.code, tc.body)
 		})
 	}
@@ -342,6 +350,8 @@ func TestApiDevAuthUpdateStatusDevice(t *testing.T) {
 }
 
 func TestApiDevAuthVerifyToken(t *testing.T) {
+	t.Parallel()
+
 	// enforce specific field naming in errors returned by API
 	rest.ErrorFieldName = "error"
 
@@ -398,8 +408,11 @@ func TestApiDevAuthVerifyToken(t *testing.T) {
 		},
 	}
 
-	for i, tc := range tcases {
+	for i := range tcases {
+		tc := tcases[i]
 		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			t.Parallel()
+
 			devauth := MockDevAuthApp{}
 			devauth.On("VerifyToken", mock.AnythingOfType("string")).Return(tc.err)
 
@@ -417,6 +430,8 @@ func TestApiDevAuthVerifyToken(t *testing.T) {
 }
 
 func TestApiDevAuthDeleteToken(t *testing.T) {
+	t.Parallel()
+
 	// enforce specific field naming in errors returned by API
 	rest.ErrorFieldName = "error"
 
@@ -447,8 +462,11 @@ func TestApiDevAuthDeleteToken(t *testing.T) {
 		},
 	}
 
-	for i, tc := range tcases {
+	for i := range tcases {
+		tc := tcases[i]
 		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			t.Parallel()
+
 			devauth := MockDevAuthApp{}
 			devauth.On("RevokeToken", mock.AnythingOfType("string")).Return(tc.err)
 
@@ -463,6 +481,8 @@ func TestApiDevAuthDeleteToken(t *testing.T) {
 }
 
 func TestApiGetDevice(t *testing.T) {
+	t.Parallel()
+
 	// enforce specific field naming in errors returned by API
 	rest.ErrorFieldName = "error"
 
@@ -495,8 +515,12 @@ func TestApiGetDevice(t *testing.T) {
 		},
 	}
 
-	for i, tc := range tcases {
+	for i := range tcases {
+		tc := tcases[i]
+
 		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			t.Parallel()
+
 			devauth := MockDevAuthApp{}
 			devauth.On("GetDevice", mock.AnythingOfType("string")).Return(
 				tc.device, tc.err)
@@ -511,6 +535,8 @@ func TestApiGetDevice(t *testing.T) {
 }
 
 func TestApiGetDevices(t *testing.T) {
+	t.Parallel()
+
 	// enforce specific field naming in errors returned by API
 	rest.ErrorFieldName = "error"
 
@@ -582,8 +608,11 @@ func TestApiGetDevices(t *testing.T) {
 		},
 	}
 
-	for i, tc := range tcases {
+	for i := range tcases {
+		tc := tcases[i]
 		t.Run(fmt.Sprintf("tc %v", i), func(t *testing.T) {
+			t.Parallel()
+
 			devauth := MockDevAuthApp{}
 			devauth.On("GetDevices", tc.skip, tc.limit).Return(
 				tc.devices, tc.err)

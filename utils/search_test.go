@@ -16,6 +16,7 @@ package utils
 import "testing"
 
 func TestContainsString(t *testing.T) {
+	t.Parallel()
 
 	if ContainsString("foo", []string{"foo", "bar", "baz"}) == false {
 		t.Errorf("string not found")

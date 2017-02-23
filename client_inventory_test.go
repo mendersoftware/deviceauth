@@ -24,12 +24,16 @@ import (
 )
 
 func TestInventoryClientGet(t *testing.T) {
+	t.Parallel()
+
 	c := NewInventoryClientWithLogger(InventoryClientConfig{InventoryAddr: "http://foo"},
 		log.New(log.Ctx{}))
 	assert.NotNil(t, c)
 }
 
 func TestInventoryClient(t *testing.T) {
+	t.Parallel()
+
 	tcs := []struct {
 		status int
 		dev    Device
@@ -63,8 +67,11 @@ func TestInventoryClient(t *testing.T) {
 		},
 	}
 
-	for _, tc := range tcs {
+	for i := range tcs {
+		tc := tcs[i]
 		t.Run(fmt.Sprintf("case %v %s", tc.status, tc.expReq), func(t *testing.T) {
+			t.Parallel()
+
 			s, rd := newMockServer(tc.status)
 
 			c := NewInventoryClient(InventoryClientConfig{

@@ -26,6 +26,7 @@ import (
 )
 
 func TestSupportsMethod(t *testing.T) {
+	t.Parallel()
 
 	var sets = []struct {
 		exp       bool
@@ -69,6 +70,8 @@ func funcName(f interface{}) string {
 }
 
 func TestAutogenOptionRoutes(t *testing.T) {
+	t.Parallel()
+
 	// make sure that dummy and options are different to prevent
 	// the compiler making this a single symbol
 	dummy := func(w rest.ResponseWriter, r *rest.Request) {
@@ -141,6 +144,7 @@ func TestAutogenOptionRoutes(t *testing.T) {
 
 //
 func TestAutogenOptionHeaders(t *testing.T) {
+	t.Parallel()
 
 	suppmeth := []string{
 		http.MethodGet,

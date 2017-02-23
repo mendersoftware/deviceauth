@@ -20,6 +20,8 @@ import (
 )
 
 func TestJoinURL(t *testing.T) {
+	t.Parallel()
+
 	assert.Equal(t, "http://foo:123/bar/baz", JoinURL("http://foo:123/bar", "baz"))
 	assert.Equal(t, "http://foo:123/bar/baz", JoinURL("http://foo:123/bar/", "baz"))
 	assert.Equal(t, "http://foo:123/bar/baz", JoinURL("http://foo:123/bar/", "baz"))
