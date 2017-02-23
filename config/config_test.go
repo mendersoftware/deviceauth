@@ -52,6 +52,8 @@ func NewMockWriter() *MockConfigWriter {
 }
 
 func TestValidateConfig(t *testing.T) {
+	t.Parallel()
+
 	err := errors.New("test error")
 
 	testList := []struct {
@@ -71,6 +73,8 @@ func TestValidateConfig(t *testing.T) {
 }
 
 func TestSetDefaultConfigs(t *testing.T) {
+	t.Parallel()
+
 	defaults := []Default{
 		{"foo", "bar"},
 		{"baz", 1},
@@ -92,6 +96,8 @@ func TestSetDefaultConfigs(t *testing.T) {
 }
 
 func TestFromConfigFile(t *testing.T) {
+	t.Parallel()
+
 	err := FromConfigFile("", nil)
 	if err != nil {
 		t.FailNow()

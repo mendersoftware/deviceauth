@@ -15,13 +15,17 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
-	"github.com/mendersoftware/deviceauth/requestid"
+	"github.com/mendersoftware/go-lib-micro/requestid"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 func TestSubmitAuthRequest(t *testing.T) {
+	t.Parallel()
+
 	req := AuthReq{
 		IdData:      "iddata",
 		TenantToken: "tenant",
@@ -232,81 +236,87 @@ func TestSubmitAuthRequest(t *testing.T) {
 		},
 	}
 
-	for tcidx, tc := range testCases {
-		t.Logf("tc: %d", tcidx)
+	for tcidx := range testCases {
+		tc := testCases[tcidx]
+		t.Run(fmt.Sprintf("tc: %d", tcidx), func(t *testing.T) {
+			t.Parallel()
 
-		db := MockDataStore{
-			mockGetDeviceById: func(id string) (*Device, error) {
-				if tc.getDevByIdErr != nil {
-					return nil, tc.getDevByIdErr
-				}
-				return &Device{PubKey: tc.getDevByIdKey,
-					Id:     devId,
-					Status: tc.devStatus}, nil
-			},
+			db := MockDataStore{}
+			db.On("GetDeviceById",
+				mock.AnythingOfType("string")).
+				Return(
+					func(id string) *Device {
+						if tc.getDevByIdErr == nil {
+							return &Device{
+								PubKey: tc.getDevByIdKey,
+								Id:     id,
+								Status: tc.devStatus,
+							}
+						}
+						return nil
+					},
+					tc.getDevByIdErr)
 
-			mockGetDeviceByKey: func(key string) (*Device, error) {
-				if tc.getDevByKeyErr != nil {
-					return nil, tc.getDevByKeyErr
-				}
-				return &Device{Id: tc.getDevByKeyId,
-					PubKey: key,
-					Status: tc.devStatus}, nil
-			},
+			db.On("GetDeviceByKey",
+				mock.AnythingOfType("string")).Return(
+				func(key string) *Device {
+					if tc.getDevByKeyErr == nil {
+						return &Device{
+							Id:     tc.getDevByKeyId,
+							PubKey: key,
+							Status: tc.devStatus,
+						}
+					}
+					return nil
+				},
+				tc.getDevByKeyErr)
 
-			mockAddDevice: func(d *Device) error {
-				return tc.addDeviceErr
-			},
+			db.On("AddDevice",
+				mock.AnythingOfType("*main.Device")).Return(tc.addDeviceErr)
+			db.On("AddToken",
+				mock.AnythingOfType("*main.Token")).Return(nil)
+			db.On("GetToken",
+				mock.AnythingOfType("string")).Return(nil, nil)
+			db.On("DeleteToken",
+				mock.AnythingOfType("string")).Return(nil)
+			db.On("DeleteToken",
+				mock.AnythingOfType("string")).Return(nil)
+			db.On("DeleteTokenByDevId",
+				mock.AnythingOfType("string")).Return(nil)
 
-			mockAddToken: func(t *Token) error {
-				return nil
-			},
+			cda := MockDevAdmClient{}
+			cda.On("AddDevice", mock.AnythingOfType("*main.Device"),
+				mock.MatchedBy(func(_ requestid.ApiRequester) bool { return true })).
+				Return(tc.devAdmErr)
 
-			mockGetToken: func(jti string) (*Token, error) {
-				return nil, nil
-			},
+			cdi := MockInventoryClient{}
+			cdi.On("AddDevice", mock.AnythingOfType("*main.Device"),
+				mock.MatchedBy(func(_ requestid.ApiRequester) bool { return true })).
+				Return(tc.devAdmErr)
 
-			mockDeleteToken: func(jti string) error {
-				return nil
-			},
+			jwt := MockJWTAgent{
+				mockGenerateTokenSignRS256: func(devId string) (*Token, error) {
+					return NewToken("", devId, "dummytoken"), nil
+				},
+				mockValidateTokenSignRS256: func(token string) (string, error) {
+					return "", nil
+				},
+			}
 
-			mockDeleteTokenByDevId: func(dev_id string) error {
-				return nil
-			},
-		}
+			devauth := NewDevAuth(&db, &cda, &cdi, &jwt)
+			res, err := devauth.SubmitAuthRequest(&req)
 
-		cda := MockDevAdmClient{
-			mockAddDevice: func(dev *Device, c requestid.ApiRequester) error {
-				return tc.devAdmErr
-			},
-		}
-
-		cdi := MockInventoryClient{
-			mockAddDevice: func(dev *Device, c requestid.ApiRequester) error {
-				return tc.devAdmErr
-			},
-		}
-
-		jwt := MockJWTAgent{
-			mockGenerateTokenSignRS256: func(devId string) (*Token, error) {
-				return NewToken("", devId, "dummytoken"), nil
-			},
-			mockValidateTokenSignRS256: func(token string) (string, error) {
-				return "", nil
-			},
-		}
-
-		devauth := NewDevAuth(&db, &cda, &cdi, &jwt)
-		res, err := devauth.SubmitAuthRequest(&req)
-
-		assert.Equal(t, tc.res, res)
-		if tc.err != nil {
-			assert.EqualError(t, err, tc.err.Error())
-		}
+			assert.Equal(t, tc.res, res)
+			if tc.err != nil {
+				assert.EqualError(t, err, tc.err.Error())
+			}
+		})
 	}
 }
 
 func TestAcceptDevice(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		dbUpdateErr error
 		dbGetErr    error
@@ -329,46 +339,52 @@ func TestAcceptDevice(t *testing.T) {
 		},
 	}
 
-	for idx, tc := range testCases {
-		t.Logf("running %v", idx)
-		db := MockDataStore{
-			mockUpdateDevice: func(d *Device) error {
-				if tc.dbUpdateErr != nil {
-					return tc.dbUpdateErr
-				}
+	for idx := range testCases {
+		tc := testCases[idx]
+		t.Run(fmt.Sprintf("tc %v", idx), func(t *testing.T) {
+			t.Parallel()
 
-				return nil
-			},
-			mockGetDeviceById: func(id string) (*Device, error) {
-				if tc.dbGetErr != nil {
-					return nil, tc.dbGetErr
-				}
+			db := MockDataStore{}
+			db.On("UpdateDevice",
+				mock.AnythingOfType("*main.Device")).
+				Return(tc.dbUpdateErr)
 
-				return &Device{Id: id, Status: "pending"}, nil
-			},
-		}
+			if tc.dbGetErr != nil {
+				db.On("GetDeviceById",
+					mock.AnythingOfType("string")).
+					Return(nil, tc.dbGetErr)
+			} else {
+				db.On("GetDeviceById",
+					mock.AnythingOfType("string")).Return(
+					func(id string) *Device {
+						return &Device{
+							Id:     id,
+							Status: "pending",
+						}
+					},
+					nil)
+			}
 
-		inv := MockInventoryClient{
-			mockAddDevice: func(d *Device, client requestid.ApiRequester) error {
-				if tc.invErr != nil {
-					return tc.invErr
-				}
-				return nil
-			},
-		}
+			inv := MockInventoryClient{}
+			inv.On("AddDevice", mock.AnythingOfType("*main.Device"),
+				mock.MatchedBy(func(_ requestid.ApiRequester) bool { return true })).
+				Return(tc.invErr)
 
-		devauth := NewDevAuth(&db, nil, &inv, nil)
-		err := devauth.AcceptDevice("dummyid")
+			devauth := NewDevAuth(&db, nil, &inv, nil)
+			err := devauth.AcceptDevice("dummyid")
 
-		if tc.outErr != "" {
-			assert.EqualError(t, err, tc.outErr)
-		} else {
-			assert.NoError(t, err)
-		}
+			if tc.outErr != "" {
+				assert.EqualError(t, err, tc.outErr)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
 	}
 }
 
 func TestRejectDevice(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		dbErr            string
 		dbDelDevTokenErr error
@@ -396,32 +412,40 @@ func TestRejectDevice(t *testing.T) {
 		},
 	}
 
-	for _, tc := range testCases {
-		db := MockDataStore{
-			mockUpdateDevice: func(d *Device) error {
-				if tc.dbErr != "" {
-					return errors.New(tc.dbErr)
-				}
+	for i := range testCases {
+		tc := testCases[i]
+		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			t.Parallel()
 
-				return nil
-			},
-			mockDeleteTokenByDevId: func(dev_id string) error {
-				return tc.dbDelDevTokenErr
-			},
-		}
+			db := MockDataStore{}
+			db.On("UpdateDevice", mock.AnythingOfType("*main.Device")).Return(
+				func(d *Device) error {
+					if tc.dbErr != "" {
+						return errors.New(tc.dbErr)
+					}
 
-		devauth := NewDevAuth(&db, nil, nil, nil)
-		err := devauth.RejectDevice("dummyid")
+					return nil
+				})
+			db.On("DeleteTokenByDevId", mock.AnythingOfType("string")).Return(
+				tc.dbDelDevTokenErr)
 
-		if tc.dbErr != "" || (tc.dbDelDevTokenErr != nil && tc.dbDelDevTokenErr != ErrTokenNotFound) {
-			assert.EqualError(t, err, tc.outErr)
-		} else {
-			assert.NoError(t, err)
-		}
+			devauth := NewDevAuth(&db, nil, nil, nil)
+			err := devauth.RejectDevice("dummyid")
+
+			if tc.dbErr != "" || (tc.dbDelDevTokenErr != nil &&
+				tc.dbDelDevTokenErr != ErrTokenNotFound) {
+
+				assert.EqualError(t, err, tc.outErr)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
 	}
 }
 
 func TestResetDevice(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		dbErr            string
 		dbDelDevTokenErr error
@@ -449,27 +473,34 @@ func TestResetDevice(t *testing.T) {
 		},
 	}
 
-	for _, tc := range testCases {
-		db := MockDataStore{
-			mockUpdateDevice: func(d *Device) error {
-				if tc.dbErr != "" {
-					return errors.New(tc.dbErr)
-				}
+	for i := range testCases {
+		tc := testCases[i]
+		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			t.Parallel()
 
-				return nil
-			},
-			mockDeleteTokenByDevId: func(dev_id string) error {
-				return tc.dbDelDevTokenErr
-			},
-		}
+			db := MockDataStore{}
+			db.On("UpdateDevice", mock.AnythingOfType("*main.Device")).Return(
+				func(d *Device) error {
+					if tc.dbErr != "" {
+						return errors.New(tc.dbErr)
+					}
 
-		devauth := NewDevAuth(&db, nil, nil, nil)
-		err := devauth.ResetDevice("dummyid")
+					return nil
+				})
+			db.On("DeleteTokenByDevId", mock.AnythingOfType("string")).Return(
+				tc.dbDelDevTokenErr)
 
-		if tc.dbErr != "" || (tc.dbDelDevTokenErr != nil && tc.dbDelDevTokenErr != ErrTokenNotFound) {
-			assert.EqualError(t, err, tc.outErr)
-		} else {
-			assert.NoError(t, err)
-		}
+			devauth := NewDevAuth(&db, nil, nil, nil)
+			err := devauth.ResetDevice("dummyid")
+
+			if tc.dbErr != "" ||
+				(tc.dbDelDevTokenErr != nil &&
+					tc.dbDelDevTokenErr != ErrTokenNotFound) {
+
+				assert.EqualError(t, err, tc.outErr)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
 	}
 }

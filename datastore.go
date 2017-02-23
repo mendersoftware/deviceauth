@@ -17,7 +17,7 @@ package main
 import (
 	"errors"
 
-	"github.com/mendersoftware/deviceauth/log"
+	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 )
 
@@ -36,6 +36,9 @@ type DataStore interface {
 	// retrieve device by device public key
 	// returns ErrDevNotFound if device not found
 	GetDeviceByKey(key string) (*Device, error)
+
+	// list devices
+	GetDevices(skip, limit uint) ([]Device, error)
 
 	AddDevice(r *Device) error
 

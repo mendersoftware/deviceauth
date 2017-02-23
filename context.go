@@ -15,7 +15,7 @@ package main
 
 import (
 	"github.com/ant0ine/go-json-rest/rest"
-	"github.com/mendersoftware/deviceauth/requestid"
+	"github.com/mendersoftware/go-lib-micro/requestid"
 )
 
 type RequestContext struct {

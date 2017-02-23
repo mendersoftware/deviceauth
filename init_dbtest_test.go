@@ -16,7 +16,6 @@ package main
 
 import (
 	"io/ioutil"
-	"log"
 	"os"
 	"testing"
 
@@ -27,7 +26,6 @@ var db *dbtest.DBServer
 
 // Overwrites test execution and allows for test database setup
 func TestMain(m *testing.M) {
-	log.Println("test")
 	dbdir, _ := ioutil.TempDir("", "dbsetup-test")
 	// os.Exit would ignore defers, workaround
 	status := func() int {

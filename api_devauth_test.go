@@ -17,16 +17,19 @@ import (
 	"crypto/rsa"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"testing"
 
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/ant0ine/go-json-rest/rest/test"
-	"github.com/mendersoftware/deviceauth/log"
-	"github.com/mendersoftware/deviceauth/requestid"
-	"github.com/mendersoftware/deviceauth/requestlog"
 	mtest "github.com/mendersoftware/deviceauth/test"
+	"github.com/mendersoftware/go-lib-micro/log"
+	"github.com/mendersoftware/go-lib-micro/requestid"
+	"github.com/mendersoftware/go-lib-micro/requestlog"
+	"github.com/mendersoftware/go-lib-micro/rest_utils"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 func RestError(status string) string {
@@ -83,6 +86,8 @@ func makeAuthReq(payload interface{}, key *rsa.PrivateKey, signature string, t *
 }
 
 func TestApiDevAuthSubmitAuthReq(t *testing.T) {
+	t.Parallel()
+
 	// enforce specific field naming in errors returned by API
 	rest.ErrorFieldName = "error"
 
@@ -202,34 +207,43 @@ func TestApiDevAuthSubmitAuthReq(t *testing.T) {
 		},
 	}
 
-	for _, tc := range testCases {
-		devauth := MockDevAuth{
-			mockSubmitAuthRequest: func(r *AuthReq) (string, error) {
-				if tc.devAuthErr != nil {
-					return "", tc.devAuthErr
-				}
-				return tc.devAuthToken, nil
-			},
-		}
+	for i := range testCases {
+		tc := testCases[i]
+		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			devauth := MockDevAuthApp{}
+			devauth.On("SubmitAuthRequest",
+				mock.AnythingOfType("*main.AuthReq")).
+				Return(
+					func(r *AuthReq) string {
+						if tc.devAuthErr != nil {
+							return ""
+						}
+						return tc.devAuthToken
+					},
+					tc.devAuthErr)
 
-		devauth.mockWithContext = func(ctx *RequestContext) DevAuthApp {
-			return &devauth
-		}
+			devauth.On("WithContext",
+				mock.AnythingOfType("*main.RequestContext")).
+				Return(&devauth)
 
-		factory := func(l *log.Logger) (DevAuthApp, error) {
-			return &devauth, nil
-		}
+			factory := func(l *log.Logger) (DevAuthApp, error) {
+				return &devauth, nil
+			}
 
-		apih := makeMockApiHandler(t, factory)
+			apih := makeMockApiHandler(t, factory)
 
-		recorded := runTestRequest(t, apih, tc.req, tc.code, tc.body)
-		if tc.code == http.StatusOK {
-			assert.Equal(t, "application/jwt", recorded.Recorder.HeaderMap.Get("Content-Type"))
-		}
+			recorded := runTestRequest(t, apih, tc.req, tc.code, tc.body)
+			if tc.code == http.StatusOK {
+				assert.Equal(t, "application/jwt",
+					recorded.Recorder.HeaderMap.Get("Content-Type"))
+			}
+		})
 	}
 }
 
 func TestApiDevAuthUpdateStatusDevice(t *testing.T) {
+	t.Parallel()
+
 	devs := map[string]struct {
 		dev *Device
 		err error
@@ -259,14 +273,11 @@ func TestApiDevAuthUpdateStatusDevice(t *testing.T) {
 		}
 		return nil
 	}
-	devauth := MockDevAuth{
-		mockAcceptDevice: mockaction,
-		mockRejectDevice: mockaction,
-		mockResetDevice:  mockaction,
-	}
-	devauth.mockWithContext = func(ctx *RequestContext) DevAuthApp {
-		return &devauth
-	}
+	devauth := MockDevAuthApp{}
+	devauth.On("AcceptDevice", mock.AnythingOfType("string")).Return(mockaction)
+	devauth.On("RejectDevice", mock.AnythingOfType("string")).Return(mockaction)
+	devauth.On("ResetDevice", mock.AnythingOfType("string")).Return(mockaction)
+	devauth.On("WithContext", mock.AnythingOfType("*main.RequestContext")).Return(&devauth)
 
 	factory := func(l *log.Logger) (DevAuthApp, error) {
 		return &devauth, nil
@@ -332,14 +343,20 @@ func TestApiDevAuthUpdateStatusDevice(t *testing.T) {
 		},
 	}
 
-	for idx, tc := range tcases {
-		t.Logf("running %d", idx)
-		runTestRequest(t, apih, tc.req, tc.code, tc.body)
+	for idx := range tcases {
+		tc := tcases[idx]
+		t.Run(fmt.Sprintf("tc %d", idx), func(t *testing.T) {
+			t.Parallel()
+
+			runTestRequest(t, apih, tc.req, tc.code, tc.body)
+		})
 	}
 
 }
 
 func TestApiDevAuthVerifyToken(t *testing.T) {
+	t.Parallel()
+
 	// enforce specific field naming in errors returned by API
 	rest.ErrorFieldName = "error"
 
@@ -396,25 +413,32 @@ func TestApiDevAuthVerifyToken(t *testing.T) {
 		},
 	}
 
-	for _, tc := range tcases {
-		devauth := MockDevAuth{
-			mockVerifyToken: func(token string) error {
-				return tc.err
-			},
-		}
-		factory := func(l *log.Logger) (DevAuthApp, error) {
-			return &devauth, nil
-		}
-		apih := makeMockApiHandler(t, factory)
-		if len(tc.headers) > 0 {
-			tc.req.Header.Set("authorization", tc.headers["authorization"])
-		}
-		runTestRequest(t, apih, tc.req, tc.code, tc.body)
+	for i := range tcases {
+		tc := tcases[i]
+		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			t.Parallel()
+
+			devauth := MockDevAuthApp{}
+			devauth.On("VerifyToken",
+				mock.AnythingOfType("string")).
+				Return(tc.err)
+
+			factory := func(l *log.Logger) (DevAuthApp, error) {
+				return &devauth, nil
+			}
+			apih := makeMockApiHandler(t, factory)
+			if len(tc.headers) > 0 {
+				tc.req.Header.Set("authorization", tc.headers["authorization"])
+			}
+			runTestRequest(t, apih, tc.req, tc.code, tc.body)
+		})
 	}
 
 }
 
 func TestApiDevAuthDeleteToken(t *testing.T) {
+	t.Parallel()
+
 	// enforce specific field naming in errors returned by API
 	rest.ErrorFieldName = "error"
 
@@ -445,17 +469,174 @@ func TestApiDevAuthDeleteToken(t *testing.T) {
 		},
 	}
 
-	for _, tc := range tcases {
-		devauth := MockDevAuth{
-			mockRevokeToken: func(tokenId string) error {
-				return tc.err
-			},
-		}
-		factory := func(l *log.Logger) (DevAuthApp, error) {
-			return &devauth, nil
-		}
-		apih := makeMockApiHandler(t, factory)
-		runTestRequest(t, apih, tc.req, tc.code, tc.body)
+	for i := range tcases {
+		tc := tcases[i]
+		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			t.Parallel()
+
+			devauth := MockDevAuthApp{}
+			devauth.On("RevokeToken",
+				mock.AnythingOfType("string")).
+				Return(tc.err)
+
+			factory := func(l *log.Logger) (DevAuthApp, error) {
+				return &devauth, nil
+			}
+			apih := makeMockApiHandler(t, factory)
+			runTestRequest(t, apih, tc.req, tc.code, tc.body)
+		})
 	}
 
+}
+
+func TestApiGetDevice(t *testing.T) {
+	t.Parallel()
+
+	// enforce specific field naming in errors returned by API
+	rest.ErrorFieldName = "error"
+
+	dev := &Device{
+		Id:     "foo",
+		PubKey: "pubkey",
+		Status: DevStatusPending,
+	}
+	tcases := []struct {
+		req    *http.Request
+		code   int
+		body   string
+		device *Device
+		err    error
+	}{
+		{
+			req: test.MakeSimpleRequest("GET",
+				"http://1.2.3.4/api/0.1.0/devices/foo", nil),
+			code:   http.StatusOK,
+			device: dev,
+			err:    nil,
+			body:   string(asJSON(dev)),
+		},
+		{
+			req: test.MakeSimpleRequest("GET",
+				"http://1.2.3.4/api/0.1.0/devices/bar", nil),
+			code: http.StatusNotFound,
+			err:  ErrDevNotFound,
+			body: RestError("device not found"),
+		},
+	}
+
+	for i := range tcases {
+		tc := tcases[i]
+
+		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			t.Parallel()
+
+			devauth := MockDevAuthApp{}
+			devauth.On("GetDevice",
+				mock.AnythingOfType("string")).
+				Return(tc.device, tc.err)
+
+			factory := func(l *log.Logger) (DevAuthApp, error) {
+				return &devauth, nil
+			}
+			apih := makeMockApiHandler(t, factory)
+			runTestRequest(t, apih, tc.req, tc.code, tc.body)
+		})
+	}
+}
+
+func TestApiGetDevices(t *testing.T) {
+	t.Parallel()
+
+	// enforce specific field naming in errors returned by API
+	rest.ErrorFieldName = "error"
+
+	devs := []Device{
+		{
+			Id:     "foo",
+			PubKey: "pubkey",
+			Status: DevStatusPending,
+		},
+		{
+			Id:     "bar",
+			PubKey: "pubkey2",
+			Status: DevStatusRejected,
+		},
+		{
+			Id:     "baz",
+			PubKey: "pubkey3",
+			Status: DevStatusRejected,
+		},
+	}
+
+	tcases := []struct {
+		req     *http.Request
+		code    int
+		body    string
+		devices []Device
+		err     error
+		skip    uint
+		limit   uint
+	}{
+		{
+			req: test.MakeSimpleRequest("GET",
+				"http://1.2.3.4/api/0.1.0/devices", nil),
+			code:    http.StatusOK,
+			devices: devs,
+			err:     nil,
+			skip:    0,
+			limit:   rest_utils.PerPageDefault + 1,
+			body:    string(asJSON(devs)),
+		},
+		{
+			req: test.MakeSimpleRequest("GET",
+				"http://1.2.3.4/api/0.1.0/devices", nil),
+			code:    http.StatusOK,
+			devices: []Device{},
+			skip:    0,
+			limit:   rest_utils.PerPageDefault + 1,
+			err:     nil,
+			body:    "[]",
+		},
+		{
+			req: test.MakeSimpleRequest("GET",
+				"http://1.2.3.4/api/0.1.0/devices?page=2&per_page=2", nil),
+			devices: devs,
+			skip:    2,
+			limit:   3,
+			code:    http.StatusOK,
+			// reqquested 2 devices per page, so expect only 2
+			body: string(asJSON(devs[:2])),
+		},
+		{
+			req: test.MakeSimpleRequest("GET",
+				"http://1.2.3.4/api/0.1.0/devices?page=2&per_page=2", nil),
+			skip:  2,
+			limit: 3,
+			code:  http.StatusInternalServerError,
+			err:   errors.New("failed"),
+			body:  RestError("internal error"),
+		},
+	}
+
+	for i := range tcases {
+		tc := tcases[i]
+		t.Run(fmt.Sprintf("tc %v", i), func(t *testing.T) {
+			t.Parallel()
+
+			devauth := MockDevAuthApp{}
+			devauth.On("GetDevices", tc.skip, tc.limit).Return(
+				tc.devices, tc.err)
+
+			factory := func(l *log.Logger) (DevAuthApp, error) {
+				return &devauth, nil
+			}
+			apih := makeMockApiHandler(t, factory)
+			runTestRequest(t, apih, tc.req, tc.code, tc.body)
+		})
+	}
+}
+
+func asJSON(sth interface{}) []byte {
+	data, _ := json.Marshal(sth)
+	return data
 }

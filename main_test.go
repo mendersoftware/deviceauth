@@ -17,7 +17,7 @@ import (
 	"io/ioutil"
 	"testing"
 
-	"github.com/mendersoftware/deviceauth/log"
+	"github.com/mendersoftware/go-lib-micro/log"
 )
 
 func init() {
@@ -27,5 +27,7 @@ func init() {
 }
 
 func TestHandleConfigFile(t *testing.T) {
+	t.Parallel()
+
 	HandleConfigFile("", false, nil)
 }

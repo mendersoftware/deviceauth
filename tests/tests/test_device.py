@@ -1,7 +1,7 @@
 import bravado
 import pytest
 
-from client import Client
+from client import Client, SimpleManagementClient
 from common import Device, DevAuthorizer, device_auth_req, make_devid
 
 
@@ -68,3 +68,53 @@ class TestDevice(Client):
         # device is rejected, should get unauthorized
         rsp = device_auth_req(url, da, d)
         assert rsp.status_code == 401
+
+    def test_get_devices(self):
+        url = self.make_api_url("auth_requests")
+
+        mc = SimpleManagementClient()
+
+        devs = mc.list_devices()
+        self.log.debug('devices; %s', devs)
+
+        devcount = 50
+        for _ in range(devcount):
+            dev = Device()
+            da = DevAuthorizer()
+            # poke devauth so that device appears
+            rsp = device_auth_req(url, da, dev)
+            assert rsp.status_code == 401
+
+        # try to get a maximum number of devices
+        devs = mc.list_devices(page=1, per_page=500)
+        self.log.debug('got %d devices', len(devs))
+        assert 500 >= len(devs) >= devcount
+
+        # we have added at least `devcount` devices, so listing some lower
+        # number of device should return exactly that number of entries
+        plimit = devcount // 2
+        devs = mc.list_devices(page=1, per_page=plimit)
+        self.log.debug('got %d devices', len(devs))
+        assert len(devs) == plimit
+
+    def test_get_single_device(self):
+        mc = SimpleManagementClient()
+
+        try:
+            mc.get_device(id='some-devid-foo')
+        except bravado.exception.HTTPError as e:
+            assert e.response.status_code == 404
+
+        # setup single device and poke devauth
+        dev = Device()
+        da = DevAuthorizer()
+        # poke devauth so that device appears
+        rsp = device_auth_req(self.make_api_url("auth_requests"), da, dev)
+        assert rsp.status_code == 401
+
+        # generate device ID from device identity
+        devid = make_devid(dev.identity)
+
+        authdev = mc.get_device(id=devid)
+        # devie should have been created with pending status
+        assert authdev.status == 'pending'

@@ -19,17 +19,21 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mendersoftware/deviceauth/log"
+	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestGetDevAdmClient(t *testing.T) {
+	t.Parallel()
+
 	c := GetDevAdmClient(DevAdmClientConfig{DevAdmAddr: "localhost:3333"},
 		log.New(log.Ctx{}))
 	assert.NotNil(t, c)
 }
 
 func TestDevAdmClientReqSuccess(t *testing.T) {
+	t.Parallel()
+
 	s, rd := newMockServer(http.StatusNoContent)
 	defer s.Close()
 
@@ -43,6 +47,8 @@ func TestDevAdmClientReqSuccess(t *testing.T) {
 }
 
 func TestDevAdmClientReqFail(t *testing.T) {
+	t.Parallel()
+
 	s, rd := newMockServer(http.StatusBadRequest)
 	defer s.Close()
 
@@ -56,6 +62,8 @@ func TestDevAdmClientReqFail(t *testing.T) {
 }
 
 func TestDevAdmClientReqNoHost(t *testing.T) {
+	t.Parallel()
+
 	c := NewDevAdmClient(DevAdmClientConfig{
 		DevAdmAddr: "http://somehost:1234",
 	})
@@ -65,7 +73,8 @@ func TestDevAdmClientReqNoHost(t *testing.T) {
 	assert.Error(t, err, "expected an error")
 }
 
-func TestDevAdmClientTImeout(t *testing.T) {
+func TestDevAdmClientTimeout(t *testing.T) {
+	t.Parallel()
 
 	if testing.Short() {
 		t.Skip("skipping test in short mode")

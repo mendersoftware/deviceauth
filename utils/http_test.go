@@ -14,11 +14,14 @@
 package utils
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestJoinURL(t *testing.T) {
+	t.Parallel()
+
 	assert.Equal(t, "http://foo:123/bar/baz", JoinURL("http://foo:123/bar", "baz"))
 	assert.Equal(t, "http://foo:123/bar/baz", JoinURL("http://foo:123/bar/", "baz"))
 	assert.Equal(t, "http://foo:123/bar/baz", JoinURL("http://foo:123/bar/", "baz"))

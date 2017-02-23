@@ -16,9 +16,9 @@ package main
 import (
 	"net/http"
 
-	"github.com/mendersoftware/deviceauth/log"
-	"github.com/mendersoftware/deviceauth/requestid"
 	"github.com/mendersoftware/deviceauth/utils"
+	"github.com/mendersoftware/go-lib-micro/log"
+	"github.com/mendersoftware/go-lib-micro/requestid"
 	"github.com/pkg/errors"
 )
 
@@ -45,7 +45,7 @@ func simpleApiClientGetter() requestid.ApiRequester {
 type DevAuthApp interface {
 	SubmitAuthRequest(r *AuthReq) (string, error)
 
-	GetDevices(skip, limit int, tenant_token, status string) ([]Device, error)
+	GetDevices(skip, limit uint) ([]Device, error)
 	GetDevice(dev_id string) (*Device, error)
 	AcceptDevice(dev_id string) error
 	RejectDevice(dev_id string) error
@@ -61,14 +61,14 @@ type DevAuthApp interface {
 
 type DevAuth struct {
 	db           DataStore
-	cDevAdm      DevAdmClientI
-	cInv         InventoryClientI
+	cDevAdm      DevAdmClient
+	cInv         InventoryClient
 	jwt          JWTAgentApp
 	log          *log.Logger
 	clientGetter ApiClientGetter
 }
 
-func NewDevAuth(d DataStore, cda DevAdmClientI, ci InventoryClientI, jwt JWTAgentApp) DevAuthApp {
+func NewDevAuth(d DataStore, cda DevAdmClient, ci InventoryClient, jwt JWTAgentApp) DevAuthApp {
 	return &DevAuth{
 		db:           d,
 		cDevAdm:      cda,
@@ -173,13 +173,17 @@ func (d *DevAuth) findMatchingDevice(id, key string) (*Device, error) {
 
 	return nil, ErrDevAuthUnauthorized
 }
-func (*DevAuth) GetDevices(skip, limit int, tenant_token, status string) ([]Device, error) {
-	return nil, errors.New("not implemented")
+
+func (d *DevAuth) GetDevices(skip, limit uint) ([]Device, error) {
+	return d.db.GetDevices(skip, limit)
 }
 
-func (*DevAuth) GetDevice(dev_id string) (*Device, error) {
-	return nil, errors.New("not implemented")
-
+func (d *DevAuth) GetDevice(devId string) (*Device, error) {
+	dev, err := d.db.GetDeviceById(devId)
+	if err != nil && err != ErrDevNotFound {
+		return nil, errors.Wrap(err, "db get device by id error")
+	}
+	return dev, err
 }
 
 func (d *DevAuth) AcceptDevice(dev_id string) error {

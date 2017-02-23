@@ -15,9 +15,10 @@
 package utils
 
 import (
-	"github.com/ant0ine/go-json-rest/rest"
 	"io/ioutil"
 	"strings"
+
+	"github.com/ant0ine/go-json-rest/rest"
 )
 
 func ReadBodyRaw(r *rest.Request) ([]byte, error) {

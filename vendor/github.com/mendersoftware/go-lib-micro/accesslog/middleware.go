@@ -17,7 +17,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/ant0ine/go-json-rest/rest"
-	"github.com/mendersoftware/deviceauth/requestlog"
+	"github.com/mendersoftware/go-lib-micro/requestlog"
 	"net"
 	"os"
 	"strings"
@@ -33,8 +33,7 @@ const (
 )
 
 // AccesLogMiddleware is a customized version of the AccessLogApacheMiddleware.
-// It uses the request-specific custom logger (created by requestlog), which
-// appends the Mender-specific request context.
+// It uses the request-specific custom logger (created by requestlog), which appends the Mender-specific request context.
 type AccessLogMiddleware struct {
 	Format       AccessLogFormat
 	textTemplate *template.Template

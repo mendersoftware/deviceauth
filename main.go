@@ -17,7 +17,7 @@ import (
 	"flag"
 
 	"github.com/mendersoftware/deviceauth/config"
-	"github.com/mendersoftware/deviceauth/log"
+	"github.com/mendersoftware/go-lib-micro/log"
 )
 
 func main() {

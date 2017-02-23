@@ -14,6 +14,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"reflect"
 	"runtime"
@@ -25,6 +26,7 @@ import (
 )
 
 func TestSupportsMethod(t *testing.T) {
+	t.Parallel()
 
 	var sets = []struct {
 		exp       bool
@@ -50,10 +52,12 @@ func TestSupportsMethod(t *testing.T) {
 		},
 	}
 
-	for _, tv := range sets {
-		if supportsMethod(tv.method, tv.supported) != tv.exp {
-			t.Errorf("failed case: %+v", tv)
-		}
+	for i, tv := range sets {
+		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			if supportsMethod(tv.method, tv.supported) != tv.exp {
+				t.Errorf("failed case: %+v", tv)
+			}
+		})
 	}
 }
 
@@ -66,6 +70,8 @@ func funcName(f interface{}) string {
 }
 
 func TestAutogenOptionRoutes(t *testing.T) {
+	t.Parallel()
+
 	// make sure that dummy and options are different to prevent
 	// the compiler making this a single symbol
 	dummy := func(w rest.ResponseWriter, r *rest.Request) {
@@ -138,6 +144,7 @@ func TestAutogenOptionRoutes(t *testing.T) {
 
 //
 func TestAutogenOptionHeaders(t *testing.T) {
+	t.Parallel()
 
 	suppmeth := []string{
 		http.MethodGet,

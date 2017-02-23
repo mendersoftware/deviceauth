@@ -14,21 +14,26 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"testing"
 
-	"github.com/mendersoftware/deviceauth/log"
+	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestInventoryClientGet(t *testing.T) {
+	t.Parallel()
+
 	c := NewInventoryClientWithLogger(InventoryClientConfig{InventoryAddr: "http://foo"},
 		log.New(log.Ctx{}))
 	assert.NotNil(t, c)
 }
 
 func TestInventoryClient(t *testing.T) {
+	t.Parallel()
+
 	tcs := []struct {
 		status int
 		dev    Device
@@ -62,22 +67,26 @@ func TestInventoryClient(t *testing.T) {
 		},
 	}
 
-	for _, tc := range tcs {
-		t.Logf("testing %v %s", tc.status, tc.expReq)
-		s, rd := newMockServer(tc.status)
+	for i := range tcs {
+		tc := tcs[i]
+		t.Run(fmt.Sprintf("case %v %s", tc.status, tc.expReq), func(t *testing.T) {
+			t.Parallel()
 
-		c := NewInventoryClient(InventoryClientConfig{
-			InventoryAddr: s.URL,
+			s, rd := newMockServer(tc.status)
+
+			c := NewInventoryClient(InventoryClientConfig{
+				InventoryAddr: s.URL,
+			})
+
+			err := c.AddDevice(&Device{Id: "1234"}, &http.Client{})
+			if tc.err != nil {
+				assert.EqualError(t, err, tc.err.Error())
+			} else {
+				assert.NoError(t, err)
+				assert.JSONEq(t, tc.expReq, string(rd.reqBody))
+				assert.Equal(t, InventoryDevicesUri, rd.url.Path)
+			}
+			s.Close()
 		})
-
-		err := c.AddDevice(&Device{Id: "1234"}, &http.Client{})
-		if tc.err != nil {
-			assert.EqualError(t, err, tc.err.Error())
-		} else {
-			assert.NoError(t, err)
-			assert.JSONEq(t, tc.expReq, string(rd.reqBody))
-			assert.Equal(t, InventoryDevicesUri, rd.url.Path)
-		}
-		s.Close()
 	}
 }

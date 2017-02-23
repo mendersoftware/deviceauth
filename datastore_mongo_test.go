@@ -15,6 +15,8 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"testing"
@@ -27,9 +29,6 @@ import (
 
 const (
 	testDataFolder = "testdata/mongo"
-
-	TestMongoEnv     = "TEST_MONGO"
-	TestMongoDefault = "127.0.0.1:27017"
 )
 
 // db and test management funcs
@@ -220,23 +219,26 @@ func TestGetDeviceById(t *testing.T) {
 		},
 	}
 
-	for _, tc := range testCases {
-		var expected *Device
+	for i, tc := range testCases {
+		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			var expected *Device
 
-		if tc.expected != "" {
-			expected, err = parseDev(tc.expected)
-			assert.NoError(t, err, "failed to parse %s", tc.expected)
-			assert.NotNil(t, expected)
-		}
+			if tc.expected != "" {
+				expected, err = parseDev(tc.expected)
+				assert.NoError(t, err, "failed to parse %s", tc.expected)
+				assert.NotNil(t, expected)
+			}
 
-		dev, err := d.GetDeviceById(tc.deviceId)
-		if expected != nil {
-			assert.NoError(t, err, "failed to get devices")
-		} else {
-			assert.Equal(t, ErrDevNotFound, err)
-		}
-
-		assert.Equal(t, expected, dev)
+			dev, err := d.GetDeviceById(tc.deviceId)
+			if expected != nil {
+				assert.NoError(t, err, "failed to get devices")
+				if assert.NotNil(t, dev) {
+					compareDevices(expected, dev, t)
+				}
+			} else {
+				assert.Equal(t, ErrDevNotFound, err)
+			}
+		})
 	}
 }
 
@@ -276,23 +278,27 @@ func TestGetDeviceByKey(t *testing.T) {
 		},
 	}
 
-	for _, tc := range testCases {
-		var expected *Device
+	for i, tc := range testCases {
+		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			var expected *Device
 
-		if tc.expected != "" {
-			expected, err = parseDev(tc.expected)
-			assert.NoError(t, err, "failed to parse %s", tc.expected)
-			assert.NotNil(t, expected)
-		}
+			if tc.expected != "" {
+				expected, err = parseDev(tc.expected)
+				assert.NoError(t, err, "failed to parse %s", tc.expected)
+				assert.NotNil(t, expected)
+			}
 
-		dev, err := d.GetDeviceByKey(tc.deviceKey)
-		if expected != nil {
-			assert.NoError(t, err, "failed to get devices")
-		} else {
-			assert.Equal(t, ErrDevNotFound, err)
-		}
+			dev, err := d.GetDeviceByKey(tc.deviceKey)
+			if expected != nil {
+				assert.NoError(t, err, "failed to get devices")
+				if assert.NotNil(t, dev) {
+					compareDevices(expected, dev, t)
+				}
+			} else {
+				assert.Equal(t, ErrDevNotFound, err)
+			}
+		})
 
-		assert.Equal(t, expected, dev)
 	}
 }
 
@@ -400,32 +406,34 @@ func TestUpdateDevice(t *testing.T) {
 		},
 	}
 
-	for _, tc := range testCases {
-		updev := &Device{Id: tc.id, Status: tc.status}
+	for i, tc := range testCases {
+		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			updev := &Device{Id: tc.id, Status: tc.status}
 
-		err = d.UpdateDevice(updev)
-		if tc.outErr != "" {
-			assert.EqualError(t, err, tc.outErr)
-		} else {
-			assert.NoError(t, err)
+			err = d.UpdateDevice(updev)
+			if tc.outErr != "" {
+				assert.EqualError(t, err, tc.outErr)
+			} else {
+				assert.NoError(t, err)
 
-			//verify
-			s := d.session.Copy()
-			defer s.Close()
+				//verify
+				s := d.session.Copy()
+				defer s.Close()
 
-			var found Device
+				var found Device
 
-			c := s.DB(DbName).C(DbDevicesColl)
+				c := s.DB(DbName).C(DbDevicesColl)
 
-			err = c.FindId(tc.id).One(&found)
-			assert.NoError(t, err, "failed to find device")
+				err = c.FindId(tc.id).One(&found)
+				assert.NoError(t, err, "failed to find device")
 
-			//check all fields for equality - except UpdatedTs
-			assert.Equal(t, tc.status, found.Status)
+				//check all fields for equality - except UpdatedTs
+				assert.Equal(t, tc.status, found.Status)
 
-			//check UpdatedTs was updated
-			assert.InEpsilon(t, now.Unix(), found.UpdatedTs.Unix(), 10)
-		}
+				//check UpdatedTs was updated
+				assert.InEpsilon(t, now.Unix(), found.UpdatedTs.Unix(), 10)
+			}
+		})
 	}
 }
 
@@ -492,23 +500,25 @@ func TestGetToken(t *testing.T) {
 		},
 	}
 
-	for _, tc := range testCases {
-		var expected *Token
+	for i, tc := range testCases {
+		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			var expected *Token
 
-		if tc.expected != "" {
-			expected, err = parseToken(tc.expected)
-			assert.NoError(t, err, "failed to parse %s", tc.expected)
-			assert.NotNil(t, expected)
-		}
+			if tc.expected != "" {
+				expected, err = parseToken(tc.expected)
+				assert.NoError(t, err, "failed to parse %s", tc.expected)
+				assert.NotNil(t, expected)
+			}
 
-		token, err := d.GetToken(tc.tokenId)
-		if expected != nil {
-			assert.NoError(t, err, "failed to get token")
-		} else {
-			assert.Equal(t, ErrTokenNotFound, err)
-		}
+			token, err := d.GetToken(tc.tokenId)
+			if expected != nil {
+				assert.NoError(t, err, "failed to get token")
+			} else {
+				assert.Equal(t, ErrTokenNotFound, err)
+			}
 
-		assert.Equal(t, expected, token)
+			assert.Equal(t, expected, token)
+		})
 	}
 }
 
@@ -541,13 +551,15 @@ func TestDeleteToken(t *testing.T) {
 		},
 	}
 
-	for _, tc := range testCases {
-		err := d.DeleteToken(tc.tokenId)
-		if tc.err {
-			assert.Equal(t, ErrTokenNotFound, err)
-		} else {
-			assert.NoError(t, err, "failed to delete token")
-		}
+	for i, tc := range testCases {
+		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			err := d.DeleteToken(tc.tokenId)
+			if tc.err {
+				assert.Equal(t, ErrTokenNotFound, err)
+			} else {
+				assert.NoError(t, err, "failed to delete token")
+			}
+		})
 	}
 }
 
@@ -580,13 +592,15 @@ func TestDeleteTokenByDevId(t *testing.T) {
 		},
 	}
 
-	for _, tc := range testCases {
-		err := d.DeleteTokenByDevId(tc.devId)
-		if tc.err {
-			assert.Equal(t, ErrTokenNotFound, err)
-		} else {
-			assert.NoError(t, err, "failed to delete token")
-		}
+	for i, tc := range testCases {
+		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			err := d.DeleteTokenByDevId(tc.devId)
+			if tc.err {
+				assert.Equal(t, ErrTokenNotFound, err)
+			} else {
+				assert.NoError(t, err, "failed to delete token")
+			}
+		})
 	}
 }
 
@@ -614,22 +628,102 @@ func TestMigrate(t *testing.T) {
 	}
 
 	for name, tc := range testCases {
-		t.Logf("case: %s", name)
+		t.Run(fmt.Sprintf("tc: %s", name), func(t *testing.T) {
+			db := getDb()
 
-		db := getDb()
+			err := db.Migrate(tc.version, nil)
+			if tc.err == "" {
+				assert.NoError(t, err)
+				var out []migrate.MigrationEntry
+				db.session.DB(DbName).C(migrate.DbMigrationsColl).Find(nil).All(&out)
+				assert.Len(t, out, 1)
+				v, _ := migrate.NewVersion(tc.version)
+				assert.Equal(t, v, out[0].Version)
+			} else {
+				assert.EqualError(t, err, tc.err)
+			}
+			db.session.Close()
+		})
+	}
+}
 
-		err := db.Migrate(tc.version, nil)
-		if tc.err == "" {
-			assert.NoError(t, err)
-			var out []migrate.MigrationEntry
-			db.session.DB(DbName).C(migrate.DbMigrationsColl).Find(nil).All(&out)
-			assert.Len(t, out, 1)
-			v, _ := migrate.NewVersion(tc.version)
-			assert.Equal(t, v, out[0].Version)
-		} else {
-			assert.EqualError(t, err, tc.err)
-		}
-		db.session.Close()
+func randDevStatus() string {
+	statuses := []string{
+		DevStatusAccepted,
+		DevStatusPending,
+		DevStatusRejected,
+	}
+	idx := rand.Int() % len(statuses)
+	return statuses[idx]
+}
+
+func TestGetDevices(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestGetDevices in short mode.")
 	}
 
+	db := getDb()
+	defer db.session.Close()
+
+	// use 100 automatically creted devices
+	const devCount = 100
+
+	devs_list := make([]*Device, 0, devCount)
+
+	// populate DB with a set of devices
+	for i := 0; i < devCount; i++ {
+		dev := &Device{
+			Id:     fmt.Sprintf("foo-%04d", i),
+			PubKey: fmt.Sprintf("pubkey-%04d", i),
+			Status: randDevStatus(),
+		}
+
+		devs_list = append(devs_list, dev)
+		err := db.AddDevice(dev)
+		assert.NoError(t, err)
+	}
+
+	testCases := []struct {
+		skip            uint
+		limit           uint
+		expectedCount   int
+		expectedStartId int
+		expectedEndId   int
+	}{
+		{
+			skip:            10,
+			limit:           5,
+			expectedCount:   5,
+			expectedStartId: 10,
+			expectedEndId:   14,
+		},
+		{
+			// end of the range
+			skip:            devCount - 10,
+			limit:           15,
+			expectedCount:   10,
+			expectedStartId: 90,
+			expectedEndId:   99,
+		},
+		{
+			// whole range
+			skip:            0,
+			limit:           devCount,
+			expectedCount:   devCount,
+			expectedStartId: 0,
+			expectedEndId:   devCount - 1,
+		},
+	}
+
+	for i, tc := range testCases {
+		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			dbdevs, err := db.GetDevices(tc.skip, tc.limit)
+			assert.NoError(t, err)
+
+			assert.Len(t, dbdevs, tc.expectedCount)
+			for i, dbidx := tc.expectedStartId, 0; i <= tc.expectedEndId; i, dbidx = i+1, dbidx+1 {
+				assert.EqualValues(t, devs_list[i], &dbdevs[dbidx])
+			}
+		})
+	}
 }

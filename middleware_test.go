@@ -14,6 +14,7 @@
 package main
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/ant0ine/go-json-rest/rest"
@@ -30,14 +31,16 @@ func TestSetupMiddleware(t *testing.T) {
 		{EnvDev, false},
 	}
 
-	for _, td := range tdata {
-		api := rest.NewApi()
+	for i, td := range tdata {
+		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			api := rest.NewApi()
 
-		err := SetupMiddleware(api, td.mwtype)
-		if err != nil && td.experr == false {
-			t.Errorf("dod not expect error: %s", err)
-		} else if err == nil && td.experr == true {
-			t.Errorf("expected error, got none")
-		}
+			err := SetupMiddleware(api, td.mwtype)
+			if err != nil && td.experr == false {
+				t.Errorf("dod not expect error: %s", err)
+			} else if err == nil && td.experr == true {
+				t.Errorf("expected error, got none")
+			}
+		})
 	}
 }

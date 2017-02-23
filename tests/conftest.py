@@ -20,9 +20,13 @@ def pytest_addoption(parser):
     parser.addoption("--host", action="store", default="localhost",
                      help="host running API")
     parser.addoption("--spec", default="../docs/internal_api.yml")
+    parser.addoption("--management-spec", default="../docs/management_api.yml")
 
 def pytest_configure(config):
     lvl = logging.INFO
     if config.getoption("verbose"):
         lvl = logging.DEBUG
     logging.basicConfig(level=lvl)
+    # configure bravado related loggers to be less verbose
+    logging.getLogger('swagger_spec_validator').setLevel(logging.INFO)
+    logging.getLogger('bravado_core').setLevel(logging.INFO)

@@ -14,7 +14,7 @@
 package main
 
 import (
-	"github.com/mendersoftware/deviceauth/requestid"
+	"github.com/mendersoftware/go-lib-micro/requestid"
 )
 
 type DevAuthWithContext struct {

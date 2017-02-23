@@ -15,12 +15,15 @@ package utils
 
 import (
 	"crypto/rsa"
+	"fmt"
+	"testing"
+
 	"github.com/mendersoftware/deviceauth/test"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestVerifyAuthReqSign(t *testing.T) {
+	t.Parallel()
 
 	testCases := []struct {
 		content   string
@@ -63,23 +66,32 @@ func TestVerifyAuthReqSign(t *testing.T) {
 		},
 	}
 
-	for _, tc := range testCases {
-		signed := test.AuthReqSign([]byte(tc.content), tc.privkey, t)
+	for i := range testCases {
+		tc := testCases[i]
+		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			t.Parallel()
 
-		err := VerifyAuthReqSign(string(signed),
-			tc.pubkeyStr,
-			[]byte(tc.content))
+			signed := test.AuthReqSign([]byte(tc.content), tc.privkey, t)
 
-		if tc.err != "" {
-			assert.EqualError(t, err, tc.err)
-		} else {
-			assert.NoError(t, err)
-		}
+			err := VerifyAuthReqSign(string(signed),
+				tc.pubkeyStr,
+				[]byte(tc.content))
+
+			if tc.err != "" {
+				assert.EqualError(t, err, tc.err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
 	}
 }
 
 func TestVerifyCreateDevId(t *testing.T) {
+	t.Parallel()
+
 	iddata := `{"mac":"00:00:00:01", "id" : "id-1"}`
 	id := CreateDevId(iddata)
-	assert.Equal(t, "b8f8981a80d1f214766a43f5cb3db24e12b9ef04c62a30fb77aec6f70b229e12", id)
+	assert.Equal(t,
+		"b8f8981a80d1f214766a43f5cb3db24e12b9ef04c62a30fb77aec6f70b229e12",
+		id)
 }
