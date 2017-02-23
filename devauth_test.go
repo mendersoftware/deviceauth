@@ -242,20 +242,23 @@ func TestSubmitAuthRequest(t *testing.T) {
 			t.Parallel()
 
 			db := MockDataStore{}
-			db.On("GetDeviceById", mock.AnythingOfType("string")).Return(
-				func(id string) *Device {
-					if tc.getDevByIdErr == nil {
-						return &Device{
-							PubKey: tc.getDevByIdKey,
-							Id:     id,
-							Status: tc.devStatus,
+			db.On("GetDeviceById",
+				mock.AnythingOfType("string")).
+				Return(
+					func(id string) *Device {
+						if tc.getDevByIdErr == nil {
+							return &Device{
+								PubKey: tc.getDevByIdKey,
+								Id:     id,
+								Status: tc.devStatus,
+							}
 						}
-					}
-					return nil
-				},
-				tc.getDevByIdErr)
+						return nil
+					},
+					tc.getDevByIdErr)
 
-			db.On("GetDeviceByKey", mock.AnythingOfType("string")).Return(
+			db.On("GetDeviceByKey",
+				mock.AnythingOfType("string")).Return(
 				func(key string) *Device {
 					if tc.getDevByKeyErr == nil {
 						return &Device{
@@ -268,12 +271,18 @@ func TestSubmitAuthRequest(t *testing.T) {
 				},
 				tc.getDevByKeyErr)
 
-			db.On("AddDevice", mock.AnythingOfType("*main.Device")).Return(tc.addDeviceErr)
-			db.On("AddToken", mock.AnythingOfType("*main.Token")).Return(nil)
-			db.On("GetToken", mock.AnythingOfType("string")).Return(nil, nil)
-			db.On("DeleteToken", mock.AnythingOfType("string")).Return(nil)
-			db.On("DeleteToken", mock.AnythingOfType("string")).Return(nil)
-			db.On("DeleteTokenByDevId", mock.AnythingOfType("string")).Return(nil)
+			db.On("AddDevice",
+				mock.AnythingOfType("*main.Device")).Return(tc.addDeviceErr)
+			db.On("AddToken",
+				mock.AnythingOfType("*main.Token")).Return(nil)
+			db.On("GetToken",
+				mock.AnythingOfType("string")).Return(nil, nil)
+			db.On("DeleteToken",
+				mock.AnythingOfType("string")).Return(nil)
+			db.On("DeleteToken",
+				mock.AnythingOfType("string")).Return(nil)
+			db.On("DeleteTokenByDevId",
+				mock.AnythingOfType("string")).Return(nil)
 
 			cda := MockDevAdmClient{}
 			cda.On("AddDevice", mock.AnythingOfType("*main.Device"),
@@ -336,12 +345,17 @@ func TestAcceptDevice(t *testing.T) {
 			t.Parallel()
 
 			db := MockDataStore{}
-			db.On("UpdateDevice", mock.AnythingOfType("*main.Device")).Return(tc.dbUpdateErr)
+			db.On("UpdateDevice",
+				mock.AnythingOfType("*main.Device")).
+				Return(tc.dbUpdateErr)
 
 			if tc.dbGetErr != nil {
-				db.On("GetDeviceById", mock.AnythingOfType("string")).Return(nil, tc.dbGetErr)
+				db.On("GetDeviceById",
+					mock.AnythingOfType("string")).
+					Return(nil, tc.dbGetErr)
 			} else {
-				db.On("GetDeviceById", mock.AnythingOfType("string")).Return(
+				db.On("GetDeviceById",
+					mock.AnythingOfType("string")).Return(
 					func(id string) *Device {
 						return &Device{
 							Id:     id,
@@ -418,7 +432,9 @@ func TestRejectDevice(t *testing.T) {
 			devauth := NewDevAuth(&db, nil, nil, nil)
 			err := devauth.RejectDevice("dummyid")
 
-			if tc.dbErr != "" || (tc.dbDelDevTokenErr != nil && tc.dbDelDevTokenErr != ErrTokenNotFound) {
+			if tc.dbErr != "" || (tc.dbDelDevTokenErr != nil &&
+				tc.dbDelDevTokenErr != ErrTokenNotFound) {
+
 				assert.EqualError(t, err, tc.outErr)
 			} else {
 				assert.NoError(t, err)
@@ -477,7 +493,10 @@ func TestResetDevice(t *testing.T) {
 			devauth := NewDevAuth(&db, nil, nil, nil)
 			err := devauth.ResetDevice("dummyid")
 
-			if tc.dbErr != "" || (tc.dbDelDevTokenErr != nil && tc.dbDelDevTokenErr != ErrTokenNotFound) {
+			if tc.dbErr != "" ||
+				(tc.dbDelDevTokenErr != nil &&
+					tc.dbDelDevTokenErr != ErrTokenNotFound) {
+
 				assert.EqualError(t, err, tc.outErr)
 			} else {
 				assert.NoError(t, err)

@@ -211,16 +211,20 @@ func TestApiDevAuthSubmitAuthReq(t *testing.T) {
 		tc := testCases[i]
 		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
 			devauth := MockDevAuthApp{}
-			devauth.On("SubmitAuthRequest", mock.AnythingOfType("*main.AuthReq")).Return(
-				func(r *AuthReq) string {
-					if tc.devAuthErr != nil {
-						return ""
-					}
-					return tc.devAuthToken
-				},
-				tc.devAuthErr)
+			devauth.On("SubmitAuthRequest",
+				mock.AnythingOfType("*main.AuthReq")).
+				Return(
+					func(r *AuthReq) string {
+						if tc.devAuthErr != nil {
+							return ""
+						}
+						return tc.devAuthToken
+					},
+					tc.devAuthErr)
 
-			devauth.On("WithContext", mock.AnythingOfType("*main.RequestContext")).Return(&devauth)
+			devauth.On("WithContext",
+				mock.AnythingOfType("*main.RequestContext")).
+				Return(&devauth)
 
 			factory := func(l *log.Logger) (DevAuthApp, error) {
 				return &devauth, nil
@@ -230,7 +234,8 @@ func TestApiDevAuthSubmitAuthReq(t *testing.T) {
 
 			recorded := runTestRequest(t, apih, tc.req, tc.code, tc.body)
 			if tc.code == http.StatusOK {
-				assert.Equal(t, "application/jwt", recorded.Recorder.HeaderMap.Get("Content-Type"))
+				assert.Equal(t, "application/jwt",
+					recorded.Recorder.HeaderMap.Get("Content-Type"))
 			}
 		})
 	}
@@ -414,7 +419,9 @@ func TestApiDevAuthVerifyToken(t *testing.T) {
 			t.Parallel()
 
 			devauth := MockDevAuthApp{}
-			devauth.On("VerifyToken", mock.AnythingOfType("string")).Return(tc.err)
+			devauth.On("VerifyToken",
+				mock.AnythingOfType("string")).
+				Return(tc.err)
 
 			factory := func(l *log.Logger) (DevAuthApp, error) {
 				return &devauth, nil
@@ -468,7 +475,9 @@ func TestApiDevAuthDeleteToken(t *testing.T) {
 			t.Parallel()
 
 			devauth := MockDevAuthApp{}
-			devauth.On("RevokeToken", mock.AnythingOfType("string")).Return(tc.err)
+			devauth.On("RevokeToken",
+				mock.AnythingOfType("string")).
+				Return(tc.err)
 
 			factory := func(l *log.Logger) (DevAuthApp, error) {
 				return &devauth, nil
@@ -522,8 +531,9 @@ func TestApiGetDevice(t *testing.T) {
 			t.Parallel()
 
 			devauth := MockDevAuthApp{}
-			devauth.On("GetDevice", mock.AnythingOfType("string")).Return(
-				tc.device, tc.err)
+			devauth.On("GetDevice",
+				mock.AnythingOfType("string")).
+				Return(tc.device, tc.err)
 
 			factory := func(l *log.Logger) (DevAuthApp, error) {
 				return &devauth, nil
