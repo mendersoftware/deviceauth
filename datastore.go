@@ -26,6 +26,8 @@ var (
 	ErrDevNotFound = errors.New("device not found")
 	// device not found
 	ErrTokenNotFound = errors.New("token not found")
+	// device already exists
+	ErrObjectExists = errors.New("object exists")
 )
 
 type DataStore interface {

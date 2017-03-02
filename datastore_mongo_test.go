@@ -34,7 +34,11 @@ const (
 // db and test management funcs
 func getDb() *DataStoreMongo {
 	db.Wipe()
-	return NewDataStoreMongoWithSession(db.Session())
+
+	ds := NewDataStoreMongoWithSession(db.Session())
+	ds.Index()
+
+	return ds
 }
 
 func setUp(db *DataStoreMongo, devs_dataset,
@@ -287,6 +291,13 @@ func TestStoreAddDevice(t *testing.T) {
 	assert.NoError(t, err, "failed to find device")
 
 	compareDevices(&dev, &found, t)
+
+	// add device with identical identity data
+	err = d.AddDevice(&Device{
+		Id:     "foobar",
+		IdData: "iddata",
+	})
+	assert.EqualError(t, err, ErrObjectExists.Error())
 }
 
 // custom Device comparison with 'compareTime'
@@ -613,7 +624,7 @@ func TestStoreGetDevices(t *testing.T) {
 	// populate DB with a set of devices
 	for i := 0; i < devCount; i++ {
 		dev := &Device{
-			Id:     fmt.Sprintf("foo-%04d", i),
+			IdData: fmt.Sprintf("foo-%04d", i),
 			PubKey: fmt.Sprintf("pubkey-%04d", i),
 			Status: randDevStatus(),
 		}
@@ -662,6 +673,10 @@ func TestStoreGetDevices(t *testing.T) {
 
 			assert.Len(t, dbdevs, tc.expectedCount)
 			for i, dbidx := tc.expectedStartId, 0; i <= tc.expectedEndId; i, dbidx = i+1, dbidx+1 {
+				// make sure that ID is not empty
+				assert.NotEmpty(t, dbdevs[dbidx].Id)
+				// clear it now so that next assert does not fail
+				dbdevs[dbidx].Id = ""
 				assert.EqualValues(t, devs_list[i], &dbdevs[dbidx])
 			}
 		})

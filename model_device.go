@@ -21,6 +21,8 @@ const (
 	DevStatusAccepted = "accepted"
 	DevStatusRejected = "rejected"
 	DevStatusPending  = "pending"
+
+	DevKeyIdData = "id_data"
 )
 
 // note: fields with underscores need the 'bson' decorator

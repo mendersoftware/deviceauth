@@ -144,9 +144,11 @@ func (db *DataStoreMongo) AddDevice(d *Device) error {
 	c := s.DB(DbName).C(DbDevicesColl)
 
 	if err := c.Insert(d); err != nil {
+		if mgo.IsDup(err) {
+			return ErrObjectExists
+		}
 		return errors.Wrap(err, "failed to store device")
 	}
-
 	return nil
 }
 
@@ -273,3 +275,21 @@ func makeUpdate(d *Device) *Device {
 func (db *DataStoreMongo) UseLog(l *log.Logger) {
 	db.log = l.F(log.Ctx{})
 }
+
+func (db *DataStoreMongo) Index() error {
+	s := db.session.Copy()
+	defer s.Close()
+
+	// devices collection
+	err := s.DB(DbName).C(DbDevicesColl).EnsureIndex(mgo.Index{
+		Unique: true,
+		// identity data shall be unique within collection
+		Key: []string{DevKeyIdData},
+	})
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
