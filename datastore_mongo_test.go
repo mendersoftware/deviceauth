@@ -186,7 +186,7 @@ func parseToken(dataset string) (*Token, error) {
 	return &res[0], nil
 }
 
-func TestGetDeviceByIdentityData(t *testing.T) {
+func TestStoreGetDeviceByIdentityData(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping TestGetDeviceById in short mode.")
 	}
@@ -252,7 +252,7 @@ func compareAuthReq(expected *AuthReq, actual *AuthReq, t *testing.T) {
 	compareTime(expected.Timestamp, actual.Timestamp, t)
 }
 
-func TestAddDevice(t *testing.T) {
+func TestStoreAddDevice(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping TestAddDevice in short mode.")
 	}
@@ -309,7 +309,7 @@ func compareTime(expected time.Time, actual time.Time, t *testing.T) {
 	assert.Equal(t, expected.Unix(), actual.Unix())
 }
 
-func TestUpdateDevice(t *testing.T) {
+func TestStoreUpdateDevice(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping TestUpdateDevice in short mode.")
 	}
@@ -377,7 +377,7 @@ func TestUpdateDevice(t *testing.T) {
 	}
 }
 
-func TestAddToken(t *testing.T) {
+func TestStoreAddToken(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping TestAddToken in short mode.")
 	}
@@ -411,7 +411,7 @@ func TestAddToken(t *testing.T) {
 
 }
 
-func TestGetToken(t *testing.T) {
+func TestStoreGetToken(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping TestGetToken in short mode.")
 	}
@@ -462,7 +462,7 @@ func TestGetToken(t *testing.T) {
 	}
 }
 
-func TestDeleteToken(t *testing.T) {
+func TestStoreDeleteToken(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping TestDeleteToken in short mode.")
 	}
@@ -503,7 +503,7 @@ func TestDeleteToken(t *testing.T) {
 	}
 }
 
-func TestDeleteTokenByDevId(t *testing.T) {
+func TestStoreDeleteTokenByDevId(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping TestDeleteTokenByDevId in short mode.")
 	}
@@ -544,7 +544,7 @@ func TestDeleteTokenByDevId(t *testing.T) {
 	}
 }
 
-func TestMigrate(t *testing.T) {
+func TestStoreMigrate(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping TestMigrate in short mode.")
 	}
@@ -597,7 +597,7 @@ func randDevStatus() string {
 	return statuses[idx]
 }
 
-func TestGetDevices(t *testing.T) {
+func TestStoreGetDevices(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping TestGetDevices in short mode.")
 	}
