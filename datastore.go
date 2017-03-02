@@ -33,9 +33,9 @@ type DataStore interface {
 	//returns ErrDevNotFound if device not found
 	GetDeviceById(id string) (*Device, error)
 
-	// retrieve device by device public key
+	// retrieve device by its identity data
 	// returns ErrDevNotFound if device not found
-	GetDeviceByKey(key string) (*Device, error)
+	GetDeviceByIdentityData(idata string) (*Device, error)
 
 	// list devices
 	GetDevices(skip, limit uint) ([]Device, error)

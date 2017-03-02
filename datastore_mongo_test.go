@@ -186,7 +186,7 @@ func parseToken(dataset string) (*Token, error) {
 	return &res[0], nil
 }
 
-func TestGetDeviceById(t *testing.T) {
+func TestGetDeviceByIdentityData(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping TestGetDeviceById in short mode.")
 	}
@@ -202,20 +202,20 @@ func TestGetDeviceById(t *testing.T) {
 	assert.NoError(t, err, "failed to setup input data")
 
 	testCases := []struct {
-		deviceId string
-		expected string
+		deviceIdData string
+		expected     string
 	}{
 		{
-			deviceId: "0001",
-			expected: "device_expected_1.json",
+			deviceIdData: "0001-id-data",
+			expected:     "device_expected_1.json",
 		},
 		{
-			deviceId: "0002",
-			expected: "device_expected_2.json",
+			deviceIdData: "0002-id-data",
+			expected:     "device_expected_2.json",
 		},
 		{
-			deviceId: "0003",
-			expected: "",
+			deviceIdData: "0003",
+			expected:     "",
 		},
 	}
 
@@ -229,7 +229,7 @@ func TestGetDeviceById(t *testing.T) {
 				assert.NotNil(t, expected)
 			}
 
-			dev, err := d.GetDeviceById(tc.deviceId)
+			dev, err := d.GetDeviceByIdentityData(tc.deviceIdData)
 			if expected != nil {
 				assert.NoError(t, err, "failed to get devices")
 				if assert.NotNil(t, dev) {
@@ -239,66 +239,6 @@ func TestGetDeviceById(t *testing.T) {
 				assert.Equal(t, ErrDevNotFound, err)
 			}
 		})
-	}
-}
-
-func TestGetDeviceByKey(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping TestGetDeviceByKey in short mode.")
-	}
-
-	// set this to get reliable time.Time serialization
-	// (always get UTC instead of e.g. CEST)
-	time.Local = time.UTC
-
-	d := getDb()
-	defer d.session.Close()
-
-	err := setUp(d, "devices_input.json", "", "")
-	assert.NoError(t, err, "failed to setup input data")
-
-	testCases := []struct {
-		deviceKey string
-		expected  string
-	}{
-		{
-			//device 1
-			deviceKey: "0001-key",
-			expected:  "device_expected_1.json",
-		},
-		{
-			//device 2
-			deviceKey: "0002-key",
-			expected:  "device_expected_2.json",
-		},
-		{
-			//device doesn't exist
-			deviceKey: "0003-key",
-			expected:  "",
-		},
-	}
-
-	for i, tc := range testCases {
-		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
-			var expected *Device
-
-			if tc.expected != "" {
-				expected, err = parseDev(tc.expected)
-				assert.NoError(t, err, "failed to parse %s", tc.expected)
-				assert.NotNil(t, expected)
-			}
-
-			dev, err := d.GetDeviceByKey(tc.deviceKey)
-			if expected != nil {
-				assert.NoError(t, err, "failed to get devices")
-				if assert.NotNil(t, dev) {
-					compareDevices(expected, dev, t)
-				}
-			} else {
-				assert.Equal(t, ErrDevNotFound, err)
-			}
-		})
-
 	}
 }
 

@@ -115,13 +115,13 @@ func (db *DataStoreMongo) GetDeviceById(id string) (*Device, error) {
 	return &res, nil
 }
 
-func (db *DataStoreMongo) GetDeviceByKey(key string) (*Device, error) {
+func (db *DataStoreMongo) GetDeviceByIdentityData(idata string) (*Device, error) {
 	s := db.session.Copy()
 	defer s.Close()
 
 	c := s.DB(DbName).C(DbDevicesColl)
 
-	filter := bson.M{"pubkey": key}
+	filter := bson.M{"id_data": idata}
 	res := Device{}
 
 	err := c.Find(filter).One(&res)

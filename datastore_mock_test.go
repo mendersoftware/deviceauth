@@ -105,13 +105,13 @@ func (_m *MockDataStore) GetDeviceById(id string) (*Device, error) {
 	return r0, r1
 }
 
-// GetDeviceByKey provides a mock function with given fields: key
-func (_m *MockDataStore) GetDeviceByKey(key string) (*Device, error) {
-	ret := _m.Called(key)
+// GetDeviceByIdentityData provides a mock function with given fields: idata
+func (_m *MockDataStore) GetDeviceByIdentityData(idata string) (*Device, error) {
+	ret := _m.Called(idata)
 
 	var r0 *Device
 	if rf, ok := ret.Get(0).(func(string) *Device); ok {
-		r0 = rf(key)
+		r0 = rf(idata)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*Device)
@@ -120,7 +120,7 @@ func (_m *MockDataStore) GetDeviceByKey(key string) (*Device, error) {
 
 	var r1 error
 	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(key)
+		r1 = rf(idata)
 	} else {
 		r1 = ret.Error(1)
 	}
