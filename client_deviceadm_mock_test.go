@@ -26,13 +26,13 @@ type MockDevAdmClient struct {
 	mock.Mock
 }
 
-// AddDevice provides a mock function with given fields: dev, client
-func (_m *MockDevAdmClient) AddDevice(dev *Device, client requestid.ApiRequester) error {
-	ret := _m.Called(dev, client)
+// AddDevice provides a mock function with given fields: dev, auth, client
+func (_m *MockDevAdmClient) AddDevice(dev *Device, auth *AuthReq, client requestid.ApiRequester) error {
+	ret := _m.Called(dev, auth, client)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*Device, requestid.ApiRequester) error); ok {
-		r0 = rf(dev, client)
+	if rf, ok := ret.Get(0).(func(*Device, *AuthReq, requestid.ApiRequester) error); ok {
+		r0 = rf(dev, auth, client)
 	} else {
 		r0 = ret.Error(0)
 	}

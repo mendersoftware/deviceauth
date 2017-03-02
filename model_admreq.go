@@ -14,6 +14,7 @@
 package main
 
 type AdmReq struct {
-	IdData string `json:"device_identity"`
-	PubKey string `json:"key"`
+	IdData   string `json:"device_identity"`
+	PubKey   string `json:"key"`
+	DeviceId string `json:"device_id"`
 }
