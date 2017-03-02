@@ -16,7 +16,7 @@ package main
 import (
 	"net/http"
 
-	"github.com/mendersoftware/deviceauth/utils"
+	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/mendersoftware/go-lib-micro/requestid"
 	"github.com/pkg/errors"
@@ -84,36 +84,69 @@ func (d *DevAuth) SubmitAuthRequest(r *AuthReq) (string, error) {
 }
 
 func (d *DevAuth) SubmitAuthRequestWithClient(r *AuthReq, client requestid.ApiRequester) (string, error) {
-	id := utils.CreateDevId(r.IdData)
 
-	//check if device exists with the same id+key
-	//TODO at some point add key rotation handling (same id, different key)
-	dev, err := d.findMatchingDevice(id, r.PubKey)
-	if err != nil {
-		d.log.Errorf("find matching device error: %v", err)
+	dev := NewDevice("", r.IdData, r.PubKey, r.TenantToken)
 
+	// record device
+	err := d.db.AddDevice(dev)
+	if err != nil && err != ErrObjectExists {
+		d.log.Errorf("failed to add/find device: %v", err)
 		return "", err
 	}
+	// either the device was added or it was already present, in any case,
+	// pull it from DB
+	dev, err = d.db.GetDeviceByIdentityData(r.IdData)
+	if err != nil {
+		d.log.Error("failed to find device but could not add either")
+		return "", errors.New("failed to locate device")
+	}
 
-	if dev == nil {
-		//new device - create in 'pending' state
-		dev = NewDevice(id, r.IdData, r.PubKey, r.TenantToken)
+	areq := &AuthSet{
+		IdData:      r.IdData,
+		TenantToken: r.TenantToken,
+		PubKey:      r.PubKey,
+		DeviceId:    dev.Id,
+		Status:      DevStatusPending,
+	}
+	added := true
+	// record authentication request
+	err = d.db.AddAuthSet(areq)
+	if err != nil && err != ErrObjectExists {
+		return "", err
+	} else if err == ErrObjectExists {
+		added = false
+	}
+	// either the request was added or it was already present in the DB, get
+	// it now
+	areq, err = d.db.GetAuthSetByDataKey(r.IdData, r.PubKey)
+	if err != nil {
+		d.log.Error("failed to find device auth set but could not add one either")
+		return "", errors.New("failed to locate device auth set")
+	}
 
-		if err := d.cDevAdm.AddDevice(dev, client); err != nil {
+	// it it was indeed added (a new request), pass it to admission service
+	if added || !to.Bool(areq.AdmissionNotified) {
+		if err := d.cDevAdm.AddDevice(dev, areq, client); err != nil {
+			// we've failed to submit the request, no worries, just
+			// return an error
 			return "", errors.Wrap(err, "devadm add device error")
 		}
 
-		// add device to database only if it was
-		// successfully added to admission service
-		if err := d.db.AddDevice(dev); err != nil {
-			return "", errors.Wrap(err, "db add device error")
+		if err := d.db.UpdateAuthSet(areq, &AuthSetUpdate{
+			AdmissionNotified: to.BoolPtr(true),
+		}); err != nil {
+			d.log.Errorf("failed to update auth set data: %v", err)
+			// nothing bad happens here, we'll try to post the
+			// request next time device pings us
 		}
 
+		return "", ErrDevAuthUnauthorized
 	}
 
-	//return according to dev status
-	if dev.Status == DevStatusAccepted {
-		token, err := d.jwt.GenerateTokenSignRS256(id)
+	// request was already present in DB, check its status
+	if areq.Status == DevStatusAccepted {
+		// make & give token, include aid when generating token
+		token, err := d.jwt.GenerateTokenSignRS256(dev.Id)
 		if err != nil {
 			return "", errors.Wrap(err, "generate token error")
 		}
@@ -125,6 +158,7 @@ func (d *DevAuth) SubmitAuthRequestWithClient(r *AuthReq, client requestid.ApiRe
 		return token.Token, nil
 	}
 
+	// no token, return device unauthorized
 	return "", ErrDevAuthUnauthorized
 }
 
@@ -140,40 +174,6 @@ func (d *DevAuth) SubmitInventoryDeviceWithClient(dev Device, client requestid.A
 	return nil
 }
 
-// try to get an existing device, while checking for mismatched pubkey/id pairs
-func (d *DevAuth) findMatchingDevice(id, key string) (*Device, error) {
-	//find devs by id and key, compare results
-	devi, err := d.db.GetDeviceById(id)
-	if err != nil && err != ErrDevNotFound {
-		return nil, errors.Wrap(err, "db get device by id error")
-	}
-
-	devk, err := d.db.GetDeviceByKey(key)
-	if err != nil && err != ErrDevNotFound {
-		return nil, errors.Wrap(err, "db get device by key error")
-	}
-
-	//cases:
-	//both devs nil - new device
-	//both devs !nil - must compare id/key
-	//other combinations: id/key mismatch
-	if devi == nil && devk == nil {
-		return nil, nil
-	} else if devi != nil && devk != nil {
-		if devi.Id != devk.Id {
-			return nil, ErrDevAuthIdKeyMismatch
-		}
-
-		if devi.PubKey != devk.PubKey {
-			return nil, ErrDevAuthKeyMismatch
-		}
-
-		return devi, nil
-	}
-
-	return nil, ErrDevAuthUnauthorized
-}
-
 func (d *DevAuth) GetDevices(skip, limit uint) ([]Device, error) {
 	return d.db.GetDevices(skip, limit)
 }
@@ -186,60 +186,61 @@ func (d *DevAuth) GetDevice(devId string) (*Device, error) {
 	return dev, err
 }
 
-func (d *DevAuth) AcceptDevice(dev_id string) error {
-	updev := &Device{Id: dev_id, Status: DevStatusAccepted}
+func (d *DevAuth) AcceptDevice(auth_id string) error {
+	if err := d.setAuthSetStatus(auth_id, DevStatusAccepted); err != nil {
+		return err
+	}
 
-	if _, err := d.db.GetDeviceById(dev_id); err != nil {
+	aset, err := d.db.GetAuthSetById(auth_id)
+	if err != nil {
 		if err == ErrDevNotFound {
 			return err
 		}
-		return errors.Wrap(err, "db get device error")
+		return errors.Wrap(err, "db get auth set error")
 	}
 
 	// TODO make this a job for an orchestrator
-	if err := d.SubmitInventoryDevice(*updev); err != nil {
+	if err := d.SubmitInventoryDevice(Device{
+		Id: aset.DeviceId,
+	}); err != nil {
 		return errors.Wrap(err, "inventory device add error")
 	}
 
-	if err := d.db.UpdateDevice(updev); err != nil {
-		return errors.Wrap(err, "db update device error")
+	return nil
+}
+
+func (d *DevAuth) setAuthSetStatus(auth_id string, status string) error {
+	aset, err := d.db.GetAuthSetById(auth_id)
+	if err != nil {
+		if err == ErrDevNotFound {
+			return err
+		}
+		return errors.Wrap(err, "db get auth set error")
+	}
+
+	if status == DevStatusRejected || status == DevStatusPending {
+		// delete device token
+		err := d.db.DeleteTokenByDevId(aset.DeviceId)
+		if err != nil && err != ErrTokenNotFound {
+			return errors.Wrap(err, "db delete device token error")
+		}
+	}
+
+	if err := d.db.UpdateAuthSet(aset, &AuthSetUpdate{
+		Status: status,
+	}); err != nil {
+		return errors.Wrap(err, "db update device auth set error")
 	}
 
 	return nil
 }
 
-func (d *DevAuth) RejectDevice(dev_id string) error {
-	// delete device token
-	err := d.db.DeleteTokenByDevId(dev_id)
-	if err != nil && err != ErrTokenNotFound {
-		return errors.Wrap(err, "db delete device token error")
-	}
-
-	// update device status
-	updev := &Device{Id: dev_id, Status: DevStatusRejected}
-
-	if err := d.db.UpdateDevice(updev); err != nil {
-		return errors.Wrap(err, "db update device error")
-	}
-
-	return nil
+func (d *DevAuth) RejectDevice(auth_id string) error {
+	return d.setAuthSetStatus(auth_id, DevStatusRejected)
 }
 
-func (d *DevAuth) ResetDevice(dev_id string) error {
-	// delete device token
-	err := d.db.DeleteTokenByDevId(dev_id)
-	if err != nil && err != ErrTokenNotFound {
-		return errors.Wrap(err, "db delete device token error")
-	}
-
-	// update device status
-	updev := &Device{Id: dev_id, Status: DevStatusPending}
-
-	if err := d.db.UpdateDevice(updev); err != nil {
-		return errors.Wrap(err, "db update device error")
-	}
-
-	return nil
+func (d *DevAuth) ResetDevice(auth_id string) error {
+	return d.setAuthSetStatus(auth_id, DevStatusPending)
 }
 
 func (*DevAuth) GetDeviceToken(dev_id string) (*Token, error) {

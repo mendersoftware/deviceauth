@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/mendersoftware/go-lib-micro/requestid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -26,14 +27,16 @@ import (
 func TestDevAuthSubmitAuthRequest(t *testing.T) {
 	t.Parallel()
 
-	req := AuthReq{
-		IdData:      "iddata",
-		TenantToken: "tenant",
-		PubKey:      "pubkey",
-	}
+	pubKey := "dummy_pubkey"
+	idData := "dummy_iddata"
+	devId := "dummy_devid"
+	authId := "dummy_aid"
 
-	//precomputed device id for "iddata"
-	devId := "a8f728bad9540212e93283282a07b774f9bd85a5d550faa9b2afe1502cdc6328"
+	req := AuthReq{
+		IdData:      idData,
+		TenantToken: "tenant",
+		PubKey:      pubKey,
+	}
 
 	testCases := []struct {
 		inReq AuthReq
@@ -45,13 +48,13 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 		getDevByIdErr error
 
 		//id of returned device
-		getDevByKeyId  string
-		getDevByKeyErr error
-
-		getAuthReqsErr error
+		getDevByKeyId string
+		getAuthSetErr error
 
 		addDeviceErr  error
-		addAuthReqErr error
+		addAuthSetErr error
+
+		admissionNotified bool
 
 		devAdmErr error
 
@@ -59,180 +62,100 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 		err error
 	}{
 		{
-			//existing, accepted device
-			inReq: req,
-
-			devStatus: DevStatusAccepted,
-
-			getDevByIdKey: "pubkey",
-			getDevByIdErr: nil,
-
-			getDevByKeyId:  devId,
-			getDevByKeyErr: nil,
-
-			getAuthReqsErr: nil,
-
-			addDeviceErr:  nil,
-			addAuthReqErr: nil,
-
-			devAdmErr: nil,
-
-			res: "dummytoken",
-			err: nil,
+			// pretend we failed to add device to DB
+			inReq:        req,
+			addDeviceErr: errors.New("failed"),
+			err:          errors.New("failed"),
 		},
 		{
-			//existing, rejected device
+			//existing device, existing auth set, auth set accepted,
+			//admission was notified, so we should get a token right
+			//away
 			inReq: req,
 
-			devStatus: DevStatusRejected,
+			addDeviceErr:  ErrObjectExists,
+			addAuthSetErr: ErrObjectExists,
 
-			getDevByIdKey: "pubkey",
-			getDevByIdErr: nil,
+			devStatus:     DevStatusAccepted,
+			getDevByIdKey: pubKey,
+			getDevByKeyId: devId,
 
-			getDevByKeyId:  devId,
-			getDevByKeyErr: nil,
+			admissionNotified: true,
 
-			getAuthReqsErr: nil,
+			res: "dummytoken",
+		},
+		{
+			//existing device, existing auth set, auth set rejected,
+			//no token
+			inReq: req,
 
-			addDeviceErr:  nil,
-			addAuthReqErr: nil,
+			addDeviceErr:  ErrObjectExists,
+			addAuthSetErr: ErrObjectExists,
 
-			devAdmErr: nil,
+			devStatus:     DevStatusRejected,
+			getDevByIdKey: pubKey,
+			getDevByKeyId: devId,
 
-			res: "",
+			admissionNotified: true,
+
 			err: ErrDevAuthUnauthorized,
 		},
 		{
 			//existing, pending device
 			inReq: req,
 
-			devStatus: DevStatusPending,
+			addDeviceErr:  ErrObjectExists,
+			addAuthSetErr: ErrObjectExists,
 
-			getDevByIdKey: "pubkey",
-			getDevByIdErr: nil,
+			devStatus:     DevStatusPending,
+			getDevByIdKey: pubKey,
+			getDevByKeyId: devId,
 
-			getDevByKeyId:  devId,
-			getDevByKeyErr: nil,
+			admissionNotified: true,
 
-			getAuthReqsErr: nil,
-
-			addDeviceErr:  nil,
-			addAuthReqErr: nil,
-
-			devAdmErr: nil,
-
-			res: "",
 			err: ErrDevAuthUnauthorized,
-		},
-		{
-			//existing device, key duplicate + id mismatch
-			inReq: req,
-
-			devStatus: DevStatusAccepted,
-
-			getDevByIdKey: "pubkey",
-			getDevByIdErr: nil,
-
-			getDevByKeyId:  "anotherid",
-			getDevByKeyErr: nil,
-
-			getAuthReqsErr: nil,
-
-			addDeviceErr:  nil,
-			addAuthReqErr: nil,
-
-			devAdmErr: nil,
-
-			res: "",
-			err: ErrDevAuthIdKeyMismatch,
-		},
-		{
-			//existing device, id duplicate + key mismatch
-			inReq: req,
-
-			devStatus: DevStatusAccepted,
-
-			getDevByIdKey: "anotherkey",
-			getDevByIdErr: nil,
-
-			getDevByKeyId:  devId,
-			getDevByKeyErr: nil,
-
-			getAuthReqsErr: nil,
-
-			addDeviceErr:  nil,
-			addAuthReqErr: nil,
-
-			devAdmErr: nil,
-
-			res: "",
-			err: ErrDevAuthKeyMismatch,
 		},
 		{
 			//new device
 			inReq: req,
 
-			devStatus: DevStatusAccepted,
+			devStatus: DevStatusPending,
 
-			getDevByIdKey: "",
+			getDevByIdKey: pubKey,
+			getDevByKeyId: devId,
+
+			err: ErrDevAuthUnauthorized,
+		},
+		{
+			//known device, adding returns that device exists, but
+			//trying to fetch it fails
+			inReq: req,
+
+			addDeviceErr: ErrObjectExists,
+
 			getDevByIdErr: ErrDevNotFound,
 
-			getDevByKeyId:  "",
-			getDevByKeyErr: ErrDevNotFound,
+			err: errors.New("failed to locate device"),
+		},
+		{
+			//known device and auth set, but fetching auth set fails
+			inReq: req,
 
-			getAuthReqsErr: nil,
+			addDeviceErr:  ErrObjectExists,
+			addAuthSetErr: ErrObjectExists,
 
-			addDeviceErr:  nil,
-			addAuthReqErr: nil,
+			getAuthSetErr: ErrDevNotFound,
 
-			devAdmErr: nil,
-
-			res: "",
-			err: ErrDevAuthUnauthorized,
+			err: errors.New("failed to locate device auth set"),
 		},
 		{
 			//new device - admission error
 			inReq: req,
 
-			devStatus: DevStatusAccepted,
+			getDevByKeyId: devId,
+			devAdmErr:     errors.New("failed to add device"),
 
-			getDevByIdKey: "",
-			getDevByIdErr: ErrDevNotFound,
-
-			getDevByKeyId:  "",
-			getDevByKeyErr: ErrDevNotFound,
-
-			getAuthReqsErr: nil,
-
-			addDeviceErr:  nil,
-			addAuthReqErr: nil,
-
-			devAdmErr: errors.New("failed to add device"),
-
-			res: "",
 			err: errors.New("devadm add device error: failed to add device"),
-		},
-		{
-			//device exists in DB but has not sent any requests yet?
-			inReq: req,
-
-			devStatus: DevStatusPending,
-
-			getDevByIdKey: "pubkey",
-			getDevByIdErr: nil,
-
-			getDevByKeyId:  devId,
-			getDevByKeyErr: nil,
-
-			getAuthReqsErr: nil,
-
-			addDeviceErr:  nil,
-			addAuthReqErr: nil,
-
-			devAdmErr: nil,
-
-			res: "",
-			err: ErrDevAuthUnauthorized,
 		},
 	}
 
@@ -242,57 +165,77 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 			t.Parallel()
 
 			db := MockDataStore{}
-			db.On("GetDeviceById",
-				mock.AnythingOfType("string")).
-				Return(
-					func(id string) *Device {
-						if tc.getDevByIdErr == nil {
-							return &Device{
-								PubKey: tc.getDevByIdKey,
-								Id:     id,
-								Status: tc.devStatus,
-							}
-						}
-						return nil
-					},
-					tc.getDevByIdErr)
+			db.On("AddDevice",
+				mock.MatchedBy(
+					func(d *Device) bool {
+						return d.IdData == idData
+					})).Return(tc.addDeviceErr)
 
-			db.On("GetDeviceByKey",
-				mock.AnythingOfType("string")).Return(
-				func(key string) *Device {
-					if tc.getDevByKeyErr == nil {
+			db.On("GetDeviceByIdentityData", idData).Return(
+				func(idata string) *Device {
+					if tc.getDevByIdErr == nil {
 						return &Device{
-							Id:     tc.getDevByKeyId,
-							PubKey: key,
-							Status: tc.devStatus,
+							PubKey: tc.getDevByIdKey,
+							IdData: idata,
+							Id:     devId,
 						}
 					}
 					return nil
 				},
-				tc.getDevByKeyErr)
+				tc.getDevByIdErr)
+			db.On("AddAuthSet",
+				mock.MatchedBy(
+					func(m *AuthSet) bool {
+						return m.DeviceId == devId
+					})).Return(tc.addAuthSetErr)
+			db.On("UpdateAuthSet",
+				mock.MatchedBy(
+					func(m *AuthSet) bool {
+						return m.DeviceId == devId
 
-			db.On("AddDevice",
-				mock.AnythingOfType("*main.Device")).Return(tc.addDeviceErr)
+					}),
+				mock.MatchedBy(
+					func(m *AuthSetUpdate) bool {
+						return to.Bool(m.AdmissionNotified) == true
+					})).Return(nil)
+
+			db.On("GetAuthSetByDataKey",
+				idData, pubKey).Return(
+				func(idata string, key string) *AuthSet {
+					if tc.getAuthSetErr == nil {
+						return &AuthSet{
+							Id:                authId,
+							DeviceId:          tc.getDevByKeyId,
+							IdData:            idData,
+							PubKey:            key,
+							Status:            tc.devStatus,
+							AdmissionNotified: to.BoolPtr(tc.admissionNotified),
+						}
+					}
+					return nil
+				},
+				tc.getAuthSetErr)
+
 			db.On("AddToken",
 				mock.AnythingOfType("*main.Token")).Return(nil)
-			db.On("GetToken",
-				mock.AnythingOfType("string")).Return(nil, nil)
-			db.On("DeleteToken",
-				mock.AnythingOfType("string")).Return(nil)
-			db.On("DeleteToken",
-				mock.AnythingOfType("string")).Return(nil)
-			db.On("DeleteTokenByDevId",
-				mock.AnythingOfType("string")).Return(nil)
 
 			cda := MockDevAdmClient{}
-			cda.On("AddDevice", mock.AnythingOfType("*main.Device"),
-				mock.MatchedBy(func(_ requestid.ApiRequester) bool { return true })).
-				Return(tc.devAdmErr)
+			if !tc.admissionNotified {
+				// setup admission client mock only if admission
+				// was not notified yet as per test case
+				cda.On("AddDevice",
+					mock.MatchedBy(func(d *Device) bool { return d.Id == devId }),
+					mock.MatchedBy(func(a *AuthSet) bool {
+						return (a.Id == authId) &&
+							(a.IdData == idData) &&
+							(a.DeviceId == devId) &&
+							(a.PubKey == pubKey)
+					}),
+					mock.MatchedBy(func(_ requestid.ApiRequester) bool { return true })).
+					Return(tc.devAdmErr)
+			}
 
 			cdi := MockInventoryClient{}
-			cdi.On("AddDevice", mock.AnythingOfType("*main.Device"),
-				mock.MatchedBy(func(_ requestid.ApiRequester) bool { return true })).
-				Return(tc.devAdmErr)
 
 			jwt := MockJWTAgent{
 				mockGenerateTokenSignRS256: func(devId string) (*Token, error) {
@@ -309,6 +252,8 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 			assert.Equal(t, tc.res, res)
 			if tc.err != nil {
 				assert.EqualError(t, err, tc.err.Error())
+			} else {
+				assert.NoError(t, err)
 			}
 		})
 	}
@@ -318,22 +263,36 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
+		aset        *AuthSet
 		dbUpdateErr error
 		dbGetErr    error
 		invErr      error
 
 		outErr string
 	}{
-		{},
+		{
+			aset: &AuthSet{
+				Id:       "dummy_aid",
+				DeviceId: "dummy_devid",
+			},
+		},
 		{
 			dbGetErr: ErrDevNotFound,
 			outErr:   ErrDevNotFound.Error(),
 		},
 		{
+			aset: &AuthSet{
+				Id:       "dummy_aid",
+				DeviceId: "dummy_devid",
+			},
 			dbUpdateErr: errors.New("failed to update device"),
-			outErr:      "db update device error: failed to update device",
+			outErr:      "db update device auth set error: failed to update device",
 		},
 		{
+			aset: &AuthSet{
+				Id:       "dummy_aid",
+				DeviceId: "dummy_devid",
+			},
 			invErr: errors.New("inventory failed"),
 			outErr: "inventory device add error: failed to add device to inventory: inventory failed",
 		},
@@ -345,33 +304,17 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 			t.Parallel()
 
 			db := MockDataStore{}
-			db.On("UpdateDevice",
-				mock.AnythingOfType("*main.Device")).
-				Return(tc.dbUpdateErr)
-
-			if tc.dbGetErr != nil {
-				db.On("GetDeviceById",
-					mock.AnythingOfType("string")).
-					Return(nil, tc.dbGetErr)
-			} else {
-				db.On("GetDeviceById",
-					mock.AnythingOfType("string")).Return(
-					func(id string) *Device {
-						return &Device{
-							Id:     id,
-							Status: "pending",
-						}
-					},
-					nil)
-			}
+			db.On("GetAuthSetById", "dummy_aid").Return(tc.aset, tc.dbGetErr)
+			db.On("UpdateAuthSet", tc.aset,
+				&AuthSetUpdate{Status: DevStatusAccepted}).Return(tc.dbUpdateErr)
 
 			inv := MockInventoryClient{}
-			inv.On("AddDevice", mock.AnythingOfType("*main.Device"),
+			inv.On("AddDevice", &Device{Id: "dummy_devid"},
 				mock.MatchedBy(func(_ requestid.ApiRequester) bool { return true })).
 				Return(tc.invErr)
 
 			devauth := NewDevAuth(&db, nil, &inv, nil)
-			err := devauth.AcceptDevice("dummyid")
+			err := devauth.AcceptDevice("dummy_aid")
 
 			if tc.outErr != "" {
 				assert.EqualError(t, err, tc.outErr)
@@ -386,27 +329,37 @@ func TestDevAuthRejectDevice(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
-		dbErr            string
+		aset             *AuthSet
+		dbErr            error
 		dbDelDevTokenErr error
 
 		outErr string
 	}{
 		{
-			dbErr:            "",
+			aset: &AuthSet{
+				Id:       "dummy_aid",
+				DeviceId: "dummy_devid",
+			},
 			dbDelDevTokenErr: nil,
 		},
 		{
-			dbErr:            "failed to update device",
+			dbErr:            errors.New("failed"),
 			dbDelDevTokenErr: nil,
-			outErr:           "db update device error: failed to update device",
+			outErr:           "db get auth set error: failed",
 		},
 		{
-			dbErr:            "",
+			aset: &AuthSet{
+				Id:       "dummy_aid",
+				DeviceId: "dummy_devid",
+			},
 			dbDelDevTokenErr: ErrTokenNotFound,
 			outErr:           "db delete device token error: token not found",
 		},
 		{
-			dbErr:            "",
+			aset: &AuthSet{
+				Id:       "dummy_aid",
+				DeviceId: "dummy_devid",
+			},
 			dbDelDevTokenErr: errors.New("some error"),
 			outErr:           "db delete device token error: some error",
 		},
@@ -418,21 +371,16 @@ func TestDevAuthRejectDevice(t *testing.T) {
 			t.Parallel()
 
 			db := MockDataStore{}
-			db.On("UpdateDevice", mock.AnythingOfType("*main.Device")).Return(
-				func(d *Device) error {
-					if tc.dbErr != "" {
-						return errors.New(tc.dbErr)
-					}
-
-					return nil
-				})
-			db.On("DeleteTokenByDevId", mock.AnythingOfType("string")).Return(
+			db.On("GetAuthSetById", "dummy_aid").Return(tc.aset, tc.dbErr)
+			db.On("UpdateAuthSet", tc.aset,
+				&AuthSetUpdate{Status: DevStatusRejected}).Return(nil)
+			db.On("DeleteTokenByDevId", "dummy_devid").Return(
 				tc.dbDelDevTokenErr)
 
 			devauth := NewDevAuth(&db, nil, nil, nil)
-			err := devauth.RejectDevice("dummyid")
+			err := devauth.RejectDevice("dummy_aid")
 
-			if tc.dbErr != "" || (tc.dbDelDevTokenErr != nil &&
+			if tc.dbErr != nil || (tc.dbDelDevTokenErr != nil &&
 				tc.dbDelDevTokenErr != ErrTokenNotFound) {
 
 				assert.EqualError(t, err, tc.outErr)
@@ -447,27 +395,36 @@ func TestDevAuthResetDevice(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
-		dbErr            string
+		aset             *AuthSet
+		dbErr            error
 		dbDelDevTokenErr error
 
 		outErr string
 	}{
 		{
-			dbErr:            "",
+			aset: &AuthSet{
+				Id:       "dummy_aid",
+				DeviceId: "dummy_devid",
+			},
 			dbDelDevTokenErr: nil,
 		},
 		{
-			dbErr:            "failed to update device",
-			dbDelDevTokenErr: nil,
-			outErr:           "db update device error: failed to update device",
+			dbErr:  errors.New("failed"),
+			outErr: "db get auth set error: failed",
 		},
 		{
-			dbErr:            "",
+			aset: &AuthSet{
+				Id:       "dummy_aid",
+				DeviceId: "dummy_devid",
+			},
 			dbDelDevTokenErr: ErrTokenNotFound,
 			outErr:           "db delete device token error: token not found",
 		},
 		{
-			dbErr:            "",
+			aset: &AuthSet{
+				Id:       "dummy_aid",
+				DeviceId: "dummy_devid",
+			},
 			dbDelDevTokenErr: errors.New("some error"),
 			outErr:           "db delete device token error: some error",
 		},
@@ -479,21 +436,16 @@ func TestDevAuthResetDevice(t *testing.T) {
 			t.Parallel()
 
 			db := MockDataStore{}
-			db.On("UpdateDevice", mock.AnythingOfType("*main.Device")).Return(
-				func(d *Device) error {
-					if tc.dbErr != "" {
-						return errors.New(tc.dbErr)
-					}
-
-					return nil
-				})
-			db.On("DeleteTokenByDevId", mock.AnythingOfType("string")).Return(
+			db.On("GetAuthSetById", "dummy_aid").Return(tc.aset, tc.dbErr)
+			db.On("UpdateAuthSet", tc.aset,
+				&AuthSetUpdate{Status: DevStatusPending}).Return(nil)
+			db.On("DeleteTokenByDevId", "dummy_devid").Return(
 				tc.dbDelDevTokenErr)
 
 			devauth := NewDevAuth(&db, nil, nil, nil)
-			err := devauth.ResetDevice("dummyid")
+			err := devauth.ResetDevice("dummy_aid")
 
-			if tc.dbErr != "" ||
+			if tc.dbErr != nil ||
 				(tc.dbDelDevTokenErr != nil &&
 					tc.dbDelDevTokenErr != ErrTokenNotFound) {
 
