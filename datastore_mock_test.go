@@ -26,6 +26,20 @@ type MockDataStore struct {
 	mock.Mock
 }
 
+// AddAuthSet provides a mock function with given fields: set
+func (_m *MockDataStore) AddAuthSet(set *AuthSet) error {
+	ret := _m.Called(set)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*AuthSet) error); ok {
+		r0 = rf(set)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // AddDevice provides a mock function with given fields: r
 func (_m *MockDataStore) AddDevice(r *Device) error {
 	ret := _m.Called(r)
@@ -80,6 +94,52 @@ func (_m *MockDataStore) DeleteTokenByDevId(dev_id string) error {
 	}
 
 	return r0
+}
+
+// GetAuthSetByDataKey provides a mock function with given fields: data, key
+func (_m *MockDataStore) GetAuthSetByDataKey(data string, key string) (*AuthSet, error) {
+	ret := _m.Called(data, key)
+
+	var r0 *AuthSet
+	if rf, ok := ret.Get(0).(func(string, string) *AuthSet); ok {
+		r0 = rf(data, key)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*AuthSet)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string, string) error); ok {
+		r1 = rf(data, key)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetAuthSetById provides a mock function with given fields: id
+func (_m *MockDataStore) GetAuthSetById(id string) (*AuthSet, error) {
+	ret := _m.Called(id)
+
+	var r0 *AuthSet
+	if rf, ok := ret.Get(0).(func(string) *AuthSet); ok {
+		r0 = rf(id)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*AuthSet)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // GetDeviceById provides a mock function with given fields: id
@@ -181,6 +241,20 @@ func (_m *MockDataStore) Migrate(version string, migrations []migrate.Migration)
 	var r0 error
 	if rf, ok := ret.Get(0).(func(string, []migrate.Migration) error); ok {
 		r0 = rf(version, migrations)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// UpdateAuthSet provides a mock function with given fields: orig, mod
+func (_m *MockDataStore) UpdateAuthSet(orig *AuthSet, mod *AuthSetUpdate) error {
+	ret := _m.Called(orig, mod)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*AuthSet, *AuthSetUpdate) error); ok {
+		r0 = rf(orig, mod)
 	} else {
 		r0 = ret.Error(0)
 	}

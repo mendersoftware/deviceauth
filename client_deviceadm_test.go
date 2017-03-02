@@ -41,7 +41,7 @@ func TestDevAdmClientReqSuccess(t *testing.T) {
 		DevAdmAddr: s.URL,
 	})
 
-	err := c.AddDevice(&Device{}, &AuthReq{}, &http.Client{})
+	err := c.AddDevice(&Device{}, &AuthSet{}, &http.Client{})
 	assert.NoError(t, err, "expected no errors")
 	assert.Equal(t, DevAdmDevicesUri, rd.url.Path)
 }
@@ -56,7 +56,7 @@ func TestDevAdmClientReqFail(t *testing.T) {
 		DevAdmAddr: s.URL,
 	})
 
-	err := c.AddDevice(&Device{}, &AuthReq{}, &http.Client{})
+	err := c.AddDevice(&Device{}, &AuthSet{}, &http.Client{})
 	assert.Error(t, err, "expected an error")
 	assert.Equal(t, DevAdmDevicesUri, rd.url.Path)
 }
@@ -68,7 +68,7 @@ func TestDevAdmClientReqNoHost(t *testing.T) {
 		DevAdmAddr: "http://somehost:1234",
 	})
 
-	err := c.AddDevice(&Device{}, &AuthReq{}, &http.Client{})
+	err := c.AddDevice(&Device{}, &AuthSet{}, &http.Client{})
 
 	assert.Error(t, err, "expected an error")
 }
@@ -101,7 +101,7 @@ func TestDevAdmClientTimeout(t *testing.T) {
 	})
 
 	t1 := time.Now()
-	err := c.AddDevice(&Device{}, &AuthReq{},
+	err := c.AddDevice(&Device{}, &AuthSet{},
 		&http.Client{Timeout: defaultDevAdmReqTimeout})
 	t2 := time.Now()
 

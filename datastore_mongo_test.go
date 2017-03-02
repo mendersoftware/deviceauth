@@ -22,6 +22,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Azure/go-autorest/autorest/to"
+	uto "github.com/mendersoftware/deviceauth/utils/to"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/mgo.v2"
@@ -94,7 +96,7 @@ func setUpAuthReqs(dataset string, s *mgo.Session) error {
 		return err
 	}
 
-	c := s.DB(DbName).C(DbAuthReqColl)
+	c := s.DB(DbName).C(DbAuthSetColl)
 
 	for _, r := range reqs {
 		err = c.Insert(r)
@@ -246,14 +248,14 @@ func TestStoreGetDeviceByIdentityData(t *testing.T) {
 	}
 }
 
-// custom AuthReq comparison with 'compareTime'
-func compareAuthReq(expected *AuthReq, actual *AuthReq, t *testing.T) {
+// custom AuthSet comparison with 'compareTime'
+func compareAuthSet(expected *AuthSet, actual *AuthSet, t *testing.T) {
 	assert.Equal(t, expected.IdData, actual.IdData)
 	assert.Equal(t, expected.TenantToken, actual.TenantToken)
 	assert.Equal(t, expected.PubKey, actual.PubKey)
 	assert.Equal(t, expected.DeviceId, actual.DeviceId)
 	assert.Equal(t, expected.Status, actual.Status)
-	compareTime(expected.Timestamp, actual.Timestamp, t)
+	compareTime(uto.Time(expected.Timestamp), uto.Time(actual.Timestamp), t)
 }
 
 func TestStoreAddDevice(t *testing.T) {
@@ -681,4 +683,63 @@ func TestStoreGetDevices(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestStoreAuthSet(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestGetDevices in short mode.")
+	}
+
+	db := getDb()
+	defer db.session.Close()
+
+	asin := &AuthSet{
+		IdData:    "foobar",
+		PubKey:    "pubkey-1",
+		DeviceId:  "1",
+		Timestamp: uto.TimePtr(time.Now()),
+	}
+	err := db.AddAuthSet(asin)
+	assert.NoError(t, err)
+
+	// try to get something that does not exist
+	as, err := db.GetAuthSetByDataKey("foobar-2", "pubkey-3")
+	assert.Error(t, err)
+
+	as, err = db.GetAuthSetByDataKey("foobar", "pubkey-1")
+	assert.NoError(t, err)
+	assert.NotNil(t, as)
+
+	assert.False(t, to.Bool(as.AdmissionNotified))
+
+	err = db.UpdateAuthSet(asin, &AuthSetUpdate{
+		AdmissionNotified: to.BoolPtr(true),
+		Timestamp:         uto.TimePtr(time.Now()),
+	})
+	assert.NoError(t, err)
+
+	as, err = db.GetAuthSetByDataKey("foobar", "pubkey-1")
+	assert.NoError(t, err)
+	assert.NotNil(t, as)
+	assert.True(t, to.Bool(as.AdmissionNotified))
+	assert.WithinDuration(t, time.Now(), uto.Time(as.Timestamp), time.Second)
+
+	// clear timestamp field
+	asin.Timestamp = nil
+	// selectively update public key only, remaining fields should be unchanged
+	err = db.UpdateAuthSet(asin, &AuthSetUpdate{
+		PubKey: "pubkey-2",
+	})
+	assert.NoError(t, err)
+
+	as, err = db.GetAuthSetByDataKey("foobar", "pubkey-2")
+	assert.NoError(t, err)
+	assert.NotNil(t, as)
+	assert.True(t, to.Bool(as.AdmissionNotified))
+
+	asid, err := db.GetAuthSetById(as.Id)
+	assert.NoError(t, err)
+	assert.NotNil(t, asid)
+
+	assert.EqualValues(t, as, asid)
 }

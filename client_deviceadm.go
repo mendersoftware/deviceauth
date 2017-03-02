@@ -40,7 +40,7 @@ type DevAdmClientConfig struct {
 }
 
 type DevAdmClient interface {
-	AddDevice(dev *Device, auth *AuthReq, client requestid.ApiRequester) error
+	AddDevice(dev *Device, auth *AuthSet, client requestid.ApiRequester) error
 	log.ContextLogger
 }
 
@@ -49,7 +49,7 @@ type devAdmClient struct {
 	conf DevAdmClientConfig
 }
 
-func (d *devAdmClient) AddDevice(dev *Device, auth *AuthReq, client requestid.ApiRequester) error {
+func (d *devAdmClient) AddDevice(dev *Device, auth *AuthSet, client requestid.ApiRequester) error {
 	d.log.Debugf("add device %s for admission", dev.Id)
 
 	AdmReqJson, err := json.Marshal(AdmReq{

@@ -48,6 +48,15 @@ type DataStore interface {
 	// updates only set fields
 	UpdateDevice(d *Device) error
 
+	AddAuthSet(set *AuthSet) error
+
+	GetAuthSetByDataKey(data string, key string) (*AuthSet, error)
+
+	GetAuthSetById(id string) (*AuthSet, error)
+
+	// update AuthSet and set its values to ones in AuthSetUpdate
+	UpdateAuthSet(orig *AuthSet, mod *AuthSetUpdate) error
+
 	// adds JWT to database
 	AddToken(t *Token) error
 

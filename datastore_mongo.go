@@ -29,7 +29,7 @@ const (
 	DbVersion     = "0.1.0"
 	DbName        = "deviceauth"
 	DbDevicesColl = "devices"
-	DbAuthReqColl = "auth_requests"
+	DbAuthSetColl = "auth_sets"
 	DbTokensColl  = "tokens"
 )
 
@@ -290,6 +290,96 @@ func (db *DataStoreMongo) Index() error {
 		return err
 	}
 
+	// auth requests
+	err = s.DB(DbName).C(DbAuthSetColl).EnsureIndex(mgo.Index{
+		Unique: true,
+		// tuple (device ID,identity, public key) shall be unique within
+		// collection
+		Key: []string{
+			AuthSetKeyDeviceId,
+			AuthSetKeyIdData,
+			AuthSetKeyPubKey,
+		},
+	})
+	if err != nil {
+		return err
+	}
+
 	return err
 }
 
+func (db *DataStoreMongo) AddAuthSet(set *AuthSet) error {
+	s := db.session.Copy()
+	defer s.Close()
+
+	c := s.DB(DbName).C(DbAuthSetColl)
+
+	set.Id = bson.NewObjectId().Hex()
+
+	if err := c.Insert(set); err != nil {
+		if mgo.IsDup(err) {
+			return ErrObjectExists
+		}
+		return errors.Wrap(err, "failed to store device")
+	}
+	return nil
+}
+
+func (db *DataStoreMongo) GetAuthSetByDataKey(idata string, key string) (*AuthSet, error) {
+	s := db.session.Copy()
+	defer s.Close()
+
+	c := s.DB(DbName).C(DbAuthSetColl)
+
+	filter := AuthSet{
+		IdData: idata,
+		PubKey: key,
+	}
+	res := AuthSet{}
+
+	err := c.Find(filter).One(&res)
+
+	if err != nil {
+		if err == mgo.ErrNotFound {
+			return nil, ErrDevNotFound
+		} else {
+			return nil, errors.Wrap(err, "failed to fetch device")
+		}
+	}
+
+	return &res, nil
+}
+
+func (db *DataStoreMongo) GetAuthSetById(auth_id string) (*AuthSet, error) {
+	s := db.session.Copy()
+	defer s.Close()
+
+	c := s.DB(DbName).C(DbAuthSetColl)
+
+	res := AuthSet{}
+	err := c.FindId(auth_id).One(&res)
+
+	if err != nil {
+		if err == mgo.ErrNotFound {
+			return nil, ErrDevNotFound
+		} else {
+			return nil, errors.Wrap(err, "failed to fetch device")
+		}
+	}
+
+	return &res, nil
+}
+
+func (db *DataStoreMongo) UpdateAuthSet(orig *AuthSet, mod *AuthSetUpdate) error {
+	s := db.session.Copy()
+	defer s.Close()
+
+	c := s.DB(DbName).C(DbAuthSetColl)
+
+	err := c.Update(orig, bson.M{"$set": mod})
+	if err != nil {
+		return errors.Wrap(err, "failed to update auth set")
+	}
+
+	return nil
+}
