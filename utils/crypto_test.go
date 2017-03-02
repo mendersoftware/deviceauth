@@ -85,13 +85,3 @@ func TestVerifyAuthReqSign(t *testing.T) {
 		})
 	}
 }
-
-func TestVerifyCreateDevId(t *testing.T) {
-	t.Parallel()
-
-	iddata := `{"mac":"00:00:00:01", "id" : "id-1"}`
-	id := CreateDevId(iddata)
-	assert.Equal(t,
-		"b8f8981a80d1f214766a43f5cb3db24e12b9ef04c62a30fb77aec6f70b229e12",
-		id)
-}
