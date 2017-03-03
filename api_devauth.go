@@ -270,6 +270,9 @@ func (d *DevAuthHandler) UpdateDeviceStatusHandler(w rest.ResponseWriter, r *res
 
 	devid := r.PathParam("id")
 
+	// TODO backwards compatibility, :id used to be device ID, but now it
+	// means authentication set ID
+
 	var status DevAuthApiStatus
 	err = r.DecodeJsonPayload(&status)
 	if err != nil {
