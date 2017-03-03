@@ -196,6 +196,7 @@ func (d *DevAuth) AcceptDevice(dev_id string) error {
 		return errors.Wrap(err, "db get device error")
 	}
 
+	// TODO make this a job for an orchestrator
 	if err := d.SubmitInventoryDevice(*updev); err != nil {
 		return errors.Wrap(err, "inventory device add error")
 	}
