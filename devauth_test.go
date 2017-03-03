@@ -23,7 +23,7 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-func TestSubmitAuthRequest(t *testing.T) {
+func TestDevAuthSubmitAuthRequest(t *testing.T) {
 	t.Parallel()
 
 	req := AuthReq{
@@ -314,7 +314,7 @@ func TestSubmitAuthRequest(t *testing.T) {
 	}
 }
 
-func TestAcceptDevice(t *testing.T) {
+func TestDevAuthAcceptDevice(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
@@ -382,7 +382,7 @@ func TestAcceptDevice(t *testing.T) {
 	}
 }
 
-func TestRejectDevice(t *testing.T) {
+func TestDevAuthRejectDevice(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
@@ -443,7 +443,7 @@ func TestRejectDevice(t *testing.T) {
 	}
 }
 
-func TestResetDevice(t *testing.T) {
+func TestDevAuthResetDevice(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
