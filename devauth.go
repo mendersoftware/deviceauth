@@ -15,8 +15,10 @@ package main
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/Azure/go-autorest/autorest/to"
+	uto "github.com/mendersoftware/deviceauth/utils/to"
 	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/mendersoftware/go-lib-micro/requestid"
 	"github.com/pkg/errors"
@@ -107,6 +109,7 @@ func (d *DevAuth) SubmitAuthRequestWithClient(r *AuthReq, client requestid.ApiRe
 		PubKey:      r.PubKey,
 		DeviceId:    dev.Id,
 		Status:      DevStatusPending,
+		Timestamp:   uto.TimePtr(time.Now()),
 	}
 	added := true
 	// record authentication request
