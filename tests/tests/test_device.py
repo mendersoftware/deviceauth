@@ -33,20 +33,23 @@ class TestDevice(Client):
         da = DevAuthorizer()
         url = self.make_api_url("auth_requests")
 
-        # generate device ID from its identity
-        devid = make_devid(d.identity)
-
-        try:
-            self.accept_device(devid)
-        except bravado.exception.HTTPError as e:
-            assert e.response.status_code == 404
-
         # poke devauth so that device appears
         rsp = device_auth_req(url, da, d)
         assert rsp.status_code == 401
 
+        # determine device ID by listing all devices and finding one with
+        # matching public key
+        mc = SimpleManagementClient()
+        dev = mc.find_device_by_identity(d.identity)
+
+        assert dev
+        devid = dev.id
+
+        self.log.debug('found matching device with ID: %s', dev.id)
+        aid = dev.auth_sets[0].id
+
         try:
-            self.accept_device(devid)
+            self.accept_device(aid)
         except bravado.exception.HTTPError as e:
             assert e.response.status_code == 204
 
@@ -61,7 +64,7 @@ class TestDevice(Client):
 
         # reject it now
         try:
-            self.reject_device(devid)
+            self.reject_device(aid)
         except bravado.exception.HTTPError as e:
             assert e.response.status_code == 204
 
@@ -112,9 +115,9 @@ class TestDevice(Client):
         rsp = device_auth_req(self.make_api_url("auth_requests"), da, dev)
         assert rsp.status_code == 401
 
-        # generate device ID from device identity
-        devid = make_devid(dev.identity)
+        # try to find our devices in all devices listing
+        mc = SimpleManagementClient()
+        ourdev = mc.find_device_by_identity(dev.identity)
 
-        authdev = mc.get_device(id=devid)
-        # devie should have been created with pending status
-        assert authdev.status == 'pending'
+        authdev = mc.get_device(id=ourdev.id)
+        assert authdev == ourdev

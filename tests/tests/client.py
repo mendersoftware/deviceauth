@@ -14,6 +14,7 @@
 #    limitations under the License.
 import os.path
 import logging
+import json
 
 import pytest
 from bravado.swagger_model import load_file
@@ -97,3 +98,22 @@ class SimpleManagementClient(SwaggerApiClient):
             self.log.debug('appending default authorization header')
             kwargs['Authorization'] = 'Bearer foo'
         return self.client.devices.get_devices_id(**kwargs).result()[0]
+
+    def find_device_by_identity(self, identity):
+        page = 1
+        per_page = 100
+        self.log.debug('find device with identity: %s', identity)
+
+        while True:
+            self.log.debug('trying page %d', page)
+            devs = self.list_devices(page=page, per_page=per_page)
+            for dev in devs:
+                if dev.id_data == identity:
+                    # found
+                    return dev
+            # try another page
+            if len(devs) < per_page:
+                break
+            page += 1
+
+        return None
