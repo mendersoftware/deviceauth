@@ -372,6 +372,27 @@ func (db *DataStoreMongo) GetAuthSetById(auth_id string) (*AuthSet, error) {
 	return &res, nil
 }
 
+func (db *DataStoreMongo) GetAuthSetsForDevice(devid string) ([]AuthSet, error) {
+	s := db.session.Copy()
+	defer s.Close()
+
+	c := s.DB(DbName).C(DbAuthSetColl)
+
+	res := []AuthSet{}
+
+	err := c.Find(AuthSet{DeviceId: devid}).All(&res)
+
+	if err != nil {
+		if err == mgo.ErrNotFound {
+			return nil, ErrDevNotFound
+		} else {
+			return nil, errors.Wrap(err, "failed to fetch device")
+		}
+	}
+
+	return res, nil
+}
+
 func (db *DataStoreMongo) UpdateAuthSet(orig AuthSet, mod AuthSetUpdate) error {
 	s := db.session.Copy()
 	defer s.Close()

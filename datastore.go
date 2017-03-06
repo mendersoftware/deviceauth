@@ -54,6 +54,8 @@ type DataStore interface {
 
 	GetAuthSetById(id string) (*AuthSet, error)
 
+	GetAuthSetsForDevice(devid string) ([]AuthSet, error)
+
 	// update AuthSet and set its values to ones in AuthSetUpdate
 	UpdateAuthSet(orig AuthSet, mod AuthSetUpdate) error
 

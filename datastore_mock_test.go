@@ -142,6 +142,29 @@ func (_m *MockDataStore) GetAuthSetById(id string) (*AuthSet, error) {
 	return r0, r1
 }
 
+// GetAuthSetsForDevice provides a mock function with given fields: devid
+func (_m *MockDataStore) GetAuthSetsForDevice(devid string) ([]AuthSet, error) {
+	ret := _m.Called(devid)
+
+	var r0 []AuthSet
+	if rf, ok := ret.Get(0).(func(string) []AuthSet); ok {
+		r0 = rf(devid)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]AuthSet)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(devid)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetDeviceById provides a mock function with given fields: id
 func (_m *MockDataStore) GetDeviceById(id string) (*Device, error) {
 	ret := _m.Called(id)

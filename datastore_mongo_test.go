@@ -738,4 +738,24 @@ func TestStoreAuthSet(t *testing.T) {
 	assert.NotNil(t, asid)
 
 	assert.EqualValues(t, as, asid)
+
+	// verify auth sets count for this device
+	asets, err := db.GetAuthSetsForDevice("1")
+	assert.NoError(t, err)
+	assert.Len(t, asets, 1)
+
+	// add another auth set
+	asin = AuthSet{
+		IdData:    "foobar",
+		PubKey:    "pubkey-99",
+		DeviceId:  "1",
+		Timestamp: uto.TimePtr(time.Now()),
+	}
+	err = db.AddAuthSet(asin)
+	assert.NoError(t, err)
+
+	// we should have 2 now
+	asets, err = db.GetAuthSetsForDevice("1")
+	assert.NoError(t, err)
+	assert.Len(t, asets, 2)
 }
