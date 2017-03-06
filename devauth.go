@@ -88,7 +88,7 @@ func (d *DevAuth) SubmitAuthRequestWithClient(r *AuthReq, client requestid.ApiRe
 	dev := NewDevice("", r.IdData, r.PubKey, r.TenantToken)
 
 	// record device
-	err := d.db.AddDevice(dev)
+	err := d.db.AddDevice(*dev)
 	if err != nil && err != ErrObjectExists {
 		d.log.Errorf("failed to add/find device: %v", err)
 		return "", err
@@ -110,7 +110,7 @@ func (d *DevAuth) SubmitAuthRequestWithClient(r *AuthReq, client requestid.ApiRe
 	}
 	added := true
 	// record authentication request
-	err = d.db.AddAuthSet(areq)
+	err = d.db.AddAuthSet(*areq)
 	if err != nil && err != ErrObjectExists {
 		return "", err
 	} else if err == ErrObjectExists {
@@ -132,7 +132,7 @@ func (d *DevAuth) SubmitAuthRequestWithClient(r *AuthReq, client requestid.ApiRe
 			return "", errors.Wrap(err, "devadm add device error")
 		}
 
-		if err := d.db.UpdateAuthSet(areq, &AuthSetUpdate{
+		if err := d.db.UpdateAuthSet(*areq, AuthSetUpdate{
 			AdmissionNotified: to.BoolPtr(true),
 		}); err != nil {
 			d.log.Errorf("failed to update auth set data: %v", err)
@@ -151,7 +151,7 @@ func (d *DevAuth) SubmitAuthRequestWithClient(r *AuthReq, client requestid.ApiRe
 			return "", errors.Wrap(err, "generate token error")
 		}
 
-		if err := d.db.AddToken(token); err != nil {
+		if err := d.db.AddToken(*token); err != nil {
 			return "", errors.Wrap(err, "add token error")
 		}
 
@@ -226,7 +226,7 @@ func (d *DevAuth) setAuthSetStatus(auth_id string, status string) error {
 		}
 	}
 
-	if err := d.db.UpdateAuthSet(aset, &AuthSetUpdate{
+	if err := d.db.UpdateAuthSet(*aset, AuthSetUpdate{
 		Status: status,
 	}); err != nil {
 		return errors.Wrap(err, "db update device auth set error")

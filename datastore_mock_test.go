@@ -27,11 +27,11 @@ type MockDataStore struct {
 }
 
 // AddAuthSet provides a mock function with given fields: set
-func (_m *MockDataStore) AddAuthSet(set *AuthSet) error {
+func (_m *MockDataStore) AddAuthSet(set AuthSet) error {
 	ret := _m.Called(set)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*AuthSet) error); ok {
+	if rf, ok := ret.Get(0).(func(AuthSet) error); ok {
 		r0 = rf(set)
 	} else {
 		r0 = ret.Error(0)
@@ -40,13 +40,13 @@ func (_m *MockDataStore) AddAuthSet(set *AuthSet) error {
 	return r0
 }
 
-// AddDevice provides a mock function with given fields: r
-func (_m *MockDataStore) AddDevice(r *Device) error {
-	ret := _m.Called(r)
+// AddDevice provides a mock function with given fields: d
+func (_m *MockDataStore) AddDevice(d Device) error {
+	ret := _m.Called(d)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*Device) error); ok {
-		r0 = rf(r)
+	if rf, ok := ret.Get(0).(func(Device) error); ok {
+		r0 = rf(d)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -55,11 +55,11 @@ func (_m *MockDataStore) AddDevice(r *Device) error {
 }
 
 // AddToken provides a mock function with given fields: t
-func (_m *MockDataStore) AddToken(t *Token) error {
+func (_m *MockDataStore) AddToken(t Token) error {
 	ret := _m.Called(t)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*Token) error); ok {
+	if rf, ok := ret.Get(0).(func(Token) error); ok {
 		r0 = rf(t)
 	} else {
 		r0 = ret.Error(0)
@@ -249,11 +249,11 @@ func (_m *MockDataStore) Migrate(version string, migrations []migrate.Migration)
 }
 
 // UpdateAuthSet provides a mock function with given fields: orig, mod
-func (_m *MockDataStore) UpdateAuthSet(orig *AuthSet, mod *AuthSetUpdate) error {
+func (_m *MockDataStore) UpdateAuthSet(orig AuthSet, mod AuthSetUpdate) error {
 	ret := _m.Called(orig, mod)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*AuthSet, *AuthSetUpdate) error); ok {
+	if rf, ok := ret.Get(0).(func(AuthSet, AuthSetUpdate) error); ok {
 		r0 = rf(orig, mod)
 	} else {
 		r0 = ret.Error(0)

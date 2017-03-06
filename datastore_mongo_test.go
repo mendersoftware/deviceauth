@@ -265,8 +265,7 @@ func TestStoreAddDevice(t *testing.T) {
 	time.Local = time.UTC
 
 	//setup
-	dev := Device{
-		Id:          "id",
+	dev := &Device{
 		TenantToken: "tenant",
 		PubKey:      "pubkey",
 		IdData:      "iddata",
@@ -278,24 +277,21 @@ func TestStoreAddDevice(t *testing.T) {
 	d := getDb()
 	defer d.session.Close()
 
-	err := d.AddDevice(&dev)
+	err := d.AddDevice(*dev)
 	assert.NoError(t, err, "failed to add device")
 
-	//verify
-	s := d.session.Copy()
-	defer s.Close()
+	found, err := d.GetDeviceByIdentityData("iddata")
+	assert.NoError(t, err)
+	assert.NotNil(t, found)
 
-	var found Device
-
-	c := s.DB(DbName).C(DbDevicesColl)
-
-	err = c.FindId(dev.Id).One(&found)
-	assert.NoError(t, err, "failed to find device")
-
-	compareDevices(&dev, &found, t)
+	// verify that device ID was set
+	assert.NotEmpty(t, found.Id)
+	// clear it now to allow compareDevices() to succeed
+	found.Id = ""
+	compareDevices(dev, found, t)
 
 	// add device with identical identity data
-	err = d.AddDevice(&Device{
+	err = d.AddDevice(Device{
 		Id:     "foobar",
 		IdData: "iddata",
 	})
@@ -405,7 +401,7 @@ func TestStoreAddToken(t *testing.T) {
 	d := getDb()
 	defer d.session.Close()
 
-	err := d.AddToken(&token)
+	err := d.AddToken(token)
 	assert.NoError(t, err, "failed to add token")
 
 	//verify
@@ -621,11 +617,11 @@ func TestStoreGetDevices(t *testing.T) {
 	// use 100 automatically creted devices
 	const devCount = 100
 
-	devs_list := make([]*Device, 0, devCount)
+	devs_list := make([]Device, 0, devCount)
 
 	// populate DB with a set of devices
 	for i := 0; i < devCount; i++ {
-		dev := &Device{
+		dev := Device{
 			IdData: fmt.Sprintf("foo-%04d", i),
 			PubKey: fmt.Sprintf("pubkey-%04d", i),
 			Status: randDevStatus(),
@@ -679,7 +675,7 @@ func TestStoreGetDevices(t *testing.T) {
 				assert.NotEmpty(t, dbdevs[dbidx].Id)
 				// clear it now so that next assert does not fail
 				dbdevs[dbidx].Id = ""
-				assert.EqualValues(t, devs_list[i], &dbdevs[dbidx])
+				assert.EqualValues(t, devs_list[i], dbdevs[dbidx])
 			}
 		})
 	}
@@ -693,7 +689,7 @@ func TestStoreAuthSet(t *testing.T) {
 	db := getDb()
 	defer db.session.Close()
 
-	asin := &AuthSet{
+	asin := AuthSet{
 		IdData:    "foobar",
 		PubKey:    "pubkey-1",
 		DeviceId:  "1",
@@ -712,7 +708,7 @@ func TestStoreAuthSet(t *testing.T) {
 
 	assert.False(t, to.Bool(as.AdmissionNotified))
 
-	err = db.UpdateAuthSet(asin, &AuthSetUpdate{
+	err = db.UpdateAuthSet(asin, AuthSetUpdate{
 		AdmissionNotified: to.BoolPtr(true),
 		Timestamp:         uto.TimePtr(time.Now()),
 	})
@@ -727,7 +723,7 @@ func TestStoreAuthSet(t *testing.T) {
 	// clear timestamp field
 	asin.Timestamp = nil
 	// selectively update public key only, remaining fields should be unchanged
-	err = db.UpdateAuthSet(asin, &AuthSetUpdate{
+	err = db.UpdateAuthSet(asin, AuthSetUpdate{
 		PubKey: "pubkey-2",
 	})
 	assert.NoError(t, err)

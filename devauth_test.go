@@ -167,7 +167,7 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 			db := MockDataStore{}
 			db.On("AddDevice",
 				mock.MatchedBy(
-					func(d *Device) bool {
+					func(d Device) bool {
 						return d.IdData == idData
 					})).Return(tc.addDeviceErr)
 
@@ -185,17 +185,17 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 				tc.getDevByIdErr)
 			db.On("AddAuthSet",
 				mock.MatchedBy(
-					func(m *AuthSet) bool {
+					func(m AuthSet) bool {
 						return m.DeviceId == devId
 					})).Return(tc.addAuthSetErr)
 			db.On("UpdateAuthSet",
 				mock.MatchedBy(
-					func(m *AuthSet) bool {
+					func(m AuthSet) bool {
 						return m.DeviceId == devId
 
 					}),
 				mock.MatchedBy(
-					func(m *AuthSetUpdate) bool {
+					func(m AuthSetUpdate) bool {
 						return to.Bool(m.AdmissionNotified) == true
 					})).Return(nil)
 
@@ -217,7 +217,7 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 				tc.getAuthSetErr)
 
 			db.On("AddToken",
-				mock.AnythingOfType("*main.Token")).Return(nil)
+				mock.AnythingOfType("main.Token")).Return(nil)
 
 			cda := MockDevAdmClient{}
 			if !tc.admissionNotified {
@@ -305,8 +305,10 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 
 			db := MockDataStore{}
 			db.On("GetAuthSetById", "dummy_aid").Return(tc.aset, tc.dbGetErr)
-			db.On("UpdateAuthSet", tc.aset,
-				&AuthSetUpdate{Status: DevStatusAccepted}).Return(tc.dbUpdateErr)
+			if tc.aset != nil {
+				db.On("UpdateAuthSet", *tc.aset,
+					AuthSetUpdate{Status: DevStatusAccepted}).Return(tc.dbUpdateErr)
+			}
 
 			inv := MockInventoryClient{}
 			inv.On("AddDevice", &Device{Id: "dummy_devid"},
@@ -372,8 +374,10 @@ func TestDevAuthRejectDevice(t *testing.T) {
 
 			db := MockDataStore{}
 			db.On("GetAuthSetById", "dummy_aid").Return(tc.aset, tc.dbErr)
-			db.On("UpdateAuthSet", tc.aset,
-				&AuthSetUpdate{Status: DevStatusRejected}).Return(nil)
+			if tc.aset != nil {
+				db.On("UpdateAuthSet", *tc.aset,
+					AuthSetUpdate{Status: DevStatusRejected}).Return(nil)
+			}
 			db.On("DeleteTokenByDevId", "dummy_devid").Return(
 				tc.dbDelDevTokenErr)
 
@@ -437,8 +441,10 @@ func TestDevAuthResetDevice(t *testing.T) {
 
 			db := MockDataStore{}
 			db.On("GetAuthSetById", "dummy_aid").Return(tc.aset, tc.dbErr)
-			db.On("UpdateAuthSet", tc.aset,
-				&AuthSetUpdate{Status: DevStatusPending}).Return(nil)
+			if tc.aset != nil {
+				db.On("UpdateAuthSet", *tc.aset,
+					AuthSetUpdate{Status: DevStatusPending}).Return(nil)
+			}
 			db.On("DeleteTokenByDevId", "dummy_devid").Return(
 				tc.dbDelDevTokenErr)
 

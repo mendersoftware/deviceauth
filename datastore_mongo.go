@@ -137,7 +137,7 @@ func (db *DataStoreMongo) GetDeviceByIdentityData(idata string) (*Device, error)
 	return &res, nil
 }
 
-func (db *DataStoreMongo) AddDevice(d *Device) error {
+func (db *DataStoreMongo) AddDevice(d Device) error {
 	s := db.session.Copy()
 	defer s.Close()
 
@@ -170,7 +170,7 @@ func (db *DataStoreMongo) UpdateDevice(d *Device) error {
 	return nil
 }
 
-func (db *DataStoreMongo) AddToken(t *Token) error {
+func (db *DataStoreMongo) AddToken(t Token) error {
 	s := db.session.Copy()
 	defer s.Close()
 
@@ -310,7 +310,7 @@ func (db *DataStoreMongo) Index() error {
 	return err
 }
 
-func (db *DataStoreMongo) AddAuthSet(set *AuthSet) error {
+func (db *DataStoreMongo) AddAuthSet(set AuthSet) error {
 	s := db.session.Copy()
 	defer s.Close()
 
@@ -372,7 +372,7 @@ func (db *DataStoreMongo) GetAuthSetById(auth_id string) (*AuthSet, error) {
 	return &res, nil
 }
 
-func (db *DataStoreMongo) UpdateAuthSet(orig *AuthSet, mod *AuthSetUpdate) error {
+func (db *DataStoreMongo) UpdateAuthSet(orig AuthSet, mod AuthSetUpdate) error {
 	s := db.session.Copy()
 	defer s.Close()
 
