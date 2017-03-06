@@ -143,6 +143,8 @@ func (db *DataStoreMongo) AddDevice(d *Device) error {
 
 	c := s.DB(DbName).C(DbDevicesColl)
 
+	d.Id = bson.NewObjectId().Hex()
+
 	if err := c.Insert(d); err != nil {
 		if mgo.IsDup(err) {
 			return ErrObjectExists
