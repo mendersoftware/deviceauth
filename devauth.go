@@ -178,13 +178,35 @@ func (d *DevAuth) SubmitInventoryDeviceWithClient(dev Device, client requestid.A
 }
 
 func (d *DevAuth) GetDevices(skip, limit uint) ([]Device, error) {
-	return d.db.GetDevices(skip, limit)
+	devs, err := d.db.GetDevices(skip, limit)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to list devices")
+	}
+
+	for i := range devs {
+		devs[i].AuthSets, err = d.db.GetAuthSetsForDevice(devs[i].Id)
+		if err != nil && err != ErrDevNotFound {
+			return nil, errors.Wrap(err, "db get auth sets error")
+		}
+	}
+	return devs, err
 }
 
 func (d *DevAuth) GetDevice(devId string) (*Device, error) {
 	dev, err := d.db.GetDeviceById(devId)
-	if err != nil && err != ErrDevNotFound {
-		return nil, errors.Wrap(err, "db get device by id error")
+	if err != nil {
+		if err != ErrDevNotFound {
+			return nil, errors.Wrap(err, "db get device by id error")
+		}
+		return nil, err
+	}
+
+	dev.AuthSets, err = d.db.GetAuthSetsForDevice(dev.Id)
+	if err != nil {
+		if err != ErrDevNotFound {
+			return nil, errors.Wrap(err, "db get auth sets error")
+		}
+		return nil, err
 	}
 	return dev, err
 }
@@ -199,7 +221,7 @@ func (d *DevAuth) AcceptDevice(auth_id string) error {
 		if err == ErrDevNotFound {
 			return err
 		}
-		return errors.Wrap(err, "db get auth set error")
+		return errors.Wrapf(err, "db get auth set error")
 	}
 
 	// TODO make this a job for an orchestrator

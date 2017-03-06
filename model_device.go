@@ -29,12 +29,13 @@ const (
 // otherwise the underscore will be removed upon write to mongo
 type Device struct {
 	Id          string    `json:"id" bson:"_id,omitempty"`
-	TenantToken string    `json:"tenant_token" bson:"tenant_token,omitempty"`
-	PubKey      string    `json:"pubkey" bson:",omitempty"`
+	TenantToken string    `json:"-" bson:"tenant_token,omitempty"`
+	PubKey      string    `json:"-" bson:",omitempty"`
 	IdData      string    `json:"id_data" bson:"id_data,omitempty"`
-	Status      string    `json:"status" bson:",omitempty"`
+	Status      string    `json:"-" bson:",omitempty"`
 	CreatedTs   time.Time `json:"created_ts" bson:"created_ts,omitempty"`
 	UpdatedTs   time.Time `json:"updated_ts" bson:"updated_ts,omitempty"`
+	AuthSets    []AuthSet `json:"auth_sets" bson:"-"`
 }
 
 func NewDevice(id, id_data, pubkey, tenant_token string) *Device {

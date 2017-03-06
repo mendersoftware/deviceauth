@@ -28,10 +28,10 @@ type AuthSet struct {
 	IdData            string     `json:"id_data" bson:"id_data,omitempty"`
 	TenantToken       string     `json:"tenant_token" bson:"tenant_token,omitempty"`
 	PubKey            string     `json:"pubkey" bson:"pubkey,omitempty"`
-	DeviceId          string     `json:"device_id" bson:"device_id,omitempty"`
+	DeviceId          string     `json:"-" bson:"device_id,omitempty"`
 	Timestamp         *time.Time `json:"ts" bson:"ts,omitempty"`
 	Status            string     `json:"status" bson:"status,omitempty"`
-	AdmissionNotified *bool      `json:"admission_notified" bson:"admission_notified,omitempty"`
+	AdmissionNotified *bool      `json:"-" bson:"admission_notified,omitempty"`
 }
 
 type AuthSetUpdate struct {
