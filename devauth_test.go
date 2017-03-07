@@ -459,3 +459,105 @@ func TestDevAuthResetDevice(t *testing.T) {
 		})
 	}
 }
+
+func TestDevAuthVerifyToken(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		tokenString      string
+		tokenValidateErr error
+
+		jti         string
+		validateErr error
+
+		token       *Token
+		getTokenErr error
+
+		auth       *AuthSet
+		getAuthErr error
+	}{
+		{
+			tokenString:      "expired",
+			tokenValidateErr: ErrTokenExpired,
+
+			jti:         "expired",
+			validateErr: ErrTokenExpired,
+		},
+		{
+			tokenString:      "bad",
+			tokenValidateErr: ErrTokenInvalid,
+
+			jti:         "bad",
+			validateErr: ErrTokenInvalid,
+		},
+		{
+			tokenString:      "good-no-auth",
+			tokenValidateErr: ErrDevNotFound,
+
+			jti: "good-no-auth",
+			token: &Token{
+				Id:        "good-no-auth",
+				AuthSetId: "not-found",
+			},
+			getAuthErr: ErrDevNotFound,
+		},
+		{
+			tokenString: "good-accepted",
+			jti:         "good-accepted",
+			token: &Token{
+				Id:        "good-accepted",
+				AuthSetId: "foo",
+			},
+			auth: &AuthSet{
+				Id:     "foo",
+				Status: DevStatusAccepted,
+			},
+		},
+		{
+			tokenString:      "good-rejected",
+			tokenValidateErr: ErrTokenInvalid,
+
+			jti: "good-rejected",
+			token: &Token{
+				Id:        "good-rejected",
+				AuthSetId: "foo",
+			},
+			auth: &AuthSet{
+				Id:     "foo",
+				Status: DevStatusRejected,
+			},
+		},
+	}
+
+	for i := range testCases {
+		tc := testCases[i]
+		t.Run(fmt.Sprintf("tc %s", tc.tokenString), func(t *testing.T) {
+			t.Parallel()
+
+			db := &MockDataStore{}
+			jwt := &MockJWTAgentApp{}
+
+			devauth := NewDevAuth(db, nil, nil, jwt)
+
+			jwt.On("ValidateTokenSignRS256", tc.tokenString).Return(tc.jti, tc.validateErr)
+
+			if tc.validateErr == ErrTokenExpired {
+				db.On("DeleteToken", tc.jti).Return(nil)
+			}
+
+			db.On("GetToken", tc.jti).Return(tc.token, tc.getTokenErr)
+
+			if tc.token != nil {
+				db.On("GetAuthSetById", tc.token.AuthSetId).Return(tc.auth, tc.getAuthErr)
+			}
+
+			err := devauth.VerifyToken(tc.tokenString)
+			if tc.tokenValidateErr != nil {
+				assert.EqualError(t, err, tc.tokenValidateErr.Error())
+			} else {
+				assert.NoError(t, err)
+			}
+
+		})
+	}
+}

@@ -14,9 +14,10 @@
 package main
 
 type Token struct {
-	Id    string `json:"id" bson:"_id"`
-	DevId string `json:"dev_id" bson:"dev_id,omitempty"`
-	Token string `json:"token" bson:"token,omitempty"`
+	Id        string `json:"id" bson:"_id"`
+	DevId     string `json:"dev_id" bson:"dev_id,omitempty"`
+	AuthSetId string `json:"auth_id" bson:"auth_id,omitempty"`
+	Token     string `json:"token" bson:"token,omitempty"`
 }
 
 func NewToken(id string, dev_id string, token string) *Token {
@@ -25,4 +26,9 @@ func NewToken(id string, dev_id string, token string) *Token {
 		DevId: dev_id,
 		Token: token,
 	}
+}
+
+func (t *Token) WithAuthSet(set *AuthSet) *Token {
+	t.AuthSetId = set.Id
+	return t
 }

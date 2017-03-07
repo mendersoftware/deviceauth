@@ -154,6 +154,8 @@ func (d *DevAuth) SubmitAuthRequestWithClient(r *AuthReq, client requestid.ApiRe
 			return "", errors.Wrap(err, "generate token error")
 		}
 
+		token = token.WithAuthSet(areq)
+
 		if err := d.db.AddToken(*token); err != nil {
 			return "", errors.Wrap(err, "add token error")
 		}
@@ -297,14 +299,29 @@ func (d *DevAuth) VerifyToken(token string) error {
 		return ErrTokenInvalid
 	}
 	// check if token is in the system
-	_, err = d.db.GetToken(jti)
-	if err == ErrTokenNotFound {
-		d.log.Errorf("Token with jti: %s not found", jti)
-		return err
-	}
+	tok, err := d.db.GetToken(jti)
 	if err != nil {
+		if err == ErrTokenNotFound {
+			d.log.Errorf("Token with jti: %s not found", jti)
+			return err
+		}
 		return errors.Wrapf(err, "Cannot get token with id: %s from database: %s", jti, err)
 	}
+
+	auth, err := d.db.GetAuthSetById(tok.AuthSetId)
+	if err != nil {
+		if err == ErrTokenNotFound {
+			d.log.Errorf("auth set %v for token jti: %s not found",
+				tok.AuthSetId, jti)
+			return err
+		}
+		return err
+	}
+
+	if auth.Status != DevStatusAccepted {
+		return ErrTokenInvalid
+	}
+
 	return nil
 }
 
