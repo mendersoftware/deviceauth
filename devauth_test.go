@@ -237,14 +237,11 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 
 			cdi := MockInventoryClient{}
 
-			jwt := MockJWTAgent{
-				mockGenerateTokenSignRS256: func(devId string) (*Token, error) {
-					return NewToken("", devId, "dummytoken"), nil
-				},
-				mockValidateTokenSignRS256: func(token string) (string, error) {
-					return "", nil
-				},
-			}
+			jwt := MockJWTAgentApp{}
+			jwt.On("GenerateTokenSignRS256", mock.AnythingOfType("string")).Return(
+				func(devid string) *Token {
+					return NewToken("", devId, "dummytoken")
+				}, nil)
 
 			devauth := NewDevAuth(&db, &cda, &cdi, &jwt)
 			res, err := devauth.SubmitAuthRequest(&req)
