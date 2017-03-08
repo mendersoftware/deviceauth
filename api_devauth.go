@@ -28,12 +28,15 @@ import (
 )
 
 const (
-	uriAuthReqs     = "/api/0.1.0/auth_requests"
-	uriDevices      = "/api/0.1.0/devices"
-	uriDevice       = "/api/0.1.0/devices/:id"
-	uriToken        = "/api/0.1.0/tokens/:id"
-	uriTokenVerify  = "/api/0.1.0/tokens/verify"
-	uriDeviceStatus = "/api/0.1.0/devices/:id/status"
+	uriAuthReqs = "/api/devices/v1/authentication/auth_requests"
+
+	uriDevices      = "/api/management/v1/devauth/devices"
+	uriDevice       = "/api/management/v1/devauth/devices/:id"
+	uriToken        = "/api/management/v1/devauth/tokens/:id"
+	uriDeviceStatus = "/api/management/v1/devauth/devices/:id/status"
+
+	// internal API
+	uriTokenVerify = "/api/internal/v1/devauth/tokens/verify"
 
 	HdrAuthReqSign = "X-MEN-Signature"
 )

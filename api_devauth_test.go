@@ -77,7 +77,7 @@ func makeMockApiHandler(t *testing.T, f DevAuthFactory) http.Handler {
 // - signed with a bogus test value
 // - not signed at all
 func makeAuthReq(payload interface{}, key *rsa.PrivateKey, signature string, t *testing.T) *http.Request {
-	r := test.MakeSimpleRequest("POST", "http://1.2.3.4/api/0.1.0/auth_requests", payload)
+	r := test.MakeSimpleRequest("POST", "http://1.2.3.4/api/devices/v1/authentication/auth_requests", payload)
 
 	b, err := json.Marshal(payload)
 	if err != nil {
@@ -307,46 +307,46 @@ func TestApiDevAuthUpdateStatusDevice(t *testing.T) {
 	}{
 		{
 			req: test.MakeSimpleRequest("PUT",
-				"http://1.2.3.4/api/0.1.0/devices/foo/status", nil),
+				"http://1.2.3.4/api/management/v1/devauth/devices/foo/status", nil),
 			code: http.StatusBadRequest,
 			body: RestError("failed to decode status data: JSON payload is empty"),
 		},
 		{
 			req: test.MakeSimpleRequest("PUT",
-				"http://1.2.3.4/api/0.1.0/devices/foo/status",
+				"http://1.2.3.4/api/management/v1/devauth/devices/foo/status",
 				DevAuthApiStatus{"foo"}),
 			code: http.StatusBadRequest,
 			body: RestError("incorrect device status"),
 		},
 		{
 			req: test.MakeSimpleRequest("PUT",
-				"http://1.2.3.4/api/0.1.0/devices/foo/status",
+				"http://1.2.3.4/api/management/v1/devauth/devices/foo/status",
 				accstatus),
 			code: http.StatusNoContent,
 		},
 		{
 			req: test.MakeSimpleRequest("PUT",
-				"http://1.2.3.4/api/0.1.0/devices/bar/status",
+				"http://1.2.3.4/api/management/v1/devauth/devices/bar/status",
 				accstatus),
 			code: http.StatusInternalServerError,
 			body: RestError("internal error"),
 		},
 		{
 			req: test.MakeSimpleRequest("PUT",
-				"http://1.2.3.4/api/0.1.0/devices/baz/status",
+				"http://1.2.3.4/api/management/v1/devauth/devices/baz/status",
 				accstatus),
 			code: http.StatusNotFound,
 			body: RestError(ErrDevNotFound.Error()),
 		},
 		{
 			req: test.MakeSimpleRequest("PUT",
-				"http://1.2.3.4/api/0.1.0/devices/foo/status",
+				"http://1.2.3.4/api/management/v1/devauth/devices/foo/status",
 				rejstatus),
 			code: http.StatusNoContent,
 		},
 		{
 			req: test.MakeSimpleRequest("PUT",
-				"http://1.2.3.4/api/0.1.0/devices/foo/status",
+				"http://1.2.3.4/api/management/v1/devauth/devices/foo/status",
 				penstatus),
 			code: http.StatusNoContent,
 		},
@@ -378,14 +378,14 @@ func TestApiDevAuthVerifyToken(t *testing.T) {
 	}{
 		{
 			req: test.MakeSimpleRequest("POST",
-				"http://1.2.3.4/api/0.1.0/tokens/verify", nil),
+				"http://1.2.3.4/api/internal/v1/devauth/tokens/verify", nil),
 			code: http.StatusUnauthorized,
 			body: RestError(ErrNoAuthHeader.Error()),
 			err:  nil,
 		},
 		{
 			req: test.MakeSimpleRequest("POST",
-				"http://1.2.3.4/api/0.1.0/tokens/verify", nil),
+				"http://1.2.3.4/api/internal/v1/devauth/tokens/verify", nil),
 			code: 200,
 			headers: map[string]string{
 				"authorization": "dummytoken",
@@ -394,7 +394,7 @@ func TestApiDevAuthVerifyToken(t *testing.T) {
 		},
 		{
 			req: test.MakeSimpleRequest("POST",
-				"http://1.2.3.4/api/0.1.0/tokens/verify", nil),
+				"http://1.2.3.4/api/internal/v1/devauth/tokens/verify", nil),
 			code: http.StatusForbidden,
 			headers: map[string]string{
 				"authorization": "dummytoken",
@@ -403,7 +403,7 @@ func TestApiDevAuthVerifyToken(t *testing.T) {
 		},
 		{
 			req: test.MakeSimpleRequest("POST",
-				"http://1.2.3.4/api/0.1.0/tokens/verify", nil),
+				"http://1.2.3.4/api/internal/v1/devauth/tokens/verify", nil),
 			code: http.StatusUnauthorized,
 			headers: map[string]string{
 				"authorization": "dummytoken",
@@ -412,7 +412,7 @@ func TestApiDevAuthVerifyToken(t *testing.T) {
 		},
 		{
 			req: test.MakeSimpleRequest("POST",
-				"http://1.2.3.4/api/0.1.0/tokens/verify", nil),
+				"http://1.2.3.4/api/internal/v1/devauth/tokens/verify", nil),
 			code: 500,
 			body: RestError("internal error"),
 			headers: map[string]string{
@@ -459,19 +459,19 @@ func TestApiDevAuthDeleteToken(t *testing.T) {
 	}{
 		{
 			req: test.MakeSimpleRequest("DELETE",
-				"http://1.2.3.4/api/0.1.0/tokens/foo", nil),
+				"http://1.2.3.4/api/management/v1/devauth/tokens/foo", nil),
 			code: http.StatusNoContent,
 			err:  nil,
 		},
 		{
 			req: test.MakeSimpleRequest("DELETE",
-				"http://1.2.3.4/api/0.1.0/tokens/foo", nil),
+				"http://1.2.3.4/api/management/v1/devauth/tokens/foo", nil),
 			code: http.StatusNotFound,
 			err:  ErrTokenNotFound,
 		},
 		{
 			req: test.MakeSimpleRequest("DELETE",
-				"http://1.2.3.4/api/0.1.0/tokens/foo", nil),
+				"http://1.2.3.4/api/management/v1/devauth/tokens/foo", nil),
 			code: http.StatusInternalServerError,
 			body: RestError("internal error"),
 			err:  errors.New("some error that will only be logged"),
@@ -518,7 +518,7 @@ func TestApiGetDevice(t *testing.T) {
 	}{
 		{
 			req: test.MakeSimpleRequest("GET",
-				"http://1.2.3.4/api/0.1.0/devices/foo", nil),
+				"http://1.2.3.4/api/management/v1/devauth/devices/foo", nil),
 			code:   http.StatusOK,
 			device: dev,
 			err:    nil,
@@ -526,7 +526,7 @@ func TestApiGetDevice(t *testing.T) {
 		},
 		{
 			req: test.MakeSimpleRequest("GET",
-				"http://1.2.3.4/api/0.1.0/devices/bar", nil),
+				"http://1.2.3.4/api/management/v1/devauth/devices/bar", nil),
 			code: http.StatusNotFound,
 			err:  ErrDevNotFound,
 			body: RestError("device not found"),
@@ -588,7 +588,7 @@ func TestApiGetDevices(t *testing.T) {
 	}{
 		{
 			req: test.MakeSimpleRequest("GET",
-				"http://1.2.3.4/api/0.1.0/devices", nil),
+				"http://1.2.3.4/api/management/v1/devauth/devices", nil),
 			code:    http.StatusOK,
 			devices: devs,
 			err:     nil,
@@ -598,7 +598,7 @@ func TestApiGetDevices(t *testing.T) {
 		},
 		{
 			req: test.MakeSimpleRequest("GET",
-				"http://1.2.3.4/api/0.1.0/devices", nil),
+				"http://1.2.3.4/api/management/v1/devauth/devices", nil),
 			code:    http.StatusOK,
 			devices: []Device{},
 			skip:    0,
@@ -608,7 +608,7 @@ func TestApiGetDevices(t *testing.T) {
 		},
 		{
 			req: test.MakeSimpleRequest("GET",
-				"http://1.2.3.4/api/0.1.0/devices?page=2&per_page=2", nil),
+				"http://1.2.3.4/api/management/v1/devauth/devices?page=2&per_page=2", nil),
 			devices: devs,
 			skip:    2,
 			limit:   3,
@@ -618,7 +618,7 @@ func TestApiGetDevices(t *testing.T) {
 		},
 		{
 			req: test.MakeSimpleRequest("GET",
-				"http://1.2.3.4/api/0.1.0/devices?page=2&per_page=2", nil),
+				"http://1.2.3.4/api/management/v1/devauth/devices?page=2&per_page=2", nil),
 			skip:  2,
 			limit: 3,
 			code:  http.StatusInternalServerError,

@@ -5,7 +5,7 @@ info:
   description: |
       An API for device authentication handling. Not exposed via the API Gateway - intended for internal use only.
 
-basePath: '/api/0.1.0/'
+basePath: '/api/management/v1/devauth/'
 host: 'mender-device-auth:8080'
 schemes:
   - http
