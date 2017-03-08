@@ -11,65 +11,6 @@ schemes:
   - http
 
 paths:
-  /devices/{id}/status:
-    put:
-      summary: Update the device's admission status
-      description: |
-        Sets the status of a given device to the selected value.
-
-        All possible transitions are valid.
-
-      parameters:
-        - name: id
-          in: path
-          description: Device identifier.
-          required: true
-          type: string
-        - name: status
-          in: body
-          description: New status.
-          required: true
-          schema:
-            $ref: '#/definitions/Status'
-      responses:
-        204:
-          description: The device status was successfully updated.
-        400:
-          description: Bad request.
-          schema:
-            $ref: '#/definitions/Error'
-        404:
-          description: The device was not found.
-          schema:
-            $ref: "#/definitions/Error"
-        500:
-          description: Internal server error.
-          schema:
-            $ref: "#/definitions/Error"
-  /tokens/{id}:
-    delete:
-      summary: Delete token
-      description: |
-        Deletes the token, effectively revoking it. The device must
-        apply for a new one with a new authentication request.
-        The token 'id' corresponds to the standard 'jti' claim.
-      parameters:
-        - name: id
-          in: path
-          description: Unique token identifier('jti').
-          required: true
-          type: string
-      responses:
-        204:
-          description: The token was successfully deleted.
-        404:
-          description: The token was not found.
-          schema:
-            $ref: '#/definitions/Error'
-        500:
-          description: Internal server error.
-          schema:
-            $ref: '#/definitions/Error'
   /tokens/verify:
     post:
      summary: Check the validity of a token
@@ -97,21 +38,6 @@ paths:
             schema:
               $ref: '#/definitions/Error'
 definitions:
-  Status:
-    description: Admission status of the device.
-    type: object
-    properties:
-      status:
-        type: string
-        enum:
-          - pending
-          - accepted
-          - rejected
-    required:
-      - status
-    example:
-      application/json:
-          status: "accepted"
   Error:
     description: Error descriptor.
     type: object
