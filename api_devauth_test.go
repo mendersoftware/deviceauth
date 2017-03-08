@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sync"
 	"testing"
 
 	"github.com/ant0ine/go-json-rest/rest"
@@ -31,6 +32,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
+
+var restErrUpdateDone sync.Once
+
+func updateRestErrorFieldName() {
+	restErrUpdateDone.Do(func() {
+		rest.ErrorFieldName = "error"
+	})
+}
 
 func RestError(status string) string {
 	msg, _ := json.Marshal(map[string]interface{}{"error": status, "request_id": "test"})
@@ -89,7 +98,7 @@ func TestApiDevAuthSubmitAuthReq(t *testing.T) {
 	t.Parallel()
 
 	// enforce specific field naming in errors returned by API
-	rest.ErrorFieldName = "error"
+	updateRestErrorFieldName()
 
 	privkey := mtest.LoadPrivKey("testdata/private.pem", t)
 	pubkeyStr := mtest.LoadPubKeyStr("testdata/public.pem", t)
@@ -285,7 +294,7 @@ func TestApiDevAuthUpdateStatusDevice(t *testing.T) {
 
 	apih := makeMockApiHandler(t, factory)
 	// enforce specific field naming in errors returned by API
-	rest.ErrorFieldName = "error"
+	updateRestErrorFieldName()
 
 	accstatus := DevAuthApiStatus{"accepted"}
 	rejstatus := DevAuthApiStatus{"rejected"}
@@ -358,7 +367,7 @@ func TestApiDevAuthVerifyToken(t *testing.T) {
 	t.Parallel()
 
 	// enforce specific field naming in errors returned by API
-	rest.ErrorFieldName = "error"
+	updateRestErrorFieldName()
 
 	tcases := []struct {
 		req     *http.Request
@@ -440,7 +449,7 @@ func TestApiDevAuthDeleteToken(t *testing.T) {
 	t.Parallel()
 
 	// enforce specific field naming in errors returned by API
-	rest.ErrorFieldName = "error"
+	updateRestErrorFieldName()
 
 	tcases := []struct {
 		req  *http.Request
@@ -493,7 +502,7 @@ func TestApiGetDevice(t *testing.T) {
 	t.Parallel()
 
 	// enforce specific field naming in errors returned by API
-	rest.ErrorFieldName = "error"
+	updateRestErrorFieldName()
 
 	dev := &Device{
 		Id:     "foo",
@@ -548,7 +557,7 @@ func TestApiGetDevices(t *testing.T) {
 	t.Parallel()
 
 	// enforce specific field naming in errors returned by API
-	rest.ErrorFieldName = "error"
+	updateRestErrorFieldName()
 
 	devs := []Device{
 		{
