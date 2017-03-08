@@ -2,17 +2,22 @@ import bravado
 import pytest
 import requests
 
-from client import Client, SimpleManagementClient
+from client import BaseDevicesApiClient, ManagementClient, \
+    SimpleInternalClient, SimpleManagementClient
 from common import Device, DevAuthorizer, device_auth_req, \
     make_devid, explode_jwt
 
 
-class TestToken(Client):
+class TestToken(ManagementClient):
+
+    intclient = SimpleInternalClient()
+
+    devapi = BaseDevicesApiClient()
 
     def test_token(self):
         d = Device()
         da = DevAuthorizer()
-        url = self.make_api_url("/auth_requests")
+        url = self.devapi.make_api_url("/auth_requests")
 
         # poke devauth so that device appears
         rsp = device_auth_req(url, da, d)
@@ -53,7 +58,7 @@ class TestToken(Client):
         # verify token; the token is to be placed in the Authorization header
         # and it looks like bravado cannot handle a POST request with no data
         # in body, hence we fall back to sending request directly
-        verify_url = self.make_api_url("/tokens/verify")
+        verify_url = self.intclient.make_api_url("/tokens/verify")
         self.log.info("verify URL: %s", verify_url)
         auth_hdr = 'Bearer {}'.format(d.token)
 

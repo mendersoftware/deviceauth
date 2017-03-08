@@ -1,18 +1,20 @@
 import bravado
 import pytest
 
-from client import Client, SimpleManagementClient
+from client import ManagementClient, SimpleManagementClient, BaseDevicesApiClient
 from common import Device, DevAuthorizer, device_auth_req, make_devid
 
 
-class TestDevice(Client):
+class TestDevice(ManagementClient):
+
+    devapi = BaseDevicesApiClient()
 
     def test_device_new(self):
         d = Device()
         da = DevAuthorizer()
-        url = self.make_api_url("auth_requests")
+        url = self.devapi.make_api_url("auth_requests")
         self.log.error("device URL: %s", url)
-        rsp = device_auth_req(self.make_api_url("auth_requests"),
+        rsp = device_auth_req(self.devapi.make_api_url("auth_requests"),
                               da, d)
         assert rsp.status_code == 401
 
@@ -31,7 +33,7 @@ class TestDevice(Client):
     def test_device_accept_reject(self):
         d = Device()
         da = DevAuthorizer()
-        url = self.make_api_url("auth_requests")
+        url = self.devapi.make_api_url("auth_requests")
 
         # poke devauth so that device appears
         rsp = device_auth_req(url, da, d)
@@ -73,7 +75,7 @@ class TestDevice(Client):
         assert rsp.status_code == 401
 
     def test_get_devices(self):
-        url = self.make_api_url("auth_requests")
+        url = self.devapi.make_api_url("auth_requests")
 
         mc = SimpleManagementClient()
 
@@ -112,7 +114,8 @@ class TestDevice(Client):
         dev = Device()
         da = DevAuthorizer()
         # poke devauth so that device appears
-        rsp = device_auth_req(self.make_api_url("auth_requests"), da, dev)
+        rsp = device_auth_req(self.devapi.make_api_url("auth_requests"),
+                              da, dev)
         assert rsp.status_code == 401
 
         # try to find our devices in all devices listing
