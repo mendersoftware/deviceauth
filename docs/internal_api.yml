@@ -3,7 +3,8 @@ info:
   version: '0.1.0'
   title: Device authentication
   description: |
-      An API for device authentication handling. Not exposed via the API Gateway - intended for internal use only.
+      An API for device authentication handling. Not exposed via the API Gateway,
+      internal use only.
 
 basePath: '/api/0.1.0/'
 host: 'mender-device-auth:8080'
