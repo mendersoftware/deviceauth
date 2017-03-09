@@ -33,7 +33,7 @@ class TestToken(ManagementClient):
         aid = dev.auth_sets[0].id
 
         try:
-            self.accept_device(aid)
+            self.accept_device(devid, aid)
         except bravado.exception.HTTPError as e:
             assert e.response.status_code == 204
 

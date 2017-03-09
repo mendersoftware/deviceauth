@@ -257,7 +257,7 @@ func TestApiDevAuthUpdateStatusDevice(t *testing.T) {
 		dev *Device
 		err error
 	}{
-		"foo": {
+		"123,456": {
 			dev: &Device{
 				Id:     "foo",
 				PubKey: "foobar",
@@ -266,14 +266,18 @@ func TestApiDevAuthUpdateStatusDevice(t *testing.T) {
 			},
 			err: nil,
 		},
-		"bar": {
+		"234,567": {
+			dev: nil,
+			err: ErrDevIdAuthIdMismatch,
+		},
+		"345,678": {
 			dev: nil,
 			err: errors.New("processing failed"),
 		},
 	}
 
-	mockaction := func(id string) error {
-		d, ok := devs[id]
+	mockaction := func(dev_id string, auth_id string) error {
+		d, ok := devs[dev_id+","+auth_id]
 		if ok == false {
 			return ErrDevNotFound
 		}
@@ -283,9 +287,12 @@ func TestApiDevAuthUpdateStatusDevice(t *testing.T) {
 		return nil
 	}
 	devauth := MockDevAuthApp{}
-	devauth.On("AcceptDevice", mock.AnythingOfType("string")).Return(mockaction)
-	devauth.On("RejectDevice", mock.AnythingOfType("string")).Return(mockaction)
-	devauth.On("ResetDevice", mock.AnythingOfType("string")).Return(mockaction)
+	devauth.On("AcceptDeviceAuth", mock.AnythingOfType("string"),
+		mock.AnythingOfType("string")).Return(mockaction)
+	devauth.On("RejectDeviceAuth", mock.AnythingOfType("string"),
+		mock.AnythingOfType("string")).Return(mockaction)
+	devauth.On("ResetDeviceAuth", mock.AnythingOfType("string"),
+		mock.AnythingOfType("string")).Return(mockaction)
 	devauth.On("WithContext", mock.AnythingOfType("*main.RequestContext")).Return(&devauth)
 
 	factory := func(l *log.Logger) (DevAuthApp, error) {
@@ -307,48 +314,55 @@ func TestApiDevAuthUpdateStatusDevice(t *testing.T) {
 	}{
 		{
 			req: test.MakeSimpleRequest("PUT",
-				"http://1.2.3.4/api/management/v1/devauth/devices/foo/status", nil),
+				"http://1.2.3.4/api/management/v1/devauth/devices/123/auth/456/status", nil),
 			code: http.StatusBadRequest,
 			body: RestError("failed to decode status data: JSON payload is empty"),
 		},
 		{
 			req: test.MakeSimpleRequest("PUT",
-				"http://1.2.3.4/api/management/v1/devauth/devices/foo/status",
+				"http://1.2.3.4/api/management/v1/devauth/devices/123/auth/456/status",
 				DevAuthApiStatus{"foo"}),
 			code: http.StatusBadRequest,
 			body: RestError("incorrect device status"),
 		},
 		{
 			req: test.MakeSimpleRequest("PUT",
-				"http://1.2.3.4/api/management/v1/devauth/devices/foo/status",
+				"http://1.2.3.4/api/management/v1/devauth/devices/123/auth/456/status",
 				accstatus),
 			code: http.StatusNoContent,
 		},
 		{
 			req: test.MakeSimpleRequest("PUT",
-				"http://1.2.3.4/api/management/v1/devauth/devices/bar/status",
+				"http://1.2.3.4/api/management/v1/devauth/devices/345/auth/678/status",
 				accstatus),
 			code: http.StatusInternalServerError,
 			body: RestError("internal error"),
 		},
 		{
 			req: test.MakeSimpleRequest("PUT",
-				"http://1.2.3.4/api/management/v1/devauth/devices/baz/status",
+				"http://1.2.3.4/api/management/v1/devauth/devices/999/auth/123/status",
 				accstatus),
 			code: http.StatusNotFound,
 			body: RestError(ErrDevNotFound.Error()),
 		},
 		{
 			req: test.MakeSimpleRequest("PUT",
-				"http://1.2.3.4/api/management/v1/devauth/devices/foo/status",
+				"http://1.2.3.4/api/management/v1/devauth/devices/123/auth/456/status",
 				rejstatus),
 			code: http.StatusNoContent,
 		},
 		{
 			req: test.MakeSimpleRequest("PUT",
-				"http://1.2.3.4/api/management/v1/devauth/devices/foo/status",
+				"http://1.2.3.4/api/management/v1/devauth/devices/123/auth/456/status",
 				penstatus),
 			code: http.StatusNoContent,
+		},
+		{
+			req: test.MakeSimpleRequest("PUT",
+				"http://1.2.3.4/api/management/v1/devauth/devices/234/auth/567/status",
+				penstatus),
+			code: http.StatusBadRequest,
+			body: RestError("dev auth: dev ID and auth ID mismatch"),
 		},
 	}
 

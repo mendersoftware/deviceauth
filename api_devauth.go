@@ -33,7 +33,7 @@ const (
 	uriDevices      = "/api/management/v1/devauth/devices"
 	uriDevice       = "/api/management/v1/devauth/devices/:id"
 	uriToken        = "/api/management/v1/devauth/tokens/:id"
-	uriDeviceStatus = "/api/management/v1/devauth/devices/:id/status"
+	uriDeviceStatus = "/api/management/v1/devauth/devices/:id/auth/:aid/status"
 
 	// internal API
 	uriTokenVerify = "/api/internal/v1/devauth/tokens/verify"
@@ -136,7 +136,7 @@ func (d *DevAuthHandler) SubmitAuthRequestHandler(w rest.ResponseWriter, r *rest
 	ctx := ContextFromRequest(r)
 	token, err := da.WithContext(ctx).SubmitAuthRequest(&authreq)
 	switch err {
-	case ErrDevAuthUnauthorized, ErrDevAuthIdKeyMismatch, ErrDevAuthKeyMismatch:
+	case ErrDevAuthUnauthorized, ErrDevIdAuthIdMismatch:
 		// error is always set to unauthorized, client does not need to
 		// know why
 		restErrWithLogMsg(w, r, l, ErrDevAuthUnauthorized, http.StatusUnauthorized, "unauthorized")
@@ -272,6 +272,7 @@ func (d *DevAuthHandler) UpdateDeviceStatusHandler(w rest.ResponseWriter, r *res
 	}
 
 	devid := r.PathParam("id")
+	authid := r.PathParam("aid")
 
 	// TODO backwards compatibility, :id used to be device ID, but now it
 	// means authentication set ID
@@ -291,16 +292,19 @@ func (d *DevAuthHandler) UpdateDeviceStatusHandler(w rest.ResponseWriter, r *res
 
 	if status.Status == DevStatusAccepted {
 		ctx := ContextFromRequest(r)
-		err = da.WithContext(ctx).AcceptDevice(devid)
+		err = da.WithContext(ctx).AcceptDeviceAuth(devid, authid)
 	} else if status.Status == DevStatusRejected {
-		err = da.RejectDevice(devid)
+		err = da.RejectDeviceAuth(devid, authid)
 	} else if status.Status == DevStatusPending {
-		err = da.ResetDevice(devid)
+		err = da.ResetDeviceAuth(devid, authid)
 	}
 	if err != nil {
-		if err == ErrDevNotFound {
+		switch err {
+		case ErrDevNotFound:
 			restErrWithLog(w, r, l, err, http.StatusNotFound)
-		} else {
+		case ErrDevIdAuthIdMismatch:
+			restErrWithLog(w, r, l, err, http.StatusBadRequest)
+		default:
 			restErrWithLogInternal(w, r, l, err)
 		}
 		return

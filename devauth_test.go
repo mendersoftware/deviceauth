@@ -313,7 +313,7 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 				Return(tc.invErr)
 
 			devauth := NewDevAuth(&db, nil, &inv, nil)
-			err := devauth.AcceptDevice("dummy_aid")
+			err := devauth.AcceptDeviceAuth("dummy_devid", "dummy_aid")
 
 			if tc.outErr != "" {
 				assert.EqualError(t, err, tc.outErr)
@@ -379,7 +379,7 @@ func TestDevAuthRejectDevice(t *testing.T) {
 				tc.dbDelDevTokenErr)
 
 			devauth := NewDevAuth(&db, nil, nil, nil)
-			err := devauth.RejectDevice("dummy_aid")
+			err := devauth.RejectDeviceAuth("dummy_devid", "dummy_aid")
 
 			if tc.dbErr != nil || (tc.dbDelDevTokenErr != nil &&
 				tc.dbDelDevTokenErr != ErrTokenNotFound) {
@@ -446,7 +446,7 @@ func TestDevAuthResetDevice(t *testing.T) {
 				tc.dbDelDevTokenErr)
 
 			devauth := NewDevAuth(&db, nil, nil, nil)
-			err := devauth.ResetDevice("dummy_aid")
+			err := devauth.ResetDeviceAuth("dummy_devid", "dummy_aid")
 
 			if tc.dbErr != nil ||
 				(tc.dbDelDevTokenErr != nil &&

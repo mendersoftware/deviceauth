@@ -83,17 +83,19 @@ class ManagementClient(SwaggerApiClient):
     def setup(self):
         self.setup_swagger()
 
-    def accept_device(self, devid):
-        return self.put_device_status(devid, 'accepted')
+    def accept_device(self, devid, aid):
+        return self.put_device_status(devid, aid, 'accepted')
 
-    def reject_device(self, devid):
-        return self.put_device_status(devid, 'rejected')
+    def reject_device(self, devid, aid):
+        return self.put_device_status(devid, aid, 'rejected')
 
-    def put_device_status(self, devid, status):
+    def put_device_status(self, devid, aid, status):
         self.log.info("definitions: %s", self.client.swagger_spec.definitions)
         Status = self.client.get_model('Status')
         st = Status(status=status)
-        return self.client.devices.put_devices_id_status(id=devid, status=st).result()
+        return self.client.devices.put_devices_id_auth_aid_status(id=devid,
+                                                                  aid=aid,
+                                                                  status=st).result()
 
     def verify_token(self, token):
         return self.client.devices.put_devices_id_status(id=devid, status=st).result()

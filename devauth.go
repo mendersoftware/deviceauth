@@ -25,9 +25,8 @@ import (
 )
 
 var (
-	ErrDevAuthUnauthorized  = errors.New("dev auth: unauthorized")
-	ErrDevAuthKeyMismatch   = errors.New("dev auth: device key mismatch")
-	ErrDevAuthIdKeyMismatch = errors.New("dev auth: ID and key mismatch")
+	ErrDevAuthUnauthorized = errors.New("dev auth: unauthorized")
+	ErrDevIdAuthIdMismatch = errors.New("dev auth: dev ID and auth ID mismatch")
 )
 
 // Expiration Timeout should be moved to database
@@ -49,9 +48,9 @@ type DevAuthApp interface {
 
 	GetDevices(skip, limit uint) ([]Device, error)
 	GetDevice(dev_id string) (*Device, error)
-	AcceptDevice(dev_id string) error
-	RejectDevice(dev_id string) error
-	ResetDevice(dev_id string) error
+	AcceptDeviceAuth(dev_id string, auth_id string) error
+	RejectDeviceAuth(dev_id string, auth_id string) error
+	ResetDeviceAuth(dev_id string, auth_id string) error
 	GetDeviceToken(dev_id string) (*Token, error)
 
 	RevokeToken(token_id string) error
@@ -213,8 +212,8 @@ func (d *DevAuth) GetDevice(devId string) (*Device, error) {
 	return dev, err
 }
 
-func (d *DevAuth) AcceptDevice(auth_id string) error {
-	if err := d.setAuthSetStatus(auth_id, DevStatusAccepted); err != nil {
+func (d *DevAuth) AcceptDeviceAuth(device_id string, auth_id string) error {
+	if err := d.setAuthSetStatus(device_id, auth_id, DevStatusAccepted); err != nil {
 		return err
 	}
 
@@ -236,13 +235,17 @@ func (d *DevAuth) AcceptDevice(auth_id string) error {
 	return nil
 }
 
-func (d *DevAuth) setAuthSetStatus(auth_id string, status string) error {
+func (d *DevAuth) setAuthSetStatus(device_id string, auth_id string, status string) error {
 	aset, err := d.db.GetAuthSetById(auth_id)
 	if err != nil {
 		if err == ErrDevNotFound {
 			return err
 		}
 		return errors.Wrap(err, "db get auth set error")
+	}
+
+	if aset.DeviceId != device_id {
+		return ErrDevIdAuthIdMismatch
 	}
 
 	if status == DevStatusRejected || status == DevStatusPending {
@@ -262,12 +265,12 @@ func (d *DevAuth) setAuthSetStatus(auth_id string, status string) error {
 	return nil
 }
 
-func (d *DevAuth) RejectDevice(auth_id string) error {
-	return d.setAuthSetStatus(auth_id, DevStatusRejected)
+func (d *DevAuth) RejectDeviceAuth(device_id string, auth_id string) error {
+	return d.setAuthSetStatus(device_id, auth_id, DevStatusRejected)
 }
 
-func (d *DevAuth) ResetDevice(auth_id string) error {
-	return d.setAuthSetStatus(auth_id, DevStatusPending)
+func (d *DevAuth) ResetDeviceAuth(device_id string, auth_id string) error {
+	return d.setAuthSetStatus(device_id, auth_id, DevStatusPending)
 }
 
 func (*DevAuth) GetDeviceToken(dev_id string) (*Token, error) {

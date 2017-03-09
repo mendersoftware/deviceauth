@@ -20,13 +20,13 @@ class TestDevice(ManagementClient):
 
     def test_device_accept_nonexistent(self):
         try:
-            self.accept_device('funnyid')
+            self.accept_device('funnyid', 'funnyid')
         except bravado.exception.HTTPError as e:
             assert e.response.status_code == 404
 
     def test_device_reject_nonexistent(self):
         try:
-            self.accept_device('funnyid')
+            self.accept_device('funnyid', 'funnyid')
         except bravado.exception.HTTPError as e:
             assert e.response.status_code == 404
 
@@ -51,7 +51,7 @@ class TestDevice(ManagementClient):
         aid = dev.auth_sets[0].id
 
         try:
-            self.accept_device(aid)
+            self.accept_device(devid, aid)
         except bravado.exception.HTTPError as e:
             assert e.response.status_code == 204
 
@@ -66,7 +66,7 @@ class TestDevice(ManagementClient):
 
         # reject it now
         try:
-            self.reject_device(aid)
+            self.reject_device(devid, aid)
         except bravado.exception.HTTPError as e:
             assert e.response.status_code == 204
 

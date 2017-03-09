@@ -110,11 +110,11 @@ paths:
           description: Internal server error.
           schema:
             $ref: "#/definitions/Error"
-  /devices/{id}/status:
+  /devices/{id}/auth/{aid}/status:
     put:
-      summary: Update the device's admission status
+      summary: Update the device authentication set status
       description: |
-        Sets the status of given device to the selected value.
+        Sets the status of a authentication data set of selected value.
 
         All possible transitions are valid.
 
@@ -122,6 +122,11 @@ paths:
         - name: id
           in: path
           description: Device identifier.
+          required: true
+          type: string
+        - name: aid
+          in: path
+          description: Authentication data set identifier.
           required: true
           type: string
         - name: status
@@ -132,7 +137,7 @@ paths:
             $ref: '#/definitions/Status'
       responses:
         204:
-          description: The device status was successfully updated.
+          description: The device authentication data set status was successfully updated.
         400:
           description: Bad request.
           schema:
