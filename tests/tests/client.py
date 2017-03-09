@@ -97,9 +97,6 @@ class ManagementClient(SwaggerApiClient):
                                                                   aid=aid,
                                                                   status=st).result()
 
-    def verify_token(self, token):
-        return self.client.devices.put_devices_id_status(id=devid, status=st).result()
-
 
 class SimpleManagementClient(ManagementClient):
     """Management API client. Cannot be used as pytest base class"""
