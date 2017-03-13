@@ -40,7 +40,7 @@ type DevAdmClientConfig struct {
 }
 
 type DevAdmClient interface {
-	AddDevice(dev *Device, client requestid.ApiRequester) error
+	AddDevice(dev *Device, auth *AuthSet, client requestid.ApiRequester) error
 	log.ContextLogger
 }
 
@@ -49,12 +49,13 @@ type devAdmClient struct {
 	conf DevAdmClientConfig
 }
 
-func (d *devAdmClient) AddDevice(dev *Device, client requestid.ApiRequester) error {
+func (d *devAdmClient) AddDevice(dev *Device, auth *AuthSet, client requestid.ApiRequester) error {
 	d.log.Debugf("add device %s for admission", dev.Id)
 
 	AdmReqJson, err := json.Marshal(AdmReq{
-		IdData: dev.IdData,
-		PubKey: dev.PubKey,
+		IdData:   auth.IdData,
+		PubKey:   auth.PubKey,
+		DeviceId: dev.Id,
 	})
 	if err != nil {
 		return errors.Wrapf(err, "failed to prepare device admission request")
@@ -64,7 +65,7 @@ func (d *devAdmClient) AddDevice(dev *Device, client requestid.ApiRequester) err
 
 	req, err := http.NewRequest(
 		http.MethodPut,
-		utils.JoinURL(d.conf.DevAdmAddr, DevAdmDevicesUri+dev.Id),
+		utils.JoinURL(d.conf.DevAdmAddr, DevAdmDevicesUri+auth.Id),
 		contentReader)
 	if err != nil {
 		return errors.Wrapf(err, "failed to create request")

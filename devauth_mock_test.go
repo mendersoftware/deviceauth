@@ -24,13 +24,13 @@ type MockDevAuthApp struct {
 	mock.Mock
 }
 
-// AcceptDevice provides a mock function with given fields: dev_id
-func (_m *MockDevAuthApp) AcceptDevice(dev_id string) error {
-	ret := _m.Called(dev_id)
+// AcceptDeviceAuth provides a mock function with given fields: dev_id, auth_id
+func (_m *MockDevAuthApp) AcceptDeviceAuth(dev_id string, auth_id string) error {
+	ret := _m.Called(dev_id, auth_id)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string) error); ok {
-		r0 = rf(dev_id)
+	if rf, ok := ret.Get(0).(func(string, string) error); ok {
+		r0 = rf(dev_id, auth_id)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -107,13 +107,13 @@ func (_m *MockDevAuthApp) GetDevices(skip uint, limit uint) ([]Device, error) {
 	return r0, r1
 }
 
-// RejectDevice provides a mock function with given fields: dev_id
-func (_m *MockDevAuthApp) RejectDevice(dev_id string) error {
-	ret := _m.Called(dev_id)
+// RejectDeviceAuth provides a mock function with given fields: dev_id, auth_id
+func (_m *MockDevAuthApp) RejectDeviceAuth(dev_id string, auth_id string) error {
+	ret := _m.Called(dev_id, auth_id)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string) error); ok {
-		r0 = rf(dev_id)
+	if rf, ok := ret.Get(0).(func(string, string) error); ok {
+		r0 = rf(dev_id, auth_id)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -121,13 +121,13 @@ func (_m *MockDevAuthApp) RejectDevice(dev_id string) error {
 	return r0
 }
 
-// ResetDevice provides a mock function with given fields: dev_id
-func (_m *MockDevAuthApp) ResetDevice(dev_id string) error {
-	ret := _m.Called(dev_id)
+// ResetDeviceAuth provides a mock function with given fields: dev_id, auth_id
+func (_m *MockDevAuthApp) ResetDeviceAuth(dev_id string, auth_id string) error {
+	ret := _m.Called(dev_id, auth_id)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string) error); ok {
-		r0 = rf(dev_id)
+	if rf, ok := ret.Get(0).(func(string, string) error); ok {
+		r0 = rf(dev_id, auth_id)
 	} else {
 		r0 = ret.Error(0)
 	}

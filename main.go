@@ -57,6 +57,11 @@ func main() {
 		l.Fatal("failed to run migrations")
 	}
 
+	err = db.Index()
+	if err != nil {
+		l.Fatal("failed to setup indexing")
+	}
+
 	l.Fatal(RunServer(config.Config))
 }
 

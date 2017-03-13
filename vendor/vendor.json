@@ -3,6 +3,12 @@
 	"ignore": "",
 	"package": [
 		{
+			"checksumSHA1": "axEUOz9Tq8m8RnSmeqPWNXpA5cU=",
+			"path": "github.com/Azure/go-autorest/autorest/to",
+			"revision": "ec5f4903f77ed9927ac95b19ab8e44ada64c1356",
+			"revisionTime": "2017-02-15T19:58:14Z"
+		},
+		{
 			"checksumSHA1": "qxkeLXH8kpYi1H0IBTO1FuOWRDk=",
 			"path": "github.com/ant0ine/go-json-rest/rest",
 			"revision": "4602b00d2caab423578a3094c68137dcc1eb2051",
@@ -22,7 +28,6 @@
 		},
 		{
 			"checksumSHA1": "WRu+mhZ2PfQu27qRr69HVGjtN4Q=",
-			"origin": "github.com/mendersoftware/deviceauth/vendor/github.com/davecgh/go-spew/spew",
 			"path": "github.com/davecgh/go-spew/spew",
 			"revision": "346938d642f2ec3594ed81d874461961cd0faa76",
 			"revisionTime": "2016-10-29T20:57:26Z"

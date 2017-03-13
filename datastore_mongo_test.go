@@ -22,6 +22,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Azure/go-autorest/autorest/to"
+	uto "github.com/mendersoftware/deviceauth/utils/to"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/mgo.v2"
@@ -34,7 +36,11 @@ const (
 // db and test management funcs
 func getDb() *DataStoreMongo {
 	db.Wipe()
-	return NewDataStoreMongoWithSession(db.Session())
+
+	ds := NewDataStoreMongoWithSession(db.Session())
+	ds.Index()
+
+	return ds
 }
 
 func setUp(db *DataStoreMongo, devs_dataset,
@@ -90,7 +96,7 @@ func setUpAuthReqs(dataset string, s *mgo.Session) error {
 		return err
 	}
 
-	c := s.DB(DbName).C(DbAuthReqColl)
+	c := s.DB(DbName).C(DbAuthSetColl)
 
 	for _, r := range reqs {
 		err = c.Insert(r)
@@ -186,7 +192,7 @@ func parseToken(dataset string) (*Token, error) {
 	return &res[0], nil
 }
 
-func TestGetDeviceById(t *testing.T) {
+func TestStoreGetDeviceByIdentityData(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping TestGetDeviceById in short mode.")
 	}
@@ -202,20 +208,20 @@ func TestGetDeviceById(t *testing.T) {
 	assert.NoError(t, err, "failed to setup input data")
 
 	testCases := []struct {
-		deviceId string
-		expected string
+		deviceIdData string
+		expected     string
 	}{
 		{
-			deviceId: "0001",
-			expected: "device_expected_1.json",
+			deviceIdData: "0001-id-data",
+			expected:     "device_expected_1.json",
 		},
 		{
-			deviceId: "0002",
-			expected: "device_expected_2.json",
+			deviceIdData: "0002-id-data",
+			expected:     "device_expected_2.json",
 		},
 		{
-			deviceId: "0003",
-			expected: "",
+			deviceIdData: "0003",
+			expected:     "",
 		},
 	}
 
@@ -229,7 +235,7 @@ func TestGetDeviceById(t *testing.T) {
 				assert.NotNil(t, expected)
 			}
 
-			dev, err := d.GetDeviceById(tc.deviceId)
+			dev, err := d.GetDeviceByIdentityData(tc.deviceIdData)
 			if expected != nil {
 				assert.NoError(t, err, "failed to get devices")
 				if assert.NotNil(t, dev) {
@@ -242,85 +248,24 @@ func TestGetDeviceById(t *testing.T) {
 	}
 }
 
-func TestGetDeviceByKey(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping TestGetDeviceByKey in short mode.")
-	}
-
-	// set this to get reliable time.Time serialization
-	// (always get UTC instead of e.g. CEST)
-	time.Local = time.UTC
-
-	d := getDb()
-	defer d.session.Close()
-
-	err := setUp(d, "devices_input.json", "", "")
-	assert.NoError(t, err, "failed to setup input data")
-
-	testCases := []struct {
-		deviceKey string
-		expected  string
-	}{
-		{
-			//device 1
-			deviceKey: "0001-key",
-			expected:  "device_expected_1.json",
-		},
-		{
-			//device 2
-			deviceKey: "0002-key",
-			expected:  "device_expected_2.json",
-		},
-		{
-			//device doesn't exist
-			deviceKey: "0003-key",
-			expected:  "",
-		},
-	}
-
-	for i, tc := range testCases {
-		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
-			var expected *Device
-
-			if tc.expected != "" {
-				expected, err = parseDev(tc.expected)
-				assert.NoError(t, err, "failed to parse %s", tc.expected)
-				assert.NotNil(t, expected)
-			}
-
-			dev, err := d.GetDeviceByKey(tc.deviceKey)
-			if expected != nil {
-				assert.NoError(t, err, "failed to get devices")
-				if assert.NotNil(t, dev) {
-					compareDevices(expected, dev, t)
-				}
-			} else {
-				assert.Equal(t, ErrDevNotFound, err)
-			}
-		})
-
-	}
-}
-
-// custom AuthReq comparison with 'compareTime'
-func compareAuthReq(expected *AuthReq, actual *AuthReq, t *testing.T) {
+// custom AuthSet comparison with 'compareTime'
+func compareAuthSet(expected *AuthSet, actual *AuthSet, t *testing.T) {
 	assert.Equal(t, expected.IdData, actual.IdData)
 	assert.Equal(t, expected.TenantToken, actual.TenantToken)
 	assert.Equal(t, expected.PubKey, actual.PubKey)
 	assert.Equal(t, expected.DeviceId, actual.DeviceId)
 	assert.Equal(t, expected.Status, actual.Status)
-	compareTime(expected.Timestamp, actual.Timestamp, t)
+	compareTime(uto.Time(expected.Timestamp), uto.Time(actual.Timestamp), t)
 }
 
-func TestAddDevice(t *testing.T) {
+func TestStoreAddDevice(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping TestAddDevice in short mode.")
 	}
 	time.Local = time.UTC
 
 	//setup
-	dev := Device{
-		Id:          "id",
+	dev := &Device{
 		TenantToken: "tenant",
 		PubKey:      "pubkey",
 		IdData:      "iddata",
@@ -332,21 +277,25 @@ func TestAddDevice(t *testing.T) {
 	d := getDb()
 	defer d.session.Close()
 
-	err := d.AddDevice(&dev)
+	err := d.AddDevice(*dev)
 	assert.NoError(t, err, "failed to add device")
 
-	//verify
-	s := d.session.Copy()
-	defer s.Close()
+	found, err := d.GetDeviceByIdentityData("iddata")
+	assert.NoError(t, err)
+	assert.NotNil(t, found)
 
-	var found Device
+	// verify that device ID was set
+	assert.NotEmpty(t, found.Id)
+	// clear it now to allow compareDevices() to succeed
+	found.Id = ""
+	compareDevices(dev, found, t)
 
-	c := s.DB(DbName).C(DbDevicesColl)
-
-	err = c.FindId(dev.Id).One(&found)
-	assert.NoError(t, err, "failed to find device")
-
-	compareDevices(&dev, &found, t)
+	// add device with identical identity data
+	err = d.AddDevice(Device{
+		Id:     "foobar",
+		IdData: "iddata",
+	})
+	assert.EqualError(t, err, ErrObjectExists.Error())
 }
 
 // custom Device comparison with 'compareTime'
@@ -369,7 +318,7 @@ func compareTime(expected time.Time, actual time.Time, t *testing.T) {
 	assert.Equal(t, expected.Unix(), actual.Unix())
 }
 
-func TestUpdateDevice(t *testing.T) {
+func TestStoreUpdateDevice(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping TestUpdateDevice in short mode.")
 	}
@@ -437,7 +386,7 @@ func TestUpdateDevice(t *testing.T) {
 	}
 }
 
-func TestAddToken(t *testing.T) {
+func TestStoreAddToken(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping TestAddToken in short mode.")
 	}
@@ -452,7 +401,7 @@ func TestAddToken(t *testing.T) {
 	d := getDb()
 	defer d.session.Close()
 
-	err := d.AddToken(&token)
+	err := d.AddToken(token)
 	assert.NoError(t, err, "failed to add token")
 
 	//verify
@@ -471,7 +420,7 @@ func TestAddToken(t *testing.T) {
 
 }
 
-func TestGetToken(t *testing.T) {
+func TestStoreGetToken(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping TestGetToken in short mode.")
 	}
@@ -522,7 +471,7 @@ func TestGetToken(t *testing.T) {
 	}
 }
 
-func TestDeleteToken(t *testing.T) {
+func TestStoreDeleteToken(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping TestDeleteToken in short mode.")
 	}
@@ -563,7 +512,7 @@ func TestDeleteToken(t *testing.T) {
 	}
 }
 
-func TestDeleteTokenByDevId(t *testing.T) {
+func TestStoreDeleteTokenByDevId(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping TestDeleteTokenByDevId in short mode.")
 	}
@@ -604,7 +553,7 @@ func TestDeleteTokenByDevId(t *testing.T) {
 	}
 }
 
-func TestMigrate(t *testing.T) {
+func TestStoreMigrate(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping TestMigrate in short mode.")
 	}
@@ -657,7 +606,7 @@ func randDevStatus() string {
 	return statuses[idx]
 }
 
-func TestGetDevices(t *testing.T) {
+func TestStoreGetDevices(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping TestGetDevices in short mode.")
 	}
@@ -668,12 +617,12 @@ func TestGetDevices(t *testing.T) {
 	// use 100 automatically creted devices
 	const devCount = 100
 
-	devs_list := make([]*Device, 0, devCount)
+	devs_list := make([]Device, 0, devCount)
 
 	// populate DB with a set of devices
 	for i := 0; i < devCount; i++ {
-		dev := &Device{
-			Id:     fmt.Sprintf("foo-%04d", i),
+		dev := Device{
+			IdData: fmt.Sprintf("foo-%04d", i),
 			PubKey: fmt.Sprintf("pubkey-%04d", i),
 			Status: randDevStatus(),
 		}
@@ -722,8 +671,91 @@ func TestGetDevices(t *testing.T) {
 
 			assert.Len(t, dbdevs, tc.expectedCount)
 			for i, dbidx := tc.expectedStartId, 0; i <= tc.expectedEndId; i, dbidx = i+1, dbidx+1 {
-				assert.EqualValues(t, devs_list[i], &dbdevs[dbidx])
+				// make sure that ID is not empty
+				assert.NotEmpty(t, dbdevs[dbidx].Id)
+				// clear it now so that next assert does not fail
+				dbdevs[dbidx].Id = ""
+				assert.EqualValues(t, devs_list[i], dbdevs[dbidx])
 			}
 		})
 	}
+}
+
+func TestStoreAuthSet(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestGetDevices in short mode.")
+	}
+
+	db := getDb()
+	defer db.session.Close()
+
+	asin := AuthSet{
+		IdData:    "foobar",
+		PubKey:    "pubkey-1",
+		DeviceId:  "1",
+		Timestamp: uto.TimePtr(time.Now()),
+	}
+	err := db.AddAuthSet(asin)
+	assert.NoError(t, err)
+
+	// try to get something that does not exist
+	as, err := db.GetAuthSetByDataKey("foobar-2", "pubkey-3")
+	assert.Error(t, err)
+
+	as, err = db.GetAuthSetByDataKey("foobar", "pubkey-1")
+	assert.NoError(t, err)
+	assert.NotNil(t, as)
+
+	assert.False(t, to.Bool(as.AdmissionNotified))
+
+	err = db.UpdateAuthSet(asin, AuthSetUpdate{
+		AdmissionNotified: to.BoolPtr(true),
+		Timestamp:         uto.TimePtr(time.Now()),
+	})
+	assert.NoError(t, err)
+
+	as, err = db.GetAuthSetByDataKey("foobar", "pubkey-1")
+	assert.NoError(t, err)
+	assert.NotNil(t, as)
+	assert.True(t, to.Bool(as.AdmissionNotified))
+	assert.WithinDuration(t, time.Now(), uto.Time(as.Timestamp), time.Second)
+
+	// clear timestamp field
+	asin.Timestamp = nil
+	// selectively update public key only, remaining fields should be unchanged
+	err = db.UpdateAuthSet(asin, AuthSetUpdate{
+		PubKey: "pubkey-2",
+	})
+	assert.NoError(t, err)
+
+	as, err = db.GetAuthSetByDataKey("foobar", "pubkey-2")
+	assert.NoError(t, err)
+	assert.NotNil(t, as)
+	assert.True(t, to.Bool(as.AdmissionNotified))
+
+	asid, err := db.GetAuthSetById(as.Id)
+	assert.NoError(t, err)
+	assert.NotNil(t, asid)
+
+	assert.EqualValues(t, as, asid)
+
+	// verify auth sets count for this device
+	asets, err := db.GetAuthSetsForDevice("1")
+	assert.NoError(t, err)
+	assert.Len(t, asets, 1)
+
+	// add another auth set
+	asin = AuthSet{
+		IdData:    "foobar",
+		PubKey:    "pubkey-99",
+		DeviceId:  "1",
+		Timestamp: uto.TimePtr(time.Now()),
+	}
+	err = db.AddAuthSet(asin)
+	assert.NoError(t, err)
+
+	// we should have 2 now
+	asets, err = db.GetAuthSetsForDevice("1")
+	assert.NoError(t, err)
+	assert.Len(t, asets, 2)
 }

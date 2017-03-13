@@ -11,10 +11,19 @@
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
-package main
+package to
 
-type AdmReq struct {
-	IdData   string `json:"device_identity"`
-	PubKey   string `json:"key"`
-	DeviceId string `json:"device_id"`
+import (
+	"time"
+)
+
+func Time(f *time.Time) time.Time {
+	if f != nil {
+		return *f
+	}
+	return time.Time{}
+}
+
+func TimePtr(t time.Time) *time.Time {
+	return &t
 }

@@ -15,18 +15,14 @@ package main
 
 import (
 	"errors"
-	"time"
 )
 
 // note: fields with underscores need the 'bson' decorator
 // otherwise the underscore will be removed upon write to mongo
 type AuthReq struct {
-	IdData      string    `json:"id_data" bson:"id_data"`
-	TenantToken string    `json:"tenant_token" bson:"tenant_token"`
-	PubKey      string    `json:"pubkey"`
-	DeviceId    string    `json:"device_id" bson:"device_id"`
-	Timestamp   time.Time `json:"ts" bson:"ts"`
-	Status      string    `json:"status"`
+	IdData      string `json:"id_data" bson:"id_data"`
+	TenantToken string `json:"tenant_token" bson:"tenant_token"`
+	PubKey      string `json:"pubkey"`
 }
 
 func (r *AuthReq) Validate() error {

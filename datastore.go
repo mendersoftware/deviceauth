@@ -26,6 +26,8 @@ var (
 	ErrDevNotFound = errors.New("device not found")
 	// device not found
 	ErrTokenNotFound = errors.New("token not found")
+	// device already exists
+	ErrObjectExists = errors.New("object exists")
 )
 
 type DataStore interface {
@@ -33,21 +35,32 @@ type DataStore interface {
 	//returns ErrDevNotFound if device not found
 	GetDeviceById(id string) (*Device, error)
 
-	// retrieve device by device public key
+	// retrieve device by its identity data
 	// returns ErrDevNotFound if device not found
-	GetDeviceByKey(key string) (*Device, error)
+	GetDeviceByIdentityData(idata string) (*Device, error)
 
 	// list devices
 	GetDevices(skip, limit uint) ([]Device, error)
 
-	AddDevice(r *Device) error
+	AddDevice(d Device) error
 
 	// updates a single device selected via d.Id
 	// updates only set fields
 	UpdateDevice(d *Device) error
 
+	AddAuthSet(set AuthSet) error
+
+	GetAuthSetByDataKey(data string, key string) (*AuthSet, error)
+
+	GetAuthSetById(id string) (*AuthSet, error)
+
+	GetAuthSetsForDevice(devid string) ([]AuthSet, error)
+
+	// update AuthSet and set its values to ones in AuthSetUpdate
+	UpdateAuthSet(orig AuthSet, mod AuthSetUpdate) error
+
 	// adds JWT to database
-	AddToken(t *Token) error
+	AddToken(t Token) error
 
 	// retrieves JWT from database using JWT Id and device Id
 	// returns ErrTokenNotFound if token not found
