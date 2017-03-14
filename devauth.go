@@ -48,6 +48,7 @@ type DevAuthApp interface {
 
 	GetDevices(skip, limit uint) ([]Device, error)
 	GetDevice(dev_id string) (*Device, error)
+	DecommissionDevice(dev_id string) error
 	AcceptDeviceAuth(dev_id string, auth_id string) error
 	RejectDeviceAuth(dev_id string, auth_id string) error
 	ResetDeviceAuth(dev_id string, auth_id string) error
@@ -80,26 +81,43 @@ func NewDevAuth(d DataStore, cda DevAdmClient, ci InventoryClient, jwt JWTAgentA
 	}
 }
 
-func (d *DevAuth) SubmitAuthRequest(r *AuthReq) (string, error) {
-	return d.SubmitAuthRequestWithClient(r, d.clientGetter())
-}
-
-func (d *DevAuth) SubmitAuthRequestWithClient(r *AuthReq, client requestid.ApiRequester) (string, error) {
-
+func (d *DevAuth) getDeviceFromAuthRequest(r *AuthReq) (*Device, error) {
 	dev := NewDevice("", r.IdData, r.PubKey, r.TenantToken)
 
 	// record device
 	err := d.db.AddDevice(*dev)
 	if err != nil && err != ErrObjectExists {
 		d.log.Errorf("failed to add/find device: %v", err)
-		return "", err
+		return nil, err
 	}
+
 	// either the device was added or it was already present, in any case,
 	// pull it from DB
 	dev, err = d.db.GetDeviceByIdentityData(r.IdData)
 	if err != nil {
 		d.log.Error("failed to find device but could not add either")
-		return "", errors.New("failed to locate device")
+		return nil, errors.New("failed to locate device")
+	}
+
+	// check if the device is in the decommissioning state
+	if dev.Decommissioning {
+		d.log.Warnf("Device %s in the decommissioning state. %s", dev.Id)
+		return nil, ErrDevAuthUnauthorized
+	}
+
+	return dev, nil
+}
+
+func (d *DevAuth) SubmitAuthRequest(r *AuthReq) (string, error) {
+	return d.SubmitAuthRequestWithClient(r, d.clientGetter())
+}
+
+func (d *DevAuth) SubmitAuthRequestWithClient(r *AuthReq, client requestid.ApiRequester) (string, error) {
+
+	// get device associated with given authorization request
+	dev, err := d.getDeviceFromAuthRequest(r)
+	if err != nil {
+		return "", err
 	}
 
 	areq := &AuthSet{
@@ -210,6 +228,31 @@ func (d *DevAuth) GetDevice(devId string) (*Device, error) {
 		return nil, err
 	}
 	return dev, err
+}
+
+// DecommissionDevice deletes device and all its tokens
+// TODO: submit device decommission job
+func (d *DevAuth) DecommissionDevice(devId string) error {
+	d.log.Warnf("Decommission device with id: %s", devId)
+
+	// set decommissioning flag on the device
+	updev := &Device{Id: devId, Decommissioning: true}
+	if err := d.db.UpdateDevice(updev); err != nil {
+		return err
+	}
+
+	// delete device athorization sets
+	if err := d.db.DeleteAuthSetsForDevice(devId); err != nil && err != ErrAuthSetNotFound {
+		return errors.Wrap(err, "db delete device authorization sets error")
+	}
+
+	// delete device tokens
+	if err := d.db.DeleteTokenByDevId(devId); err != nil && err != ErrTokenNotFound {
+		return errors.Wrap(err, "db delete device tokens error")
+	}
+
+	// delete device
+	return d.db.DeleteDevice(devId)
 }
 
 func (d *DevAuth) AcceptDeviceAuth(device_id string, auth_id string) error {
