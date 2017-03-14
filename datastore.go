@@ -48,6 +48,9 @@ type DataStore interface {
 	// updates only set fields
 	UpdateDevice(d *Device) error
 
+	// deletes device
+	DeleteDevice(id string) error
+
 	AddAuthSet(set AuthSet) error
 
 	GetAuthSetByDataKey(data string, key string) (*AuthSet, error)

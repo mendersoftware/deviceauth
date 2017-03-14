@@ -170,6 +170,23 @@ func (db *DataStoreMongo) UpdateDevice(d *Device) error {
 	return nil
 }
 
+func (db *DataStoreMongo) DeleteDevice(id string) error {
+	s := db.session.Copy()
+	defer s.Close()
+
+	c := db.session.DB(DbName).C(DbDevicesColl)
+	err := c.RemoveId(id)
+	if err != nil {
+		if err == mgo.ErrNotFound {
+			return ErrDevNotFound
+		} else {
+			return errors.Wrap(err, "failed to remove device")
+		}
+	}
+
+	return nil
+}
+
 func (db *DataStoreMongo) AddToken(t Token) error {
 	s := db.session.Copy()
 	defer s.Close()
