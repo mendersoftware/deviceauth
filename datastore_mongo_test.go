@@ -351,7 +351,7 @@ func TestStoreUpdateDevice(t *testing.T) {
 		{
 			id:     "0003",
 			status: DevStatusRejected,
-			outErr: "failed to update device: not found",
+			outErr: ErrDevNotFound.Error(),
 		},
 	}
 

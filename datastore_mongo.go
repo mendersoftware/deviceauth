@@ -164,6 +164,9 @@ func (db *DataStoreMongo) UpdateDevice(d *Device) error {
 	update := bson.M{"$set": updev}
 
 	if err := c.UpdateId(d.Id, update); err != nil {
+		if err == mgo.ErrNotFound {
+			return ErrDevNotFound
+		}
 		return errors.Wrap(err, "failed to update device")
 	}
 
