@@ -68,6 +68,34 @@ func (_m *MockDataStore) AddToken(t Token) error {
 	return r0
 }
 
+// DeleteAuthSetsForDevice provides a mock function with given fields: devid
+func (_m *MockDataStore) DeleteAuthSetsForDevice(devid string) error {
+	ret := _m.Called(devid)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string) error); ok {
+		r0 = rf(devid)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// DeleteDevice provides a mock function with given fields: id
+func (_m *MockDataStore) DeleteDevice(id string) error {
+	ret := _m.Called(id)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string) error); ok {
+		r0 = rf(id)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // DeleteToken provides a mock function with given fields: jti
 func (_m *MockDataStore) DeleteToken(jti string) error {
 	ret := _m.Called(jti)

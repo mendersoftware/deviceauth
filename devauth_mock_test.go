@@ -38,6 +38,20 @@ func (_m *MockDevAuthApp) AcceptDeviceAuth(dev_id string, auth_id string) error 
 	return r0
 }
 
+// DecommissionDevice provides a mock function with given fields: dev_id
+func (_m *MockDevAuthApp) DecommissionDevice(dev_id string) error {
+	ret := _m.Called(dev_id)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string) error); ok {
+		r0 = rf(dev_id)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // GetDevice provides a mock function with given fields: dev_id
 func (_m *MockDevAuthApp) GetDevice(dev_id string) (*Device, error) {
 	ret := _m.Called(dev_id)
