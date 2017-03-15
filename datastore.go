@@ -24,8 +24,10 @@ import (
 var (
 	// device not found
 	ErrDevNotFound = errors.New("device not found")
-	// device not found
+	// token not found
 	ErrTokenNotFound = errors.New("token not found")
+	// authorization set not found
+	ErrAuthSetNotFound = errors.New("authorization set not found")
 	// device already exists
 	ErrObjectExists = errors.New("object exists")
 )
@@ -61,6 +63,9 @@ type DataStore interface {
 
 	// update AuthSet and set its values to ones in AuthSetUpdate
 	UpdateAuthSet(orig AuthSet, mod AuthSetUpdate) error
+
+	// deletes all auth sets for device
+	DeleteAuthSetsForDevice(devid string) error
 
 	// adds JWT to database
 	AddToken(t Token) error

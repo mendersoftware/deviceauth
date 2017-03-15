@@ -423,3 +423,22 @@ func (db *DataStoreMongo) UpdateAuthSet(orig AuthSet, mod AuthSetUpdate) error {
 
 	return nil
 }
+
+func (db *DataStoreMongo) DeleteAuthSetsForDevice(devid string) error {
+	s := db.session.Copy()
+	defer s.Close()
+
+	c := s.DB(DbName).C(DbAuthSetColl)
+
+	err := c.Remove(AuthSet{DeviceId: devid})
+
+	if err != nil {
+		if err == mgo.ErrNotFound {
+			return ErrAuthSetNotFound
+		} else {
+			return errors.Wrap(err, "failed to remove auth sets for device")
+		}
+	}
+
+	return nil
+}
