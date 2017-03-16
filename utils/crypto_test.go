@@ -38,8 +38,8 @@ func TestVerifyAuthReqSign(t *testing.T) {
 				"tenant_token": "token"
 				"seq_no": 1
 			}`,
-			test.LoadPubKeyStr("../testdata/public.pem", t),
-			test.LoadPrivKey("../testdata/private.pem", t),
+			test.LoadPubKeyStr("testdata/public.pem", t),
+			test.LoadPrivKey("testdata/private.pem", t),
 			"",
 		},
 		{
@@ -49,8 +49,8 @@ func TestVerifyAuthReqSign(t *testing.T) {
 				"tenant_token": "token"
 				"seq_no": 1
 			}`,
-			test.LoadPubKeyStr("../testdata/public.pem", t),
-			test.LoadPrivKey("../testdata/private_invalid.pem", t),
+			test.LoadPubKeyStr("testdata/public.pem", t),
+			test.LoadPrivKey("testdata/private_invalid.pem", t),
 			"verification failed: crypto/rsa: verification error",
 		},
 		{
@@ -61,7 +61,7 @@ func TestVerifyAuthReqSign(t *testing.T) {
 				"seq_no": 1
 			}`,
 			"invalidpubkey",
-			test.LoadPrivKey("../testdata/private.pem", t),
+			test.LoadPrivKey("testdata/private.pem", t),
 			ErrMsgVerify,
 		},
 	}
