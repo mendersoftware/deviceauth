@@ -11,11 +11,24 @@
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
-package migrate
+package requestid
 
-import "context"
+import (
+	"context"
+	"testing"
 
-// Migrator applies a list of migrations to bring the db up to target version.
-type Migrator interface {
-	Apply(ctx context.Context, target Version, migrations []Migration) error
+	"github.com/stretchr/testify/assert"
+)
+
+// FromContext extracts current request Id from context.Context
+func TestFromContext(t *testing.T) {
+
+	ctx := context.Background()
+
+	assert.Equal(t, "", FromContext(ctx))
+	assert.Equal(t, "foo",
+		FromContext(context.WithValue(ctx, RequestIdHeader, "foo")))
+	// fallback to default string
+	assert.Equal(t, "",
+		FromContext(context.WithValue(ctx, RequestIdHeader, 123)))
 }
