@@ -26,15 +26,15 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestInventoryClientGet(t *testing.T) {
+func TestClientGet(t *testing.T) {
 	t.Parallel()
 
-	c := NewInventoryClientWithLogger(InventoryClientConfig{InventoryAddr: "http://foo"},
+	c := NewClientWithLogger(ClientConfig{InventoryAddr: "http://foo"},
 		log.New(log.Ctx{}))
 	assert.NotNil(t, c)
 }
 
-func TestInventoryClient(t *testing.T) {
+func TestClient(t *testing.T) {
 	t.Parallel()
 
 	tcs := []struct {
@@ -77,11 +77,11 @@ func TestInventoryClient(t *testing.T) {
 
 			s, rd := ct.NewMockServer(tc.status)
 
-			c := NewInventoryClient(InventoryClientConfig{
+			c := NewClient(ClientConfig{
 				InventoryAddr: s.URL,
 			})
 
-			err := c.AddDevice(&model.Device{Id: "1234"}, &http.Client{})
+			err := c.AddDevice(AddReq{Id: "1234"}, &http.Client{})
 			if tc.err != nil {
 				assert.EqualError(t, err, tc.err.Error())
 			} else {

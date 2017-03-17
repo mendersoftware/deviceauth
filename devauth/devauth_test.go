@@ -20,6 +20,7 @@ import (
 
 	"github.com/mendersoftware/deviceauth/client/deviceadm"
 	mdevadm "github.com/mendersoftware/deviceauth/client/deviceadm/mocks"
+	"github.com/mendersoftware/deviceauth/client/inventory"
 	minventory "github.com/mendersoftware/deviceauth/client/inventory/mocks"
 	"github.com/mendersoftware/deviceauth/jwt"
 	mjwt "github.com/mendersoftware/deviceauth/jwt/mocks"
@@ -243,7 +244,7 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 					Return(tc.devAdmErr)
 			}
 
-			cdi := minventory.InventoryClient{}
+			cdi := minventory.ClientRunner{}
 
 			jwt := mjwt.JWTAgentApp{}
 			jwt.On("GenerateTokenSignRS256", mock.AnythingOfType("string")).Return(
@@ -315,8 +316,8 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 					model.AuthSetUpdate{Status: model.DevStatusAccepted}).Return(tc.dbUpdateErr)
 			}
 
-			inv := minventory.InventoryClient{}
-			inv.On("AddDevice", &model.Device{Id: "dummy_devid"},
+			inv := minventory.ClientRunner{}
+			inv.On("AddDevice", inventory.AddReq{Id: "dummy_devid"},
 				mock.MatchedBy(func(_ requestid.ApiRequester) bool { return true })).
 				Return(tc.invErr)
 

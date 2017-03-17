@@ -18,7 +18,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/mendersoftware/deviceauth/model"
 	"github.com/mendersoftware/deviceauth/utils"
 
 	"github.com/mendersoftware/go-lib-micro/log"
@@ -31,31 +30,35 @@ const (
 	InventoryDevicesUri = "/api/0.1.0/devices"
 )
 
-type InventoryClientConfig struct {
-	// inventory service address
+// ClientConfig conveys client configuration
+type ClientConfig struct {
+	// Inventory service address
 	InventoryAddr string
 }
 
-type InventoryClient interface {
-	AddDevice(dev *model.Device, client requestid.ApiRequester) error
+// ClientRunner is an interface of inventory client
+type ClientRunner interface {
+	AddDevice(req AddReq, client requestid.ApiRequester) error
 	log.ContextLogger
 }
 
-type inventoryClient struct {
+// Client is an opaque implementation of inventory client. Implements
+// ClientRunner interface
+type Client struct {
 	log  *log.Logger
-	conf InventoryClientConfig
+	conf ClientConfig
 }
 
-type InventoryAddReq struct {
+// AddReq contains request data of request to add a device.
+type AddReq struct {
+	// Device ID
 	Id string `json:"id"`
 }
 
-func (ic *inventoryClient) AddDevice(dev *model.Device, client requestid.ApiRequester) error {
-	ic.log.Debugf("add device %s to inventory", dev.Id)
+func (ic *Client) AddDevice(areq AddReq, client requestid.ApiRequester) error {
+	ic.log.Debugf("add device %s to inventory", areq.Id)
 
-	ireq, err := json.Marshal(InventoryAddReq{
-		Id: dev.Id,
-	})
+	ireq, err := json.Marshal(areq)
 	if err != nil {
 		return errors.Wrapf(err, "failed to prepare device admission request")
 	}
@@ -80,9 +83,9 @@ func (ic *inventoryClient) AddDevice(dev *model.Device, client requestid.ApiRequ
 
 	switch rsp.StatusCode {
 	case http.StatusConflict:
-		ic.log.Warnf("inventory entry for device %s already exists", dev.Id)
+		ic.log.Warnf("inventory entry for device %s already exists", areq.Id)
 	case http.StatusCreated:
-		ic.log.Infof("inventory entry for device %s created", dev.Id)
+		ic.log.Infof("inventory entry for device %s created", areq.Id)
 	default:
 		ic.log.Errorf("failed to create inventory entry for device")
 		if err == nil {
@@ -94,19 +97,19 @@ func (ic *inventoryClient) AddDevice(dev *model.Device, client requestid.ApiRequ
 	return nil
 }
 
-func (ic *inventoryClient) UseLog(l *log.Logger) {
+func (ic *Client) UseLog(l *log.Logger) {
 	ic.log = l.F(log.Ctx{})
 }
 
-func NewInventoryClientWithLogger(c InventoryClientConfig, l *log.Logger) *inventoryClient {
+func NewClientWithLogger(c ClientConfig, l *log.Logger) *Client {
 	l = l.F(log.Ctx{})
-	client := NewInventoryClient(c)
+	client := NewClient(c)
 	client.UseLog(l)
 	return client
 }
 
-func NewInventoryClient(c InventoryClientConfig) *inventoryClient {
-	return &inventoryClient{
+func NewClient(c ClientConfig) *Client {
+	return &Client{
 		log:  log.New(log.Ctx{}),
 		conf: c,
 	}

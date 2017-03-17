@@ -71,13 +71,13 @@ type DevAuthApp interface {
 type DevAuth struct {
 	db           store.DataStore
 	cDevAdm      deviceadm.ClientRunner
-	cInv         inventory.InventoryClient
+	cInv         inventory.ClientRunner
 	jwt          jwt.JWTAgentApp
 	log          *log.Logger
 	clientGetter ApiClientGetter
 }
 
-func NewDevAuth(d store.DataStore, cda deviceadm.ClientRunner, ci inventory.InventoryClient, jwt jwt.JWTAgentApp) DevAuthApp {
+func NewDevAuth(d store.DataStore, cda deviceadm.ClientRunner, ci inventory.ClientRunner, jwt jwt.JWTAgentApp) DevAuthApp {
 	return &DevAuth{
 		db:           d,
 		cDevAdm:      cda,
@@ -202,7 +202,7 @@ func (d *DevAuth) SubmitInventoryDevice(dev model.Device) error {
 }
 
 func (d *DevAuth) SubmitInventoryDeviceWithClient(dev model.Device, client requestid.ApiRequester) error {
-	err := d.cInv.AddDevice(&dev, client)
+	err := d.cInv.AddDevice(inventory.AddReq{Id: dev.Id}, client)
 	if err != nil {
 		return errors.Wrap(err, "failed to add device to inventory")
 	}

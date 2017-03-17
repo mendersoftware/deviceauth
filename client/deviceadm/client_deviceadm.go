@@ -33,13 +33,15 @@ const (
 	defaultReqTimeout = time.Duration(10) * time.Second
 )
 
+// ClientConfig conveys client configuration
 type ClientConfig struct {
-	// device add URL
+	// Device admission host
 	DevAdmAddr string
-	// request timeout
+	// Request timeout
 	Timeout time.Duration
 }
 
+// ClientRunner is an interface of device admission client
 type ClientRunner interface {
 	AddDevice(req AdmReq, client requestid.ApiRequester) error
 	log.ContextLogger
