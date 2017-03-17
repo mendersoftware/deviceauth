@@ -561,3 +561,59 @@ func TestDevAuthVerifyToken(t *testing.T) {
 		})
 	}
 }
+
+func TestDevAuthDecommissionDevice(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		dbUpdateDeviceErr            error
+		dbDeleteAuthSetsForDeviceErr error
+		dbDeleteTokenByDevIdErr      error
+		dbDeleteDeviceErr            error
+
+		outErr string
+	}{
+		{
+			dbUpdateDeviceErr: errors.New("UpdateDevice Error"),
+			outErr:            "UpdateDevice Error",
+		},
+		{
+			dbDeleteAuthSetsForDeviceErr: errors.New("DeleteAuthSetsForDevice Error"),
+			outErr: "db delete device authorization sets error: DeleteAuthSetsForDevice Error",
+		},
+		{
+			dbDeleteTokenByDevIdErr: errors.New("DeleteTokenByDevId Error"),
+			outErr:                  "db delete device tokens error: DeleteTokenByDevId Error",
+		},
+		{
+			dbUpdateDeviceErr: errors.New("DeleteDevice Error"),
+			outErr:            "DeleteDevice Error",
+		},
+	}
+
+	for i := range testCases {
+		tc := testCases[i]
+		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			t.Parallel()
+
+			db := MockDataStore{}
+			db.On("UpdateDevice", mock.AnythingOfType("*main.Device")).Return(
+				tc.dbUpdateDeviceErr)
+			db.On("DeleteAuthSetsForDevice", mock.AnythingOfType("string")).Return(
+				tc.dbDeleteAuthSetsForDeviceErr)
+			db.On("DeleteTokenByDevId", mock.AnythingOfType("string")).Return(
+				tc.dbDeleteTokenByDevIdErr)
+			db.On("DeleteDevice", mock.AnythingOfType("string")).Return(
+				tc.dbDeleteDeviceErr)
+
+			devauth := NewDevAuth(&db, nil, nil, nil)
+			err := devauth.DecommissionDevice("dummy_devid")
+
+			if tc.outErr != "" {
+				assert.EqualError(t, err, tc.outErr)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
