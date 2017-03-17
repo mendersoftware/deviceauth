@@ -20,6 +20,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"sort"
 	"testing"
 	"time"
 
@@ -525,12 +526,8 @@ func TestStoreMigrate(t *testing.T) {
 		version string
 		err     string
 	}{
-		"0.1.0": {
-			version: "0.1.0",
-			err:     "",
-		},
-		"1.2.3": {
-			version: "1.2.3",
+		DbVersion: {
+			version: DbVersion,
 			err:     "",
 		},
 		"0.1 error": {
@@ -549,9 +546,12 @@ func TestStoreMigrate(t *testing.T) {
 				assert.NoError(t, err)
 				var out []migrate.MigrationEntry
 				db.session.DB(DbName).C(migrate.DbMigrationsColl).Find(nil).All(&out)
-				assert.Len(t, out, 1)
+				sort.Slice(out, func(i int, j int) bool {
+					return migrate.VersionIsLess(out[i].Version, out[j].Version)
+				})
+				// the last migration should match what we want
 				v, _ := migrate.NewVersion(tc.version)
-				assert.Equal(t, *v, out[0].Version)
+				assert.Equal(t, *v, out[len(out)-1].Version)
 			} else {
 				assert.EqualError(t, err, tc.err)
 			}

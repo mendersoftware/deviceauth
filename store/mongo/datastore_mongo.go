@@ -30,7 +30,7 @@ import (
 )
 
 const (
-	DbVersion     = "0.1.0"
+	DbVersion     = "1.1.0"
 	DbName        = "deviceauth"
 	DbDevicesColl = "devices"
 	DbAuthSetColl = "auth_sets"
@@ -264,7 +264,7 @@ func (db *DataStoreMongo) DeleteTokenByDevId(devId string) error {
 }
 
 func (db *DataStoreMongo) Migrate(ctx context.Context, version string, migrations []migrate.Migration) error {
-	m := migrate.DummyMigrator{
+	m := migrate.SimpleMigrator{
 		Session: db.session,
 		Db:      DbName,
 	}
@@ -272,6 +272,10 @@ func (db *DataStoreMongo) Migrate(ctx context.Context, version string, migration
 	ver, err := migrate.NewVersion(version)
 	if err != nil {
 		return errors.Wrap(err, "failed to parse service version")
+	}
+
+	migrations = []migrate.Migration{
+		&migration_1_1_0{ms: db},
 	}
 
 	err = m.Apply(ctx, *ver, migrations)
