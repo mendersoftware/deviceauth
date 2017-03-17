@@ -15,34 +15,26 @@
 package mongo
 
 import (
-	"io/ioutil"
 	"os"
 	"testing"
 
-	"gopkg.in/mgo.v2/dbtest"
+	mtesting "github.com/mendersoftware/go-lib-micro/mongo/testing"
 )
 
-var db *dbtest.DBServer
+var db mtesting.TestDBRunner
 
 // Overwrites test execution and allows for test database setup
 func TestMain(m *testing.M) {
-	dbdir, _ := ioutil.TempDir("", "dbsetup-test")
-	// os.Exit would ignore defers, workaround
-	status := func() int {
-		// Start test database server
-		if !testing.Short() {
-			db = &dbtest.DBServer{}
-			db.SetPath(dbdir)
-			// Tear down databaser server
-			// Note:
-			// if test panics, it will require manual database tier down
-			// testing package executes tests in goroutines therefore
-			// we can't catch panics issued in tests.
-			defer os.RemoveAll(dbdir)
-			defer db.Stop()
-		}
-		return m.Run()
-	}()
+
+	var status int
+	if !testing.Short() {
+		status = mtesting.WithDB(func(dbtest mtesting.TestDBRunner) int {
+			db = dbtest
+			return m.Run()
+		})
+	} else {
+		status = m.Run()
+	}
 
 	os.Exit(status)
 }
