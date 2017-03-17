@@ -20,63 +20,62 @@ import (
 	"time"
 
 	ct "github.com/mendersoftware/deviceauth/client/testing"
-	"github.com/mendersoftware/deviceauth/model"
 
 	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestGetDevAdmClient(t *testing.T) {
+func TestGetClient(t *testing.T) {
 	t.Parallel()
 
-	c := GetDevAdmClient(DevAdmClientConfig{DevAdmAddr: "localhost:3333"},
+	c := NewClientWithLogger(ClientConfig{DevAdmAddr: "localhost:3333"},
 		log.New(log.Ctx{}))
 	assert.NotNil(t, c)
 }
 
-func TestDevAdmClientReqSuccess(t *testing.T) {
+func TestClientReqSuccess(t *testing.T) {
 	t.Parallel()
 
 	s, rd := ct.NewMockServer(http.StatusNoContent)
 	defer s.Close()
 
-	c := NewDevAdmClient(DevAdmClientConfig{
+	c := NewClient(ClientConfig{
 		DevAdmAddr: s.URL,
 	})
 
-	err := c.AddDevice(&model.Device{}, &model.AuthSet{}, &http.Client{})
+	err := c.AddDevice(AdmReq{}, &http.Client{})
 	assert.NoError(t, err, "expected no errors")
 	assert.Equal(t, DevAdmDevicesUri, rd.Url.Path)
 }
 
-func TestDevAdmClientReqFail(t *testing.T) {
+func TestClientReqFail(t *testing.T) {
 	t.Parallel()
 
 	s, rd := ct.NewMockServer(http.StatusBadRequest)
 	defer s.Close()
 
-	c := NewDevAdmClient(DevAdmClientConfig{
+	c := NewClient(ClientConfig{
 		DevAdmAddr: s.URL,
 	})
 
-	err := c.AddDevice(&model.Device{}, &model.AuthSet{}, &http.Client{})
+	err := c.AddDevice(AdmReq{}, &http.Client{})
 	assert.Error(t, err, "expected an error")
 	assert.Equal(t, DevAdmDevicesUri, rd.Url.Path)
 }
 
-func TestDevAdmClientReqNoHost(t *testing.T) {
+func TestClientReqNoHost(t *testing.T) {
 	t.Parallel()
 
-	c := NewDevAdmClient(DevAdmClientConfig{
+	c := NewClient(ClientConfig{
 		DevAdmAddr: "http://somehost:1234",
 	})
 
-	err := c.AddDevice(&model.Device{}, &model.AuthSet{}, &http.Client{})
+	err := c.AddDevice(AdmReq{}, &http.Client{})
 
 	assert.Error(t, err, "expected an error")
 }
 
-func TestDevAdmClientTimeout(t *testing.T) {
+func TestClientTimeout(t *testing.T) {
 	t.Parallel()
 
 	if testing.Short() {
@@ -92,20 +91,20 @@ func TestDevAdmClientTimeout(t *testing.T) {
 		select {
 		case <-testdone:
 			// test finished, can leave now
-		case <-time.After(defaultDevAdmReqTimeout * 2):
+		case <-time.After(defaultReqTimeout * 2):
 			// don't block longer than default timeout * 2
 		}
 		w.WriteHeader(400)
 	}))
 
 	addDevUrl := s.URL + "/devices"
-	c := NewDevAdmClient(DevAdmClientConfig{
+	c := NewClient(ClientConfig{
 		DevAdmAddr: addDevUrl,
 	})
 
 	t1 := time.Now()
-	err := c.AddDevice(&model.Device{}, &model.AuthSet{},
-		&http.Client{Timeout: defaultDevAdmReqTimeout})
+	err := c.AddDevice(AdmReq{},
+		&http.Client{Timeout: defaultReqTimeout})
 	t2 := time.Now()
 
 	// let the responder know we're done
@@ -115,8 +114,8 @@ func TestDevAdmClientTimeout(t *testing.T) {
 
 	assert.Error(t, err, "expected timeout error")
 	// allow some slack in timeout, add 20% of the default timeout
-	maxdur := defaultDevAdmReqTimeout +
-		time.Duration(0.2*float64(defaultDevAdmReqTimeout))
+	maxdur := defaultReqTimeout +
+		time.Duration(0.2*float64(defaultReqTimeout))
 
 	assert.WithinDuration(t, t2, t1, maxdur, "timeout took too long")
 }

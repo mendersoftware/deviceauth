@@ -61,7 +61,7 @@ func DevAuthAppFor(c config.Reader, key *rsa.PrivateKey) api_http.DevAuthFactory
 			Issuer:            c.GetString(SettingJWTIssuer),
 		})
 
-		devAdmClientConf := deviceadm.DevAdmClientConfig{
+		devAdmClientConf := deviceadm.ClientConfig{
 			DevAdmAddr: c.GetString(SettingDevAdmAddr),
 		}
 		invClientConf := inventory.InventoryClientConfig{
@@ -69,7 +69,7 @@ func DevAuthAppFor(c config.Reader, key *rsa.PrivateKey) api_http.DevAuthFactory
 		}
 
 		devauth := devauth.NewDevAuth(db,
-			deviceadm.NewDevAdmClient(devAdmClientConf),
+			deviceadm.NewClient(devAdmClientConf),
 			inventory.NewInventoryClient(invClientConf),
 			jwtHandler)
 		devauth.UseLog(l)

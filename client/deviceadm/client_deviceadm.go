@@ -19,7 +19,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/mendersoftware/deviceauth/model"
 	"github.com/mendersoftware/deviceauth/utils"
 
 	"github.com/mendersoftware/go-lib-micro/log"
@@ -31,34 +30,32 @@ const (
 	// devices endpoint
 	DevAdmDevicesUri = "/api/0.1.0/devices/"
 	// default request timeout, 10s?
-	defaultDevAdmReqTimeout = time.Duration(10) * time.Second
+	defaultReqTimeout = time.Duration(10) * time.Second
 )
 
-type DevAdmClientConfig struct {
+type ClientConfig struct {
 	// device add URL
 	DevAdmAddr string
 	// request timeout
 	Timeout time.Duration
 }
 
-type DevAdmClient interface {
-	AddDevice(dev *model.Device, auth *model.AuthSet, client requestid.ApiRequester) error
+type ClientRunner interface {
+	AddDevice(req AdmReq, client requestid.ApiRequester) error
 	log.ContextLogger
 }
 
-type devAdmClient struct {
+// Client is an opaque implementation of device admission client. Implements
+// ClientRunner interface
+type Client struct {
 	log  *log.Logger
-	conf DevAdmClientConfig
+	conf ClientConfig
 }
 
-func (d *devAdmClient) AddDevice(dev *model.Device, auth *model.AuthSet, client requestid.ApiRequester) error {
-	d.log.Debugf("add device %s for admission", dev.Id)
+func (d *Client) AddDevice(admreq AdmReq, client requestid.ApiRequester) error {
+	d.log.Debugf("add device %s for admission", admreq.DeviceId)
 
-	AdmReqJson, err := json.Marshal(AdmReq{
-		IdData:   auth.IdData,
-		PubKey:   auth.PubKey,
-		DeviceId: dev.Id,
-	})
+	AdmReqJson, err := json.Marshal(admreq)
 	if err != nil {
 		return errors.Wrapf(err, "failed to prepare device admission request")
 	}
@@ -67,7 +64,7 @@ func (d *devAdmClient) AddDevice(dev *model.Device, auth *model.AuthSet, client 
 
 	req, err := http.NewRequest(
 		http.MethodPut,
-		utils.JoinURL(d.conf.DevAdmAddr, DevAdmDevicesUri+auth.Id),
+		utils.JoinURL(d.conf.DevAdmAddr, DevAdmDevicesUri+admreq.AuthId),
 		contentReader)
 	if err != nil {
 		return errors.Wrapf(err, "failed to create request")
@@ -88,23 +85,23 @@ func (d *devAdmClient) AddDevice(dev *model.Device, auth *model.AuthSet, client 
 	return nil
 }
 
-func (d *devAdmClient) UseLog(l *log.Logger) {
+func (d *Client) UseLog(l *log.Logger) {
 	d.log = l.F(log.Ctx{})
 }
 
-func GetDevAdmClient(c DevAdmClientConfig, l *log.Logger) *devAdmClient {
+func NewClientWithLogger(c ClientConfig, l *log.Logger) *Client {
 	l = l.F(log.Ctx{})
-	client := NewDevAdmClient(c)
+	client := NewClient(c)
 	client.UseLog(l)
 	return client
 }
 
-func NewDevAdmClient(c DevAdmClientConfig) *devAdmClient {
+func NewClient(c ClientConfig) *Client {
 	if c.Timeout == 0 {
-		c.Timeout = defaultDevAdmReqTimeout
+		c.Timeout = defaultReqTimeout
 	}
 
-	return &devAdmClient{
+	return &Client{
 		log:  log.New(log.Ctx{}),
 		conf: c,
 	}

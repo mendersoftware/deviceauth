@@ -13,8 +13,14 @@
 //    limitations under the License.
 package deviceadm
 
+// AdmReq contains request data of request to add a device
 type AdmReq struct {
-	IdData   string `json:"device_identity"`
-	PubKey   string `json:"key"`
+	// Authentication set ID
+	AuthId string `json:"-"`
+	// Device identity (raw)
+	IdData string `json:"device_identity"`
+	// Device public key
+	PubKey string `json:"key"`
+	// Device ID
 	DeviceId string `json:"device_id"`
 }

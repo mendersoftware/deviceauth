@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/mendersoftware/deviceauth/client/deviceadm"
 	mdevadm "github.com/mendersoftware/deviceauth/client/deviceadm/mocks"
 	minventory "github.com/mendersoftware/deviceauth/client/inventory/mocks"
 	"github.com/mendersoftware/deviceauth/jwt"
@@ -227,17 +228,16 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 			db.On("AddToken",
 				mock.AnythingOfType("model.Token")).Return(nil)
 
-			cda := mdevadm.DevAdmClient{}
+			cda := mdevadm.ClientRunner{}
 			if !tc.admissionNotified {
 				// setup admission client mock only if admission
 				// was not notified yet as per test case
 				cda.On("AddDevice",
-					mock.MatchedBy(func(d *model.Device) bool { return d.Id == devId }),
-					mock.MatchedBy(func(a *model.AuthSet) bool {
-						return (a.Id == authId) &&
-							(a.IdData == idData) &&
-							(a.DeviceId == devId) &&
-							(a.PubKey == pubKey)
+					mock.MatchedBy(func(r deviceadm.AdmReq) bool {
+						return (r.AuthId == authId) &&
+							(r.IdData == idData) &&
+							(r.DeviceId == devId) &&
+							(r.PubKey == pubKey)
 					}),
 					mock.MatchedBy(func(_ requestid.ApiRequester) bool { return true })).
 					Return(tc.devAdmErr)

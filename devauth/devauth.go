@@ -70,14 +70,14 @@ type DevAuthApp interface {
 
 type DevAuth struct {
 	db           store.DataStore
-	cDevAdm      deviceadm.DevAdmClient
+	cDevAdm      deviceadm.ClientRunner
 	cInv         inventory.InventoryClient
 	jwt          jwt.JWTAgentApp
 	log          *log.Logger
 	clientGetter ApiClientGetter
 }
 
-func NewDevAuth(d store.DataStore, cda deviceadm.DevAdmClient, ci inventory.InventoryClient, jwt jwt.JWTAgentApp) DevAuthApp {
+func NewDevAuth(d store.DataStore, cda deviceadm.ClientRunner, ci inventory.InventoryClient, jwt jwt.JWTAgentApp) DevAuthApp {
 	return &DevAuth{
 		db:           d,
 		cDevAdm:      cda,
@@ -153,7 +153,13 @@ func (d *DevAuth) SubmitAuthRequestWithClient(r *model.AuthReq, client requestid
 
 	// it it was indeed added (a new request), pass it to admission service
 	if added || !to.Bool(areq.AdmissionNotified) {
-		if err := d.cDevAdm.AddDevice(dev, areq, client); err != nil {
+		admreq := deviceadm.AdmReq{
+			AuthId:   areq.Id,
+			DeviceId: dev.Id,
+			IdData:   r.IdData,
+			PubKey:   r.PubKey,
+		}
+		if err := d.cDevAdm.AddDevice(admreq, client); err != nil {
 			// we've failed to submit the request, no worries, just
 			// return an error
 			return "", errors.Wrap(err, "devadm add device error")
