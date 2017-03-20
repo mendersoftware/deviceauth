@@ -317,8 +317,9 @@ func (db *DataStoreMongo) Index() error {
 	err := s.DB(DbName).C(DbDevicesColl).EnsureIndex(mgo.Index{
 		Unique: true,
 		// identity data shall be unique within collection
-		Key:  []string{model.DevKeyIdData},
-		Name: indexDevices_IdentityData,
+		Key:        []string{model.DevKeyIdData},
+		Name:       indexDevices_IdentityData,
+		Background: false,
 	})
 	if err != nil {
 		return err
@@ -334,7 +335,8 @@ func (db *DataStoreMongo) Index() error {
 			model.AuthSetKeyIdData,
 			model.AuthSetKeyPubKey,
 		},
-		Name: indexAuthSet_DeviceId_IdentityData_PubKey,
+		Name:       indexAuthSet_DeviceId_IdentityData_PubKey,
+		Background: false,
 	})
 	if err != nil {
 		return err
