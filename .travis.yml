@@ -53,7 +53,7 @@ before_install:
     - npm install -g swagger-cli
 
     # Install yaml python module
-    - pip2.7 install -U --user paramiko fabric PyYAML pytest requests
+    - pip2.7 install -U --user paramiko fabric PyYAML pytest requests pytest-xdist
 
     - python -c "import fabric.api"
     # Get our own Swagger verifier
