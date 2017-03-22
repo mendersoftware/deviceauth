@@ -663,3 +663,55 @@ func asJSON(sth interface{}) []byte {
 	data, _ := json.Marshal(sth)
 	return data
 }
+
+func TestApiDevAuthDecommissionDevice(t *testing.T) {
+	t.Parallel()
+
+	// enforce specific field naming in errors returned by API
+	updateRestErrorFieldName()
+
+	tcases := []struct {
+		req  *http.Request
+		code int
+		body string
+		err  error
+	}{
+		{
+			req: test.MakeSimpleRequest("DELETE",
+				"http://1.2.3.4/api/management/v1/devauth/devices/foo", nil),
+			code: http.StatusNoContent,
+			err:  nil,
+		},
+		{
+			req: test.MakeSimpleRequest("DELETE",
+				"http://1.2.3.4/api/management/v1/devauth/devices/foo", nil),
+			code: http.StatusNotFound,
+			err:  ErrDevNotFound,
+		},
+		{
+			req: test.MakeSimpleRequest("DELETE",
+				"http://1.2.3.4/api/management/v1/devauth/devices/foo", nil),
+			code: http.StatusInternalServerError,
+			body: RestError("internal error"),
+			err:  errors.New("some error that will only be logged"),
+		},
+	}
+
+	for i := range tcases {
+		tc := tcases[i]
+		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			t.Parallel()
+
+			devauth := MockDevAuthApp{}
+			devauth.On("DecommissionDevice",
+				mock.AnythingOfType("string")).
+				Return(tc.err)
+
+			factory := func(l *log.Logger) (DevAuthApp, error) {
+				return &devauth, nil
+			}
+			apih := makeMockApiHandler(t, factory)
+			runTestRequest(t, apih, tc.req, tc.code, tc.body)
+		})
+	}
+}

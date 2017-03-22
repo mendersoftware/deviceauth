@@ -164,7 +164,27 @@ func (db *DataStoreMongo) UpdateDevice(d *Device) error {
 	update := bson.M{"$set": updev}
 
 	if err := c.UpdateId(d.Id, update); err != nil {
+		if err == mgo.ErrNotFound {
+			return ErrDevNotFound
+		}
 		return errors.Wrap(err, "failed to update device")
+	}
+
+	return nil
+}
+
+func (db *DataStoreMongo) DeleteDevice(id string) error {
+	s := db.session.Copy()
+	defer s.Close()
+
+	c := db.session.DB(DbName).C(DbDevicesColl)
+	err := c.RemoveId(id)
+	if err != nil {
+		if err == mgo.ErrNotFound {
+			return ErrDevNotFound
+		} else {
+			return errors.Wrap(err, "failed to remove device")
+		}
 	}
 
 	return nil
@@ -402,6 +422,25 @@ func (db *DataStoreMongo) UpdateAuthSet(orig AuthSet, mod AuthSetUpdate) error {
 	err := c.Update(orig, bson.M{"$set": mod})
 	if err != nil {
 		return errors.Wrap(err, "failed to update auth set")
+	}
+
+	return nil
+}
+
+func (db *DataStoreMongo) DeleteAuthSetsForDevice(devid string) error {
+	s := db.session.Copy()
+	defer s.Close()
+
+	c := s.DB(DbName).C(DbAuthSetColl)
+
+	err := c.Remove(AuthSet{DeviceId: devid})
+
+	if err != nil {
+		if err == mgo.ErrNotFound {
+			return ErrAuthSetNotFound
+		} else {
+			return errors.Wrap(err, "failed to remove auth sets for device")
+		}
 	}
 
 	return nil

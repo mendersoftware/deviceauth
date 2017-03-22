@@ -68,6 +68,8 @@ func (d *DevAuthHandler) GetApp() (rest.App, error) {
 
 		rest.Get(uriDevice, d.GetDeviceHandler),
 
+		rest.Delete(uriDevice, d.DeleteDeviceHandler),
+
 		rest.Delete(uriToken, d.DeleteTokenHandler),
 
 		rest.Post(uriTokenVerify, d.VerifyTokenHandler),
@@ -207,6 +209,28 @@ func (d *DevAuthHandler) GetDeviceHandler(w rest.ResponseWriter, r *rest.Request
 	default:
 		restErrWithLogInternal(w, r, l, err)
 	}
+}
+
+func (d *DevAuthHandler) DeleteDeviceHandler(w rest.ResponseWriter, r *rest.Request) {
+	l := requestlog.GetRequestLogger(r.Env)
+
+	da, err := d.createDevAuth(l)
+	if err != nil {
+		restErrWithLogInternal(w, r, l, err)
+	}
+
+	devId := r.PathParam("id")
+
+	if err = da.DecommissionDevice(devId); err != nil {
+		if err == ErrDevNotFound {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		restErrWithLogInternal(w, r, l, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (d *DevAuthHandler) DeleteTokenHandler(w rest.ResponseWriter, r *rest.Request) {

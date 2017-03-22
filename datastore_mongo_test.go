@@ -351,7 +351,7 @@ func TestStoreUpdateDevice(t *testing.T) {
 		{
 			id:     "0003",
 			status: DevStatusRejected,
-			outErr: "failed to update device: not found",
+			outErr: ErrDevNotFound.Error(),
 		},
 	}
 
@@ -758,4 +758,118 @@ func TestStoreAuthSet(t *testing.T) {
 	asets, err = db.GetAuthSetsForDevice("1")
 	assert.NoError(t, err)
 	assert.Len(t, asets, 2)
+}
+
+func TestStoreDeleteDevice(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestStoreDeleteDevice in short mode.")
+	}
+
+	devices := []interface{}{
+		Device{
+			Id:     "001",
+			IdData: "1",
+		},
+		Device{
+			Id:     "002",
+			IdData: "2",
+		},
+	}
+	db := getDb()
+	defer db.session.Close()
+	s := db.session.Copy()
+	defer s.Close()
+
+	coll := s.DB(DbName).C(DbDevicesColl)
+	assert.NoError(t, coll.Insert(devices...))
+
+	testCases := []struct {
+		devId string
+		err   string
+	}{
+		{
+			devId: "001",
+			err:   "",
+		},
+		{
+			devId: "100",
+			err:   ErrDevNotFound.Error(),
+		},
+		{
+			devId: "",
+			err:   ErrDevNotFound.Error(),
+		},
+	}
+
+	for i, tc := range testCases {
+		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			err := db.DeleteDevice(tc.devId)
+			if tc.err != "" {
+				assert.Equal(t, tc.err, err.Error())
+			} else {
+				assert.NoError(t, err)
+				var found Device
+				err = coll.FindId(tc.devId).One(&found)
+				if assert.Error(t, err) {
+					assert.Equal(t, err.Error(), mgo.ErrNotFound.Error())
+				}
+			}
+		})
+	}
+}
+
+func TestStoreDeleteAuthSetsForDevice(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestStoreDeleteAuthSetsForDevice in short mode.")
+	}
+
+	authSets := []interface{}{
+		AuthSet{
+			DeviceId: "001",
+			IdData:   "001",
+			PubKey:   "001",
+		},
+		AuthSet{
+			DeviceId: "001",
+			IdData:   "001",
+			PubKey:   "002",
+		},
+	}
+	db := getDb()
+	defer db.session.Close()
+	s := db.session.Copy()
+	defer s.Close()
+
+	coll := s.DB(DbName).C(DbAuthSetColl)
+	assert.NoError(t, coll.Insert(authSets...))
+
+	testCases := []struct {
+		devId string
+		err   string
+	}{
+		{
+			devId: "001",
+			err:   "",
+		},
+		{
+			devId: "100",
+			err:   ErrAuthSetNotFound.Error(),
+		},
+	}
+
+	for i, tc := range testCases {
+		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			err := db.DeleteAuthSetsForDevice(tc.devId)
+			if tc.err != "" {
+				assert.Equal(t, tc.err, err.Error())
+			} else {
+				assert.NoError(t, err)
+				var found Device
+				err = coll.FindId(AuthSet{DeviceId: tc.devId}).One(&found)
+				if assert.Error(t, err) {
+					assert.Equal(t, err.Error(), mgo.ErrNotFound.Error())
+				}
+			}
+		})
+	}
 }
