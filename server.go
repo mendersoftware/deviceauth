@@ -17,8 +17,16 @@ import (
 	"crypto/rsa"
 	"net/http"
 
-	"github.com/ant0ine/go-json-rest/rest"
+	api_http "github.com/mendersoftware/deviceauth/api/http"
+	"github.com/mendersoftware/deviceauth/client/deviceadm"
+	"github.com/mendersoftware/deviceauth/client/inventory"
 	"github.com/mendersoftware/deviceauth/config"
+	"github.com/mendersoftware/deviceauth/devauth"
+	"github.com/mendersoftware/deviceauth/jwt"
+	"github.com/mendersoftware/deviceauth/keys"
+	"github.com/mendersoftware/deviceauth/store/mongo"
+
+	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/pkg/errors"
 )
@@ -40,29 +48,29 @@ func SetupAPI(stacktype string) (*rest.Api, error) {
 
 // DevAuthAppFor returns a factory function that creates DevAuthApp and sets it
 // up using `c` as configuration source and `key` as private key.
-func DevAuthAppFor(c config.Reader, key *rsa.PrivateKey) DevAuthFactory {
-	return func(l *log.Logger) (DevAuthApp, error) {
-		db, err := GetDataStoreMongo(c.GetString(SettingDb), l)
+func DevAuthAppFor(c config.Reader, key *rsa.PrivateKey) api_http.DevAuthFactory {
+	return func(l *log.Logger) (devauth.DevAuthApp, error) {
+		db, err := mongo.GetDataStoreMongo(c.GetString(SettingDb), l)
 		if err != nil {
 			return nil, errors.Wrap(err, "database connection failed")
 		}
 
-		jwtHandler := NewJWTAgent(JWTAgentConfig{
+		jwtHandler := jwt.NewJWTAgent(jwt.JWTAgentConfig{
 			PrivateKey:        key,
 			ExpirationTimeout: int64(c.GetInt(SettingJWTExpirationTimeout)),
 			Issuer:            c.GetString(SettingJWTIssuer),
 		})
 
-		devAdmClientConf := DevAdmClientConfig{
+		devAdmClientConf := deviceadm.ClientConfig{
 			DevAdmAddr: c.GetString(SettingDevAdmAddr),
 		}
-		invClientConf := InventoryClientConfig{
+		invClientConf := inventory.ClientConfig{
 			InventoryAddr: c.GetString(SettingInventoryAddr),
 		}
 
-		devauth := NewDevAuth(db,
-			NewDevAdmClient(devAdmClientConf),
-			NewInventoryClient(invClientConf),
+		devauth := devauth.NewDevAuth(db,
+			deviceadm.NewClient(devAdmClientConf),
+			inventory.NewClient(invClientConf),
 			jwtHandler)
 		devauth.UseLog(l)
 
@@ -74,7 +82,7 @@ func RunServer(c config.Reader) error {
 
 	l := log.New(log.Ctx{})
 
-	privKey, err := loadRSAPrivKey(c.GetString(SettingServerPrivKeyPath))
+	privKey, err := keys.LoadRSAPrivate(c.GetString(SettingServerPrivKeyPath))
 	if err != nil {
 		return errors.Wrap(err, "failed to read rsa private key")
 	}
@@ -84,7 +92,7 @@ func RunServer(c config.Reader) error {
 		return errors.Wrap(err, "API setup failed")
 	}
 
-	devauthapi := NewDevAuthApiHandler(DevAuthAppFor(c, privKey))
+	devauthapi := api_http.NewDevAuthApiHandler(DevAuthAppFor(c, privKey))
 
 	apph, err := devauthapi.GetApp()
 	if err != nil {

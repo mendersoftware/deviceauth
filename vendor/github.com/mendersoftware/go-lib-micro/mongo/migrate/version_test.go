@@ -74,3 +74,12 @@ func TestVersionString(t *testing.T) {
 		assert.Equal(t, tc.output, str)
 	}
 }
+
+func TestVersionIsLess(t *testing.T) {
+	assert.True(t, VersionIsLess(Version{0, 0, 0}, Version{1, 1, 0}))
+	assert.True(t, VersionIsLess(Version{1, 0, 0}, Version{1, 1, 0}))
+	assert.True(t, VersionIsLess(Version{1, 0, 0}, Version{1, 0, 1}))
+	assert.False(t, VersionIsLess(Version{1, 0, 0}, Version{0, 1, 0}))
+	assert.False(t, VersionIsLess(Version{1, 1, 0}, Version{1, 0, 1}))
+	assert.False(t, VersionIsLess(Version{1, 1, 0}, Version{1, 1, 0}))
+}

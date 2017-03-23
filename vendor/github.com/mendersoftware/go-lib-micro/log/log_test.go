@@ -14,10 +14,12 @@
 package log
 
 import (
-	"github.com/Sirupsen/logrus"
-	"github.com/stretchr/testify/assert"
+	"context"
 	"io/ioutil"
 	"testing"
+
+	"github.com/Sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNew(t *testing.T) {
@@ -86,4 +88,20 @@ func TestWithFields(t *testing.T) {
 				v, ev)
 		}
 	}
+}
+
+func TestFromContext(t *testing.T) {
+	ctx := context.Background()
+
+	l := New(Ctx{"foo": "bar"})
+
+	// we should get the same logger
+	ln := FromContext(context.WithValue(ctx, LoggerContextKey, l))
+	assert.Equal(t, l, ln)
+
+	// since we're using a background context, a new, empty logger should be
+	// returned
+	ln2 := FromContext(context.Background())
+	assert.NotEqual(t, ln2, ln)
+	assert.Len(t, ln2.Data, 0)
 }

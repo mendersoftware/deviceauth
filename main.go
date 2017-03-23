@@ -14,9 +14,12 @@
 package main
 
 import (
+	"context"
 	"flag"
 
 	"github.com/mendersoftware/deviceauth/config"
+	"github.com/mendersoftware/deviceauth/store/mongo"
+
 	"github.com/mendersoftware/go-lib-micro/log"
 )
 
@@ -42,17 +45,19 @@ func main() {
 
 	l := log.New(log.Ctx{})
 
+	ctx := context.Background()
+
 	HandleConfigFile(configPath, devSetup, l)
 
 	l.Printf("Device Authentication Service, version %s starting up",
 		CreateVersionString())
 
-	db, err := NewDataStoreMongo(config.Config.GetString(SettingDb))
+	db, err := mongo.NewDataStoreMongo(config.Config.GetString(SettingDb))
 	if err != nil {
 		l.Fatal("failed to connect to db")
 	}
 
-	err = db.Migrate(DbVersion, nil)
+	err = db.Migrate(ctx, mongo.DbVersion, nil)
 	if err != nil {
 		l.Fatal("failed to run migrations")
 	}

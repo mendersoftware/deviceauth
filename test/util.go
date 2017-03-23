@@ -33,12 +33,12 @@ const (
 func AuthReqSign(data []byte, privkey *rsa.PrivateKey, t *testing.T) []byte {
 	hash := sha256.New()
 	if _, err := bytes.NewReader(data).WriteTo(hash); err != nil {
-		t.FailNow()
+		t.Fatal(err)
 	}
 
 	sig, err := rsa.SignPKCS1v15(rand.Reader, privkey, crypto.SHA256, hash.Sum(nil))
 	if err != nil {
-		t.FailNow()
+		t.Fatal(err)
 	}
 
 	b64 := make([]byte, base64.StdEncoding.EncodedLen(len(sig)))
@@ -50,19 +50,19 @@ func AuthReqSign(data []byte, privkey *rsa.PrivateKey, t *testing.T) []byte {
 func LoadPrivKey(path string, t *testing.T) *rsa.PrivateKey {
 	pem_data, err := ioutil.ReadFile(path)
 	if err != nil {
-		t.FailNow()
+		t.Fatal(err)
 	}
 
 	block, _ := pem.Decode(pem_data)
 
 	if block == nil ||
 		block.Type != PrivKeyBlockType {
-		t.FailNow()
+		t.Fatal(err)
 	}
 
 	key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
 	if err != nil {
-		t.FailNow()
+		t.Fatal(err)
 	}
 
 	return key
@@ -71,7 +71,7 @@ func LoadPrivKey(path string, t *testing.T) *rsa.PrivateKey {
 func LoadPubKeyStr(path string, t *testing.T) string {
 	pem_data, err := ioutil.ReadFile(path)
 	if err != nil {
-		t.FailNow()
+		t.Fatal(err)
 	}
 
 	return string(pem_data)
