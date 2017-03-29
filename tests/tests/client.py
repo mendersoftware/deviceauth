@@ -99,6 +99,14 @@ class ManagementClient(SwaggerApiClient):
                                                                   aid=aid,
                                                                   status=st).result()
 
+    def delete_device(self, devid, headers={}):
+        if 'Authorization' not in headers:
+            self.log.debug('appending default authorization header')
+            headers['Authorization'] = 'Bearer foo'
+        # bravado for some reason doesn't issue DELETEs properly (silent failure)
+        # fall back to 'requests'
+        #   return self.client.devices.delete_devices_id(id=devid, **kwargs)
+        rsp = requests.delete(self.make_api_url('/devices/{}'.format(devid)), headers = headers)
 
 class SimpleManagementClient(ManagementClient):
     """Management API client. Cannot be used as pytest base class"""
