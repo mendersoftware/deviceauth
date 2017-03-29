@@ -156,14 +156,14 @@ class ConductorClient():
     def __init__(self, base_url="http://mender-conductor:8080/api/"):
         self.base_url = base_url
 
-    def get_executed_workflows(self, workflow_name, maxresults=10):
+    def get_workflows(self, workflow_name):
         """Wraps the search endpoint.
-        Gets maxresults of executed workflows of a given name, starting with the most recently scheduled one."""
+        Gets workflows of a given name, starting with the most recently scheduled one."""
 
         sort = '{}:{}'.format('startTime', 'DESC')
         freetext = '{}:{}'.format('workflowType', workflow_name)
 
-        params = {'sort' :sort, 'freeText':freetext}
+        params = {'sort': sort, 'freeText': freetext}
         endpoint = up.urljoin(self.base_url, 'workflow/search')
 
         return requests.get(endpoint, params=params)
