@@ -1,7 +1,7 @@
 import bravado
 import pytest
 
-from client import ManagementClient, SimpleManagementClient, BaseDevicesApiClient
+from client import ManagementClient, SimpleManagementClient, BaseDevicesApiClient, ConductorClient
 from common import Device, DevAuthorizer, device_auth_req, make_devid
 
 
@@ -124,3 +124,40 @@ class TestDevice(ManagementClient):
 
         authdev = mc.get_device(id=ourdev.id)
         assert authdev == ourdev
+
+    def test_delete_device(self):
+        # try delete a nonexistent device
+        try:
+            self.delete_device('some-devid-foo')
+        except bravado.exception.HTTPError as e:
+            assert e.response.status_code == 404
+
+        # try delete an existing device, verify decommissioning workflow was started
+        # setup single device and poke devauth
+        dev = Device()
+        da = DevAuthorizer()
+        # poke devauth so that device appears
+        rsp = device_auth_req(self.devapi.make_api_url("auth_requests"),
+                              da, dev)
+        assert rsp.status_code == 401
+
+        mc = SimpleManagementClient()
+        ourdev = mc.find_device_by_identity(dev.identity)
+        assert ourdev
+
+        # delete our device
+        # use a predetermined request id to correlate with executed workflows
+        self.delete_device(ourdev.id, {'X-MEN-RequestID':'delete_device'})
+        found = mc.find_device_by_identity(dev.identity)
+        assert not found
+
+        # verify workflow was executed
+        cc = ConductorClient()
+        r = cc.get_executed_workflows('decommission_device')
+        assert r.status_code == 200
+
+        res = r.json()
+        assert res['totalHits'] > 0
+
+        wf = [x for x in res['results'] if x['input']['request_id'] == 'delete_device']
+        assert len(wf) == 1
