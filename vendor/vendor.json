@@ -35,62 +35,74 @@
 		{
 			"checksumSHA1": "IXFSsCKFpB7OwDjUjX1p4kae3/c=",
 			"path": "github.com/mendersoftware/go-lib-micro",
-			"revision": "4650969cb9c1d24856894f30ac9c4971ba385847",
-			"revisionTime": "2017-03-17T10:54:53Z"
+			"revision": "2fb25d89b70c3986322411f7af22403d5861dbe4",
+			"revisionTime": "2017-03-30T12:29:32Z"
 		},
 		{
-			"checksumSHA1": "TBy4BC8vdb8QenUOK253xKqZ4r8=",
+			"checksumSHA1": "JRGHsodU6lgiNHRodtyIO34hRF4=",
 			"path": "github.com/mendersoftware/go-lib-micro/accesslog",
-			"revision": "4650969cb9c1d24856894f30ac9c4971ba385847",
-			"revisionTime": "2017-03-17T10:54:53Z"
+			"revision": "2fb25d89b70c3986322411f7af22403d5861dbe4",
+			"revisionTime": "2017-03-30T12:29:32Z"
 		},
 		{
 			"checksumSHA1": "XvmQkFe1S3yAa451K+06MqPkfyk=",
 			"path": "github.com/mendersoftware/go-lib-micro/customheader",
-			"revision": "4650969cb9c1d24856894f30ac9c4971ba385847",
-			"revisionTime": "2017-03-17T10:54:53Z"
+			"revision": "2fb25d89b70c3986322411f7af22403d5861dbe4",
+			"revisionTime": "2017-03-30T12:29:32Z"
 		},
 		{
-			"checksumSHA1": "c7PgK5/J0HFmfU26rdKrLtSb61s=",
+			"checksumSHA1": "dE7tCrU7PoGBGSH2sJvbGCEE8qg=",
 			"path": "github.com/mendersoftware/go-lib-micro/log",
-			"revision": "4650969cb9c1d24856894f30ac9c4971ba385847",
-			"revisionTime": "2017-03-17T10:54:53Z"
+			"revision": "2fb25d89b70c3986322411f7af22403d5861dbe4",
+			"revisionTime": "2017-03-30T12:29:32Z"
 		},
 		{
-			"checksumSHA1": "4jfsrNgJ+wzi4s14qgFJPuQm5I8=",
+			"checksumSHA1": "Dng/qbc1obqad8/9fFEi/VPpepg=",
+			"path": "github.com/mendersoftware/go-lib-micro/log/testing",
+			"revision": "2fb25d89b70c3986322411f7af22403d5861dbe4",
+			"revisionTime": "2017-03-30T12:29:32Z"
+		},
+		{
+			"checksumSHA1": "A8yC36He3joA3ep2h9bxA/5RVa8=",
 			"path": "github.com/mendersoftware/go-lib-micro/mongo/migrate",
-			"revision": "4650969cb9c1d24856894f30ac9c4971ba385847",
-			"revisionTime": "2017-03-17T10:54:53Z"
+			"revision": "2fb25d89b70c3986322411f7af22403d5861dbe4",
+			"revisionTime": "2017-03-30T12:29:32Z"
+		},
+		{
+			"checksumSHA1": "HyIf8mAGP/Hwhtj2vpKorYyvF+U=",
+			"path": "github.com/mendersoftware/go-lib-micro/mongo/migrate/mocks",
+			"revision": "2fb25d89b70c3986322411f7af22403d5861dbe4",
+			"revisionTime": "2017-03-30T12:29:32Z"
 		},
 		{
 			"checksumSHA1": "aFpMSIKd5L05oFey4tkL1UEBtnE=",
 			"path": "github.com/mendersoftware/go-lib-micro/mongo/testing",
-			"revision": "4650969cb9c1d24856894f30ac9c4971ba385847",
-			"revisionTime": "2017-03-17T10:54:53Z"
+			"revision": "2fb25d89b70c3986322411f7af22403d5861dbe4",
+			"revisionTime": "2017-03-30T12:29:32Z"
 		},
 		{
-			"checksumSHA1": "blgl8IuH/0Gag9Jsq9VdVrsfX08=",
+			"checksumSHA1": "UA8LFYeKBistp+Deg8v6XUAZTdc=",
 			"path": "github.com/mendersoftware/go-lib-micro/requestid",
-			"revision": "4650969cb9c1d24856894f30ac9c4971ba385847",
-			"revisionTime": "2017-03-17T10:54:53Z"
+			"revision": "2fb25d89b70c3986322411f7af22403d5861dbe4",
+			"revisionTime": "2017-03-30T12:29:32Z"
 		},
 		{
-			"checksumSHA1": "A2kMe7i2bxsF5KzAWd6h+Jf9+XE=",
+			"checksumSHA1": "q9Wv3x4udqUZVJNveuyuUVWabTY=",
 			"path": "github.com/mendersoftware/go-lib-micro/requestlog",
-			"revision": "4650969cb9c1d24856894f30ac9c4971ba385847",
-			"revisionTime": "2017-03-17T10:54:53Z"
+			"revision": "2fb25d89b70c3986322411f7af22403d5861dbe4",
+			"revisionTime": "2017-03-30T12:29:32Z"
 		},
 		{
-			"checksumSHA1": "pbqigeMFeARZZLQS3WgT52TULLY=",
+			"checksumSHA1": "ErwcS1MaahAM3yT/v/1pK3GOxrY=",
 			"path": "github.com/mendersoftware/go-lib-micro/rest_utils",
-			"revision": "4650969cb9c1d24856894f30ac9c4971ba385847",
-			"revisionTime": "2017-03-17T10:54:53Z"
+			"revision": "2fb25d89b70c3986322411f7af22403d5861dbe4",
+			"revisionTime": "2017-03-30T12:29:32Z"
 		},
 		{
 			"checksumSHA1": "ETHv3rVP72846EgSFy6H1yFNe88=",
 			"path": "github.com/mendersoftware/go-lib-micro/strings",
-			"revision": "4650969cb9c1d24856894f30ac9c4971ba385847",
-			"revisionTime": "2017-03-17T10:54:53Z"
+			"revision": "2fb25d89b70c3986322411f7af22403d5861dbe4",
+			"revisionTime": "2017-03-30T12:29:32Z"
 		},
 		{
 			"checksumSHA1": "2HwYkBQ8tBAT7wgXjdXv3AwgfEI=",
@@ -106,6 +118,7 @@
 			"revisionTime": "2017-01-30T11:31:45Z"
 		},
 		{
+			"checksumSHA1": "8rxOh1Vlti1bzoIy6mH5eL0RYsI=",
 			"path": "github.com/stretchr/testify/assert",
 			"revision": "4d4bfba8f1d1027c4fdbe371823030df51419987",
 			"revisionTime": "2017-01-30T11:31:45Z"

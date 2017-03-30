@@ -14,8 +14,9 @@
 package migrate
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNewVersion(t *testing.T) {
