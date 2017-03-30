@@ -14,20 +14,41 @@
 package main
 
 import (
+	"flag"
 	"io/ioutil"
+	"os"
+	"os/signal"
 	"testing"
 
 	"github.com/mendersoftware/go-lib-micro/log"
 )
 
+var runAcceptanceTests bool
+
 func init() {
-	// disbale logging thile running unit tests
+	// disable logging thile running unit tests
 	// default application settup couses to mich noice
 	log.Log.Out = ioutil.Discard
+
+	flag.BoolVar(&runAcceptanceTests, "acceptance-tests", false, "set flag when running acceptance tests")
+	flag.Parse()
 }
 
 func TestHandleConfigFile(t *testing.T) {
 	t.Parallel()
 
 	HandleConfigFile("", false, nil)
+}
+
+func TestRunMain(t *testing.T) {
+	if !runAcceptanceTests {
+		t.Skip()
+	}
+
+	go main()
+
+	stopChan := make(chan os.Signal)
+	signal.Notify(stopChan, os.Interrupt)
+
+	<-stopChan
 }
