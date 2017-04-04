@@ -1,6 +1,6 @@
 swagger: '2.0'
 info:
-  version: '0.1.0'
+  version: '1'
   title: Device authentication
   description: |
       An API for device authentication handling.
