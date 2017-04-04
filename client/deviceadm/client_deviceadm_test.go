@@ -14,6 +14,7 @@
 package deviceadm
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -21,15 +22,15 @@ import (
 
 	ct "github.com/mendersoftware/deviceauth/client/testing"
 
-	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestGetClient(t *testing.T) {
 	t.Parallel()
 
-	c := NewClientWithLogger(ClientConfig{DevAdmAddr: "localhost:3333"},
-		log.New(log.Ctx{}))
+	c := NewClient(ClientConfig{
+		DevAdmAddr: "localhost:3333",
+	})
 	assert.NotNil(t, c)
 }
 
@@ -43,7 +44,9 @@ func TestClientReqSuccess(t *testing.T) {
 		DevAdmAddr: s.URL,
 	})
 
-	err := c.AddDevice(AdmReq{}, &http.Client{})
+	ctx := context.Background()
+
+	err := c.AddDevice(ctx, AdmReq{}, &http.Client{})
 	assert.NoError(t, err, "expected no errors")
 	assert.Equal(t, DevAdmDevicesUri, rd.Url.Path)
 }
@@ -58,7 +61,9 @@ func TestClientReqFail(t *testing.T) {
 		DevAdmAddr: s.URL,
 	})
 
-	err := c.AddDevice(AdmReq{}, &http.Client{})
+	ctx := context.Background()
+
+	err := c.AddDevice(ctx, AdmReq{}, &http.Client{})
 	assert.Error(t, err, "expected an error")
 	assert.Equal(t, DevAdmDevicesUri, rd.Url.Path)
 }
@@ -70,7 +75,9 @@ func TestClientReqNoHost(t *testing.T) {
 		DevAdmAddr: "http://somehost:1234",
 	})
 
-	err := c.AddDevice(AdmReq{}, &http.Client{})
+	ctx := context.Background()
+
+	err := c.AddDevice(ctx, AdmReq{}, &http.Client{})
 
 	assert.Error(t, err, "expected an error")
 }
@@ -103,7 +110,8 @@ func TestClientTimeout(t *testing.T) {
 	})
 
 	t1 := time.Now()
-	err := c.AddDevice(AdmReq{},
+	ctx := context.Background()
+	err := c.AddDevice(ctx, AdmReq{},
 		&http.Client{Timeout: defaultReqTimeout})
 	t2 := time.Now()
 
