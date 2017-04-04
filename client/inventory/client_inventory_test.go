@@ -14,6 +14,7 @@
 package inventory
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"testing"
@@ -21,7 +22,6 @@ import (
 	ct "github.com/mendersoftware/deviceauth/client/testing"
 	"github.com/mendersoftware/deviceauth/model"
 
-	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 )
@@ -29,8 +29,7 @@ import (
 func TestClientGet(t *testing.T) {
 	t.Parallel()
 
-	c := NewClientWithLogger(ClientConfig{InventoryAddr: "http://foo"},
-		log.New(log.Ctx{}))
+	c := NewClient(ClientConfig{InventoryAddr: "http://foo"})
 	assert.NotNil(t, c)
 }
 
@@ -81,7 +80,7 @@ func TestClient(t *testing.T) {
 				InventoryAddr: s.URL,
 			})
 
-			err := c.AddDevice(AddReq{Id: "1234"}, &http.Client{})
+			err := c.AddDevice(context.Background(), AddReq{Id: "1234"}, &http.Client{})
 			if tc.err != nil {
 				assert.EqualError(t, err, tc.err.Error())
 			} else {

@@ -15,6 +15,7 @@ package inventory
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 
@@ -38,14 +39,12 @@ type ClientConfig struct {
 
 // ClientRunner is an interface of inventory client
 type ClientRunner interface {
-	AddDevice(req AddReq, client requestid.ApiRequester) error
-	log.ContextLogger
+	AddDevice(ctx context.Context, req AddReq, client requestid.ApiRequester) error
 }
 
 // Client is an opaque implementation of inventory client. Implements
 // ClientRunner interface
 type Client struct {
-	log  *log.Logger
 	conf ClientConfig
 }
 
@@ -55,8 +54,11 @@ type AddReq struct {
 	Id string `json:"id"`
 }
 
-func (ic *Client) AddDevice(areq AddReq, client requestid.ApiRequester) error {
-	ic.log.Debugf("add device %s to inventory", areq.Id)
+func (ic *Client) AddDevice(ctx context.Context, areq AddReq, client requestid.ApiRequester) error {
+
+	l := log.FromContext(ctx)
+
+	l.Debugf("add device %s to inventory", areq.Id)
 
 	ireq, err := json.Marshal(areq)
 	if err != nil {
@@ -83,11 +85,11 @@ func (ic *Client) AddDevice(areq AddReq, client requestid.ApiRequester) error {
 
 	switch rsp.StatusCode {
 	case http.StatusConflict:
-		ic.log.Warnf("inventory entry for device %s already exists", areq.Id)
+		l.Warnf("inventory entry for device %s already exists", areq.Id)
 	case http.StatusCreated:
-		ic.log.Infof("inventory entry for device %s created", areq.Id)
+		l.Infof("inventory entry for device %s created", areq.Id)
 	default:
-		ic.log.Errorf("failed to create inventory entry for device")
+		l.Errorf("failed to create inventory entry for device")
 		if err == nil {
 			err = errors.New("unexpected response status")
 		}
@@ -97,20 +99,8 @@ func (ic *Client) AddDevice(areq AddReq, client requestid.ApiRequester) error {
 	return nil
 }
 
-func (ic *Client) UseLog(l *log.Logger) {
-	ic.log = l.F(log.Ctx{})
-}
-
-func NewClientWithLogger(c ClientConfig, l *log.Logger) *Client {
-	l = l.F(log.Ctx{})
-	client := NewClient(c)
-	client.UseLog(l)
-	return client
-}
-
 func NewClient(c ClientConfig) *Client {
 	return &Client{
-		log:  log.New(log.Ctx{}),
 		conf: c,
 	}
 }
