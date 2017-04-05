@@ -65,7 +65,7 @@ func RunServer(c config.Reader) error {
 		Issuer:            c.GetString(SettingJWTIssuer),
 	})
 
-	devAdmClientConf := deviceadm.ClientConfig{
+	devAdmClientConf := deviceadm.Config{
 		DevAdmAddr: c.GetString(SettingDevAdmAddr),
 	}
 	invClientConf := inventory.ClientConfig{

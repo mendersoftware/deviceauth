@@ -28,7 +28,7 @@ import (
 func TestGetClient(t *testing.T) {
 	t.Parallel()
 
-	c := NewClient(ClientConfig{
+	c := NewClient(Config{
 		DevAdmAddr: "localhost:3333",
 	})
 	assert.NotNil(t, c)
@@ -40,7 +40,7 @@ func TestClientReqSuccess(t *testing.T) {
 	s, rd := ct.NewMockServer(http.StatusNoContent)
 	defer s.Close()
 
-	c := NewClient(ClientConfig{
+	c := NewClient(Config{
 		DevAdmAddr: s.URL,
 	})
 
@@ -57,7 +57,7 @@ func TestClientReqFail(t *testing.T) {
 	s, rd := ct.NewMockServer(http.StatusBadRequest)
 	defer s.Close()
 
-	c := NewClient(ClientConfig{
+	c := NewClient(Config{
 		DevAdmAddr: s.URL,
 	})
 
@@ -71,7 +71,7 @@ func TestClientReqFail(t *testing.T) {
 func TestClientReqNoHost(t *testing.T) {
 	t.Parallel()
 
-	c := NewClient(ClientConfig{
+	c := NewClient(Config{
 		DevAdmAddr: "http://somehost:1234",
 	})
 
@@ -105,7 +105,7 @@ func TestClientTimeout(t *testing.T) {
 	}))
 
 	addDevUrl := s.URL + "/devices"
-	c := NewClient(ClientConfig{
+	c := NewClient(Config{
 		DevAdmAddr: addDevUrl,
 	})
 

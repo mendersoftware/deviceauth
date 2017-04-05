@@ -35,7 +35,7 @@ const (
 )
 
 // ClientConfig conveys client configuration
-type ClientConfig struct {
+type Config struct {
 	// Device admission host
 	DevAdmAddr string
 	// Request timeout
@@ -50,7 +50,7 @@ type ClientRunner interface {
 // Client is an opaque implementation of device admission client. Implements
 // ClientRunner interface
 type Client struct {
-	conf ClientConfig
+	conf Config
 }
 
 func (d *Client) AddDevice(ctx context.Context, admreq AdmReq, client requestid.ApiRequester) error {
@@ -89,7 +89,7 @@ func (d *Client) AddDevice(ctx context.Context, admreq AdmReq, client requestid.
 	return nil
 }
 
-func NewClient(c ClientConfig) *Client {
+func NewClient(c Config) *Client {
 	if c.Timeout == 0 {
 		c.Timeout = defaultReqTimeout
 	}
