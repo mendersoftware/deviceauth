@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/mendersoftware/deviceauth/utils"
 
@@ -29,12 +30,16 @@ import (
 const (
 	// devices endpoint
 	InventoryDevicesUri = "/api/0.1.0/devices"
+	// default request timeout, 10s?
+	defaultReqTimeout = time.Duration(10) * time.Second
 )
 
 // ClientConfig conveys client configuration
 type Config struct {
 	// Inventory service address
 	InventoryAddr string
+	// Request timeout
+	Timeout time.Duration
 }
 
 // ClientRunner is an interface of inventory client
@@ -77,7 +82,11 @@ func (ic *Client) AddDevice(ctx context.Context, areq AddReq, client requestid.A
 
 	req.Header.Set("Content-Type", "application/json")
 
-	rsp, err := client.Do(req)
+	// set the inventory request timeout
+	ctx, cancel := context.WithTimeout(ctx, ic.conf.Timeout)
+	defer cancel()
+
+	rsp, err := client.Do(req.WithContext(ctx))
 	if err != nil {
 		return errors.Wrapf(err, "failed to add device")
 	}
@@ -100,6 +109,10 @@ func (ic *Client) AddDevice(ctx context.Context, areq AddReq, client requestid.A
 }
 
 func NewClient(c Config) *Client {
+	if c.Timeout == 0 {
+		c.Timeout = defaultReqTimeout
+	}
+
 	return &Client{
 		conf: c,
 	}
