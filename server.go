@@ -68,7 +68,7 @@ func RunServer(c config.Reader) error {
 	devAdmClientConf := deviceadm.Config{
 		DevAdmAddr: c.GetString(SettingDevAdmAddr),
 	}
-	invClientConf := inventory.ClientConfig{
+	invClientConf := inventory.Config{
 		InventoryAddr: c.GetString(SettingInventoryAddr),
 	}
 

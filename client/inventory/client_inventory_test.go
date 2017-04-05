@@ -29,7 +29,7 @@ import (
 func TestClientGet(t *testing.T) {
 	t.Parallel()
 
-	c := NewClient(ClientConfig{InventoryAddr: "http://foo"})
+	c := NewClient(Config{InventoryAddr: "http://foo"})
 	assert.NotNil(t, c)
 }
 
@@ -76,7 +76,7 @@ func TestClient(t *testing.T) {
 
 			s, rd := ct.NewMockServer(tc.status)
 
-			c := NewClient(ClientConfig{
+			c := NewClient(Config{
 				InventoryAddr: s.URL,
 			})
 

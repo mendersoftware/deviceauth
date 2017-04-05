@@ -32,7 +32,7 @@ const (
 )
 
 // ClientConfig conveys client configuration
-type ClientConfig struct {
+type Config struct {
 	// Inventory service address
 	InventoryAddr string
 }
@@ -45,7 +45,7 @@ type ClientRunner interface {
 // Client is an opaque implementation of inventory client. Implements
 // ClientRunner interface
 type Client struct {
-	conf ClientConfig
+	conf Config
 }
 
 // AddReq contains request data of request to add a device.
@@ -99,7 +99,7 @@ func (ic *Client) AddDevice(ctx context.Context, areq AddReq, client requestid.A
 	return nil
 }
 
-func NewClient(c ClientConfig) *Client {
+func NewClient(c Config) *Client {
 	return &Client{
 		conf: c,
 	}
