@@ -199,7 +199,7 @@ func TestStoreGetDeviceByIdentityData(t *testing.T) {
 				assert.NotNil(t, expected)
 			}
 
-			dev, err := d.GetDeviceByIdentityData(tc.deviceIdData)
+			dev, err := d.GetDeviceByIdentityData(context.Background(), tc.deviceIdData)
 			if expected != nil {
 				assert.NoError(t, err, "failed to get devices")
 				if assert.NotNil(t, dev) {
@@ -241,10 +241,10 @@ func TestStoreAddDevice(t *testing.T) {
 	d := getDb()
 	defer d.session.Close()
 
-	err := d.AddDevice(*dev)
+	err := d.AddDevice(context.Background(), *dev)
 	assert.NoError(t, err, "failed to add device")
 
-	found, err := d.GetDeviceByIdentityData("iddata")
+	found, err := d.GetDeviceByIdentityData(context.Background(), "iddata")
 	assert.NoError(t, err)
 	assert.NotNil(t, found)
 
@@ -255,7 +255,7 @@ func TestStoreAddDevice(t *testing.T) {
 	compareDevices(dev, found, t)
 
 	// add device with identical identity data
-	err = d.AddDevice(model.Device{
+	err = d.AddDevice(context.Background(), model.Device{
 		Id:     "foobar",
 		IdData: "iddata",
 	})
@@ -323,7 +323,7 @@ func TestStoreUpdateDevice(t *testing.T) {
 		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
 			updev := &model.Device{Id: tc.id, Status: tc.status}
 
-			err = d.UpdateDevice(updev)
+			err = d.UpdateDevice(context.Background(), updev)
 			if tc.outErr != "" {
 				assert.EqualError(t, err, tc.outErr)
 			} else {
@@ -365,7 +365,7 @@ func TestStoreAddToken(t *testing.T) {
 	d := getDb()
 	defer d.session.Close()
 
-	err := d.AddToken(token)
+	err := d.AddToken(context.Background(), token)
 	assert.NoError(t, err, "failed to add token")
 
 	//verify
@@ -423,7 +423,7 @@ func TestStoreGetToken(t *testing.T) {
 				assert.NotNil(t, expected)
 			}
 
-			token, err := d.GetToken(tc.tokenId)
+			token, err := d.GetToken(context.Background(), tc.tokenId)
 			if expected != nil {
 				assert.NoError(t, err, "failed to get token")
 			} else {
@@ -466,7 +466,7 @@ func TestStoreDeleteToken(t *testing.T) {
 
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
-			err := d.DeleteToken(tc.tokenId)
+			err := d.DeleteToken(context.Background(), tc.tokenId)
 			if tc.err {
 				assert.Equal(t, store.ErrTokenNotFound, err)
 			} else {
@@ -507,7 +507,7 @@ func TestStoreDeleteTokenByDevId(t *testing.T) {
 
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
-			err := d.DeleteTokenByDevId(tc.devId)
+			err := d.DeleteTokenByDevId(context.Background(), tc.devId)
 			if tc.err {
 				assert.Equal(t, store.ErrTokenNotFound, err)
 			} else {
@@ -539,9 +539,8 @@ func TestStoreMigrate(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(fmt.Sprintf("tc: %s", name), func(t *testing.T) {
 			db := getDb()
-			ctx := context.Background()
 
-			err := db.Migrate(ctx, tc.version, nil)
+			err := db.Migrate(context.Background(), tc.version, nil)
 			if tc.err == "" {
 				assert.NoError(t, err)
 				var out []migrate.MigrationEntry
@@ -592,7 +591,7 @@ func TestStoreGetDevices(t *testing.T) {
 		}
 
 		devs_list = append(devs_list, dev)
-		err := db.AddDevice(dev)
+		err := db.AddDevice(context.Background(), dev)
 		assert.NoError(t, err)
 	}
 
@@ -630,7 +629,7 @@ func TestStoreGetDevices(t *testing.T) {
 
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
-			dbdevs, err := db.GetDevices(tc.skip, tc.limit)
+			dbdevs, err := db.GetDevices(context.Background(), tc.skip, tc.limit)
 			assert.NoError(t, err)
 
 			assert.Len(t, dbdevs, tc.expectedCount)
@@ -659,26 +658,26 @@ func TestStoreAuthSet(t *testing.T) {
 		DeviceId:  "1",
 		Timestamp: uto.TimePtr(time.Now()),
 	}
-	err := db.AddAuthSet(asin)
+	err := db.AddAuthSet(context.Background(), asin)
 	assert.NoError(t, err)
 
 	// try to get something that does not exist
-	as, err := db.GetAuthSetByDataKey("foobar-2", "pubkey-3")
+	as, err := db.GetAuthSetByDataKey(context.Background(), "foobar-2", "pubkey-3")
 	assert.Error(t, err)
 
-	as, err = db.GetAuthSetByDataKey("foobar", "pubkey-1")
+	as, err = db.GetAuthSetByDataKey(context.Background(), "foobar", "pubkey-1")
 	assert.NoError(t, err)
 	assert.NotNil(t, as)
 
 	assert.False(t, to.Bool(as.AdmissionNotified))
 
-	err = db.UpdateAuthSet(asin, model.AuthSetUpdate{
+	err = db.UpdateAuthSet(context.Background(), asin, model.AuthSetUpdate{
 		AdmissionNotified: to.BoolPtr(true),
 		Timestamp:         uto.TimePtr(time.Now()),
 	})
 	assert.NoError(t, err)
 
-	as, err = db.GetAuthSetByDataKey("foobar", "pubkey-1")
+	as, err = db.GetAuthSetByDataKey(context.Background(), "foobar", "pubkey-1")
 	assert.NoError(t, err)
 	assert.NotNil(t, as)
 	assert.True(t, to.Bool(as.AdmissionNotified))
@@ -687,24 +686,24 @@ func TestStoreAuthSet(t *testing.T) {
 	// clear timestamp field
 	asin.Timestamp = nil
 	// selectively update public key only, remaining fields should be unchanged
-	err = db.UpdateAuthSet(asin, model.AuthSetUpdate{
+	err = db.UpdateAuthSet(context.Background(), asin, model.AuthSetUpdate{
 		PubKey: "pubkey-2",
 	})
 	assert.NoError(t, err)
 
-	as, err = db.GetAuthSetByDataKey("foobar", "pubkey-2")
+	as, err = db.GetAuthSetByDataKey(context.Background(), "foobar", "pubkey-2")
 	assert.NoError(t, err)
 	assert.NotNil(t, as)
 	assert.True(t, to.Bool(as.AdmissionNotified))
 
-	asid, err := db.GetAuthSetById(as.Id)
+	asid, err := db.GetAuthSetById(context.Background(), as.Id)
 	assert.NoError(t, err)
 	assert.NotNil(t, asid)
 
 	assert.EqualValues(t, as, asid)
 
 	// verify auth sets count for this device
-	asets, err := db.GetAuthSetsForDevice("1")
+	asets, err := db.GetAuthSetsForDevice(context.Background(), "1")
 	assert.NoError(t, err)
 	assert.Len(t, asets, 1)
 
@@ -715,11 +714,11 @@ func TestStoreAuthSet(t *testing.T) {
 		DeviceId:  "1",
 		Timestamp: uto.TimePtr(time.Now()),
 	}
-	err = db.AddAuthSet(asin)
+	err = db.AddAuthSet(context.Background(), asin)
 	assert.NoError(t, err)
 
 	// we should have 2 now
-	asets, err = db.GetAuthSetsForDevice("1")
+	asets, err = db.GetAuthSetsForDevice(context.Background(), "1")
 	assert.NoError(t, err)
 	assert.Len(t, asets, 2)
 }
@@ -767,7 +766,7 @@ func TestStoreDeleteDevice(t *testing.T) {
 
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
-			err := db.DeleteDevice(tc.devId)
+			err := db.DeleteDevice(context.Background(), tc.devId)
 			if tc.err != "" {
 				assert.Equal(t, tc.err, err.Error())
 			} else {
@@ -823,7 +822,7 @@ func TestStoreDeleteAuthSetsForDevice(t *testing.T) {
 
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
-			err := db.DeleteAuthSetsForDevice(tc.devId)
+			err := db.DeleteAuthSetsForDevice(context.Background(), tc.devId)
 			if tc.err != "" {
 				assert.Equal(t, tc.err, err.Error())
 			} else {

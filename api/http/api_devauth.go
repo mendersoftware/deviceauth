@@ -26,8 +26,6 @@ import (
 
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/mendersoftware/go-lib-micro/log"
-	"github.com/mendersoftware/go-lib-micro/requestid"
-	"github.com/mendersoftware/go-lib-micro/requestlog"
 	"github.com/mendersoftware/go-lib-micro/rest_utils"
 	"github.com/pkg/errors"
 )
@@ -51,21 +49,21 @@ var (
 	ErrNoAuthHeader    = errors.New("no authorization header")
 )
 
-type DevAuthFactory func(l *log.Logger) (devauth.DevAuthApp, error)
-
-type DevAuthHandler struct {
-	createDevAuth DevAuthFactory
+type DevAuthApiHandlers struct {
+	devAuth devauth.App
 }
 
 type DevAuthApiStatus struct {
 	Status string `json:"status"`
 }
 
-func NewDevAuthApiHandler(daf DevAuthFactory) ApiHandler {
-	return &DevAuthHandler{daf}
+func NewDevAuthApiHandlers(devAuth devauth.App) ApiHandler {
+	return &DevAuthApiHandlers{
+		devAuth: devAuth,
+	}
 }
 
-func (d *DevAuthHandler) GetApp() (rest.App, error) {
+func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
 	routes := []*rest.Route{
 		rest.Post(uriAuthReqs, d.SubmitAuthRequestHandler),
 
@@ -93,15 +91,12 @@ func (d *DevAuthHandler) GetApp() (rest.App, error) {
 	return app, nil
 }
 
-func (d *DevAuthHandler) SubmitAuthRequestHandler(w rest.ResponseWriter, r *rest.Request) {
-	l := requestlog.GetRequestLogger(r.Env)
-
-	da, err := d.createDevAuth(l)
-	if err != nil {
-		restErrWithLogInternal(w, r, l, err)
-	}
-
+func (d *DevAuthApiHandlers) SubmitAuthRequestHandler(w rest.ResponseWriter, r *rest.Request) {
 	var authreq model.AuthReq
+
+	ctx := r.Context()
+
+	l := log.FromContext(ctx)
 
 	//validate req body by reading raw content manually
 	//(raw body will be needed later, DecodeJsonPayload would
@@ -109,44 +104,43 @@ func (d *DevAuthHandler) SubmitAuthRequestHandler(w rest.ResponseWriter, r *rest
 	body, err := utils.ReadBodyRaw(r)
 	if err != nil {
 		err = errors.Wrap(err, "failed to decode auth request")
-		restErrWithLog(w, r, l, err, http.StatusBadRequest)
+		rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
 		return
 	}
 
 	err = json.Unmarshal(body, &authreq)
 	if err != nil {
 		err = errors.Wrap(err, "failed to decode auth request")
-		restErrWithLog(w, r, l, err, http.StatusBadRequest)
+		rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
 		return
 	}
 
 	err = authreq.Validate()
 	if err != nil {
 		err = errors.Wrap(err, "invalid auth request")
-		restErrWithLog(w, r, l, err, http.StatusBadRequest)
+		rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
 		return
 	}
 
 	//verify signature
 	signature := r.Header.Get(HdrAuthReqSign)
 	if signature == "" {
-		restErrWithLog(w, r, l, errors.New("missing request signature header"), http.StatusBadRequest)
+		rest_utils.RestErrWithLog(w, r, l, errors.New("missing request signature header"), http.StatusBadRequest)
 		return
 	}
 
 	err = utils.VerifyAuthReqSign(signature, authreq.PubKey, body)
 	if err != nil {
-		restErrWithLogMsg(w, r, l, err, http.StatusUnauthorized, "signature verification failed")
+		rest_utils.RestErrWithLogMsg(w, r, l, err, http.StatusUnauthorized, "signature verification failed")
 		return
 	}
 
-	ctx := ContextFromRequest(r)
-	token, err := da.WithContext(ctx).SubmitAuthRequest(&authreq)
+	token, err := d.devAuth.SubmitAuthRequest(ctx, &authreq)
 	switch err {
 	case devauth.ErrDevAuthUnauthorized, devauth.ErrDevIdAuthIdMismatch:
 		// error is always set to unauthorized, client does not need to
 		// know why
-		restErrWithLogMsg(w, r, l, devauth.ErrDevAuthUnauthorized,
+		rest_utils.RestErrWithLogMsg(w, r, l, devauth.ErrDevAuthUnauthorized,
 			http.StatusUnauthorized, "unauthorized")
 		return
 	case nil:
@@ -154,30 +148,28 @@ func (d *DevAuthHandler) SubmitAuthRequestHandler(w rest.ResponseWriter, r *rest
 		w.Header().Set("Content-Type", "application/jwt")
 		return
 	default:
-		restErrWithLogInternal(w, r, l, err)
+		rest_utils.RestErrWithLogInternal(w, r, l, err)
 		return
 	}
 }
 
-func (d *DevAuthHandler) GetDevicesHandler(w rest.ResponseWriter, r *rest.Request) {
-	l := requestlog.GetRequestLogger(r.Env)
+func (d *DevAuthApiHandlers) GetDevicesHandler(w rest.ResponseWriter, r *rest.Request) {
 
-	da, err := d.createDevAuth(l)
-	if err != nil {
-		restErrWithLogInternal(w, r, l, err)
-	}
+	ctx := r.Context()
+
+	l := log.FromContext(ctx)
 
 	page, perPage, err := rest_utils.ParsePagination(r)
 	if err != nil {
-		restErrWithLog(w, r, l, err, http.StatusBadRequest)
+		rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
 		return
 	}
 
 	skip := (page - 1) * perPage
 	limit := perPage + 1
-	devs, err := da.GetDevices(uint(skip), uint(limit))
+	devs, err := d.devAuth.GetDevices(ctx, uint(skip), uint(limit))
 	if err != nil {
-		restErrWithLogInternal(w, r, l, err)
+		rest_utils.RestErrWithLogInternal(w, r, l, err)
 		return
 	}
 
@@ -196,86 +188,76 @@ func (d *DevAuthHandler) GetDevicesHandler(w rest.ResponseWriter, r *rest.Reques
 	w.WriteJson(devs[:len])
 }
 
-func (d *DevAuthHandler) GetDeviceHandler(w rest.ResponseWriter, r *rest.Request) {
-	l := requestlog.GetRequestLogger(r.Env)
+func (d *DevAuthApiHandlers) GetDeviceHandler(w rest.ResponseWriter, r *rest.Request) {
 
-	da, err := d.createDevAuth(l)
-	if err != nil {
-		restErrWithLogInternal(w, r, l, err)
-	}
+	ctx := r.Context()
+
+	l := log.FromContext(ctx)
 
 	devId := r.PathParam("id")
 
-	dev, err := da.GetDevice(devId)
+	dev, err := d.devAuth.GetDevice(ctx, devId)
 	switch {
 	case err == store.ErrDevNotFound:
-		restErrWithLog(w, r, l, err, http.StatusNotFound)
+		rest_utils.RestErrWithLog(w, r, l, err, http.StatusNotFound)
 	case dev != nil:
 		w.WriteJson(dev)
 	default:
-		restErrWithLogInternal(w, r, l, err)
+		rest_utils.RestErrWithLogInternal(w, r, l, err)
 	}
 }
 
-func (d *DevAuthHandler) DeleteDeviceHandler(w rest.ResponseWriter, r *rest.Request) {
-	l := requestlog.GetRequestLogger(r.Env)
+func (d *DevAuthApiHandlers) DeleteDeviceHandler(w rest.ResponseWriter, r *rest.Request) {
 
-	da, err := d.createDevAuth(l)
-	if err != nil {
-		restErrWithLogInternal(w, r, l, err)
-	}
+	ctx := r.Context()
+
+	l := log.FromContext(ctx)
 
 	devId := r.PathParam("id")
 
-	if err = da.DecommissionDevice(devId); err != nil {
+	if err := d.devAuth.DecommissionDevice(ctx, devId); err != nil {
 		if err == store.ErrDevNotFound {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		restErrWithLogInternal(w, r, l, err)
+		rest_utils.RestErrWithLogInternal(w, r, l, err)
 		return
 	}
 
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (d *DevAuthHandler) DeleteTokenHandler(w rest.ResponseWriter, r *rest.Request) {
-	l := requestlog.GetRequestLogger(r.Env)
+func (d *DevAuthApiHandlers) DeleteTokenHandler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
 
-	da, err := d.createDevAuth(l)
-	if err != nil {
-		restErrWithLogInternal(w, r, l, err)
-	}
+	l := log.FromContext(ctx)
 
 	tokenId := r.PathParam("id")
 
-	err = da.RevokeToken(tokenId)
+	err := d.devAuth.RevokeToken(ctx, tokenId)
 	if err != nil {
 		if err == store.ErrTokenNotFound {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		restErrWithLogInternal(w, r, l, err)
+		rest_utils.RestErrWithLogInternal(w, r, l, err)
 		return
 	}
 
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (d *DevAuthHandler) VerifyTokenHandler(w rest.ResponseWriter, r *rest.Request) {
-	l := requestlog.GetRequestLogger(r.Env)
+func (d *DevAuthApiHandlers) VerifyTokenHandler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
 
-	da, err := d.createDevAuth(l)
-	if err != nil {
-		restErrWithLogInternal(w, r, l, err)
-	}
+	l := log.FromContext(ctx)
 
 	tokenStr, err := extractToken(r.Header)
 	if err != nil {
-		restErrWithLog(w, r, l, ErrNoAuthHeader, http.StatusUnauthorized)
+		rest_utils.RestErrWithLog(w, r, l, ErrNoAuthHeader, http.StatusUnauthorized)
 	}
 	// verify token
-	err = da.VerifyToken(tokenStr)
+	err = d.devAuth.VerifyToken(ctx, tokenStr)
 	code := http.StatusOK
 	if err != nil {
 		switch err {
@@ -284,22 +266,19 @@ func (d *DevAuthHandler) VerifyTokenHandler(w rest.ResponseWriter, r *rest.Reque
 		case store.ErrTokenNotFound, jwt.ErrTokenInvalid:
 			code = http.StatusUnauthorized
 		default:
-			restErrWithLogInternal(w, r, l, err)
+			rest_utils.RestErrWithLogInternal(w, r, l, err)
 			return
 		}
-		l.F(log.Ctx{}).Error(err)
+		l.Error(err)
 	}
 
 	w.WriteHeader(code)
 }
 
-func (d *DevAuthHandler) UpdateDeviceStatusHandler(w rest.ResponseWriter, r *rest.Request) {
-	l := requestlog.GetRequestLogger(r.Env)
+func (d *DevAuthApiHandlers) UpdateDeviceStatusHandler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
 
-	da, err := d.createDevAuth(l)
-	if err != nil {
-		restErrWithLogInternal(w, r, l, err)
-	}
+	l := log.FromContext(ctx)
 
 	devid := r.PathParam("id")
 	authid := r.PathParam("aid")
@@ -308,67 +287,38 @@ func (d *DevAuthHandler) UpdateDeviceStatusHandler(w rest.ResponseWriter, r *res
 	// means authentication set ID
 
 	var status DevAuthApiStatus
-	err = r.DecodeJsonPayload(&status)
+	err := r.DecodeJsonPayload(&status)
 	if err != nil {
 		err = errors.Wrap(err, "failed to decode status data")
-		restErrWithLog(w, r, l, err, http.StatusBadRequest)
+		rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
 		return
 	}
 
-	if err = statusValidate(&status); err != nil {
-		restErrWithLog(w, r, l, err, http.StatusBadRequest)
+	if err := statusValidate(&status); err != nil {
+		rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
 		return
 	}
 
 	if status.Status == model.DevStatusAccepted {
-		ctx := ContextFromRequest(r)
-		err = da.WithContext(ctx).AcceptDeviceAuth(devid, authid)
+		err = d.devAuth.AcceptDeviceAuth(ctx, devid, authid)
 	} else if status.Status == model.DevStatusRejected {
-		err = da.RejectDeviceAuth(devid, authid)
+		err = d.devAuth.RejectDeviceAuth(ctx, devid, authid)
 	} else if status.Status == model.DevStatusPending {
-		err = da.ResetDeviceAuth(devid, authid)
+		err = d.devAuth.ResetDeviceAuth(ctx, devid, authid)
 	}
 	if err != nil {
 		switch err {
 		case store.ErrDevNotFound:
-			restErrWithLog(w, r, l, err, http.StatusNotFound)
+			rest_utils.RestErrWithLog(w, r, l, err, http.StatusNotFound)
 		case devauth.ErrDevIdAuthIdMismatch:
-			restErrWithLog(w, r, l, err, http.StatusBadRequest)
+			rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
 		default:
-			restErrWithLogInternal(w, r, l, err)
+			rest_utils.RestErrWithLogInternal(w, r, l, err)
 		}
 		return
 	}
 
 	w.WriteHeader(http.StatusNoContent)
-}
-
-// return selected http code + error message directly taken from error
-// log error
-func restErrWithLog(w rest.ResponseWriter, r *rest.Request, l *log.Logger, e error, code int) {
-	restErrWithLogMsg(w, r, l, e, code, e.Error())
-}
-
-// return http 500, with an "internal error" message
-// log full error
-func restErrWithLogInternal(w rest.ResponseWriter, r *rest.Request, l *log.Logger, e error) {
-	msg := "internal error"
-	e = errors.Wrap(e, msg)
-	restErrWithLogMsg(w, r, l, e, http.StatusInternalServerError, msg)
-}
-
-// return an error code with an overriden message (to avoid exposing the details)
-// log full error
-func restErrWithLogMsg(w rest.ResponseWriter, r *rest.Request, l *log.Logger, e error, code int, msg string) {
-	w.WriteHeader(code)
-	err := w.WriteJson(map[string]string{
-		rest.ErrorFieldName: msg,
-		"request_id":        requestid.GetReqId(r),
-	})
-	if err != nil {
-		panic(err)
-	}
-	l.F(log.Ctx{}).Error(errors.Wrap(e, msg).Error())
 }
 
 // Validate status.

@@ -14,11 +14,12 @@
 package requestid
 
 import (
+	"testing"
+
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/ant0ine/go-json-rest/rest/test"
 	"github.com/satori/go.uuid"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestRequestIdMiddlewareWithReqID(t *testing.T) {

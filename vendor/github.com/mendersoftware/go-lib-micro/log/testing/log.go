@@ -11,24 +11,20 @@
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
-package requestid
+
+package testing
 
 import (
-	"context"
-	"testing"
+	"io/ioutil"
+	"os"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/mendersoftware/go-lib-micro/log"
 )
 
-// FromContext extracts current request Id from context.Context
-func TestContext(t *testing.T) {
-
-	assert.Equal(t, "", FromContext(context.Background()))
-	assert.Equal(t, "foo",
-		FromContext(WithContext(context.Background(), "foo")))
-	// fallback to default string if someone packs the value into context
-	// themselves
-	assert.Equal(t, "",
-		FromContext(context.WithValue(context.Background(),
-			RequestIdHeader, 123)))
+// MaybeDiscardLogs() will setup a default logger to write to ioutil.Discard
+// unless TESTING_LOGS environment variable is non empty.
+func MaybeDiscardLogs() {
+	if os.Getenv("TESTING_LOGS") == "" {
+		log.Log.Out = ioutil.Discard
+	}
 }

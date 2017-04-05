@@ -37,3 +37,8 @@ func FromContext(ctx context.Context) string {
 	}
 	return ""
 }
+
+// WithContext adds request to context `ctx` and returns the resulting context.
+func WithContext(ctx context.Context, reqid string) context.Context {
+	return context.WithValue(ctx, RequestIdHeader, reqid)
+}

@@ -11,7 +11,7 @@
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
-package requestlog
+package context
 
 import (
 	"net/http"
@@ -22,40 +22,32 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/mendersoftware/go-lib-micro/log"
+	"github.com/mendersoftware/go-lib-micro/requestid"
+	"github.com/mendersoftware/go-lib-micro/requestlog"
 )
 
-func TestRequestLogMiddleware(t *testing.T) {
+func TestUpdateContextMiddlewareMiddleware(t *testing.T) {
 	api := rest.NewApi()
 
-	api.Use(&RequestLogMiddleware{})
+	api.Use(
+		&requestlog.RequestLogMiddleware{
+			BaseLogger: log.NewEmpty().Logger,
+			LogContext: log.Ctx{"foo": "bar"},
+		},
+		&requestid.RequestIdMiddleware{},
+		&UpdateContextMiddleware{
+			Updates: []UpdateContextFunc{
+				RepackLoggerToContext,
+				RepackRequestIdToContext,
+			},
+		},
+	)
 
 	api.SetApp(rest.AppSimple(func(w rest.ResponseWriter, r *rest.Request) {
-		log := r.Env[ReqLog]
-		assert.NotNil(t, log)
-		w.WriteJson(map[string]string{"foo": "bar"})
-	}))
+		cl := log.FromContext(r.Context())
 
-	handler := api.MakeHandler()
-
-	req := test.MakeSimpleRequest("GET", "http://localhost/", nil)
-
-	_ = test.RunRequest(t, handler, req)
-}
-
-func TestRequestLogMiddlewareWithCtx(t *testing.T) {
-	api := rest.NewApi()
-
-	api.Use(&RequestLogMiddleware{
-		LogContext: log.Ctx{"foo": "bar"},
-	})
-
-	api.SetApp(rest.AppSimple(func(w rest.ResponseWriter, r *rest.Request) {
-		le := r.Env[ReqLog]
-
-		assert.NotNil(t, le)
-
-		l := le.(*log.Logger)
-		assert.Contains(t, l.Data, "foo")
+		assert.Contains(t, cl.Data, "foo")
+		assert.NotEmpty(t, requestid.FromContext(r.Context()))
 
 		w.WriteHeader(http.StatusNoContent)
 	}))

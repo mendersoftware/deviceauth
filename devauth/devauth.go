@@ -14,10 +14,10 @@
 package devauth
 
 import (
+	"context"
 	"net/http"
 	"time"
 
-	"github.com/mendersoftware/deviceauth/api"
 	"github.com/mendersoftware/deviceauth/client/deviceadm"
 	"github.com/mendersoftware/deviceauth/client/inventory"
 	"github.com/mendersoftware/deviceauth/jwt"
@@ -50,22 +50,19 @@ func simpleApiClientGetter() requestid.ApiRequester {
 }
 
 // this device auth service interface
-type DevAuthApp interface {
-	SubmitAuthRequest(r *model.AuthReq) (string, error)
+type App interface {
+	SubmitAuthRequest(ctx context.Context, r *model.AuthReq) (string, error)
 
-	GetDevices(skip, limit uint) ([]model.Device, error)
-	GetDevice(dev_id string) (*model.Device, error)
-	DecommissionDevice(dev_id string) error
-	AcceptDeviceAuth(dev_id string, auth_id string) error
-	RejectDeviceAuth(dev_id string, auth_id string) error
-	ResetDeviceAuth(dev_id string, auth_id string) error
-	GetDeviceToken(dev_id string) (*model.Token, error)
+	GetDevices(ctx context.Context, skip, limit uint) ([]model.Device, error)
+	GetDevice(ctx context.Context, dev_id string) (*model.Device, error)
+	DecommissionDevice(ctx context.Context, dev_id string) error
+	AcceptDeviceAuth(ctx context.Context, dev_id string, auth_id string) error
+	RejectDeviceAuth(ctx context.Context, dev_id string, auth_id string) error
+	ResetDeviceAuth(ctx context.Context, dev_id string, auth_id string) error
+	GetDeviceToken(ctx context.Context, dev_id string) (*model.Token, error)
 
-	RevokeToken(token_id string) error
-	VerifyToken(token string) error
-	WithContext(c *api.RequestContext) DevAuthApp
-
-	log.ContextLogger
+	RevokeToken(ctx context.Context, token_id string) error
+	VerifyToken(ctx context.Context, token string) error
 }
 
 type DevAuth struct {
@@ -73,56 +70,58 @@ type DevAuth struct {
 	cDevAdm      deviceadm.ClientRunner
 	cInv         inventory.ClientRunner
 	jwt          jwt.JWTAgentApp
-	log          *log.Logger
 	clientGetter ApiClientGetter
 }
 
-func NewDevAuth(d store.DataStore, cda deviceadm.ClientRunner, ci inventory.ClientRunner, jwt jwt.JWTAgentApp) DevAuthApp {
+func NewDevAuth(d store.DataStore, cda deviceadm.ClientRunner, ci inventory.ClientRunner, jwt jwt.JWTAgentApp) App {
 	return &DevAuth{
 		db:           d,
 		cDevAdm:      cda,
 		cInv:         ci,
 		jwt:          jwt,
-		log:          log.New(log.Ctx{}),
 		clientGetter: simpleApiClientGetter,
 	}
 }
 
-func (d *DevAuth) getDeviceFromAuthRequest(r *model.AuthReq) (*model.Device, error) {
+func (d *DevAuth) getDeviceFromAuthRequest(ctx context.Context, r *model.AuthReq) (*model.Device, error) {
 	dev := model.NewDevice("", r.IdData, r.PubKey, r.TenantToken)
 
+	l := log.FromContext(ctx)
+
 	// record device
-	err := d.db.AddDevice(*dev)
+	err := d.db.AddDevice(ctx, *dev)
 	if err != nil && err != store.ErrObjectExists {
-		d.log.Errorf("failed to add/find device: %v", err)
+		l.Errorf("failed to add/find device: %v", err)
 		return nil, err
 	}
 
 	// either the device was added or it was already present, in any case,
 	// pull it from DB
-	dev, err = d.db.GetDeviceByIdentityData(r.IdData)
+	dev, err = d.db.GetDeviceByIdentityData(ctx, r.IdData)
 	if err != nil {
-		d.log.Error("failed to find device but could not add either")
+		l.Error("failed to find device but could not add either")
 		return nil, errors.New("failed to locate device")
 	}
 
 	// check if the device is in the decommissioning state
 	if dev.Decommissioning {
-		d.log.Warnf("Device %s in the decommissioning state. %s", dev.Id)
+		l.Warnf("Device %s in the decommissioning state. %s", dev.Id)
 		return nil, ErrDevAuthUnauthorized
 	}
 
 	return dev, nil
 }
 
-func (d *DevAuth) SubmitAuthRequest(r *model.AuthReq) (string, error) {
-	return d.SubmitAuthRequestWithClient(r, d.clientGetter())
+func (d *DevAuth) SubmitAuthRequest(ctx context.Context, r *model.AuthReq) (string, error) {
+	return d.SubmitAuthRequestWithClient(ctx, r, d.clientGetter())
 }
 
-func (d *DevAuth) SubmitAuthRequestWithClient(r *model.AuthReq, client requestid.ApiRequester) (string, error) {
+func (d *DevAuth) SubmitAuthRequestWithClient(ctx context.Context, r *model.AuthReq, client requestid.ApiRequester) (string, error) {
+
+	l := log.FromContext(ctx)
 
 	// get device associated with given authorization request
-	dev, err := d.getDeviceFromAuthRequest(r)
+	dev, err := d.getDeviceFromAuthRequest(ctx, r)
 	if err != nil {
 		return "", err
 	}
@@ -137,7 +136,7 @@ func (d *DevAuth) SubmitAuthRequestWithClient(r *model.AuthReq, client requestid
 	}
 	added := true
 	// record authentication request
-	err = d.db.AddAuthSet(*areq)
+	err = d.db.AddAuthSet(ctx, *areq)
 	if err != nil && err != store.ErrObjectExists {
 		return "", err
 	} else if err == store.ErrObjectExists {
@@ -145,9 +144,9 @@ func (d *DevAuth) SubmitAuthRequestWithClient(r *model.AuthReq, client requestid
 	}
 	// either the request was added or it was already present in the DB, get
 	// it now
-	areq, err = d.db.GetAuthSetByDataKey(r.IdData, r.PubKey)
+	areq, err = d.db.GetAuthSetByDataKey(ctx, r.IdData, r.PubKey)
 	if err != nil {
-		d.log.Error("failed to find device auth set but could not add one either")
+		l.Error("failed to find device auth set but could not add one either")
 		return "", errors.New("failed to locate device auth set")
 	}
 
@@ -159,16 +158,16 @@ func (d *DevAuth) SubmitAuthRequestWithClient(r *model.AuthReq, client requestid
 			IdData:   r.IdData,
 			PubKey:   r.PubKey,
 		}
-		if err := d.cDevAdm.AddDevice(admreq, client); err != nil {
+		if err := d.cDevAdm.AddDevice(ctx, admreq, client); err != nil {
 			// we've failed to submit the request, no worries, just
 			// return an error
 			return "", errors.Wrap(err, "devadm add device error")
 		}
 
-		if err := d.db.UpdateAuthSet(*areq, model.AuthSetUpdate{
+		if err := d.db.UpdateAuthSet(ctx, *areq, model.AuthSetUpdate{
 			AdmissionNotified: to.BoolPtr(true),
 		}); err != nil {
-			d.log.Errorf("failed to update auth set data: %v", err)
+			l.Errorf("failed to update auth set data: %v", err)
 			// nothing bad happens here, we'll try to post the
 			// request next time device pings us
 		}
@@ -186,7 +185,7 @@ func (d *DevAuth) SubmitAuthRequestWithClient(r *model.AuthReq, client requestid
 
 		token = token.WithAuthSet(areq)
 
-		if err := d.db.AddToken(*token); err != nil {
+		if err := d.db.AddToken(ctx, *token); err != nil {
 			return "", errors.Wrap(err, "add token error")
 		}
 
@@ -197,26 +196,26 @@ func (d *DevAuth) SubmitAuthRequestWithClient(r *model.AuthReq, client requestid
 	return "", ErrDevAuthUnauthorized
 }
 
-func (d *DevAuth) SubmitInventoryDevice(dev model.Device) error {
-	return d.SubmitInventoryDeviceWithClient(dev, d.clientGetter())
+func (d *DevAuth) SubmitInventoryDevice(ctx context.Context, dev model.Device) error {
+	return d.SubmitInventoryDeviceWithClient(ctx, dev, d.clientGetter())
 }
 
-func (d *DevAuth) SubmitInventoryDeviceWithClient(dev model.Device, client requestid.ApiRequester) error {
-	err := d.cInv.AddDevice(inventory.AddReq{Id: dev.Id}, client)
+func (d *DevAuth) SubmitInventoryDeviceWithClient(ctx context.Context, dev model.Device, client requestid.ApiRequester) error {
+	err := d.cInv.AddDevice(ctx, inventory.AddReq{Id: dev.Id}, client)
 	if err != nil {
 		return errors.Wrap(err, "failed to add device to inventory")
 	}
 	return nil
 }
 
-func (d *DevAuth) GetDevices(skip, limit uint) ([]model.Device, error) {
-	devs, err := d.db.GetDevices(skip, limit)
+func (d *DevAuth) GetDevices(ctx context.Context, skip, limit uint) ([]model.Device, error) {
+	devs, err := d.db.GetDevices(ctx, skip, limit)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to list devices")
 	}
 
 	for i := range devs {
-		devs[i].AuthSets, err = d.db.GetAuthSetsForDevice(devs[i].Id)
+		devs[i].AuthSets, err = d.db.GetAuthSetsForDevice(ctx, devs[i].Id)
 		if err != nil && err != store.ErrDevNotFound {
 			return nil, errors.Wrap(err, "db get auth sets error")
 		}
@@ -224,8 +223,8 @@ func (d *DevAuth) GetDevices(skip, limit uint) ([]model.Device, error) {
 	return devs, err
 }
 
-func (d *DevAuth) GetDevice(devId string) (*model.Device, error) {
-	dev, err := d.db.GetDeviceById(devId)
+func (d *DevAuth) GetDevice(ctx context.Context, devId string) (*model.Device, error) {
+	dev, err := d.db.GetDeviceById(ctx, devId)
 	if err != nil {
 		if err != store.ErrDevNotFound {
 			return nil, errors.Wrap(err, "db get device by id error")
@@ -233,7 +232,7 @@ func (d *DevAuth) GetDevice(devId string) (*model.Device, error) {
 		return nil, err
 	}
 
-	dev.AuthSets, err = d.db.GetAuthSetsForDevice(dev.Id)
+	dev.AuthSets, err = d.db.GetAuthSetsForDevice(ctx, dev.Id)
 	if err != nil {
 		if err != store.ErrDevNotFound {
 			return nil, errors.Wrap(err, "db get auth sets error")
@@ -245,35 +244,38 @@ func (d *DevAuth) GetDevice(devId string) (*model.Device, error) {
 
 // DecommissionDevice deletes device and all its tokens
 // TODO: submit device decommission job
-func (d *DevAuth) DecommissionDevice(devId string) error {
-	d.log.Warnf("Decommission device with id: %s", devId)
+func (d *DevAuth) DecommissionDevice(ctx context.Context, devId string) error {
+
+	l := log.FromContext(ctx)
+
+	l.Warnf("Decommission device with id: %s", devId)
 
 	// set decommissioning flag on the device
 	updev := &model.Device{Id: devId, Decommissioning: true}
-	if err := d.db.UpdateDevice(updev); err != nil {
+	if err := d.db.UpdateDevice(ctx, updev); err != nil {
 		return err
 	}
 
 	// delete device athorization sets
-	if err := d.db.DeleteAuthSetsForDevice(devId); err != nil && err != store.ErrAuthSetNotFound {
+	if err := d.db.DeleteAuthSetsForDevice(ctx, devId); err != nil && err != store.ErrAuthSetNotFound {
 		return errors.Wrap(err, "db delete device authorization sets error")
 	}
 
 	// delete device tokens
-	if err := d.db.DeleteTokenByDevId(devId); err != nil && err != store.ErrTokenNotFound {
+	if err := d.db.DeleteTokenByDevId(ctx, devId); err != nil && err != store.ErrTokenNotFound {
 		return errors.Wrap(err, "db delete device tokens error")
 	}
 
 	// delete device
-	return d.db.DeleteDevice(devId)
+	return d.db.DeleteDevice(ctx, devId)
 }
 
-func (d *DevAuth) AcceptDeviceAuth(device_id string, auth_id string) error {
-	if err := d.setAuthSetStatus(device_id, auth_id, model.DevStatusAccepted); err != nil {
+func (d *DevAuth) AcceptDeviceAuth(ctx context.Context, device_id string, auth_id string) error {
+	if err := d.setAuthSetStatus(ctx, device_id, auth_id, model.DevStatusAccepted); err != nil {
 		return err
 	}
 
-	aset, err := d.db.GetAuthSetById(auth_id)
+	aset, err := d.db.GetAuthSetById(ctx, auth_id)
 	if err != nil {
 		if err == store.ErrDevNotFound {
 			return err
@@ -282,7 +284,7 @@ func (d *DevAuth) AcceptDeviceAuth(device_id string, auth_id string) error {
 	}
 
 	// TODO make this a job for an orchestrator
-	if err := d.SubmitInventoryDevice(model.Device{
+	if err := d.SubmitInventoryDevice(ctx, model.Device{
 		Id: aset.DeviceId,
 	}); err != nil {
 		return errors.Wrap(err, "inventory device add error")
@@ -291,8 +293,8 @@ func (d *DevAuth) AcceptDeviceAuth(device_id string, auth_id string) error {
 	return nil
 }
 
-func (d *DevAuth) setAuthSetStatus(device_id string, auth_id string, status string) error {
-	aset, err := d.db.GetAuthSetById(auth_id)
+func (d *DevAuth) setAuthSetStatus(ctx context.Context, device_id string, auth_id string, status string) error {
+	aset, err := d.db.GetAuthSetById(ctx, auth_id)
 	if err != nil {
 		if err == store.ErrDevNotFound {
 			return err
@@ -306,13 +308,13 @@ func (d *DevAuth) setAuthSetStatus(device_id string, auth_id string, status stri
 
 	if status == model.DevStatusRejected || status == model.DevStatusPending {
 		// delete device token
-		err := d.db.DeleteTokenByDevId(aset.DeviceId)
+		err := d.db.DeleteTokenByDevId(ctx, aset.DeviceId)
 		if err != nil && err != store.ErrTokenNotFound {
 			return errors.Wrap(err, "db delete device token error")
 		}
 	}
 
-	if err := d.db.UpdateAuthSet(*aset, model.AuthSetUpdate{
+	if err := d.db.UpdateAuthSet(ctx, *aset, model.AuthSetUpdate{
 		Status: status,
 	}); err != nil {
 		return errors.Wrap(err, "db update device auth set error")
@@ -321,32 +323,39 @@ func (d *DevAuth) setAuthSetStatus(device_id string, auth_id string, status stri
 	return nil
 }
 
-func (d *DevAuth) RejectDeviceAuth(device_id string, auth_id string) error {
-	return d.setAuthSetStatus(device_id, auth_id, model.DevStatusRejected)
+func (d *DevAuth) RejectDeviceAuth(ctx context.Context, device_id string, auth_id string) error {
+	return d.setAuthSetStatus(ctx, device_id, auth_id, model.DevStatusRejected)
 }
 
-func (d *DevAuth) ResetDeviceAuth(device_id string, auth_id string) error {
-	return d.setAuthSetStatus(device_id, auth_id, model.DevStatusPending)
+func (d *DevAuth) ResetDeviceAuth(ctx context.Context, device_id string, auth_id string) error {
+	return d.setAuthSetStatus(ctx, device_id, auth_id, model.DevStatusPending)
 }
 
-func (*DevAuth) GetDeviceToken(dev_id string) (*model.Token, error) {
+func (*DevAuth) GetDeviceToken(ctx context.Context, dev_id string) (*model.Token, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (d *DevAuth) RevokeToken(token_id string) error {
-	d.log.Warnf("Revoke token with jti: %s", token_id)
-	return d.db.DeleteToken(token_id)
+func (d *DevAuth) RevokeToken(ctx context.Context, token_id string) error {
+
+	l := log.FromContext(ctx)
+
+	l.Warnf("Revoke token with jti: %s", token_id)
+
+	return d.db.DeleteToken(ctx, token_id)
 }
 
-func (d *DevAuth) VerifyToken(token string) error {
+func (d *DevAuth) VerifyToken(ctx context.Context, token string) error {
+
+	l := log.FromContext(ctx)
+
 	// validate signature and claims
 	jti, err := d.jwt.ValidateTokenSignRS256(token)
 	if err != nil {
 		if err == jwt.ErrTokenExpired {
-			d.log.Errorf("Token %s expired: %v", jti, err)
-			err := d.db.DeleteToken(jti)
+			l.Errorf("Token %s expired: %v", jti, err)
+			err := d.db.DeleteToken(ctx, jti)
 			if err == store.ErrTokenNotFound {
-				d.log.Errorf("Token with jti: %s not found", jti)
+				l.Errorf("Token with jti: %s not found", jti)
 				return err
 			}
 			if err != nil {
@@ -354,23 +363,23 @@ func (d *DevAuth) VerifyToken(token string) error {
 			}
 			return jwt.ErrTokenExpired
 		}
-		d.log.Errorf("Token invalid: %v", err)
+		l.Errorf("Token invalid: %v", err)
 		return jwt.ErrTokenInvalid
 	}
 	// check if token is in the system
-	tok, err := d.db.GetToken(jti)
+	tok, err := d.db.GetToken(ctx, jti)
 	if err != nil {
 		if err == store.ErrTokenNotFound {
-			d.log.Errorf("Token with jti: %s not found", jti)
+			l.Errorf("Token with jti: %s not found", jti)
 			return err
 		}
 		return errors.Wrapf(err, "Cannot get token with id: %s from database: %s", jti, err)
 	}
 
-	auth, err := d.db.GetAuthSetById(tok.AuthSetId)
+	auth, err := d.db.GetAuthSetById(ctx, tok.AuthSetId)
 	if err != nil {
 		if err == store.ErrTokenNotFound {
-			d.log.Errorf("auth set %v for token jti: %s not found",
+			l.Errorf("auth set %v for token jti: %s not found",
 				tok.AuthSetId, jti)
 			return err
 		}
@@ -382,17 +391,4 @@ func (d *DevAuth) VerifyToken(token string) error {
 	}
 
 	return nil
-}
-
-func (d *DevAuth) WithContext(ctx *api.RequestContext) DevAuthApp {
-	dwc := &DevAuthWithContext{
-		*d,
-		ctx,
-	}
-	dwc.clientGetter = dwc.contextClientGetter
-	return dwc
-}
-
-func (d *DevAuth) UseLog(l *log.Logger) {
-	d.log = l.F(log.Ctx{})
 }

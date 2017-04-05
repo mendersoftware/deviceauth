@@ -22,7 +22,6 @@ import (
 	"github.com/mendersoftware/deviceauth/model"
 	"github.com/mendersoftware/deviceauth/store"
 
-	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	"github.com/pkg/errors"
 	"gopkg.in/mgo.v2"
@@ -51,15 +50,13 @@ var (
 
 type DataStoreMongo struct {
 	session *mgo.Session
-	log     *log.Logger
 }
 
-func GetDataStoreMongo(db string, l *log.Logger) (*DataStoreMongo, error) {
+func GetDataStoreMongo(db string) (*DataStoreMongo, error) {
 	d, err := NewDataStoreMongo(db)
 	if err != nil {
 		return nil, errors.Wrap(err, "database connection failed")
 	}
-	d.UseLog(l)
 
 	return d, nil
 }
@@ -67,7 +64,6 @@ func GetDataStoreMongo(db string, l *log.Logger) (*DataStoreMongo, error) {
 func NewDataStoreMongoWithSession(session *mgo.Session) *DataStoreMongo {
 	return &DataStoreMongo{
 		session: session,
-		log:     log.New(log.Ctx{}),
 	}
 }
 
@@ -86,7 +82,7 @@ func NewDataStoreMongo(host string) (*DataStoreMongo, error) {
 	return db, nil
 }
 
-func (db *DataStoreMongo) GetDevices(skip, limit uint) ([]model.Device, error) {
+func (db *DataStoreMongo) GetDevices(ctx context.Context, skip, limit uint) ([]model.Device, error) {
 	s := db.session.Copy()
 	defer s.Close()
 
@@ -101,7 +97,7 @@ func (db *DataStoreMongo) GetDevices(skip, limit uint) ([]model.Device, error) {
 	return res, nil
 }
 
-func (db *DataStoreMongo) GetDeviceById(id string) (*model.Device, error) {
+func (db *DataStoreMongo) GetDeviceById(ctx context.Context, id string) (*model.Device, error) {
 	s := db.session.Copy()
 	defer s.Close()
 
@@ -122,7 +118,7 @@ func (db *DataStoreMongo) GetDeviceById(id string) (*model.Device, error) {
 	return &res, nil
 }
 
-func (db *DataStoreMongo) GetDeviceByIdentityData(idata string) (*model.Device, error) {
+func (db *DataStoreMongo) GetDeviceByIdentityData(ctx context.Context, idata string) (*model.Device, error) {
 	s := db.session.Copy()
 	defer s.Close()
 
@@ -144,7 +140,7 @@ func (db *DataStoreMongo) GetDeviceByIdentityData(idata string) (*model.Device, 
 	return &res, nil
 }
 
-func (db *DataStoreMongo) AddDevice(d model.Device) error {
+func (db *DataStoreMongo) AddDevice(ctx context.Context, d model.Device) error {
 	s := db.session.Copy()
 	defer s.Close()
 
@@ -161,7 +157,7 @@ func (db *DataStoreMongo) AddDevice(d model.Device) error {
 	return nil
 }
 
-func (db *DataStoreMongo) UpdateDevice(d *model.Device) error {
+func (db *DataStoreMongo) UpdateDevice(ctx context.Context, d *model.Device) error {
 	s := db.session.Copy()
 	defer s.Close()
 
@@ -180,7 +176,7 @@ func (db *DataStoreMongo) UpdateDevice(d *model.Device) error {
 	return nil
 }
 
-func (db *DataStoreMongo) DeleteDevice(id string) error {
+func (db *DataStoreMongo) DeleteDevice(ctx context.Context, id string) error {
 	s := db.session.Copy()
 	defer s.Close()
 
@@ -197,7 +193,7 @@ func (db *DataStoreMongo) DeleteDevice(id string) error {
 	return nil
 }
 
-func (db *DataStoreMongo) AddToken(t model.Token) error {
+func (db *DataStoreMongo) AddToken(ctx context.Context, t model.Token) error {
 	s := db.session.Copy()
 	defer s.Close()
 
@@ -210,7 +206,7 @@ func (db *DataStoreMongo) AddToken(t model.Token) error {
 	return nil
 }
 
-func (db *DataStoreMongo) GetToken(jti string) (*model.Token, error) {
+func (db *DataStoreMongo) GetToken(ctx context.Context, jti string) (*model.Token, error) {
 	s := db.session.Copy()
 	defer s.Close()
 
@@ -231,7 +227,7 @@ func (db *DataStoreMongo) GetToken(jti string) (*model.Token, error) {
 	return &res, nil
 }
 
-func (db *DataStoreMongo) DeleteToken(jti string) error {
+func (db *DataStoreMongo) DeleteToken(ctx context.Context, jti string) error {
 	s := db.session.Copy()
 	defer s.Close()
 
@@ -248,7 +244,7 @@ func (db *DataStoreMongo) DeleteToken(jti string) error {
 	return nil
 }
 
-func (db *DataStoreMongo) DeleteTokenByDevId(devId string) error {
+func (db *DataStoreMongo) DeleteTokenByDevId(ctx context.Context, devId string) error {
 	s := db.session.Copy()
 	defer s.Close()
 
@@ -305,10 +301,6 @@ func makeUpdate(d *model.Device) *model.Device {
 	return updev
 }
 
-func (db *DataStoreMongo) UseLog(l *log.Logger) {
-	db.log = l.F(log.Ctx{})
-}
-
 func (db *DataStoreMongo) Index() error {
 	s := db.session.Copy()
 	defer s.Close()
@@ -345,7 +337,7 @@ func (db *DataStoreMongo) Index() error {
 	return err
 }
 
-func (db *DataStoreMongo) AddAuthSet(set model.AuthSet) error {
+func (db *DataStoreMongo) AddAuthSet(ctx context.Context, set model.AuthSet) error {
 	s := db.session.Copy()
 	defer s.Close()
 
@@ -362,7 +354,7 @@ func (db *DataStoreMongo) AddAuthSet(set model.AuthSet) error {
 	return nil
 }
 
-func (db *DataStoreMongo) GetAuthSetByDataKey(idata string, key string) (*model.AuthSet, error) {
+func (db *DataStoreMongo) GetAuthSetByDataKey(ctx context.Context, idata string, key string) (*model.AuthSet, error) {
 	s := db.session.Copy()
 	defer s.Close()
 
@@ -387,7 +379,7 @@ func (db *DataStoreMongo) GetAuthSetByDataKey(idata string, key string) (*model.
 	return &res, nil
 }
 
-func (db *DataStoreMongo) GetAuthSetById(auth_id string) (*model.AuthSet, error) {
+func (db *DataStoreMongo) GetAuthSetById(ctx context.Context, auth_id string) (*model.AuthSet, error) {
 	s := db.session.Copy()
 	defer s.Close()
 
@@ -407,7 +399,7 @@ func (db *DataStoreMongo) GetAuthSetById(auth_id string) (*model.AuthSet, error)
 	return &res, nil
 }
 
-func (db *DataStoreMongo) GetAuthSetsForDevice(devid string) ([]model.AuthSet, error) {
+func (db *DataStoreMongo) GetAuthSetsForDevice(ctx context.Context, devid string) ([]model.AuthSet, error) {
 	s := db.session.Copy()
 	defer s.Close()
 
@@ -428,7 +420,7 @@ func (db *DataStoreMongo) GetAuthSetsForDevice(devid string) ([]model.AuthSet, e
 	return res, nil
 }
 
-func (db *DataStoreMongo) UpdateAuthSet(orig model.AuthSet, mod model.AuthSetUpdate) error {
+func (db *DataStoreMongo) UpdateAuthSet(ctx context.Context, orig model.AuthSet, mod model.AuthSetUpdate) error {
 	s := db.session.Copy()
 	defer s.Close()
 
@@ -442,7 +434,7 @@ func (db *DataStoreMongo) UpdateAuthSet(orig model.AuthSet, mod model.AuthSetUpd
 	return nil
 }
 
-func (db *DataStoreMongo) DeleteAuthSetsForDevice(devid string) error {
+func (db *DataStoreMongo) DeleteAuthSetsForDevice(ctx context.Context, devid string) error {
 	s := db.session.Copy()
 	defer s.Close()
 

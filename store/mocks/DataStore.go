@@ -17,7 +17,7 @@
 
 package mocks
 
-import log "github.com/mendersoftware/go-lib-micro/log"
+import context "context"
 import mock "github.com/stretchr/testify/mock"
 import model "github.com/mendersoftware/deviceauth/model"
 import store "github.com/mendersoftware/deviceauth/store"
@@ -27,13 +27,13 @@ type DataStore struct {
 	mock.Mock
 }
 
-// AddAuthSet provides a mock function with given fields: set
-func (_m *DataStore) AddAuthSet(set model.AuthSet) error {
-	ret := _m.Called(set)
+// AddAuthSet provides a mock function with given fields: ctx, set
+func (_m *DataStore) AddAuthSet(ctx context.Context, set model.AuthSet) error {
+	ret := _m.Called(ctx, set)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(model.AuthSet) error); ok {
-		r0 = rf(set)
+	if rf, ok := ret.Get(0).(func(context.Context, model.AuthSet) error); ok {
+		r0 = rf(ctx, set)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -41,13 +41,13 @@ func (_m *DataStore) AddAuthSet(set model.AuthSet) error {
 	return r0
 }
 
-// AddDevice provides a mock function with given fields: d
-func (_m *DataStore) AddDevice(d model.Device) error {
-	ret := _m.Called(d)
+// AddDevice provides a mock function with given fields: ctx, d
+func (_m *DataStore) AddDevice(ctx context.Context, d model.Device) error {
+	ret := _m.Called(ctx, d)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(model.Device) error); ok {
-		r0 = rf(d)
+	if rf, ok := ret.Get(0).(func(context.Context, model.Device) error); ok {
+		r0 = rf(ctx, d)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -55,13 +55,13 @@ func (_m *DataStore) AddDevice(d model.Device) error {
 	return r0
 }
 
-// AddToken provides a mock function with given fields: t
-func (_m *DataStore) AddToken(t model.Token) error {
-	ret := _m.Called(t)
+// AddToken provides a mock function with given fields: ctx, t
+func (_m *DataStore) AddToken(ctx context.Context, t model.Token) error {
+	ret := _m.Called(ctx, t)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(model.Token) error); ok {
-		r0 = rf(t)
+	if rf, ok := ret.Get(0).(func(context.Context, model.Token) error); ok {
+		r0 = rf(ctx, t)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -69,13 +69,13 @@ func (_m *DataStore) AddToken(t model.Token) error {
 	return r0
 }
 
-// DeleteAuthSetsForDevice provides a mock function with given fields: devid
-func (_m *DataStore) DeleteAuthSetsForDevice(devid string) error {
-	ret := _m.Called(devid)
+// DeleteAuthSetsForDevice provides a mock function with given fields: ctx, devid
+func (_m *DataStore) DeleteAuthSetsForDevice(ctx context.Context, devid string) error {
+	ret := _m.Called(ctx, devid)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string) error); ok {
-		r0 = rf(devid)
+	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = rf(ctx, devid)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -83,13 +83,13 @@ func (_m *DataStore) DeleteAuthSetsForDevice(devid string) error {
 	return r0
 }
 
-// DeleteDevice provides a mock function with given fields: id
-func (_m *DataStore) DeleteDevice(id string) error {
-	ret := _m.Called(id)
+// DeleteDevice provides a mock function with given fields: ctx, id
+func (_m *DataStore) DeleteDevice(ctx context.Context, id string) error {
+	ret := _m.Called(ctx, id)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string) error); ok {
-		r0 = rf(id)
+	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = rf(ctx, id)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -97,13 +97,13 @@ func (_m *DataStore) DeleteDevice(id string) error {
 	return r0
 }
 
-// DeleteToken provides a mock function with given fields: jti
-func (_m *DataStore) DeleteToken(jti string) error {
-	ret := _m.Called(jti)
+// DeleteToken provides a mock function with given fields: ctx, jti
+func (_m *DataStore) DeleteToken(ctx context.Context, jti string) error {
+	ret := _m.Called(ctx, jti)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string) error); ok {
-		r0 = rf(jti)
+	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = rf(ctx, jti)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -111,13 +111,13 @@ func (_m *DataStore) DeleteToken(jti string) error {
 	return r0
 }
 
-// DeleteTokenByDevId provides a mock function with given fields: dev_id
-func (_m *DataStore) DeleteTokenByDevId(dev_id string) error {
-	ret := _m.Called(dev_id)
+// DeleteTokenByDevId provides a mock function with given fields: ctx, dev_id
+func (_m *DataStore) DeleteTokenByDevId(ctx context.Context, dev_id string) error {
+	ret := _m.Called(ctx, dev_id)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string) error); ok {
-		r0 = rf(dev_id)
+	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = rf(ctx, dev_id)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -125,13 +125,13 @@ func (_m *DataStore) DeleteTokenByDevId(dev_id string) error {
 	return r0
 }
 
-// GetAuthSetByDataKey provides a mock function with given fields: data, key
-func (_m *DataStore) GetAuthSetByDataKey(data string, key string) (*model.AuthSet, error) {
-	ret := _m.Called(data, key)
+// GetAuthSetByDataKey provides a mock function with given fields: ctx, data, key
+func (_m *DataStore) GetAuthSetByDataKey(ctx context.Context, data string, key string) (*model.AuthSet, error) {
+	ret := _m.Called(ctx, data, key)
 
 	var r0 *model.AuthSet
-	if rf, ok := ret.Get(0).(func(string, string) *model.AuthSet); ok {
-		r0 = rf(data, key)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) *model.AuthSet); ok {
+		r0 = rf(ctx, data, key)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*model.AuthSet)
@@ -139,8 +139,8 @@ func (_m *DataStore) GetAuthSetByDataKey(data string, key string) (*model.AuthSe
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(string, string) error); ok {
-		r1 = rf(data, key)
+	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = rf(ctx, data, key)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -148,13 +148,13 @@ func (_m *DataStore) GetAuthSetByDataKey(data string, key string) (*model.AuthSe
 	return r0, r1
 }
 
-// GetAuthSetById provides a mock function with given fields: id
-func (_m *DataStore) GetAuthSetById(id string) (*model.AuthSet, error) {
-	ret := _m.Called(id)
+// GetAuthSetById provides a mock function with given fields: ctx, id
+func (_m *DataStore) GetAuthSetById(ctx context.Context, id string) (*model.AuthSet, error) {
+	ret := _m.Called(ctx, id)
 
 	var r0 *model.AuthSet
-	if rf, ok := ret.Get(0).(func(string) *model.AuthSet); ok {
-		r0 = rf(id)
+	if rf, ok := ret.Get(0).(func(context.Context, string) *model.AuthSet); ok {
+		r0 = rf(ctx, id)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*model.AuthSet)
@@ -162,8 +162,8 @@ func (_m *DataStore) GetAuthSetById(id string) (*model.AuthSet, error) {
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(id)
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, id)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -171,13 +171,13 @@ func (_m *DataStore) GetAuthSetById(id string) (*model.AuthSet, error) {
 	return r0, r1
 }
 
-// GetAuthSetsForDevice provides a mock function with given fields: devid
-func (_m *DataStore) GetAuthSetsForDevice(devid string) ([]model.AuthSet, error) {
-	ret := _m.Called(devid)
+// GetAuthSetsForDevice provides a mock function with given fields: ctx, devid
+func (_m *DataStore) GetAuthSetsForDevice(ctx context.Context, devid string) ([]model.AuthSet, error) {
+	ret := _m.Called(ctx, devid)
 
 	var r0 []model.AuthSet
-	if rf, ok := ret.Get(0).(func(string) []model.AuthSet); ok {
-		r0 = rf(devid)
+	if rf, ok := ret.Get(0).(func(context.Context, string) []model.AuthSet); ok {
+		r0 = rf(ctx, devid)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]model.AuthSet)
@@ -185,8 +185,8 @@ func (_m *DataStore) GetAuthSetsForDevice(devid string) ([]model.AuthSet, error)
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(devid)
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, devid)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -194,13 +194,13 @@ func (_m *DataStore) GetAuthSetsForDevice(devid string) ([]model.AuthSet, error)
 	return r0, r1
 }
 
-// GetDeviceById provides a mock function with given fields: id
-func (_m *DataStore) GetDeviceById(id string) (*model.Device, error) {
-	ret := _m.Called(id)
+// GetDeviceById provides a mock function with given fields: ctx, id
+func (_m *DataStore) GetDeviceById(ctx context.Context, id string) (*model.Device, error) {
+	ret := _m.Called(ctx, id)
 
 	var r0 *model.Device
-	if rf, ok := ret.Get(0).(func(string) *model.Device); ok {
-		r0 = rf(id)
+	if rf, ok := ret.Get(0).(func(context.Context, string) *model.Device); ok {
+		r0 = rf(ctx, id)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*model.Device)
@@ -208,8 +208,8 @@ func (_m *DataStore) GetDeviceById(id string) (*model.Device, error) {
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(id)
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, id)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -217,13 +217,13 @@ func (_m *DataStore) GetDeviceById(id string) (*model.Device, error) {
 	return r0, r1
 }
 
-// GetDeviceByIdentityData provides a mock function with given fields: idata
-func (_m *DataStore) GetDeviceByIdentityData(idata string) (*model.Device, error) {
-	ret := _m.Called(idata)
+// GetDeviceByIdentityData provides a mock function with given fields: ctx, idata
+func (_m *DataStore) GetDeviceByIdentityData(ctx context.Context, idata string) (*model.Device, error) {
+	ret := _m.Called(ctx, idata)
 
 	var r0 *model.Device
-	if rf, ok := ret.Get(0).(func(string) *model.Device); ok {
-		r0 = rf(idata)
+	if rf, ok := ret.Get(0).(func(context.Context, string) *model.Device); ok {
+		r0 = rf(ctx, idata)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*model.Device)
@@ -231,8 +231,8 @@ func (_m *DataStore) GetDeviceByIdentityData(idata string) (*model.Device, error
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(idata)
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, idata)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -240,13 +240,13 @@ func (_m *DataStore) GetDeviceByIdentityData(idata string) (*model.Device, error
 	return r0, r1
 }
 
-// GetDevices provides a mock function with given fields: skip, limit
-func (_m *DataStore) GetDevices(skip uint, limit uint) ([]model.Device, error) {
-	ret := _m.Called(skip, limit)
+// GetDevices provides a mock function with given fields: ctx, skip, limit
+func (_m *DataStore) GetDevices(ctx context.Context, skip uint, limit uint) ([]model.Device, error) {
+	ret := _m.Called(ctx, skip, limit)
 
 	var r0 []model.Device
-	if rf, ok := ret.Get(0).(func(uint, uint) []model.Device); ok {
-		r0 = rf(skip, limit)
+	if rf, ok := ret.Get(0).(func(context.Context, uint, uint) []model.Device); ok {
+		r0 = rf(ctx, skip, limit)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]model.Device)
@@ -254,8 +254,8 @@ func (_m *DataStore) GetDevices(skip uint, limit uint) ([]model.Device, error) {
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(uint, uint) error); ok {
-		r1 = rf(skip, limit)
+	if rf, ok := ret.Get(1).(func(context.Context, uint, uint) error); ok {
+		r1 = rf(ctx, skip, limit)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -263,13 +263,13 @@ func (_m *DataStore) GetDevices(skip uint, limit uint) ([]model.Device, error) {
 	return r0, r1
 }
 
-// GetToken provides a mock function with given fields: jti
-func (_m *DataStore) GetToken(jti string) (*model.Token, error) {
-	ret := _m.Called(jti)
+// GetToken provides a mock function with given fields: ctx, jti
+func (_m *DataStore) GetToken(ctx context.Context, jti string) (*model.Token, error) {
+	ret := _m.Called(ctx, jti)
 
 	var r0 *model.Token
-	if rf, ok := ret.Get(0).(func(string) *model.Token); ok {
-		r0 = rf(jti)
+	if rf, ok := ret.Get(0).(func(context.Context, string) *model.Token); ok {
+		r0 = rf(ctx, jti)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*model.Token)
@@ -277,8 +277,8 @@ func (_m *DataStore) GetToken(jti string) (*model.Token, error) {
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(jti)
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, jti)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -286,13 +286,13 @@ func (_m *DataStore) GetToken(jti string) (*model.Token, error) {
 	return r0, r1
 }
 
-// UpdateAuthSet provides a mock function with given fields: orig, mod
-func (_m *DataStore) UpdateAuthSet(orig model.AuthSet, mod model.AuthSetUpdate) error {
-	ret := _m.Called(orig, mod)
+// UpdateAuthSet provides a mock function with given fields: ctx, orig, mod
+func (_m *DataStore) UpdateAuthSet(ctx context.Context, orig model.AuthSet, mod model.AuthSetUpdate) error {
+	ret := _m.Called(ctx, orig, mod)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(model.AuthSet, model.AuthSetUpdate) error); ok {
-		r0 = rf(orig, mod)
+	if rf, ok := ret.Get(0).(func(context.Context, model.AuthSet, model.AuthSetUpdate) error); ok {
+		r0 = rf(ctx, orig, mod)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -300,23 +300,18 @@ func (_m *DataStore) UpdateAuthSet(orig model.AuthSet, mod model.AuthSetUpdate) 
 	return r0
 }
 
-// UpdateDevice provides a mock function with given fields: d
-func (_m *DataStore) UpdateDevice(d *model.Device) error {
-	ret := _m.Called(d)
+// UpdateDevice provides a mock function with given fields: ctx, d
+func (_m *DataStore) UpdateDevice(ctx context.Context, d *model.Device) error {
+	ret := _m.Called(ctx, d)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*model.Device) error); ok {
-		r0 = rf(d)
+	if rf, ok := ret.Get(0).(func(context.Context, *model.Device) error); ok {
+		r0 = rf(ctx, d)
 	} else {
 		r0 = ret.Error(0)
 	}
 
 	return r0
-}
-
-// UseLog provides a mock function with given fields: l
-func (_m *DataStore) UseLog(l *log.Logger) {
-	_m.Called(l)
 }
 
 var _ store.DataStore = (*DataStore)(nil)

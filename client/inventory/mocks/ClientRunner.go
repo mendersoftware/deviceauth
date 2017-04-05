@@ -13,8 +13,8 @@
 //    limitations under the License.
 package mocks
 
+import context "context"
 import inventory "github.com/mendersoftware/deviceauth/client/inventory"
-import log "github.com/mendersoftware/go-lib-micro/log"
 import mock "github.com/stretchr/testify/mock"
 import requestid "github.com/mendersoftware/go-lib-micro/requestid"
 
@@ -23,23 +23,18 @@ type ClientRunner struct {
 	mock.Mock
 }
 
-// AddDevice provides a mock function with given fields: req, client
-func (_m *ClientRunner) AddDevice(req inventory.AddReq, client requestid.ApiRequester) error {
-	ret := _m.Called(req, client)
+// AddDevice provides a mock function with given fields: ctx, req, client
+func (_m *ClientRunner) AddDevice(ctx context.Context, req inventory.AddReq, client requestid.ApiRequester) error {
+	ret := _m.Called(ctx, req, client)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(inventory.AddReq, requestid.ApiRequester) error); ok {
-		r0 = rf(req, client)
+	if rf, ok := ret.Get(0).(func(context.Context, inventory.AddReq, requestid.ApiRequester) error); ok {
+		r0 = rf(ctx, req, client)
 	} else {
 		r0 = ret.Error(0)
 	}
 
 	return r0
-}
-
-// UseLog provides a mock function with given fields: l
-func (_m *ClientRunner) UseLog(l *log.Logger) {
-	_m.Called(l)
 }
 
 var _ inventory.ClientRunner = (*ClientRunner)(nil)

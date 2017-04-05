@@ -14,6 +14,7 @@
 package mongo
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"testing"
@@ -116,13 +117,13 @@ func TestMigration_1_0_0(t *testing.T) {
 	assert.Equal(t, devCount, cnt)
 
 	// trying to add a device with same identity data should raise conflict
-	err = db.AddDevice(model.Device{
+	err = db.AddDevice(context.Background(), model.Device{
 		IdData: data.GetDev(10).IdData,
 	})
 	assert.EqualError(t, err, store.ErrObjectExists.Error())
 
 	// trying to add device with existing out set should raise conflict
-	err = db.AddAuthSet(model.AuthSet{
+	err = db.AddAuthSet(context.Background(), model.AuthSet{
 		PubKey:   data.GetDev(10).PubKey,
 		IdData:   data.GetDev(10).IdData,
 		DeviceId: data.GetDev(10).Id,
@@ -131,7 +132,7 @@ func TestMigration_1_0_0(t *testing.T) {
 
 	// verify that there is an auth set for every device
 	for i, dev := range data.devices {
-		aset, err := db.GetAuthSetByDataKey(dev.IdData, dev.PubKey)
+		aset, err := db.GetAuthSetByDataKey(context.Background(), dev.IdData, dev.PubKey)
 		assert.NoError(t, err)
 
 		// auth set ID should be the same as device ID
@@ -149,7 +150,7 @@ func TestMigration_1_0_0(t *testing.T) {
 				break
 			}
 
-			tok, err := db.GetToken(oldtok.Id)
+			tok, err := db.GetToken(context.Background(), oldtok.Id)
 			assert.NoError(t, err)
 			assert.Equal(t, oldtok.Token, tok.Token)
 			assert.Equal(t, dev.Id, tok.DevId)

@@ -14,6 +14,7 @@
 package devauth
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"testing"
@@ -176,13 +177,14 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 
 			db := mstore.DataStore{}
 			db.On("AddDevice",
+				context.Background(),
 				mock.MatchedBy(
 					func(d model.Device) bool {
 						return d.IdData == idData
 					})).Return(tc.addDeviceErr)
 
-			db.On("GetDeviceByIdentityData", idData).Return(
-				func(idata string) *model.Device {
+			db.On("GetDeviceByIdentityData", context.Background(), idData).Return(
+				func(ctx context.Context, idata string) *model.Device {
 					if tc.getDevByIdErr == nil {
 						return &model.Device{
 							PubKey: tc.getDevByIdKey,
@@ -194,11 +196,13 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 				},
 				tc.getDevByIdErr)
 			db.On("AddAuthSet",
+				context.Background(),
 				mock.MatchedBy(
 					func(m model.AuthSet) bool {
 						return m.DeviceId == devId
 					})).Return(tc.addAuthSetErr)
 			db.On("UpdateAuthSet",
+				context.Background(),
 				mock.MatchedBy(
 					func(m model.AuthSet) bool {
 						return m.DeviceId == devId
@@ -210,8 +214,9 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 					})).Return(nil)
 
 			db.On("GetAuthSetByDataKey",
+				context.Background(),
 				idData, pubKey).Return(
-				func(idata string, key string) *model.AuthSet {
+				func(ctx context.Context, idata string, key string) *model.AuthSet {
 					if tc.getAuthSetErr == nil {
 						return &model.AuthSet{
 							Id:                authId,
@@ -227,6 +232,7 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 				tc.getAuthSetErr)
 
 			db.On("AddToken",
+				context.Background(),
 				mock.AnythingOfType("model.Token")).Return(nil)
 
 			cda := mdevadm.ClientRunner{}
@@ -234,6 +240,7 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 				// setup admission client mock only if admission
 				// was not notified yet as per test case
 				cda.On("AddDevice",
+					context.Background(),
 					mock.MatchedBy(func(r deviceadm.AdmReq) bool {
 						return (r.AuthId == authId) &&
 							(r.IdData == idData) &&
@@ -253,7 +260,7 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 				}, nil)
 
 			devauth := NewDevAuth(&db, &cda, &cdi, &jwt)
-			res, err := devauth.SubmitAuthRequest(&req)
+			res, err := devauth.SubmitAuthRequest(context.Background(), &req)
 
 			assert.Equal(t, tc.res, res)
 			if tc.err != nil {
@@ -310,19 +317,19 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 			t.Parallel()
 
 			db := mstore.DataStore{}
-			db.On("GetAuthSetById", "dummy_aid").Return(tc.aset, tc.dbGetErr)
+			db.On("GetAuthSetById", context.Background(), "dummy_aid").Return(tc.aset, tc.dbGetErr)
 			if tc.aset != nil {
-				db.On("UpdateAuthSet", *tc.aset,
+				db.On("UpdateAuthSet", context.Background(), *tc.aset,
 					model.AuthSetUpdate{Status: model.DevStatusAccepted}).Return(tc.dbUpdateErr)
 			}
 
 			inv := minventory.ClientRunner{}
-			inv.On("AddDevice", inventory.AddReq{Id: "dummy_devid"},
+			inv.On("AddDevice", context.Background(), inventory.AddReq{Id: "dummy_devid"},
 				mock.MatchedBy(func(_ requestid.ApiRequester) bool { return true })).
 				Return(tc.invErr)
 
 			devauth := NewDevAuth(&db, nil, &inv, nil)
-			err := devauth.AcceptDeviceAuth("dummy_devid", "dummy_aid")
+			err := devauth.AcceptDeviceAuth(context.Background(), "dummy_devid", "dummy_aid")
 
 			if tc.outErr != "" {
 				assert.EqualError(t, err, tc.outErr)
@@ -379,16 +386,16 @@ func TestDevAuthRejectDevice(t *testing.T) {
 			t.Parallel()
 
 			db := mstore.DataStore{}
-			db.On("GetAuthSetById", "dummy_aid").Return(tc.aset, tc.dbErr)
+			db.On("GetAuthSetById", context.Background(), "dummy_aid").Return(tc.aset, tc.dbErr)
 			if tc.aset != nil {
-				db.On("UpdateAuthSet", *tc.aset,
+				db.On("UpdateAuthSet", context.Background(), *tc.aset,
 					model.AuthSetUpdate{Status: model.DevStatusRejected}).Return(nil)
 			}
-			db.On("DeleteTokenByDevId", "dummy_devid").Return(
+			db.On("DeleteTokenByDevId", context.Background(), "dummy_devid").Return(
 				tc.dbDelDevTokenErr)
 
 			devauth := NewDevAuth(&db, nil, nil, nil)
-			err := devauth.RejectDeviceAuth("dummy_devid", "dummy_aid")
+			err := devauth.RejectDeviceAuth(context.Background(), "dummy_devid", "dummy_aid")
 
 			if tc.dbErr != nil || (tc.dbDelDevTokenErr != nil &&
 				tc.dbDelDevTokenErr != store.ErrTokenNotFound) {
@@ -446,16 +453,16 @@ func TestDevAuthResetDevice(t *testing.T) {
 			t.Parallel()
 
 			db := mstore.DataStore{}
-			db.On("GetAuthSetById", "dummy_aid").Return(tc.aset, tc.dbErr)
+			db.On("GetAuthSetById", context.Background(), "dummy_aid").Return(tc.aset, tc.dbErr)
 			if tc.aset != nil {
-				db.On("UpdateAuthSet", *tc.aset,
+				db.On("UpdateAuthSet", context.Background(), *tc.aset,
 					model.AuthSetUpdate{Status: model.DevStatusPending}).Return(nil)
 			}
-			db.On("DeleteTokenByDevId", "dummy_devid").Return(
+			db.On("DeleteTokenByDevId", context.Background(), "dummy_devid").Return(
 				tc.dbDelDevTokenErr)
 
 			devauth := NewDevAuth(&db, nil, nil, nil)
-			err := devauth.ResetDeviceAuth("dummy_devid", "dummy_aid")
+			err := devauth.ResetDeviceAuth(context.Background(), "dummy_devid", "dummy_aid")
 
 			if tc.dbErr != nil ||
 				(tc.dbDelDevTokenErr != nil &&
@@ -551,16 +558,16 @@ func TestDevAuthVerifyToken(t *testing.T) {
 			ja.On("ValidateTokenSignRS256", tc.tokenString).Return(tc.jti, tc.validateErr)
 
 			if tc.validateErr == jwt.ErrTokenExpired {
-				db.On("DeleteToken", tc.jti).Return(nil)
+				db.On("DeleteToken", context.Background(), tc.jti).Return(nil)
 			}
 
-			db.On("GetToken", tc.jti).Return(tc.token, tc.getTokenErr)
+			db.On("GetToken", context.Background(), tc.jti).Return(tc.token, tc.getTokenErr)
 
 			if tc.token != nil {
-				db.On("GetAuthSetById", tc.token.AuthSetId).Return(tc.auth, tc.getAuthErr)
+				db.On("GetAuthSetById", context.Background(), tc.token.AuthSetId).Return(tc.auth, tc.getAuthErr)
 			}
 
-			err := devauth.VerifyToken(tc.tokenString)
+			err := devauth.VerifyToken(context.Background(), tc.tokenString)
 			if tc.tokenValidateErr != nil {
 				assert.EqualError(t, err, tc.tokenValidateErr.Error())
 			} else {
@@ -606,17 +613,17 @@ func TestDevAuthDecommissionDevice(t *testing.T) {
 			t.Parallel()
 
 			db := mstore.DataStore{}
-			db.On("UpdateDevice", mock.AnythingOfType("*model.Device")).Return(
+			db.On("UpdateDevice", context.Background(), mock.AnythingOfType("*model.Device")).Return(
 				tc.dbUpdateDeviceErr)
-			db.On("DeleteAuthSetsForDevice", mock.AnythingOfType("string")).Return(
+			db.On("DeleteAuthSetsForDevice", context.Background(), mock.AnythingOfType("string")).Return(
 				tc.dbDeleteAuthSetsForDeviceErr)
-			db.On("DeleteTokenByDevId", mock.AnythingOfType("string")).Return(
+			db.On("DeleteTokenByDevId", context.Background(), mock.AnythingOfType("string")).Return(
 				tc.dbDeleteTokenByDevIdErr)
-			db.On("DeleteDevice", mock.AnythingOfType("string")).Return(
+			db.On("DeleteDevice", context.Background(), mock.AnythingOfType("string")).Return(
 				tc.dbDeleteDeviceErr)
 
 			devauth := NewDevAuth(&db, nil, nil, nil)
-			err := devauth.DecommissionDevice("dummy_devid")
+			err := devauth.DecommissionDevice(context.Background(), "dummy_devid")
 
 			if tc.outErr != "" {
 				assert.EqualError(t, err, tc.outErr)
