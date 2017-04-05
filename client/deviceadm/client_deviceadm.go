@@ -76,7 +76,11 @@ func (d *Client) AddDevice(ctx context.Context, admreq AdmReq, client requestid.
 
 	req.Header.Set("Content-Type", "application/json")
 
-	rsp, err := client.Do(req)
+	// set the device admission request timeout
+	ctx, cancel := context.WithTimeout(ctx, d.conf.Timeout)
+	defer cancel()
+
+	rsp, err := client.Do(req.WithContext(ctx))
 	if err != nil {
 		return errors.Wrapf(err, "failed to add device")
 	}
