@@ -23,6 +23,7 @@ import (
 	mdevadm "github.com/mendersoftware/deviceauth/client/deviceadm/mocks"
 	"github.com/mendersoftware/deviceauth/client/inventory"
 	minventory "github.com/mendersoftware/deviceauth/client/inventory/mocks"
+	morchestrator "github.com/mendersoftware/deviceauth/client/orchestrator/mocks"
 	"github.com/mendersoftware/deviceauth/jwt"
 	mjwt "github.com/mendersoftware/deviceauth/jwt/mocks"
 	"github.com/mendersoftware/deviceauth/model"
@@ -259,7 +260,7 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 					return model.NewToken("", devId, "dummytoken")
 				}, nil)
 
-			devauth := NewDevAuth(&db, &cda, &cdi, &jwt)
+			devauth := NewDevAuth(&db, &cda, &cdi, nil, &jwt)
 			res, err := devauth.SubmitAuthRequest(context.Background(), &req)
 
 			assert.Equal(t, tc.res, res)
@@ -328,7 +329,7 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 				mock.MatchedBy(func(_ requestid.ApiRequester) bool { return true })).
 				Return(tc.invErr)
 
-			devauth := NewDevAuth(&db, nil, &inv, nil)
+			devauth := NewDevAuth(&db, nil, &inv, nil, nil)
 			err := devauth.AcceptDeviceAuth(context.Background(), "dummy_devid", "dummy_aid")
 
 			if tc.outErr != "" {
@@ -394,7 +395,7 @@ func TestDevAuthRejectDevice(t *testing.T) {
 			db.On("DeleteTokenByDevId", context.Background(), "dummy_devid").Return(
 				tc.dbDelDevTokenErr)
 
-			devauth := NewDevAuth(&db, nil, nil, nil)
+			devauth := NewDevAuth(&db, nil, nil, nil, nil)
 			err := devauth.RejectDeviceAuth(context.Background(), "dummy_devid", "dummy_aid")
 
 			if tc.dbErr != nil || (tc.dbDelDevTokenErr != nil &&
@@ -461,7 +462,7 @@ func TestDevAuthResetDevice(t *testing.T) {
 			db.On("DeleteTokenByDevId", context.Background(), "dummy_devid").Return(
 				tc.dbDelDevTokenErr)
 
-			devauth := NewDevAuth(&db, nil, nil, nil)
+			devauth := NewDevAuth(&db, nil, nil, nil, nil)
 			err := devauth.ResetDeviceAuth(context.Background(), "dummy_devid", "dummy_aid")
 
 			if tc.dbErr != nil ||
@@ -553,7 +554,7 @@ func TestDevAuthVerifyToken(t *testing.T) {
 			db := &mstore.DataStore{}
 			ja := &mjwt.JWTAgentApp{}
 
-			devauth := NewDevAuth(db, nil, nil, ja)
+			devauth := NewDevAuth(db, nil, nil, nil, ja)
 
 			ja.On("ValidateTokenSignRS256", tc.tokenString).Return(tc.jti, tc.validateErr)
 
@@ -582,10 +583,11 @@ func TestDevAuthDecommissionDevice(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
-		dbUpdateDeviceErr            error
-		dbDeleteAuthSetsForDeviceErr error
-		dbDeleteTokenByDevIdErr      error
-		dbDeleteDeviceErr            error
+		dbUpdateDeviceErr                  error
+		dbDeleteAuthSetsForDeviceErr       error
+		dbDeleteTokenByDevIdErr            error
+		dbDeleteDeviceErr                  error
+		coSubmitDeviceDecommisioningJobErr error
 
 		outErr string
 	}{
@@ -605,6 +607,10 @@ func TestDevAuthDecommissionDevice(t *testing.T) {
 			dbUpdateDeviceErr: errors.New("DeleteDevice Error"),
 			outErr:            "DeleteDevice Error",
 		},
+		{
+			coSubmitDeviceDecommisioningJobErr: errors.New("SubmitDeviceDecommisioningJob Error"),
+			outErr: "submit device decommissioning job error: SubmitDeviceDecommisioningJob Error",
+		},
 	}
 
 	for i := range testCases {
@@ -612,6 +618,9 @@ func TestDevAuthDecommissionDevice(t *testing.T) {
 		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
 			t.Parallel()
 
+			co := morchestrator.ClientRunner{}
+			co.On("SubmitDeviceDecommisioningJob", context.Background(), mock.AnythingOfType("orchestrator.DecommissioningReq")).Return(
+				tc.coSubmitDeviceDecommisioningJobErr)
 			db := mstore.DataStore{}
 			db.On("UpdateDevice", context.Background(), mock.AnythingOfType("*model.Device")).Return(
 				tc.dbUpdateDeviceErr)
@@ -622,8 +631,8 @@ func TestDevAuthDecommissionDevice(t *testing.T) {
 			db.On("DeleteDevice", context.Background(), mock.AnythingOfType("string")).Return(
 				tc.dbDeleteDeviceErr)
 
-			devauth := NewDevAuth(&db, nil, nil, nil)
-			err := devauth.DecommissionDevice(context.Background(), "dummy_devid")
+			devauth := NewDevAuth(&db, nil, nil, &co, nil)
+			err := devauth.DecommissionDevice(context.Background(), "devId")
 
 			if tc.outErr != "" {
 				assert.EqualError(t, err, tc.outErr)
