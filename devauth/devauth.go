@@ -20,6 +20,7 @@ import (
 
 	"github.com/mendersoftware/deviceauth/client/deviceadm"
 	"github.com/mendersoftware/deviceauth/client/inventory"
+	"github.com/mendersoftware/deviceauth/client/orchestrator"
 	"github.com/mendersoftware/deviceauth/jwt"
 	"github.com/mendersoftware/deviceauth/model"
 	"github.com/mendersoftware/deviceauth/store"
@@ -69,15 +70,17 @@ type DevAuth struct {
 	db           store.DataStore
 	cDevAdm      deviceadm.ClientRunner
 	cInv         inventory.ClientRunner
+	cOrch        orchestrator.ClientRunner
 	jwt          jwt.JWTAgentApp
 	clientGetter ApiClientGetter
 }
 
-func NewDevAuth(d store.DataStore, cda deviceadm.ClientRunner, ci inventory.ClientRunner, jwt jwt.JWTAgentApp) App {
+func NewDevAuth(d store.DataStore, cda deviceadm.ClientRunner, ci inventory.ClientRunner, co orchestrator.ClientRunner, jwt jwt.JWTAgentApp) App {
 	return &DevAuth{
 		db:           d,
 		cDevAdm:      cda,
 		cInv:         ci,
+		cOrch:        co,
 		jwt:          jwt,
 		clientGetter: simpleApiClientGetter,
 	}
@@ -243,7 +246,6 @@ func (d *DevAuth) GetDevice(ctx context.Context, devId string) (*model.Device, e
 }
 
 // DecommissionDevice deletes device and all its tokens
-// TODO: submit device decommission job
 func (d *DevAuth) DecommissionDevice(ctx context.Context, devId string) error {
 
 	l := log.FromContext(ctx)
@@ -254,6 +256,18 @@ func (d *DevAuth) DecommissionDevice(ctx context.Context, devId string) error {
 	updev := &model.Device{Id: devId, Decommissioning: true}
 	if err := d.db.UpdateDevice(ctx, updev); err != nil {
 		return err
+	}
+
+	reqId := requestid.FromContext(ctx)
+
+	// submit device decommissioning job
+	if err := d.cOrch.SubmitDeviceDecommisioningJob(
+		ctx,
+		orchestrator.DecommissioningReq{
+			DeviceId:  devId,
+			RequestId: reqId,
+		}); err != nil {
+		return errors.Wrap(err, "submit device decommissioning job error")
 	}
 
 	// delete device athorization sets

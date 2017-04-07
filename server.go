@@ -19,6 +19,7 @@ import (
 	api_http "github.com/mendersoftware/deviceauth/api/http"
 	"github.com/mendersoftware/deviceauth/client/deviceadm"
 	"github.com/mendersoftware/deviceauth/client/inventory"
+	"github.com/mendersoftware/deviceauth/client/orchestrator"
 	"github.com/mendersoftware/deviceauth/config"
 	"github.com/mendersoftware/deviceauth/devauth"
 	"github.com/mendersoftware/deviceauth/jwt"
@@ -71,10 +72,14 @@ func RunServer(c config.Reader) error {
 	invClientConf := inventory.Config{
 		InventoryAddr: c.GetString(SettingInventoryAddr),
 	}
+	orchClientConf := orchestrator.Config{
+		OrchestratorAddr: c.GetString(SettingOrchestratorAddr),
+	}
 
 	devauth := devauth.NewDevAuth(db,
 		deviceadm.NewClient(devAdmClientConf),
 		inventory.NewClient(invClientConf),
+		orchestrator.NewClient(orchClientConf),
 		jwtHandler)
 
 	api, err := SetupAPI(c.GetString(SettingMiddleware))
