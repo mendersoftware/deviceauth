@@ -9,7 +9,10 @@ export PYTHONDONTWRITEBYTECODE=1
 HOST=${HOST="mender-device-auth:8080"}
 
 # if we're running in a container, wait a little before starting tests
-[ $$ -eq 1 ] && sleep 10
+[ $$ -eq 1 ] && {
+    echo "-- running in container, wait for other services"
+    sleep 10
+}
 
 py.test-3 -s --tb=short --host $HOST \
           --spec $DIR/internal_api.yml \
