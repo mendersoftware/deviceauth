@@ -39,11 +39,11 @@ const (
 )
 
 // db and test management funcs
-func getDb() *DataStoreMongo {
+func getDb(ctx context.Context) *DataStoreMongo {
 	db.Wipe()
 
 	ds := NewDataStoreMongoWithSession(db.Session())
-	ds.Index()
+	ds.Migrate(ctx, DbVersion)
 
 	return ds
 }
@@ -165,7 +165,8 @@ func TestStoreGetDeviceByIdentityData(t *testing.T) {
 	// (always get UTC instead of e.g. CEST)
 	time.Local = time.UTC
 
-	d := getDb()
+	ctx := context.Background()
+	d := getDb(ctx)
 	defer d.session.Close()
 
 	err := setUp(d, "devices_input.json", "", "")
@@ -238,7 +239,8 @@ func TestStoreAddDevice(t *testing.T) {
 		UpdatedTs:   time.Now(),
 	}
 
-	d := getDb()
+	ctx := context.Background()
+	d := getDb(ctx)
 	defer d.session.Close()
 
 	err := d.AddDevice(context.Background(), *dev)
@@ -290,7 +292,8 @@ func TestStoreUpdateDevice(t *testing.T) {
 
 	now := time.Now()
 
-	d := getDb()
+	ctx := context.Background()
+	d := getDb(ctx)
 	defer d.session.Close()
 
 	err := setUp(d, "devices_input.json", "", "")
@@ -362,7 +365,8 @@ func TestStoreAddToken(t *testing.T) {
 		Token: "token",
 	}
 
-	d := getDb()
+	ctx := context.Background()
+	d := getDb(ctx)
 	defer d.session.Close()
 
 	err := d.AddToken(context.Background(), token)
@@ -389,7 +393,8 @@ func TestStoreGetToken(t *testing.T) {
 		t.Skip("skipping TestGetToken in short mode.")
 	}
 
-	d := getDb()
+	ctx := context.Background()
+	d := getDb(ctx)
 	defer d.session.Close()
 
 	err := setUp(d, "", "", "tokens.json")
@@ -440,7 +445,8 @@ func TestStoreDeleteToken(t *testing.T) {
 		t.Skip("skipping TestDeleteToken in short mode.")
 	}
 
-	d := getDb()
+	ctx := context.Background()
+	d := getDb(ctx)
 	defer d.session.Close()
 
 	err := setUp(d, "", "", "tokens.json")
@@ -481,7 +487,8 @@ func TestStoreDeleteTokenByDevId(t *testing.T) {
 		t.Skip("skipping TestDeleteTokenByDevId in short mode.")
 	}
 
-	d := getDb()
+	ctx := context.Background()
+	d := getDb(ctx)
 	defer d.session.Close()
 
 	err := setUp(d, "", "", "tokens.json")
@@ -538,9 +545,10 @@ func TestStoreMigrate(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(fmt.Sprintf("tc: %s", name), func(t *testing.T) {
-			db := getDb()
+			db.Wipe()
+			db := NewDataStoreMongoWithSession(db.Session())
 
-			err := db.Migrate(context.Background(), tc.version, nil)
+			err := db.Migrate(context.Background(), tc.version)
 			if tc.err == "" {
 				assert.NoError(t, err)
 				var out []migrate.MigrationEntry
@@ -574,7 +582,8 @@ func TestStoreGetDevices(t *testing.T) {
 		t.Skip("skipping TestGetDevices in short mode.")
 	}
 
-	db := getDb()
+	ctx := context.Background()
+	db := getDb(ctx)
 	defer db.session.Close()
 
 	// use 100 automatically creted devices
@@ -649,7 +658,8 @@ func TestStoreAuthSet(t *testing.T) {
 		t.Skip("skipping TestGetDevices in short mode.")
 	}
 
-	db := getDb()
+	ctx := context.Background()
+	db := getDb(ctx)
 	defer db.session.Close()
 
 	asin := model.AuthSet{
@@ -738,7 +748,8 @@ func TestStoreDeleteDevice(t *testing.T) {
 			IdData: "2",
 		},
 	}
-	db := getDb()
+	ctx := context.Background()
+	db := getDb(ctx)
 	defer db.session.Close()
 	s := db.session.Copy()
 	defer s.Close()
@@ -798,7 +809,8 @@ func TestStoreDeleteAuthSetsForDevice(t *testing.T) {
 			PubKey:   "002",
 		},
 	}
-	db := getDb()
+	ctx := context.Background()
+	db := getDb(ctx)
 	defer db.session.Close()
 	s := db.session.Copy()
 	defer s.Close()

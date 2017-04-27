@@ -272,7 +272,7 @@ func (db *DataStoreMongo) DeleteTokenByDevId(ctx context.Context, devId string) 
 	return nil
 }
 
-func (db *DataStoreMongo) Migrate(ctx context.Context, version string, migrations []migrate.Migration) error {
+func (db *DataStoreMongo) Migrate(ctx context.Context, version string) error {
 	m := migrate.SimpleMigrator{
 		Session: db.session,
 		Db:      ctxStore.DbFromContext(ctx, DbName),
@@ -283,7 +283,7 @@ func (db *DataStoreMongo) Migrate(ctx context.Context, version string, migration
 		return errors.Wrap(err, "failed to parse service version")
 	}
 
-	migrations = []migrate.Migration{
+	migrations := []migrate.Migration{
 		&migration_1_1_0{
 			ms:  db,
 			ctx: ctx,
@@ -312,42 +312,6 @@ func makeUpdate(d *model.Device) *model.Device {
 	updev.UpdatedTs = time.Now()
 
 	return updev
-}
-
-func (db *DataStoreMongo) Index() error {
-	s := db.session.Copy()
-	defer s.Close()
-
-	// devices collection
-	err := s.DB(DbName).C(DbDevicesColl).EnsureIndex(mgo.Index{
-		Unique: true,
-		// identity data shall be unique within collection
-		Key:        []string{model.DevKeyIdData},
-		Name:       indexDevices_IdentityData,
-		Background: false,
-	})
-	if err != nil {
-		return err
-	}
-
-	// auth requests
-	err = s.DB(DbName).C(DbAuthSetColl).EnsureIndex(mgo.Index{
-		Unique: true,
-		// tuple (device ID,identity, public key) shall be unique within
-		// collection
-		Key: []string{
-			model.AuthSetKeyDeviceId,
-			model.AuthSetKeyIdData,
-			model.AuthSetKeyPubKey,
-		},
-		Name:       indexAuthSet_DeviceId_IdentityData_PubKey,
-		Background: false,
-	})
-	if err != nil {
-		return err
-	}
-
-	return err
 }
 
 func (db *DataStoreMongo) AddAuthSet(ctx context.Context, set model.AuthSet) error {

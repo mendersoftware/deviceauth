@@ -23,6 +23,7 @@ import (
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	ctxStore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/pkg/errors"
+	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -50,8 +51,8 @@ type token_0_1_0 struct {
 func (m *migration_1_1_0) Up(from migrate.Version) error {
 	s := m.ms.session.Copy()
 
-	if err := m.ms.Index(); err != nil {
-		return errors.Wrapf(err, "failed to update DB indexes")
+	if err := m.ensureIndexes(s); err != nil {
+		return errors.Wrap(err, "database indexing failed")
 	}
 
 	defer s.Close()
@@ -106,6 +107,37 @@ func (m *migration_1_1_0) Up(from migrate.Version) error {
 	}
 
 	return nil
+}
+
+func (m *migration_1_1_0) ensureIndexes(s *mgo.Session) error {
+
+	// devices collection
+	err := s.DB(ctxStore.DbFromContext(m.ctx, DbName)).
+		C(DbDevicesColl).EnsureIndex(mgo.Index{
+		Unique: true,
+		// identity data shall be unique within collection
+		Key:        []string{model.DevKeyIdData},
+		Name:       indexDevices_IdentityData,
+		Background: false,
+	})
+	if err != nil {
+		return err
+	}
+
+	// auth requests
+	return s.DB(ctxStore.DbFromContext(m.ctx, DbName)).
+		C(DbAuthSetColl).EnsureIndex(mgo.Index{
+		Unique: true,
+		// tuple (device ID,identity, public key) shall be unique within
+		// collection
+		Key: []string{
+			model.AuthSetKeyDeviceId,
+			model.AuthSetKeyIdData,
+			model.AuthSetKeyPubKey,
+		},
+		Name:       indexAuthSet_DeviceId_IdentityData_PubKey,
+		Background: false,
+	})
 }
 
 func (m *migration_1_1_0) Version() migrate.Version {
