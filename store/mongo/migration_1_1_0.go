@@ -14,18 +14,21 @@
 package mongo
 
 import (
+	"context"
 	"time"
 
 	"github.com/mendersoftware/deviceauth/model"
 
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
+	ctxStore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/pkg/errors"
 	"gopkg.in/mgo.v2/bson"
 )
 
 type migration_1_1_0 struct {
-	ms *DataStoreMongo
+	ms  *DataStoreMongo
+	ctx context.Context
 }
 
 type device_0_1_0 struct {
@@ -53,7 +56,8 @@ func (m *migration_1_1_0) Up(from migrate.Version) error {
 
 	defer s.Close()
 
-	iter := s.DB(DbName).C(DbDevicesColl).Find(nil).Iter()
+	iter := s.DB(ctxStore.DbFromContext(m.ctx, DbName)).
+		C(DbDevicesColl).Find(nil).Iter()
 
 	var olddev device_0_1_0
 
@@ -74,13 +78,15 @@ func (m *migration_1_1_0) Up(from migrate.Version) error {
 			AdmissionNotified: to.BoolPtr(true),
 		}
 
-		if err := s.DB(DbName).C(DbAuthSetColl).Insert(aset); err != nil {
+		if err := s.DB(ctxStore.DbFromContext(m.ctx, DbName)).
+			C(DbAuthSetColl).Insert(aset); err != nil {
 			return errors.Wrapf(err, "failed to insert auth set for device %v",
 				olddev.Id)
 		}
 
 		// update tokens
-		_, err := s.DB(DbName).C(DbTokensColl).UpdateAll(
+		_, err := s.DB(ctxStore.DbFromContext(m.ctx, DbName)).
+			C(DbTokensColl).UpdateAll(
 			token_0_1_0{
 				DevId: olddev.Id,
 			},
