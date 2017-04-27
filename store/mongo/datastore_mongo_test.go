@@ -29,7 +29,9 @@ import (
 	uto "github.com/mendersoftware/deviceauth/utils/to"
 
 	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
+	ctxStore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/mgo.v2"
 )
@@ -37,6 +39,35 @@ import (
 const (
 	testDataFolder = "testdata/mongo"
 )
+
+// data set
+var (
+	dev1   = model.NewDevice("id1", "idData1", "", "")
+	dev2   = model.NewDevice("id2", "idData2", "", "")
+	token1 = model.NewToken("id1", "devId1", "token1")
+	token2 = model.NewToken("id2", "devId2", "token2")
+	tenant = "foo"
+)
+
+// setup devices
+func setUpDevices(s *mgo.Session, ctx context.Context) error {
+	inputDevices := []interface{}{
+		dev1,
+		dev2,
+	}
+	return s.DB(ctxStore.DbFromContext(ctx, DbName)).
+		C(DbDevicesColl).Insert(inputDevices...)
+}
+
+// setup tokens
+func setUpTokens(s *mgo.Session, ctx context.Context) error {
+	inputTokens := []interface{}{
+		token1,
+		token2,
+	}
+	return s.DB(ctxStore.DbFromContext(ctx, DbName)).
+		C(DbTokensColl).Insert(inputTokens...)
+}
 
 // db and test management funcs
 func getDb(ctx context.Context) *DataStoreMongo {
@@ -156,55 +187,86 @@ func parseToken(dataset string) (*model.Token, error) {
 	return &res[0], nil
 }
 
+// custom Device comparison with 'compareTime'
+func compareDevices(expected *model.Device, actual *model.Device, t *testing.T) {
+	assert.Equal(t, expected.Id, actual.Id)
+	assert.Equal(t, expected.TenantToken, actual.TenantToken)
+	assert.Equal(t, expected.PubKey, actual.PubKey)
+	assert.Equal(t, expected.IdData, actual.IdData)
+	assert.Equal(t, expected.Status, actual.Status)
+	compareTime(expected.CreatedTs, actual.CreatedTs, t)
+	compareTime(expected.UpdatedTs, actual.UpdatedTs, t)
+}
+
+// custom time comparison since mongo stores
+// time with lower precision than 'time', e.g.:
+//
+// 2016-06-10 08:08:18.782 vs
+// 2016-06-10 08:08:18.782397877
+func compareTime(expected time.Time, actual time.Time, t *testing.T) {
+	assert.Equal(t, expected.Unix(), actual.Unix())
+}
+
 func TestStoreGetDeviceByIdentityData(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping TestGetDeviceById in short mode.")
+		t.Skip("skipping TestGetDeviceByIdentityDataWithTenant in short mode.")
 	}
 
 	// set this to get reliable time.Time serialization
 	// (always get UTC instead of e.g. CEST)
 	time.Local = time.UTC
 
-	ctx := context.Background()
-	d := getDb(ctx)
-	defer d.session.Close()
+	dbCtx := identity.WithContext(context.Background(), &identity.Identity{
+		Tenant: tenant,
+	})
 
-	err := setUp(d, "devices_input.json", "", "")
+	d := getDb(dbCtx)
+	defer d.session.Close()
+	s := d.session.Copy()
+	defer s.Close()
+
+	err := setUpDevices(s, dbCtx)
 	assert.NoError(t, err, "failed to setup input data")
 
 	testCases := []struct {
-		deviceIdData string
-		expected     string
+		idData      string
+		expectedDev *model.Device
+		tenant      string
 	}{
 		{
-			deviceIdData: "0001-id-data",
-			expected:     "device_expected_1.json",
+			idData:      dev1.IdData,
+			expectedDev: dev1,
+			tenant:      tenant,
 		},
 		{
-			deviceIdData: "0002-id-data",
-			expected:     "device_expected_2.json",
+			idData: dev1.IdData,
 		},
 		{
-			deviceIdData: "0003",
-			expected:     "",
+			idData:      dev2.IdData,
+			expectedDev: dev2,
+			tenant:      tenant,
+		},
+		{
+			idData: "foo",
+			tenant: tenant,
 		},
 	}
 
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
-			var expected *model.Device
 
-			if tc.expected != "" {
-				expected, err = parseDev(tc.expected)
-				assert.NoError(t, err, "failed to parse %s", tc.expected)
-				assert.NotNil(t, expected)
+			ctx := context.Background()
+			if tc.tenant != "" {
+				ctx = identity.WithContext(ctx, &identity.Identity{
+					Tenant: tc.tenant,
+				})
 			}
 
-			dev, err := d.GetDeviceByIdentityData(context.Background(), tc.deviceIdData)
-			if expected != nil {
+			dev, err := d.GetDeviceByIdentityData(ctx, tc.idData)
+			if tc.expectedDev != nil {
 				assert.NoError(t, err, "failed to get devices")
 				if assert.NotNil(t, dev) {
-					compareDevices(expected, dev, t)
+					compareDevices(tc.expectedDev, dev, t)
 				}
 			} else {
 				assert.Equal(t, store.ErrDevNotFound, err)
@@ -239,14 +301,16 @@ func TestStoreAddDevice(t *testing.T) {
 		UpdatedTs:   time.Now(),
 	}
 
-	ctx := context.Background()
+	ctx := identity.WithContext(context.Background(), &identity.Identity{
+		Tenant: "foo",
+	})
 	d := getDb(ctx)
 	defer d.session.Close()
 
-	err := d.AddDevice(context.Background(), *dev)
+	err := d.AddDevice(ctx, *dev)
 	assert.NoError(t, err, "failed to add device")
 
-	found, err := d.GetDeviceByIdentityData(context.Background(), "iddata")
+	found, err := d.GetDeviceByIdentityData(ctx, "iddata")
 	assert.NoError(t, err)
 	assert.NotNil(t, found)
 
@@ -257,31 +321,11 @@ func TestStoreAddDevice(t *testing.T) {
 	compareDevices(dev, found, t)
 
 	// add device with identical identity data
-	err = d.AddDevice(context.Background(), model.Device{
+	err = d.AddDevice(ctx, model.Device{
 		Id:     "foobar",
 		IdData: "iddata",
 	})
 	assert.EqualError(t, err, store.ErrObjectExists.Error())
-}
-
-// custom Device comparison with 'compareTime'
-func compareDevices(expected *model.Device, actual *model.Device, t *testing.T) {
-	assert.Equal(t, expected.Id, actual.Id)
-	assert.Equal(t, expected.TenantToken, actual.TenantToken)
-	assert.Equal(t, expected.PubKey, actual.PubKey)
-	assert.Equal(t, expected.IdData, actual.IdData)
-	assert.Equal(t, expected.Status, actual.Status)
-	compareTime(expected.CreatedTs, actual.CreatedTs, t)
-	compareTime(expected.UpdatedTs, actual.UpdatedTs, t)
-}
-
-// custom time comparison since mongo stores
-// time with lower precision than 'time', e.g.:
-//
-// 2016-06-10 08:08:18.782 vs
-// 2016-06-10 08:08:18.782397877
-func compareTime(expected time.Time, actual time.Time, t *testing.T) {
-	assert.Equal(t, expected.Unix(), actual.Unix())
 }
 
 func TestStoreUpdateDevice(t *testing.T) {
@@ -290,43 +334,64 @@ func TestStoreUpdateDevice(t *testing.T) {
 	}
 	time.Local = time.UTC
 
-	now := time.Now()
-
-	ctx := context.Background()
-	d := getDb(ctx)
+	dbCtx := identity.WithContext(context.Background(), &identity.Identity{
+		Tenant: tenant,
+	})
+	d := getDb(dbCtx)
 	defer d.session.Close()
+	s := d.session.Copy()
+	defer s.Close()
 
-	err := setUp(d, "devices_input.json", "", "")
+	err := setUpDevices(s, dbCtx)
 	assert.NoError(t, err, "failed to setup input data")
+
+	now := time.Now()
 
 	//test status updates
 	testCases := []struct {
 		id     string
 		status string
+		tenant string
 		outErr string
 	}{
 		{
-			id:     "0001",
+			id:     dev1.Id,
 			status: model.DevStatusAccepted,
 			outErr: "",
+			tenant: tenant,
 		},
 		{
-			id:     "0002",
+			id:     dev1.Id,
+			status: model.DevStatusAccepted,
+			outErr: store.ErrDevNotFound.Error(),
+		},
+		{
+			id:     dev2.Id,
 			status: model.DevStatusRejected,
 			outErr: "",
+			tenant: tenant,
 		},
 		{
-			id:     "0003",
+			id:     "id3",
 			status: model.DevStatusRejected,
 			outErr: store.ErrDevNotFound.Error(),
+			tenant: tenant,
 		},
 	}
 
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+
+			ctx := context.Background()
+			if tc.tenant != "" {
+				ctx = identity.WithContext(ctx, &identity.Identity{
+					Tenant: tc.tenant,
+				})
+			}
+
 			updev := &model.Device{Id: tc.id, Status: tc.status}
 
-			err = d.UpdateDevice(context.Background(), updev)
+			err = d.UpdateDevice(ctx, updev)
 			if tc.outErr != "" {
 				assert.EqualError(t, err, tc.outErr)
 			} else {
@@ -338,7 +403,7 @@ func TestStoreUpdateDevice(t *testing.T) {
 
 				var found model.Device
 
-				c := s.DB(DbName).C(DbDevicesColl)
+				c := s.DB(ctxStore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
 
 				err = c.FindId(tc.id).One(&found)
 				assert.NoError(t, err, "failed to find device")
@@ -365,11 +430,13 @@ func TestStoreAddToken(t *testing.T) {
 		Token: "token",
 	}
 
-	ctx := context.Background()
+	ctx := identity.WithContext(context.Background(), &identity.Identity{
+		Tenant: "foo",
+	})
 	d := getDb(ctx)
 	defer d.session.Close()
 
-	err := d.AddToken(context.Background(), token)
+	err := d.AddToken(ctx, token)
 	assert.NoError(t, err, "failed to add token")
 
 	//verify
@@ -378,7 +445,7 @@ func TestStoreAddToken(t *testing.T) {
 
 	var found model.Token
 
-	c := s.DB(DbName).C(DbTokensColl)
+	c := s.DB(ctxStore.DbFromContext(ctx, DbName)).C(DbTokensColl)
 
 	err = c.FindId(token.Id).One(&found)
 	assert.NoError(t, err, "failed to find token")
@@ -393,49 +460,59 @@ func TestStoreGetToken(t *testing.T) {
 		t.Skip("skipping TestGetToken in short mode.")
 	}
 
-	ctx := context.Background()
-	d := getDb(ctx)
+	dbCtx := identity.WithContext(context.Background(), &identity.Identity{
+		Tenant: tenant,
+	})
+	d := getDb(dbCtx)
 	defer d.session.Close()
+	s := d.session.Copy()
+	defer s.Close()
 
-	err := setUp(d, "", "", "tokens.json")
+	err := setUpTokens(s, dbCtx)
 	assert.NoError(t, err, "failed to setup input data")
 
 	testCases := []struct {
-		tokenId  string
-		expected string
+		tokenId       string
+		tenant        string
+		expectedToken *model.Token
 	}{
 		{
-			tokenId:  "0001",
-			expected: "token_expected_1.json",
+			tokenId:       token1.Id,
+			tenant:        tenant,
+			expectedToken: token1,
 		},
 		{
-			tokenId:  "0002",
-			expected: "token_expected_2.json",
+			tokenId: token1.Id,
 		},
 		{
-			tokenId:  "0003",
-			expected: "",
+			tokenId:       token2.Id,
+			tenant:        tenant,
+			expectedToken: token2,
+		},
+		{
+			tokenId: "id3",
+			tenant:  tenant,
 		},
 	}
 
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
-			var expected *model.Token
 
-			if tc.expected != "" {
-				expected, err = parseToken(tc.expected)
-				assert.NoError(t, err, "failed to parse %s", tc.expected)
-				assert.NotNil(t, expected)
+			ctx := context.Background()
+			if tc.tenant != "" {
+				ctx = identity.WithContext(ctx, &identity.Identity{
+					Tenant: tc.tenant,
+				})
 			}
 
-			token, err := d.GetToken(context.Background(), tc.tokenId)
-			if expected != nil {
+			token, err := d.GetToken(ctx, tc.tokenId)
+			if tc.expectedToken != nil {
 				assert.NoError(t, err, "failed to get token")
 			} else {
 				assert.Equal(t, store.ErrTokenNotFound, err)
 			}
 
-			assert.Equal(t, expected, token)
+			assert.Equal(t, tc.expectedToken, token)
 		})
 	}
 }
@@ -445,34 +522,54 @@ func TestStoreDeleteToken(t *testing.T) {
 		t.Skip("skipping TestDeleteToken in short mode.")
 	}
 
-	ctx := context.Background()
-	d := getDb(ctx)
+	dbCtx := identity.WithContext(context.Background(), &identity.Identity{
+		Tenant: tenant,
+	})
+	d := getDb(dbCtx)
 	defer d.session.Close()
+	s := d.session.Copy()
+	defer s.Close()
 
-	err := setUp(d, "", "", "tokens.json")
+	err := setUpTokens(s, dbCtx)
 	assert.NoError(t, err, "failed to setup input data")
 
 	testCases := []struct {
 		tokenId string
+		tenant  string
 		err     bool
 	}{
 		{
-			tokenId: "0001",
+			tokenId: token1.Id,
+			tenant:  tenant,
 			err:     false,
 		},
 		{
-			tokenId: "0002",
+			tokenId: token1.Id,
+			err:     true,
+		},
+		{
+			tokenId: token2.Id,
+			tenant:  tenant,
 			err:     false,
 		},
 		{
-			tokenId: "0003",
+			tokenId: "id3",
+			tenant:  tenant,
 			err:     true,
 		},
 	}
 
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
-			err := d.DeleteToken(context.Background(), tc.tokenId)
+
+			ctx := context.Background()
+			if tc.tenant != "" {
+				ctx = identity.WithContext(ctx, &identity.Identity{
+					Tenant: tc.tenant,
+				})
+			}
+
+			err := d.DeleteToken(ctx, tc.tokenId)
 			if tc.err {
 				assert.Equal(t, store.ErrTokenNotFound, err)
 			} else {
@@ -487,34 +584,54 @@ func TestStoreDeleteTokenByDevId(t *testing.T) {
 		t.Skip("skipping TestDeleteTokenByDevId in short mode.")
 	}
 
-	ctx := context.Background()
-	d := getDb(ctx)
+	dbCtx := identity.WithContext(context.Background(), &identity.Identity{
+		Tenant: tenant,
+	})
+	d := getDb(dbCtx)
 	defer d.session.Close()
+	s := d.session.Copy()
+	defer s.Close()
 
-	err := setUp(d, "", "", "tokens.json")
+	err := setUpTokens(s, dbCtx)
 	assert.NoError(t, err, "failed to setup input data")
 
 	testCases := []struct {
-		devId string
-		err   bool
+		devId  string
+		tenant string
+		err    bool
 	}{
 		{
-			devId: "dev_id_1",
-			err:   false,
+			devId:  token1.DevId,
+			tenant: tenant,
+			err:    false,
 		},
 		{
-			devId: "dev_id_2",
-			err:   false,
-		},
-		{
-			devId: "dev_id_3",
+			devId: token1.DevId,
 			err:   true,
+		},
+		{
+			devId:  token2.DevId,
+			tenant: tenant,
+			err:    false,
+		},
+		{
+			devId:  "devId3",
+			tenant: tenant,
+			err:    true,
 		},
 	}
 
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
-			err := d.DeleteTokenByDevId(context.Background(), tc.devId)
+
+			ctx := context.Background()
+			if tc.tenant != "" {
+				ctx = identity.WithContext(ctx, &identity.Identity{
+					Tenant: tc.tenant,
+				})
+			}
+
+			err := d.DeleteTokenByDevId(ctx, tc.devId)
 			if tc.err {
 				assert.Equal(t, store.ErrTokenNotFound, err)
 			} else {
@@ -548,11 +665,15 @@ func TestStoreMigrate(t *testing.T) {
 			db.Wipe()
 			db := NewDataStoreMongoWithSession(db.Session())
 
-			err := db.Migrate(context.Background(), tc.version)
+			ctx := identity.WithContext(context.Background(), &identity.Identity{
+				Tenant: "foo",
+			})
+			err := db.Migrate(ctx, tc.version)
 			if tc.err == "" {
 				assert.NoError(t, err)
 				var out []migrate.MigrationEntry
-				db.session.DB(DbName).C(migrate.DbMigrationsColl).Find(nil).All(&out)
+				db.session.DB(ctxStore.DbFromContext(ctx, DbName)).
+					C(migrate.DbMigrationsColl).Find(nil).All(&out)
 				sort.Slice(out, func(i int, j int) bool {
 					return migrate.VersionIsLess(out[i].Version, out[j].Version)
 				})
@@ -582,7 +703,9 @@ func TestStoreGetDevices(t *testing.T) {
 		t.Skip("skipping TestGetDevices in short mode.")
 	}
 
-	ctx := context.Background()
+	ctx := identity.WithContext(context.Background(), &identity.Identity{
+		Tenant: "foo",
+	})
 	db := getDb(ctx)
 	defer db.session.Close()
 
@@ -600,7 +723,7 @@ func TestStoreGetDevices(t *testing.T) {
 		}
 
 		devs_list = append(devs_list, dev)
-		err := db.AddDevice(context.Background(), dev)
+		err := db.AddDevice(ctx, dev)
 		assert.NoError(t, err)
 	}
 
@@ -638,7 +761,7 @@ func TestStoreGetDevices(t *testing.T) {
 
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
-			dbdevs, err := db.GetDevices(context.Background(), tc.skip, tc.limit)
+			dbdevs, err := db.GetDevices(ctx, tc.skip, tc.limit)
 			assert.NoError(t, err)
 
 			assert.Len(t, dbdevs, tc.expectedCount)
@@ -658,7 +781,9 @@ func TestStoreAuthSet(t *testing.T) {
 		t.Skip("skipping TestGetDevices in short mode.")
 	}
 
-	ctx := context.Background()
+	ctx := identity.WithContext(context.Background(), &identity.Identity{
+		Tenant: "foo",
+	})
 	db := getDb(ctx)
 	defer db.session.Close()
 
@@ -668,26 +793,30 @@ func TestStoreAuthSet(t *testing.T) {
 		DeviceId:  "1",
 		Timestamp: uto.TimePtr(time.Now()),
 	}
-	err := db.AddAuthSet(context.Background(), asin)
+	err := db.AddAuthSet(ctx, asin)
 	assert.NoError(t, err)
 
 	// try to get something that does not exist
-	as, err := db.GetAuthSetByDataKey(context.Background(), "foobar-2", "pubkey-3")
+	as, err := db.GetAuthSetByDataKey(ctx, "foobar-2", "pubkey-3")
 	assert.Error(t, err)
 
+	// no tenant
 	as, err = db.GetAuthSetByDataKey(context.Background(), "foobar", "pubkey-1")
+	assert.Error(t, err)
+
+	as, err = db.GetAuthSetByDataKey(ctx, "foobar", "pubkey-1")
 	assert.NoError(t, err)
 	assert.NotNil(t, as)
 
 	assert.False(t, to.Bool(as.AdmissionNotified))
 
-	err = db.UpdateAuthSet(context.Background(), asin, model.AuthSetUpdate{
+	err = db.UpdateAuthSet(ctx, asin, model.AuthSetUpdate{
 		AdmissionNotified: to.BoolPtr(true),
 		Timestamp:         uto.TimePtr(time.Now()),
 	})
 	assert.NoError(t, err)
 
-	as, err = db.GetAuthSetByDataKey(context.Background(), "foobar", "pubkey-1")
+	as, err = db.GetAuthSetByDataKey(ctx, "foobar", "pubkey-1")
 	assert.NoError(t, err)
 	assert.NotNil(t, as)
 	assert.True(t, to.Bool(as.AdmissionNotified))
@@ -696,24 +825,24 @@ func TestStoreAuthSet(t *testing.T) {
 	// clear timestamp field
 	asin.Timestamp = nil
 	// selectively update public key only, remaining fields should be unchanged
-	err = db.UpdateAuthSet(context.Background(), asin, model.AuthSetUpdate{
+	err = db.UpdateAuthSet(ctx, asin, model.AuthSetUpdate{
 		PubKey: "pubkey-2",
 	})
 	assert.NoError(t, err)
 
-	as, err = db.GetAuthSetByDataKey(context.Background(), "foobar", "pubkey-2")
+	as, err = db.GetAuthSetByDataKey(ctx, "foobar", "pubkey-2")
 	assert.NoError(t, err)
 	assert.NotNil(t, as)
 	assert.True(t, to.Bool(as.AdmissionNotified))
 
-	asid, err := db.GetAuthSetById(context.Background(), as.Id)
+	asid, err := db.GetAuthSetById(ctx, as.Id)
 	assert.NoError(t, err)
 	assert.NotNil(t, asid)
 
 	assert.EqualValues(t, as, asid)
 
 	// verify auth sets count for this device
-	asets, err := db.GetAuthSetsForDevice(context.Background(), "1")
+	asets, err := db.GetAuthSetsForDevice(ctx, "1")
 	assert.NoError(t, err)
 	assert.Len(t, asets, 1)
 
@@ -724,11 +853,11 @@ func TestStoreAuthSet(t *testing.T) {
 		DeviceId:  "1",
 		Timestamp: uto.TimePtr(time.Now()),
 	}
-	err = db.AddAuthSet(context.Background(), asin)
+	err = db.AddAuthSet(ctx, asin)
 	assert.NoError(t, err)
 
 	// we should have 2 now
-	asets, err = db.GetAuthSetsForDevice(context.Background(), "1")
+	asets, err = db.GetAuthSetsForDevice(ctx, "1")
 	assert.NoError(t, err)
 	assert.Len(t, asets, 2)
 }
@@ -738,46 +867,63 @@ func TestStoreDeleteDevice(t *testing.T) {
 		t.Skip("skipping TestStoreDeleteDevice in short mode.")
 	}
 
-	devices := []interface{}{
-		model.Device{
-			Id:     "001",
-			IdData: "1",
-		},
-		model.Device{
-			Id:     "002",
-			IdData: "2",
-		},
-	}
-	ctx := context.Background()
-	db := getDb(ctx)
+	dbCtx := identity.WithContext(context.Background(), &identity.Identity{
+		Tenant: tenant,
+	})
+	db := getDb(dbCtx)
 	defer db.session.Close()
+
+	// setup devices
+	inputDevices := []interface{}{
+		dev1,
+		dev2,
+	}
+	err := db.session.DB(ctxStore.DbFromContext(dbCtx, DbName)).
+		C(DbDevicesColl).Insert(inputDevices...)
+	assert.NoError(t, err, "failed to setup input data")
+
 	s := db.session.Copy()
 	defer s.Close()
 
 	coll := s.DB(DbName).C(DbDevicesColl)
-	assert.NoError(t, coll.Insert(devices...))
 
 	testCases := []struct {
-		devId string
-		err   string
+		devId  string
+		tenant string
+		err    string
 	}{
 		{
-			devId: "001",
-			err:   "",
+			devId:  dev1.Id,
+			tenant: tenant,
+			err:    "",
 		},
 		{
-			devId: "100",
+			devId: dev1.Id,
 			err:   store.ErrDevNotFound.Error(),
 		},
 		{
-			devId: "",
-			err:   store.ErrDevNotFound.Error(),
+			devId:  "100",
+			tenant: tenant,
+			err:    store.ErrDevNotFound.Error(),
+		},
+		{
+			devId:  "",
+			tenant: tenant,
+			err:    store.ErrDevNotFound.Error(),
 		},
 	}
 
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
-			err := db.DeleteDevice(context.Background(), tc.devId)
+
+			ctx := context.Background()
+			if tc.tenant != "" {
+				ctx = identity.WithContext(ctx, &identity.Identity{
+					Tenant: tc.tenant,
+				})
+			}
+
+			err := db.DeleteDevice(ctx, tc.devId)
 			if tc.err != "" {
 				assert.Equal(t, tc.err, err.Error())
 			} else {
@@ -809,32 +955,50 @@ func TestStoreDeleteAuthSetsForDevice(t *testing.T) {
 			PubKey:   "002",
 		},
 	}
-	ctx := context.Background()
-	db := getDb(ctx)
+
+	dbCtx := identity.WithContext(context.Background(), &identity.Identity{
+		Tenant: tenant,
+	})
+	db := getDb(dbCtx)
 	defer db.session.Close()
 	s := db.session.Copy()
 	defer s.Close()
 
-	coll := s.DB(DbName).C(DbAuthSetColl)
+	coll := s.DB(ctxStore.DbFromContext(dbCtx, DbName)).C(DbAuthSetColl)
 	assert.NoError(t, coll.Insert(authSets...))
 
 	testCases := []struct {
-		devId string
-		err   string
+		devId  string
+		tenant string
+		err    string
 	}{
 		{
-			devId: "001",
-			err:   "",
+			devId:  "001",
+			tenant: tenant,
+			err:    "",
 		},
 		{
-			devId: "100",
+			devId: "001",
 			err:   store.ErrAuthSetNotFound.Error(),
+		},
+		{
+			devId:  "100",
+			tenant: tenant,
+			err:    store.ErrAuthSetNotFound.Error(),
 		},
 	}
 
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
-			err := db.DeleteAuthSetsForDevice(context.Background(), tc.devId)
+
+			ctx := context.Background()
+			if tc.tenant != "" {
+				ctx = identity.WithContext(ctx, &identity.Identity{
+					Tenant: tc.tenant,
+				})
+			}
+
+			err := db.DeleteAuthSetsForDevice(ctx, tc.devId)
 			if tc.err != "" {
 				assert.Equal(t, tc.err, err.Error())
 			} else {
