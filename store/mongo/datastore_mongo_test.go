@@ -15,11 +15,8 @@ package mongo
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"math/rand"
-	"os"
-	"path/filepath"
 	"sort"
 	"testing"
 	"time"
@@ -77,114 +74,6 @@ func getDb(ctx context.Context) *DataStoreMongo {
 	ds.Migrate(ctx, DbVersion)
 
 	return ds
-}
-
-func setUp(db *DataStoreMongo, devs_dataset,
-	authreqs_dataset string, tokens_dataset string) error {
-	s := db.session.Copy()
-	defer s.Close()
-
-	if devs_dataset != "" {
-		err := setUpDevices(devs_dataset, s)
-		if err != nil {
-			return err
-		}
-	}
-
-	if tokens_dataset != "" {
-		err := setUpTokens(tokens_dataset, s)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func setUpDevices(dataset string, s *mgo.Session) error {
-	devs, err := parseDevs(dataset)
-	if err != nil {
-		return err
-	}
-
-	c := s.DB(DbName).C(DbDevicesColl)
-
-	for _, d := range devs {
-		err = c.Insert(d)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func setUpTokens(dataset string, s *mgo.Session) error {
-	tokens, err := parseTokens(dataset)
-	if err != nil {
-		return err
-	}
-
-	c := s.DB(DbName).C(DbTokensColl)
-
-	for _, t := range tokens {
-		err = c.Insert(t)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func parseDevs(dataset string) ([]model.Device, error) {
-	f, err := os.Open(filepath.Join(testDataFolder, dataset))
-	if err != nil {
-		return nil, err
-	}
-
-	var devs []model.Device
-
-	j := json.NewDecoder(f)
-	if err = j.Decode(&devs); err != nil {
-		return nil, err
-	}
-
-	return devs, nil
-}
-
-func parseDev(dataset string) (*model.Device, error) {
-	res, err := parseDevs(dataset)
-	if err != nil {
-		return nil, err
-	}
-
-	return &res[0], nil
-}
-
-func parseTokens(dataset string) ([]model.Token, error) {
-	f, err := os.Open(filepath.Join(testDataFolder, dataset))
-	if err != nil {
-		return nil, err
-	}
-
-	var tokens []model.Token
-
-	j := json.NewDecoder(f)
-	if err = j.Decode(&tokens); err != nil {
-		return nil, err
-	}
-
-	return tokens, nil
-}
-
-func parseToken(dataset string) (*model.Token, error) {
-	res, err := parseTokens(dataset)
-	if err != nil {
-		return nil, err
-	}
-
-	return &res[0], nil
 }
 
 // custom Device comparison with 'compareTime'
