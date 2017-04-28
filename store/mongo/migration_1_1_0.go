@@ -21,7 +21,7 @@ import (
 
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
-	ctxStore "github.com/mendersoftware/go-lib-micro/store"
+	ctxstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/pkg/errors"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -57,7 +57,7 @@ func (m *migration_1_1_0) Up(from migrate.Version) error {
 
 	defer s.Close()
 
-	iter := s.DB(ctxStore.DbFromContext(m.ctx, DbName)).
+	iter := s.DB(ctxstore.DbFromContext(m.ctx, DbName)).
 		C(DbDevicesColl).Find(nil).Iter()
 
 	var olddev device_0_1_0
@@ -79,14 +79,14 @@ func (m *migration_1_1_0) Up(from migrate.Version) error {
 			AdmissionNotified: to.BoolPtr(true),
 		}
 
-		if err := s.DB(ctxStore.DbFromContext(m.ctx, DbName)).
+		if err := s.DB(ctxstore.DbFromContext(m.ctx, DbName)).
 			C(DbAuthSetColl).Insert(aset); err != nil {
 			return errors.Wrapf(err, "failed to insert auth set for device %v",
 				olddev.Id)
 		}
 
 		// update tokens
-		_, err := s.DB(ctxStore.DbFromContext(m.ctx, DbName)).
+		_, err := s.DB(ctxstore.DbFromContext(m.ctx, DbName)).
 			C(DbTokensColl).UpdateAll(
 			token_0_1_0{
 				DevId: olddev.Id,
@@ -112,7 +112,7 @@ func (m *migration_1_1_0) Up(from migrate.Version) error {
 func (m *migration_1_1_0) ensureIndexes(s *mgo.Session) error {
 
 	// devices collection
-	err := s.DB(ctxStore.DbFromContext(m.ctx, DbName)).
+	err := s.DB(ctxstore.DbFromContext(m.ctx, DbName)).
 		C(DbDevicesColl).EnsureIndex(mgo.Index{
 		Unique: true,
 		// identity data shall be unique within collection
@@ -125,7 +125,7 @@ func (m *migration_1_1_0) ensureIndexes(s *mgo.Session) error {
 	}
 
 	// auth requests
-	return s.DB(ctxStore.DbFromContext(m.ctx, DbName)).
+	return s.DB(ctxstore.DbFromContext(m.ctx, DbName)).
 		C(DbAuthSetColl).EnsureIndex(mgo.Index{
 		Unique: true,
 		// tuple (device ID,identity, public key) shall be unique within

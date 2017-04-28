@@ -25,7 +25,7 @@ import (
 
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
-	ctxStore "github.com/mendersoftware/go-lib-micro/store"
+	ctxstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/mgo.v2"
 )
@@ -74,7 +74,7 @@ func populateDevices(t *testing.T, s *mgo.Session, count int, maxTokensPerDev in
 		ctx := identity.WithContext(context.Background(), &identity.Identity{
 			Tenant: tenant,
 		})
-		err := s.DB(ctxStore.DbFromContext(ctx, DbName)).C(DbDevicesColl).Insert(dev)
+		err := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbDevicesColl).Insert(dev)
 		assert.NoError(t, err)
 
 		td.devices[i] = &dev
@@ -90,7 +90,7 @@ func populateDevices(t *testing.T, s *mgo.Session, count int, maxTokensPerDev in
 			}
 			td.tokens[i<<16+j] = &tok
 
-			err := s.DB(ctxStore.DbFromContext(ctx, DbName)).C(DbTokensColl).Insert(tok)
+			err := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbTokensColl).Insert(tok)
 			assert.NoError(t, err)
 		}
 	}
@@ -119,12 +119,12 @@ func TestMigration_1_0_0(t *testing.T) {
 	assert.NoError(t, err)
 
 	// there should be devCount devices
-	cnt, err := s.DB(ctxStore.DbFromContext(ctx, DbName)).C(DbDevicesColl).Count()
+	cnt, err := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbDevicesColl).Count()
 	assert.NoError(t, err)
 	assert.Equal(t, devCount, cnt)
 
 	// there should be an auth set for each device
-	cnt, err = s.DB(ctxStore.DbFromContext(ctx, DbName)).C(DbAuthSetColl).Count()
+	cnt, err = s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbAuthSetColl).Count()
 	assert.NoError(t, err)
 	assert.Equal(t, devCount, cnt)
 

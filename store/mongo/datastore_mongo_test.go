@@ -28,7 +28,7 @@ import (
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
-	ctxStore "github.com/mendersoftware/go-lib-micro/store"
+	ctxstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/mgo.v2"
 )
@@ -52,7 +52,7 @@ func setUpDevices(s *mgo.Session, ctx context.Context) error {
 		dev1,
 		dev2,
 	}
-	return s.DB(ctxStore.DbFromContext(ctx, DbName)).
+	return s.DB(ctxstore.DbFromContext(ctx, DbName)).
 		C(DbDevicesColl).Insert(inputDevices...)
 }
 
@@ -62,7 +62,7 @@ func setUpTokens(s *mgo.Session, ctx context.Context) error {
 		token1,
 		token2,
 	}
-	return s.DB(ctxStore.DbFromContext(ctx, DbName)).
+	return s.DB(ctxstore.DbFromContext(ctx, DbName)).
 		C(DbTokensColl).Insert(inputTokens...)
 }
 
@@ -292,7 +292,7 @@ func TestStoreUpdateDevice(t *testing.T) {
 
 				var found model.Device
 
-				c := s.DB(ctxStore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
+				c := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
 
 				err = c.FindId(tc.id).One(&found)
 				assert.NoError(t, err, "failed to find device")
@@ -334,7 +334,7 @@ func TestStoreAddToken(t *testing.T) {
 
 	var found model.Token
 
-	c := s.DB(ctxStore.DbFromContext(ctx, DbName)).C(DbTokensColl)
+	c := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbTokensColl)
 
 	err = c.FindId(token.Id).One(&found)
 	assert.NoError(t, err, "failed to find token")
@@ -561,7 +561,7 @@ func TestStoreMigrate(t *testing.T) {
 			if tc.err == "" {
 				assert.NoError(t, err)
 				var out []migrate.MigrationEntry
-				db.session.DB(ctxStore.DbFromContext(ctx, DbName)).
+				db.session.DB(ctxstore.DbFromContext(ctx, DbName)).
 					C(migrate.DbMigrationsColl).Find(nil).All(&out)
 				sort.Slice(out, func(i int, j int) bool {
 					return migrate.VersionIsLess(out[i].Version, out[j].Version)
@@ -767,7 +767,7 @@ func TestStoreDeleteDevice(t *testing.T) {
 		dev1,
 		dev2,
 	}
-	err := db.session.DB(ctxStore.DbFromContext(dbCtx, DbName)).
+	err := db.session.DB(ctxstore.DbFromContext(dbCtx, DbName)).
 		C(DbDevicesColl).Insert(inputDevices...)
 	assert.NoError(t, err, "failed to setup input data")
 
@@ -853,7 +853,7 @@ func TestStoreDeleteAuthSetsForDevice(t *testing.T) {
 	s := db.session.Copy()
 	defer s.Close()
 
-	coll := s.DB(ctxStore.DbFromContext(dbCtx, DbName)).C(DbAuthSetColl)
+	coll := s.DB(ctxstore.DbFromContext(dbCtx, DbName)).C(DbAuthSetColl)
 	assert.NoError(t, coll.Insert(authSets...))
 
 	testCases := []struct {
