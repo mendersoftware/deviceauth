@@ -23,6 +23,7 @@ import (
 	"github.com/mendersoftware/deviceauth/store"
 
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
+	ctxstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/pkg/errors"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -95,7 +96,7 @@ func (db *DataStoreMongo) GetDevices(ctx context.Context, skip, limit uint) ([]m
 	s := db.session.Copy()
 	defer s.Close()
 
-	c := s.DB(DbName).C(DbDevicesColl)
+	c := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
 
 	res := []model.Device{}
 
@@ -110,7 +111,7 @@ func (db *DataStoreMongo) GetDeviceById(ctx context.Context, id string) (*model.
 	s := db.session.Copy()
 	defer s.Close()
 
-	c := s.DB(DbName).C(DbDevicesColl)
+	c := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
 
 	res := model.Device{}
 
@@ -131,7 +132,7 @@ func (db *DataStoreMongo) GetDeviceByIdentityData(ctx context.Context, idata str
 	s := db.session.Copy()
 	defer s.Close()
 
-	c := s.DB(DbName).C(DbDevicesColl)
+	c := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
 
 	filter := bson.M{"id_data": idata}
 	res := model.Device{}
@@ -153,7 +154,7 @@ func (db *DataStoreMongo) AddDevice(ctx context.Context, d model.Device) error {
 	s := db.session.Copy()
 	defer s.Close()
 
-	c := s.DB(DbName).C(DbDevicesColl)
+	c := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
 
 	d.Id = bson.NewObjectId().Hex()
 
@@ -170,7 +171,7 @@ func (db *DataStoreMongo) UpdateDevice(ctx context.Context, d *model.Device) err
 	s := db.session.Copy()
 	defer s.Close()
 
-	c := s.DB(DbName).C(DbDevicesColl)
+	c := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
 
 	updev := makeUpdate(d)
 	update := bson.M{"$set": updev}
@@ -189,7 +190,7 @@ func (db *DataStoreMongo) DeleteDevice(ctx context.Context, id string) error {
 	s := db.session.Copy()
 	defer s.Close()
 
-	c := db.session.DB(DbName).C(DbDevicesColl)
+	c := db.session.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
 	err := c.RemoveId(id)
 	if err != nil {
 		if err == mgo.ErrNotFound {
@@ -206,7 +207,7 @@ func (db *DataStoreMongo) AddToken(ctx context.Context, t model.Token) error {
 	s := db.session.Copy()
 	defer s.Close()
 
-	c := s.DB(DbName).C(DbTokensColl)
+	c := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbTokensColl)
 
 	if err := c.Insert(t); err != nil {
 		return errors.Wrap(err, "failed to store token")
@@ -219,7 +220,7 @@ func (db *DataStoreMongo) GetToken(ctx context.Context, jti string) (*model.Toke
 	s := db.session.Copy()
 	defer s.Close()
 
-	c := s.DB(DbName).C(DbTokensColl)
+	c := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbTokensColl)
 
 	res := model.Token{}
 
@@ -240,7 +241,7 @@ func (db *DataStoreMongo) DeleteToken(ctx context.Context, jti string) error {
 	s := db.session.Copy()
 	defer s.Close()
 
-	c := db.session.DB(DbName).C(DbTokensColl)
+	c := db.session.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbTokensColl)
 	err := c.RemoveId(jti)
 	if err != nil {
 		if err == mgo.ErrNotFound {
@@ -257,7 +258,7 @@ func (db *DataStoreMongo) DeleteTokenByDevId(ctx context.Context, devId string) 
 	s := db.session.Copy()
 	defer s.Close()
 
-	c := db.session.DB(DbName).C(DbTokensColl)
+	c := db.session.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbTokensColl)
 	err := c.Remove(bson.M{"dev_id": devId})
 
 	if err != nil {
@@ -271,10 +272,10 @@ func (db *DataStoreMongo) DeleteTokenByDevId(ctx context.Context, devId string) 
 	return nil
 }
 
-func (db *DataStoreMongo) Migrate(ctx context.Context, version string, migrations []migrate.Migration) error {
+func (db *DataStoreMongo) Migrate(ctx context.Context, version string) error {
 	m := migrate.SimpleMigrator{
 		Session: db.session,
-		Db:      DbName,
+		Db:      ctxstore.DbFromContext(ctx, DbName),
 	}
 
 	ver, err := migrate.NewVersion(version)
@@ -282,8 +283,11 @@ func (db *DataStoreMongo) Migrate(ctx context.Context, version string, migration
 		return errors.Wrap(err, "failed to parse service version")
 	}
 
-	migrations = []migrate.Migration{
-		&migration_1_1_0{ms: db},
+	migrations := []migrate.Migration{
+		&migration_1_1_0{
+			ms:  db,
+			ctx: ctx,
+		},
 	}
 
 	err = m.Apply(ctx, *ver, migrations)
@@ -310,47 +314,11 @@ func makeUpdate(d *model.Device) *model.Device {
 	return updev
 }
 
-func (db *DataStoreMongo) Index() error {
-	s := db.session.Copy()
-	defer s.Close()
-
-	// devices collection
-	err := s.DB(DbName).C(DbDevicesColl).EnsureIndex(mgo.Index{
-		Unique: true,
-		// identity data shall be unique within collection
-		Key:        []string{model.DevKeyIdData},
-		Name:       indexDevices_IdentityData,
-		Background: false,
-	})
-	if err != nil {
-		return err
-	}
-
-	// auth requests
-	err = s.DB(DbName).C(DbAuthSetColl).EnsureIndex(mgo.Index{
-		Unique: true,
-		// tuple (device ID,identity, public key) shall be unique within
-		// collection
-		Key: []string{
-			model.AuthSetKeyDeviceId,
-			model.AuthSetKeyIdData,
-			model.AuthSetKeyPubKey,
-		},
-		Name:       indexAuthSet_DeviceId_IdentityData_PubKey,
-		Background: false,
-	})
-	if err != nil {
-		return err
-	}
-
-	return err
-}
-
 func (db *DataStoreMongo) AddAuthSet(ctx context.Context, set model.AuthSet) error {
 	s := db.session.Copy()
 	defer s.Close()
 
-	c := s.DB(DbName).C(DbAuthSetColl)
+	c := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbAuthSetColl)
 
 	set.Id = bson.NewObjectId().Hex()
 
@@ -367,7 +335,7 @@ func (db *DataStoreMongo) GetAuthSetByDataKey(ctx context.Context, idata string,
 	s := db.session.Copy()
 	defer s.Close()
 
-	c := s.DB(DbName).C(DbAuthSetColl)
+	c := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbAuthSetColl)
 
 	filter := model.AuthSet{
 		IdData: idata,
@@ -392,7 +360,7 @@ func (db *DataStoreMongo) GetAuthSetById(ctx context.Context, auth_id string) (*
 	s := db.session.Copy()
 	defer s.Close()
 
-	c := s.DB(DbName).C(DbAuthSetColl)
+	c := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbAuthSetColl)
 
 	res := model.AuthSet{}
 	err := c.FindId(auth_id).One(&res)
@@ -412,7 +380,7 @@ func (db *DataStoreMongo) GetAuthSetsForDevice(ctx context.Context, devid string
 	s := db.session.Copy()
 	defer s.Close()
 
-	c := s.DB(DbName).C(DbAuthSetColl)
+	c := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbAuthSetColl)
 
 	res := []model.AuthSet{}
 
@@ -433,7 +401,7 @@ func (db *DataStoreMongo) UpdateAuthSet(ctx context.Context, orig model.AuthSet,
 	s := db.session.Copy()
 	defer s.Close()
 
-	c := s.DB(DbName).C(DbAuthSetColl)
+	c := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbAuthSetColl)
 
 	err := c.Update(orig, bson.M{"$set": mod})
 	if err != nil {
@@ -447,7 +415,7 @@ func (db *DataStoreMongo) DeleteAuthSetsForDevice(ctx context.Context, devid str
 	s := db.session.Copy()
 	defer s.Close()
 
-	c := s.DB(DbName).C(DbAuthSetColl)
+	c := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbAuthSetColl)
 
 	err := c.Remove(model.AuthSet{DeviceId: devid})
 
