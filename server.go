@@ -24,6 +24,7 @@ import (
 	"github.com/mendersoftware/deviceauth/client/deviceadm"
 	"github.com/mendersoftware/deviceauth/client/inventory"
 	"github.com/mendersoftware/deviceauth/client/orchestrator"
+	"github.com/mendersoftware/deviceauth/client/tenant"
 	"github.com/mendersoftware/deviceauth/config"
 	"github.com/mendersoftware/deviceauth/devauth"
 	"github.com/mendersoftware/deviceauth/jwt"
@@ -84,7 +85,12 @@ func RunServer(c config.Reader) error {
 
 	if tadmAddr := c.GetString(SettingTenantAdmAddr); tadmAddr != "" {
 		l.Infof("settting up tenant verification")
-		devauth = devauth.WithTenantVerification()
+
+		tc := tenant.NewClient(tenant.Config{
+			TenantAdmAddr: tadmAddr,
+		})
+
+		devauth = devauth.WithTenantVerification(tc)
 	}
 
 	api, err := SetupAPI(c.GetString(SettingMiddleware))

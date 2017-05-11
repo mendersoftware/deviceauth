@@ -26,6 +26,7 @@ import (
 	"github.com/mendersoftware/deviceauth/client/deviceadm"
 	"github.com/mendersoftware/deviceauth/client/inventory"
 	"github.com/mendersoftware/deviceauth/client/orchestrator"
+	"github.com/mendersoftware/deviceauth/client/tenant"
 	"github.com/mendersoftware/deviceauth/jwt"
 	"github.com/mendersoftware/deviceauth/model"
 	"github.com/mendersoftware/deviceauth/store"
@@ -71,6 +72,7 @@ type DevAuth struct {
 	cDevAdm      deviceadm.ClientRunner
 	cInv         inventory.ClientRunner
 	cOrch        orchestrator.ClientRunner
+	cTenant      tenant.ClientRunner
 	jwt          jwt.JWTAgentApp
 	clientGetter ApiClientGetter
 	verifyTenant bool
@@ -124,6 +126,16 @@ func (d *DevAuth) SubmitAuthRequest(ctx context.Context, r *model.AuthReq) (stri
 		if r.TenantToken == "" {
 			l.Errorf("request is missing tenant token")
 			return "", ErrDevAuthUnauthorized
+		}
+
+		err := d.cTenant.VerifyToken(ctx, r.TenantToken, d.clientGetter())
+		if err != nil {
+			if err == tenant.ErrTokenVerificationFailed {
+				l.Errorf("failed to verify tenant token")
+				return "", ErrDevAuthUnauthorized
+			}
+
+			return "", errors.New("request to verify tenant token failed")
 		}
 	}
 
@@ -436,7 +448,8 @@ func (d *DevAuth) VerifyToken(ctx context.Context, token string) error {
 // WithTenantVerification will force verification of tenant token with tenant
 // administrator when processing device authentication requests. Returns an
 // updated devauth.
-func (d *DevAuth) WithTenantVerification() *DevAuth {
+func (d *DevAuth) WithTenantVerification(c tenant.ClientRunner) *DevAuth {
+	d.cTenant = c
 	d.verifyTenant = true
 	return d
 }
