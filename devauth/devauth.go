@@ -73,6 +73,7 @@ type DevAuth struct {
 	cOrch        orchestrator.ClientRunner
 	jwt          jwt.JWTAgentApp
 	clientGetter ApiClientGetter
+	verifyTenant bool
 }
 
 func NewDevAuth(d store.DataStore, cda deviceadm.ClientRunner, ci inventory.ClientRunner, co orchestrator.ClientRunner, jwt jwt.JWTAgentApp) App {
@@ -83,6 +84,7 @@ func NewDevAuth(d store.DataStore, cda deviceadm.ClientRunner, ci inventory.Clie
 		cOrch:        co,
 		jwt:          jwt,
 		clientGetter: simpleApiClientGetter,
+		verifyTenant: false,
 	}
 }
 
@@ -116,6 +118,15 @@ func (d *DevAuth) getDeviceFromAuthRequest(ctx context.Context, r *model.AuthReq
 }
 
 func (d *DevAuth) SubmitAuthRequest(ctx context.Context, r *model.AuthReq) (string, error) {
+	l := log.FromContext(ctx)
+
+	if d.verifyTenant {
+		if r.TenantToken == "" {
+			l.Errorf("request is missing tenant token")
+			return "", ErrDevAuthUnauthorized
+		}
+	}
+
 	return d.SubmitAuthRequestWithClient(ctx, r, d.clientGetter())
 }
 
@@ -420,4 +431,12 @@ func (d *DevAuth) VerifyToken(ctx context.Context, token string) error {
 	}
 
 	return nil
+}
+
+// WithTenantVerification will force verification of tenant token with tenant
+// administrator when processing device authentication requests. Returns an
+// updated devauth.
+func (d *DevAuth) WithTenantVerification() *DevAuth {
+	d.verifyTenant = true
+	return d
 }

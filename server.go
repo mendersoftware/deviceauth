@@ -82,6 +82,11 @@ func RunServer(c config.Reader) error {
 		orchestrator.NewClient(orchClientConf),
 		jwtHandler)
 
+	if tadmAddr := c.GetString(SettingTenantAdmAddr); tadmAddr != "" {
+		l.Infof("settting up tenant verification")
+		devauth = devauth.WithTenantVerification()
+	}
+
 	api, err := SetupAPI(c.GetString(SettingMiddleware))
 	if err != nil {
 		return errors.Wrap(err, "API setup failed")
