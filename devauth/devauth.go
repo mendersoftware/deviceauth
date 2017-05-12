@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/mendersoftware/go-lib-micro/requestid"
 	"github.com/pkg/errors"
@@ -131,6 +132,7 @@ func (d *DevAuth) SubmitAuthRequest(ctx context.Context, r *model.AuthReq) (stri
 			return "", ErrDevAuthUnauthorized
 		}
 
+		// verify tenant token with tenant administration
 		err := d.cTenant.VerifyToken(ctx, r.TenantToken, d.clientGetter())
 		if err != nil {
 			if err == tenant.ErrTokenVerificationFailed {
@@ -140,19 +142,59 @@ func (d *DevAuth) SubmitAuthRequest(ctx context.Context, r *model.AuthReq) (stri
 
 			return "", errors.New("request to verify tenant token failed")
 		}
+
+		ident, err := identity.ExtractIdentity(r.TenantToken)
+		l.Infof("identity %v", ident)
+		if err != nil {
+			l.Errorf("failed to extract identity: %v", err)
+			return "", ErrDevAuthUnauthorized
+		}
+
+		// update context to store the identity of the caller
+		ctx = identity.WithContext(ctx, &ident)
 	}
 
-	return d.SubmitAuthRequestWithClient(ctx, r, d.clientGetter())
+	authSet, err := d.processAuthRequest(ctx, r)
+	if err != nil {
+		return "", err
+	}
+
+	// request was already present in DB, check its status
+	if authSet.Status == model.DevStatusAccepted {
+		// make & give token, include aid when generating token
+		token, err := d.jwt.GenerateTokenSignRS256(authSet.DeviceId)
+		if err != nil {
+			return "", errors.Wrap(err, "generate token error")
+		}
+
+		token = token.WithAuthSet(authSet)
+
+		if err := d.db.AddToken(ctx, *token); err != nil {
+			return "", errors.Wrap(err, "add token error")
+		}
+
+		l.Infof("Token %v assigned to device %v auth set %v",
+			token.Id, authSet.DeviceId, authSet.Id)
+		return token.Token, nil
+	}
+
+	// no token, return device unauthorized
+	return "", ErrDevAuthUnauthorized
+
 }
 
-func (d *DevAuth) SubmitAuthRequestWithClient(ctx context.Context, r *model.AuthReq, client requestid.ApiRequester) (string, error) {
+// processAuthRequest will process incoming auth request, record authentication
+// data information it contains and optionally upload the data to device
+// admission service. Returns a tupe (auth set, error). If no errors were
+// present, model.AuthSet.Status will indicate the status of device admission
+func (d *DevAuth) processAuthRequest(ctx context.Context, r *model.AuthReq) (*model.AuthSet, error) {
 
 	l := log.FromContext(ctx)
 
 	// get device associated with given authorization request
 	dev, err := d.getDeviceFromAuthRequest(ctx, r)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	areq := &model.AuthSet{
@@ -167,7 +209,7 @@ func (d *DevAuth) SubmitAuthRequestWithClient(ctx context.Context, r *model.Auth
 	// record authentication request
 	err = d.db.AddAuthSet(ctx, *areq)
 	if err != nil && err != store.ErrObjectExists {
-		return "", err
+		return nil, err
 	} else if err == store.ErrObjectExists {
 		added = false
 	}
@@ -176,7 +218,7 @@ func (d *DevAuth) SubmitAuthRequestWithClient(ctx context.Context, r *model.Auth
 	areq, err = d.db.GetAuthSetByDataKey(ctx, r.IdData, r.PubKey)
 	if err != nil {
 		l.Error("failed to find device auth set but could not add one either")
-		return "", errors.New("failed to locate device auth set")
+		return nil, errors.New("failed to locate device auth set")
 	}
 
 	// it it was indeed added (a new request), pass it to admission service
@@ -187,10 +229,10 @@ func (d *DevAuth) SubmitAuthRequestWithClient(ctx context.Context, r *model.Auth
 			IdData:   r.IdData,
 			PubKey:   r.PubKey,
 		}
-		if err := d.cDevAdm.AddDevice(ctx, admreq, client); err != nil {
+		if err := d.cDevAdm.AddDevice(ctx, admreq, d.clientGetter()); err != nil {
 			// we've failed to submit the request, no worries, just
 			// return an error
-			return "", errors.Wrap(err, "devadm add device error")
+			return nil, errors.Wrap(err, "devadm add device error")
 		}
 
 		if err := d.db.UpdateAuthSet(ctx, *areq, model.AuthSetUpdate{
@@ -200,31 +242,9 @@ func (d *DevAuth) SubmitAuthRequestWithClient(ctx context.Context, r *model.Auth
 			// nothing bad happens here, we'll try to post the
 			// request next time device pings us
 		}
-
-		return "", ErrDevAuthUnauthorized
 	}
 
-	// request was already present in DB, check its status
-	if areq.Status == model.DevStatusAccepted {
-		// make & give token, include aid when generating token
-		token, err := d.jwt.GenerateTokenSignRS256(dev.Id)
-		if err != nil {
-			return "", errors.Wrap(err, "generate token error")
-		}
-
-		token = token.WithAuthSet(areq)
-
-		if err := d.db.AddToken(ctx, *token); err != nil {
-			return "", errors.Wrap(err, "add token error")
-		}
-
-		l.Infof("Token %v assigned to device %v auth set %v",
-			token.Id, dev.Id, areq.Id)
-		return token.Token, nil
-	}
-
-	// no token, return device unauthorized
-	return "", ErrDevAuthUnauthorized
+	return areq, nil
 }
 
 func (d *DevAuth) SubmitInventoryDevice(ctx context.Context, dev model.Device) error {
