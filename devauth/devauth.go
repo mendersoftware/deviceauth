@@ -18,6 +18,11 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/mendersoftware/go-lib-micro/log"
+	"github.com/mendersoftware/go-lib-micro/requestid"
+	"github.com/pkg/errors"
+
 	"github.com/mendersoftware/deviceauth/client/deviceadm"
 	"github.com/mendersoftware/deviceauth/client/inventory"
 	"github.com/mendersoftware/deviceauth/client/orchestrator"
@@ -25,11 +30,6 @@ import (
 	"github.com/mendersoftware/deviceauth/model"
 	"github.com/mendersoftware/deviceauth/store"
 	uto "github.com/mendersoftware/deviceauth/utils/to"
-
-	"github.com/Azure/go-autorest/autorest/to"
-	"github.com/mendersoftware/go-lib-micro/log"
-	"github.com/mendersoftware/go-lib-micro/requestid"
-	"github.com/pkg/errors"
 )
 
 var (

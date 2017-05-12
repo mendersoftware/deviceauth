@@ -23,13 +23,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/mendersoftware/deviceauth/devauth"
-	"github.com/mendersoftware/deviceauth/devauth/mocks"
-	"github.com/mendersoftware/deviceauth/jwt"
-	"github.com/mendersoftware/deviceauth/model"
-	"github.com/mendersoftware/deviceauth/store"
-	mtest "github.com/mendersoftware/deviceauth/test"
-
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/ant0ine/go-json-rest/rest/test"
 	"github.com/mendersoftware/go-lib-micro/requestid"
@@ -37,6 +30,13 @@ import (
 	"github.com/mendersoftware/go-lib-micro/rest_utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+
+	"github.com/mendersoftware/deviceauth/devauth"
+	"github.com/mendersoftware/deviceauth/devauth/mocks"
+	"github.com/mendersoftware/deviceauth/jwt"
+	"github.com/mendersoftware/deviceauth/model"
+	"github.com/mendersoftware/deviceauth/store"
+	mtest "github.com/mendersoftware/deviceauth/test"
 )
 
 var restErrUpdateDone sync.Once

@@ -19,11 +19,11 @@ import (
 	"net/http"
 	"testing"
 
-	ct "github.com/mendersoftware/deviceauth/client/testing"
-	"github.com/mendersoftware/deviceauth/model"
-
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
+
+	ct "github.com/mendersoftware/deviceauth/client/testing"
+	"github.com/mendersoftware/deviceauth/model"
 )
 
 func TestClientGet(t *testing.T) {

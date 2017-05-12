@@ -14,10 +14,10 @@
 package http
 
 import (
-	"github.com/mendersoftware/deviceauth/api"
-
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/mendersoftware/go-lib-micro/requestid"
+
+	"github.com/mendersoftware/deviceauth/api"
 )
 
 func ContextFromRequest(r *rest.Request) *api.RequestContext {

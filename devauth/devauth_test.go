@@ -19,6 +19,11 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/mendersoftware/go-lib-micro/requestid"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+
 	"github.com/mendersoftware/deviceauth/client/deviceadm"
 	mdevadm "github.com/mendersoftware/deviceauth/client/deviceadm/mocks"
 	"github.com/mendersoftware/deviceauth/client/inventory"
@@ -29,11 +34,6 @@ import (
 	"github.com/mendersoftware/deviceauth/model"
 	"github.com/mendersoftware/deviceauth/store"
 	mstore "github.com/mendersoftware/deviceauth/store/mocks"
-
-	"github.com/Azure/go-autorest/autorest/to"
-	"github.com/mendersoftware/go-lib-micro/requestid"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 )
 
 func TestDevAuthSubmitAuthRequest(t *testing.T) {

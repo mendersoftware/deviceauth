@@ -21,16 +21,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mendersoftware/deviceauth/model"
-	"github.com/mendersoftware/deviceauth/store"
-	uto "github.com/mendersoftware/deviceauth/utils/to"
-
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	ctxstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/mgo.v2"
+
+	"github.com/mendersoftware/deviceauth/model"
+	"github.com/mendersoftware/deviceauth/store"
+	uto "github.com/mendersoftware/deviceauth/utils/to"
 )
 
 const (
