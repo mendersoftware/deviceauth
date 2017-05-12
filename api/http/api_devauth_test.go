@@ -83,7 +83,9 @@ func makeMockApiHandler(t *testing.T, da devauth.App) http.Handler {
 // - signed with a bogus test value
 // - not signed at all
 func makeAuthReq(payload interface{}, key *rsa.PrivateKey, signature string, t *testing.T) *http.Request {
-	r := test.MakeSimpleRequest("POST", "http://1.2.3.4/api/devices/v1/authentication/auth_requests", payload)
+	r := test.MakeSimpleRequest("POST",
+		"http://1.2.3.4/api/devices/v1/authentication/auth_requests",
+		payload)
 
 	b, err := json.Marshal(payload)
 	if err != nil {
@@ -211,6 +213,21 @@ func TestApiDevAuthSubmitAuthReq(t *testing.T) {
 					"id_data":      "id-0001",
 					"pubkey":       pubkeyStr,
 					"tenant_token": "tenant-0001",
+				},
+				privkey,
+				"",
+				t),
+			"dummytoken",
+			nil,
+			200,
+			"dummytoken",
+		},
+		{
+			//complete body + signature, auth ok, tenant token empty
+			makeAuthReq(
+				map[string]interface{}{
+					"id_data": "id-0001",
+					"pubkey":  pubkeyStr,
 				},
 				privkey,
 				"",
