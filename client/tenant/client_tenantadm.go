@@ -15,11 +15,13 @@ package tenant
 
 import (
 	"context"
+	"net/http"
 	"time"
 
 	"github.com/pkg/errors"
 
 	"github.com/mendersoftware/deviceauth/client"
+	"github.com/mendersoftware/deviceauth/utils"
 )
 
 const (
@@ -55,8 +57,39 @@ type Client struct {
 // VerifyToken will execute a request to tenenatadm's endpoint for token
 // verification. Returns nil if verification was successful.
 func (tc *Client) VerifyToken(ctx context.Context, token string, client client.HttpRunner) error {
-	// stub
-	return nil
+
+	// TODO sanitize token
+
+	req, err := http.NewRequest(http.MethodPost,
+		utils.JoinURL(tc.conf.TenantAdmAddr, TenantVerifyUri),
+		nil)
+	if err != nil {
+		return errors.Wrap(err, "failed to create request to tenant administrator")
+	}
+
+	// tenant token is passed in Authorization header
+	req.Header.Add("Authorization", "Bearer "+token)
+
+	ctx, cancel := context.WithTimeout(ctx, tc.conf.Timeout)
+	defer cancel()
+
+	rsp, err := client.Do(req.WithContext(ctx))
+	if err != nil {
+		return errors.Wrap(err, "request to verify token failed")
+	}
+	defer rsp.Body.Close()
+
+	switch rsp.StatusCode {
+
+	case http.StatusUnauthorized: // 401, verification result negative
+		return ErrTokenVerificationFailed
+
+	case http.StatusOK: // 200, token verified
+		return nil
+	default:
+		return errors.Errorf("token verification request returned unexpected status %v",
+			rsp.StatusCode)
+	}
 }
 
 // NewClient creates a client with given config.
