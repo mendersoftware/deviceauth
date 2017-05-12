@@ -36,7 +36,7 @@ import (
 	"github.com/mendersoftware/deviceauth/jwt"
 	"github.com/mendersoftware/deviceauth/model"
 	"github.com/mendersoftware/deviceauth/store"
-	mtest "github.com/mendersoftware/deviceauth/test"
+	mtest "github.com/mendersoftware/deviceauth/utils/testing"
 )
 
 var restErrUpdateDone sync.Once
