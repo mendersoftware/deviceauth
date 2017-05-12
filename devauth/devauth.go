@@ -78,7 +78,10 @@ type DevAuth struct {
 	verifyTenant bool
 }
 
-func NewDevAuth(d store.DataStore, cda deviceadm.ClientRunner, ci inventory.ClientRunner, co orchestrator.ClientRunner, jwt jwt.JWTAgentApp) App {
+func NewDevAuth(d store.DataStore, cda deviceadm.ClientRunner,
+	ci inventory.ClientRunner, co orchestrator.ClientRunner,
+	jwt jwt.JWTAgentApp) *DevAuth {
+
 	return &DevAuth{
 		db:           d,
 		cDevAdm:      cda,
