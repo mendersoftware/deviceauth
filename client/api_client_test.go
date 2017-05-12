@@ -43,8 +43,12 @@ func TestApiClient(t *testing.T) {
 		http.Header{
 			"Authorization":     []string{"Bearer of-bad-news"},
 			"X-My-First-Header": []string{"none"},
+			"No-Override":       []string{"override"},
 		},
-		"Authorization")
+		"Authorization", "No-Override")
+
+	// make sure that the client will not override already-set headers
+	r.Header.Add("No-Override", "original")
 
 	_, err := c.Do(r.WithContext(ctx))
 	assert.NoError(t, err)
@@ -52,4 +56,6 @@ func TestApiClient(t *testing.T) {
 	assert.NotNil(t, inreq)
 	assert.Equal(t, "Bearer of-bad-news", inreq.Header.Get("Authorization"))
 	assert.Equal(t, "123-456", inreq.Header.Get(requestid.RequestIdHeader))
+	assert.Equal(t, "original", inreq.Header.Get("No-Override"))
+
 }

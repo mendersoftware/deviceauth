@@ -21,12 +21,16 @@ import (
 	ctxhttpheader "github.com/mendersoftware/go-lib-micro/context/httpheader"
 )
 
+// maybeSetHeader sets HTTP header `hdr` to value `val` if `val` is not empty or
+// the header is not yet set.
 func maybeSetHeader(hdrs http.Header, hdr string, val string) {
 	if val == "" {
 		return
 	}
 
-	hdrs.Add(hdr, val)
+	if hdrs.Get(hdr) == "" {
+		hdrs.Add(hdr, val)
+	}
 }
 
 // HttpApi is an http.Client wrapper tailored to use with mender's APIs.
@@ -38,6 +42,7 @@ type HttpApi struct {
 // headers are:
 // - X-Mender-RequestId - extracted with requestid.FromContext()
 // - Authorization - extracted with httpheader.FromContext()
+// If given header is already set, the value from context will not be used
 func (a *HttpApi) Do(r *http.Request) (*http.Response, error) {
 	client := &http.Client{}
 	ctx := r.Context()
