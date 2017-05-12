@@ -24,16 +24,20 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
+	"github.com/mendersoftware/deviceauth/client"
 	"github.com/mendersoftware/deviceauth/client/deviceadm"
 	mdevadm "github.com/mendersoftware/deviceauth/client/deviceadm/mocks"
 	"github.com/mendersoftware/deviceauth/client/inventory"
 	minventory "github.com/mendersoftware/deviceauth/client/inventory/mocks"
 	morchestrator "github.com/mendersoftware/deviceauth/client/orchestrator/mocks"
+	"github.com/mendersoftware/deviceauth/client/tenant"
+	mtenant "github.com/mendersoftware/deviceauth/client/tenant/mocks"
 	"github.com/mendersoftware/deviceauth/jwt"
 	mjwt "github.com/mendersoftware/deviceauth/jwt/mocks"
 	"github.com/mendersoftware/deviceauth/model"
 	"github.com/mendersoftware/deviceauth/store"
 	mstore "github.com/mendersoftware/deviceauth/store/mocks"
+	mtesting "github.com/mendersoftware/deviceauth/utils/testing"
 )
 
 func TestDevAuthSubmitAuthRequest(t *testing.T) {
@@ -69,6 +73,9 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 		admissionNotified bool
 
 		devAdmErr error
+
+		tenantVerify          bool
+		tenantVerificationErr error
 
 		res string
 		err error
@@ -169,6 +176,37 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 
 			err: errors.New("devadm add device error: failed to add device"),
 		},
+		{
+			//new device - tenant token verification failed
+			inReq: req,
+
+			err: ErrDevAuthUnauthorized,
+
+			tenantVerify:          true,
+			tenantVerificationErr: tenant.ErrTokenVerificationFailed,
+		},
+		{
+			//new device - tenant token verification failed because of other reasons
+			inReq: req,
+
+			err: errors.New("request to verify tenant token failed"),
+
+			tenantVerify:          true,
+			tenantVerificationErr: errors.New("something something failed"),
+		},
+		{
+			//new device - tenant token required but not provided
+			inReq: model.AuthReq{
+				IdData:      idData,
+				TenantToken: "",
+				PubKey:      pubKey,
+			},
+
+			err: ErrDevAuthUnauthorized,
+
+			tenantVerify:          true,
+			tenantVerificationErr: errors.New("should not be called"),
+		},
 	}
 
 	for tcidx := range testCases {
@@ -261,7 +299,18 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 				}, nil)
 
 			devauth := NewDevAuth(&db, &cda, &cdi, nil, &jwt)
-			res, err := devauth.SubmitAuthRequest(context.Background(), &req)
+
+			if tc.tenantVerify {
+				ct := mtenant.ClientRunner{}
+				ct.On("VerifyToken",
+					mtesting.ContextMatcher(),
+					tc.inReq.TenantToken,
+					mock.MatchedBy(func(_ client.HttpRunner) bool { return true })).
+					Return(tc.tenantVerificationErr)
+				devauth = devauth.WithTenantVerification(&ct)
+			}
+
+			res, err := devauth.SubmitAuthRequest(context.Background(), &tc.inReq)
 
 			assert.Equal(t, tc.res, res)
 			if tc.err != nil {
