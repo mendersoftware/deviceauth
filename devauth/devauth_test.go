@@ -492,6 +492,9 @@ func TestDevAuthVerifyToken(t *testing.T) {
 
 		auth       *model.AuthSet
 		getAuthErr error
+
+		dev          *model.Device
+		getDeviceErr error
 	}{
 		{
 			tokenString:      "expired",
@@ -526,8 +529,13 @@ func TestDevAuthVerifyToken(t *testing.T) {
 				AuthSetId: "foo",
 			},
 			auth: &model.AuthSet{
-				Id:     "foo",
-				Status: model.DevStatusAccepted,
+				Id:       "foo",
+				Status:   model.DevStatusAccepted,
+				DeviceId: "foodev",
+			},
+			dev: &model.Device{
+				Id:              "foodev",
+				Decommissioning: false,
 			},
 		},
 		{
@@ -542,6 +550,25 @@ func TestDevAuthVerifyToken(t *testing.T) {
 			auth: &model.AuthSet{
 				Id:     "foo",
 				Status: model.DevStatusRejected,
+			},
+		},
+		{
+			tokenString:      "good-accepted-decommissioning",
+			tokenValidateErr: jwt.ErrTokenInvalid,
+
+			jti: "good-accepted-decommissioning",
+			token: &model.Token{
+				Id:        "good-accepted-decommissioning",
+				AuthSetId: "foo",
+			},
+			auth: &model.AuthSet{
+				Id:       "foo",
+				Status:   model.DevStatusAccepted,
+				DeviceId: "foodev",
+			},
+			dev: &model.Device{
+				Id:              "foodev",
+				Decommissioning: true,
 			},
 		},
 	}
@@ -565,7 +592,14 @@ func TestDevAuthVerifyToken(t *testing.T) {
 			db.On("GetToken", context.Background(), tc.jti).Return(tc.token, tc.getTokenErr)
 
 			if tc.token != nil {
-				db.On("GetAuthSetById", context.Background(), tc.token.AuthSetId).Return(tc.auth, tc.getAuthErr)
+				db.On("GetAuthSetById", context.Background(),
+					tc.token.AuthSetId).Return(tc.auth, tc.getAuthErr)
+				// devauth will ask for a device if auth set is
+				// found and accepted
+				if tc.auth != nil {
+					db.On("GetDeviceById", context.Background(),
+						tc.auth.DeviceId).Return(tc.dev, tc.getDeviceErr)
+				}
 			}
 
 			err := devauth.VerifyToken(context.Background(), tc.tokenString)

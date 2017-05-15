@@ -404,5 +404,16 @@ func (d *DevAuth) VerifyToken(ctx context.Context, token string) error {
 		return jwt.ErrTokenInvalid
 	}
 
+	// reject authentication for device that is in the process of
+	// decommissioning
+	dev, err := d.db.GetDeviceById(ctx, auth.DeviceId)
+	if err != nil {
+		return err
+	}
+	if dev.Decommissioning {
+		l.Errorf("token %v rejected, device %s is being decommissioned", jti, auth.DeviceId)
+		return jwt.ErrTokenInvalid
+	}
+
 	return nil
 }
