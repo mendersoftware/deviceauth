@@ -192,6 +192,8 @@ func (d *DevAuth) SubmitAuthRequestWithClient(ctx context.Context, r *model.Auth
 			return "", errors.Wrap(err, "add token error")
 		}
 
+		l.Infof("Token %v assigned to device %v auth set %v",
+			token.Id, dev.Id, areq.Id)
 		return token.Token, nil
 	}
 
@@ -369,7 +371,7 @@ func (d *DevAuth) VerifyToken(ctx context.Context, token string) error {
 			l.Errorf("Token %s expired: %v", jti, err)
 			err := d.db.DeleteToken(ctx, jti)
 			if err == store.ErrTokenNotFound {
-				l.Errorf("Token with jti: %s not found", jti)
+				l.Errorf("Token %s not found", jti)
 				return err
 			}
 			if err != nil {
@@ -377,14 +379,14 @@ func (d *DevAuth) VerifyToken(ctx context.Context, token string) error {
 			}
 			return jwt.ErrTokenExpired
 		}
-		l.Errorf("Token invalid: %v", err)
+		l.Errorf("Token %s invalid: %v", jti, err)
 		return jwt.ErrTokenInvalid
 	}
 	// check if token is in the system
 	tok, err := d.db.GetToken(ctx, jti)
 	if err != nil {
 		if err == store.ErrTokenNotFound {
-			l.Errorf("Token with jti: %s not found", jti)
+			l.Errorf("Token %s not found", jti)
 			return err
 		}
 		return errors.Wrapf(err, "Cannot get token with id: %s from database: %s", jti, err)
@@ -393,8 +395,8 @@ func (d *DevAuth) VerifyToken(ctx context.Context, token string) error {
 	auth, err := d.db.GetAuthSetById(ctx, tok.AuthSetId)
 	if err != nil {
 		if err == store.ErrTokenNotFound {
-			l.Errorf("auth set %v for token jti: %s not found",
-				tok.AuthSetId, jti)
+			l.Errorf("Token %s auth set %s not found",
+				jti, tok.AuthSetId)
 			return err
 		}
 		return err
@@ -411,7 +413,7 @@ func (d *DevAuth) VerifyToken(ctx context.Context, token string) error {
 		return err
 	}
 	if dev.Decommissioning {
-		l.Errorf("token %v rejected, device %s is being decommissioned", jti, auth.DeviceId)
+		l.Errorf("Token %s rejected, device %s is being decommissioned", jti, auth.DeviceId)
 		return jwt.ErrTokenInvalid
 	}
 
