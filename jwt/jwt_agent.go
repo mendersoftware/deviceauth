@@ -27,7 +27,7 @@ import (
 
 var (
 	ErrTokenExpired = errors.New("jwt: token expired")
-	ErrTokenInvalid = errors.New("jwt: token ivalid")
+	ErrTokenInvalid = errors.New("jwt: token invalid")
 )
 
 // Token field names
