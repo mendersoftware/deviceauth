@@ -37,7 +37,7 @@ const (
 	SettingOrchestratorAddrDefault = "http://mender-conductor:8080/"
 
 	SettingTenantAdmAddr        = "tenantadm_addr"
-	SettingTenantAdmAddrDefault = "http://mender-tenant-adm:8080/"
+	SettingTenantAdmAddrDefault = ""
 
 	SettingServerPrivKeyPath        = "server_priv_key_path"
 	SettingServerPrivKeyPathDefault = "/etc/deviceauth/rsa/private.pem"
