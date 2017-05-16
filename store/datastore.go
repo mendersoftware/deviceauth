@@ -15,10 +15,10 @@
 package store
 
 import (
+	"context"
 	"errors"
 
 	"github.com/mendersoftware/deviceauth/model"
-	"github.com/mendersoftware/go-lib-micro/log"
 )
 
 var (
@@ -35,50 +35,47 @@ var (
 type DataStore interface {
 	// retrieve device by Mender-assigned device ID
 	//returns ErrDevNotFound if device not found
-	GetDeviceById(id string) (*model.Device, error)
+	GetDeviceById(ctx context.Context, id string) (*model.Device, error)
 
 	// retrieve device by its identity data
 	// returns ErrDevNotFound if device not found
-	GetDeviceByIdentityData(idata string) (*model.Device, error)
+	GetDeviceByIdentityData(ctx context.Context, idata string) (*model.Device, error)
 
 	// list devices
-	GetDevices(skip, limit uint) ([]model.Device, error)
+	GetDevices(ctx context.Context, skip, limit uint) ([]model.Device, error)
 
-	AddDevice(d model.Device) error
+	AddDevice(ctx context.Context, d model.Device) error
 
-	// updates a single device selected via d.Id
-	// updates only set fields
-	UpdateDevice(d *model.Device) error
+	// updates a single device with ID `d.Id`, using data from `up`
+	UpdateDevice(ctx context.Context, d model.Device, up model.DeviceUpdate) error
 
 	// deletes device
-	DeleteDevice(id string) error
+	DeleteDevice(ctx context.Context, id string) error
 
-	AddAuthSet(set model.AuthSet) error
+	AddAuthSet(ctx context.Context, set model.AuthSet) error
 
-	GetAuthSetByDataKey(data string, key string) (*model.AuthSet, error)
+	GetAuthSetByDataKey(ctx context.Context, data string, key string) (*model.AuthSet, error)
 
-	GetAuthSetById(id string) (*model.AuthSet, error)
+	GetAuthSetById(ctx context.Context, id string) (*model.AuthSet, error)
 
-	GetAuthSetsForDevice(devid string) ([]model.AuthSet, error)
+	GetAuthSetsForDevice(ctx context.Context, devid string) ([]model.AuthSet, error)
 
 	// update AuthSet and set its values to ones in AuthSetUpdate
-	UpdateAuthSet(orig model.AuthSet, mod model.AuthSetUpdate) error
+	UpdateAuthSet(ctx context.Context, orig model.AuthSet, mod model.AuthSetUpdate) error
 
 	// deletes all auth sets for device
-	DeleteAuthSetsForDevice(devid string) error
+	DeleteAuthSetsForDevice(ctx context.Context, devid string) error
 
 	// adds JWT to database
-	AddToken(t model.Token) error
+	AddToken(ctx context.Context, t model.Token) error
 
 	// retrieves JWT from database using JWT Id and device Id
 	// returns ErrTokenNotFound if token not found
-	GetToken(jti string) (*model.Token, error)
+	GetToken(ctx context.Context, jti string) (*model.Token, error)
 
 	// deletes token
-	DeleteToken(jti string) error
+	DeleteToken(ctx context.Context, jti string) error
 
 	// deletes device token
-	DeleteTokenByDevId(dev_id string) error
-
-	log.ContextLogger
+	DeleteTokenByDevId(ctx context.Context, dev_id string) error
 }

@@ -18,8 +18,9 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	"github.com/stretchr/testify/assert"
+
+	. "github.com/mendersoftware/go-lib-micro/mongo/migrate"
 )
 
 func TestDummyMigratorApply(t *testing.T) {

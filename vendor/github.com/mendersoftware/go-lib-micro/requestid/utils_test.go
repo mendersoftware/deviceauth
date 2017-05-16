@@ -21,14 +21,14 @@ import (
 )
 
 // FromContext extracts current request Id from context.Context
-func TestFromContext(t *testing.T) {
+func TestContext(t *testing.T) {
 
-	ctx := context.Background()
-
-	assert.Equal(t, "", FromContext(ctx))
+	assert.Equal(t, "", FromContext(context.Background()))
 	assert.Equal(t, "foo",
-		FromContext(context.WithValue(ctx, RequestIdHeader, "foo")))
-	// fallback to default string
+		FromContext(WithContext(context.Background(), "foo")))
+	// fallback to default string if someone packs the value into context
+	// themselves
 	assert.Equal(t, "",
-		FromContext(context.WithValue(ctx, RequestIdHeader, 123)))
+		FromContext(context.WithValue(context.Background(),
+			RequestIdHeader, 123)))
 }

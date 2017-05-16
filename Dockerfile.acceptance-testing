@@ -1,0 +1,9 @@
+FROM alpine:3.4
+
+EXPOSE 8080
+
+COPY ./deviceauth /usr/bin/
+COPY ./config.yaml /usr/bin/
+STOPSIGNAL SIGINT
+
+ENTRYPOINT ["/usr/bin/deviceauth", "-test.coverprofile=/testing/coverage-acceptance.txt", "-acceptance-tests", "-test.run=TestRunMain"]

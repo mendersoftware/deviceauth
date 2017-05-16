@@ -14,6 +14,7 @@
 package mongo
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"testing"
@@ -22,7 +23,9 @@ import (
 	"github.com/mendersoftware/deviceauth/model"
 	"github.com/mendersoftware/deviceauth/store"
 
+	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
+	ctxstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/mgo.v2"
 )
@@ -68,7 +71,10 @@ func populateDevices(t *testing.T, s *mgo.Session, count int, maxTokensPerDev in
 			CreatedTs:   randTime(time.Now()),
 			UpdatedTs:   time.Now(),
 		}
-		err := s.DB(DbName).C(DbDevicesColl).Insert(dev)
+		ctx := identity.WithContext(context.Background(), &identity.Identity{
+			Tenant: tenant,
+		})
+		err := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbDevicesColl).Insert(dev)
 		assert.NoError(t, err)
 
 		td.devices[i] = &dev
@@ -84,7 +90,7 @@ func populateDevices(t *testing.T, s *mgo.Session, count int, maxTokensPerDev in
 			}
 			td.tokens[i<<16+j] = &tok
 
-			err := s.DB(DbName).C(DbTokensColl).Insert(tok)
+			err := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbTokensColl).Insert(tok)
 			assert.NoError(t, err)
 		}
 	}
@@ -92,7 +98,11 @@ func populateDevices(t *testing.T, s *mgo.Session, count int, maxTokensPerDev in
 }
 
 func TestMigration_1_0_0(t *testing.T) {
-	db := getDb()
+	ctx := identity.WithContext(context.Background(), &identity.Identity{
+		Tenant: tenant,
+	})
+	db.Wipe()
+	db := NewDataStoreMongoWithSession(db.Session())
 
 	s := db.session
 	devCount := 100
@@ -100,29 +110,32 @@ func TestMigration_1_0_0(t *testing.T) {
 
 	data := populateDevices(t, s, devCount, toksPerDev)
 
-	mig := migration_1_1_0{ms: db}
+	mig := migration_1_1_0{
+		ms:  db,
+		ctx: ctx,
+	}
 
 	err := mig.Up(migrate.MakeVersion(0, 1, 0))
 	assert.NoError(t, err)
 
 	// there should be devCount devices
-	cnt, err := s.DB(DbName).C(DbDevicesColl).Count()
+	cnt, err := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbDevicesColl).Count()
 	assert.NoError(t, err)
 	assert.Equal(t, devCount, cnt)
 
 	// there should be an auth set for each device
-	cnt, err = s.DB(DbName).C(DbAuthSetColl).Count()
+	cnt, err = s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbAuthSetColl).Count()
 	assert.NoError(t, err)
 	assert.Equal(t, devCount, cnt)
 
 	// trying to add a device with same identity data should raise conflict
-	err = db.AddDevice(model.Device{
+	err = db.AddDevice(ctx, model.Device{
 		IdData: data.GetDev(10).IdData,
 	})
 	assert.EqualError(t, err, store.ErrObjectExists.Error())
 
 	// trying to add device with existing out set should raise conflict
-	err = db.AddAuthSet(model.AuthSet{
+	err = db.AddAuthSet(ctx, model.AuthSet{
 		PubKey:   data.GetDev(10).PubKey,
 		IdData:   data.GetDev(10).IdData,
 		DeviceId: data.GetDev(10).Id,
@@ -131,7 +144,7 @@ func TestMigration_1_0_0(t *testing.T) {
 
 	// verify that there is an auth set for every device
 	for i, dev := range data.devices {
-		aset, err := db.GetAuthSetByDataKey(dev.IdData, dev.PubKey)
+		aset, err := db.GetAuthSetByDataKey(ctx, dev.IdData, dev.PubKey)
 		assert.NoError(t, err)
 
 		// auth set ID should be the same as device ID
@@ -149,7 +162,7 @@ func TestMigration_1_0_0(t *testing.T) {
 				break
 			}
 
-			tok, err := db.GetToken(oldtok.Id)
+			tok, err := db.GetToken(ctx, oldtok.Id)
 			assert.NoError(t, err)
 			assert.Equal(t, oldtok.Token, tok.Token)
 			assert.Equal(t, dev.Id, tok.DevId)

@@ -15,8 +15,10 @@ package inventory
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/mendersoftware/deviceauth/utils"
 
@@ -28,25 +30,27 @@ import (
 const (
 	// devices endpoint
 	InventoryDevicesUri = "/api/0.1.0/devices"
+	// default request timeout, 10s?
+	defaultReqTimeout = time.Duration(10) * time.Second
 )
 
 // ClientConfig conveys client configuration
-type ClientConfig struct {
+type Config struct {
 	// Inventory service address
 	InventoryAddr string
+	// Request timeout
+	Timeout time.Duration
 }
 
 // ClientRunner is an interface of inventory client
 type ClientRunner interface {
-	AddDevice(req AddReq, client requestid.ApiRequester) error
-	log.ContextLogger
+	AddDevice(ctx context.Context, req AddReq, client requestid.ApiRequester) error
 }
 
 // Client is an opaque implementation of inventory client. Implements
 // ClientRunner interface
 type Client struct {
-	log  *log.Logger
-	conf ClientConfig
+	conf Config
 }
 
 // AddReq contains request data of request to add a device.
@@ -55,8 +59,11 @@ type AddReq struct {
 	Id string `json:"id"`
 }
 
-func (ic *Client) AddDevice(areq AddReq, client requestid.ApiRequester) error {
-	ic.log.Debugf("add device %s to inventory", areq.Id)
+func (ic *Client) AddDevice(ctx context.Context, areq AddReq, client requestid.ApiRequester) error {
+
+	l := log.FromContext(ctx)
+
+	l.Debugf("add device %s to inventory", areq.Id)
 
 	ireq, err := json.Marshal(areq)
 	if err != nil {
@@ -75,7 +82,11 @@ func (ic *Client) AddDevice(areq AddReq, client requestid.ApiRequester) error {
 
 	req.Header.Set("Content-Type", "application/json")
 
-	rsp, err := client.Do(req)
+	// set the inventory request timeout
+	ctx, cancel := context.WithTimeout(ctx, ic.conf.Timeout)
+	defer cancel()
+
+	rsp, err := client.Do(req.WithContext(ctx))
 	if err != nil {
 		return errors.Wrapf(err, "failed to add device")
 	}
@@ -83,11 +94,11 @@ func (ic *Client) AddDevice(areq AddReq, client requestid.ApiRequester) error {
 
 	switch rsp.StatusCode {
 	case http.StatusConflict:
-		ic.log.Warnf("inventory entry for device %s already exists", areq.Id)
+		l.Warnf("inventory entry for device %s already exists", areq.Id)
 	case http.StatusCreated:
-		ic.log.Infof("inventory entry for device %s created", areq.Id)
+		l.Infof("inventory entry for device %s created", areq.Id)
 	default:
-		ic.log.Errorf("failed to create inventory entry for device")
+		l.Errorf("failed to create inventory entry for device")
 		if err == nil {
 			err = errors.New("unexpected response status")
 		}
@@ -97,20 +108,12 @@ func (ic *Client) AddDevice(areq AddReq, client requestid.ApiRequester) error {
 	return nil
 }
 
-func (ic *Client) UseLog(l *log.Logger) {
-	ic.log = l.F(log.Ctx{})
-}
+func NewClient(c Config) *Client {
+	if c.Timeout == 0 {
+		c.Timeout = defaultReqTimeout
+	}
 
-func NewClientWithLogger(c ClientConfig, l *log.Logger) *Client {
-	l = l.F(log.Ctx{})
-	client := NewClient(c)
-	client.UseLog(l)
-	return client
-}
-
-func NewClient(c ClientConfig) *Client {
 	return &Client{
-		log:  log.New(log.Ctx{}),
 		conf: c,
 	}
 }

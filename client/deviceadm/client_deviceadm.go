@@ -15,6 +15,7 @@ package deviceadm
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"time"
@@ -34,7 +35,7 @@ const (
 )
 
 // ClientConfig conveys client configuration
-type ClientConfig struct {
+type Config struct {
 	// Device admission host
 	DevAdmAddr string
 	// Request timeout
@@ -43,19 +44,20 @@ type ClientConfig struct {
 
 // ClientRunner is an interface of device admission client
 type ClientRunner interface {
-	AddDevice(req AdmReq, client requestid.ApiRequester) error
-	log.ContextLogger
+	AddDevice(ctx context.Context, req AdmReq, client requestid.ApiRequester) error
 }
 
 // Client is an opaque implementation of device admission client. Implements
 // ClientRunner interface
 type Client struct {
-	log  *log.Logger
-	conf ClientConfig
+	conf Config
 }
 
-func (d *Client) AddDevice(admreq AdmReq, client requestid.ApiRequester) error {
-	d.log.Debugf("add device %s for admission", admreq.DeviceId)
+func (d *Client) AddDevice(ctx context.Context, admreq AdmReq, client requestid.ApiRequester) error {
+
+	l := log.FromContext(ctx)
+
+	l.Debugf("add device %s for admission", admreq.DeviceId)
 
 	AdmReqJson, err := json.Marshal(admreq)
 	if err != nil {
@@ -74,7 +76,11 @@ func (d *Client) AddDevice(admreq AdmReq, client requestid.ApiRequester) error {
 
 	req.Header.Set("Content-Type", "application/json")
 
-	rsp, err := client.Do(req)
+	// set the device admission request timeout
+	ctx, cancel := context.WithTimeout(ctx, d.conf.Timeout)
+	defer cancel()
+
+	rsp, err := client.Do(req.WithContext(ctx))
 	if err != nil {
 		return errors.Wrapf(err, "failed to add device")
 	}
@@ -87,24 +93,12 @@ func (d *Client) AddDevice(admreq AdmReq, client requestid.ApiRequester) error {
 	return nil
 }
 
-func (d *Client) UseLog(l *log.Logger) {
-	d.log = l.F(log.Ctx{})
-}
-
-func NewClientWithLogger(c ClientConfig, l *log.Logger) *Client {
-	l = l.F(log.Ctx{})
-	client := NewClient(c)
-	client.UseLog(l)
-	return client
-}
-
-func NewClient(c ClientConfig) *Client {
+func NewClient(c Config) *Client {
 	if c.Timeout == 0 {
 		c.Timeout = defaultReqTimeout
 	}
 
 	return &Client{
-		log:  log.New(log.Ctx{}),
 		conf: c,
 	}
 }

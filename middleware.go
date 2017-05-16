@@ -19,7 +19,9 @@ import (
 
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/mendersoftware/go-lib-micro/accesslog"
+	mctx "github.com/mendersoftware/go-lib-micro/context"
 	"github.com/mendersoftware/go-lib-micro/customheader"
+	"github.com/mendersoftware/go-lib-micro/identity"
 	dlog "github.com/mendersoftware/go-lib-micro/log"
 	"github.com/mendersoftware/go-lib-micro/requestid"
 	"github.com/mendersoftware/go-lib-micro/requestlog"
@@ -52,6 +54,13 @@ var (
 		// if the content is non-null
 		&rest.ContentTypeCheckerMiddleware{},
 		&requestid.RequestIdMiddleware{},
+		&mctx.UpdateContextMiddleware{
+			Updates: []mctx.UpdateContextFunc{
+				mctx.RepackLoggerToContext,
+				mctx.RepackRequestIdToContext,
+			},
+		},
+		&identity.IdentityMiddleware{},
 	}
 
 	DefaultProdStack = []rest.Middleware{
@@ -73,6 +82,13 @@ var (
 		// if the content is non-null
 		&rest.ContentTypeCheckerMiddleware{},
 		&requestid.RequestIdMiddleware{},
+		&mctx.UpdateContextMiddleware{
+			Updates: []mctx.UpdateContextFunc{
+				mctx.RepackLoggerToContext,
+				mctx.RepackRequestIdToContext,
+			},
+		},
+		&identity.IdentityMiddleware{},
 	}
 
 	middlewareMap = map[string][]rest.Middleware{

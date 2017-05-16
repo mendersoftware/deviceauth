@@ -14,6 +14,7 @@
 package http
 
 import (
+	"context"
 	"crypto/rsa"
 	"encoding/json"
 	"errors"
@@ -31,7 +32,6 @@ import (
 
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/ant0ine/go-json-rest/rest/test"
-	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/mendersoftware/go-lib-micro/requestid"
 	"github.com/mendersoftware/go-lib-micro/requestlog"
 	"github.com/mendersoftware/go-lib-micro/rest_utils"
@@ -60,8 +60,8 @@ func runTestRequest(t *testing.T, handler http.Handler, req *http.Request, code 
 	return recorded
 }
 
-func makeMockApiHandler(t *testing.T, f DevAuthFactory) http.Handler {
-	handlers := NewDevAuthApiHandler(f)
+func makeMockApiHandler(t *testing.T, da devauth.App) http.Handler {
+	handlers := NewDevAuthApiHandlers(da)
 	assert.NotNil(t, handlers)
 
 	app, err := handlers.GetApp()
@@ -83,7 +83,9 @@ func makeMockApiHandler(t *testing.T, f DevAuthFactory) http.Handler {
 // - signed with a bogus test value
 // - not signed at all
 func makeAuthReq(payload interface{}, key *rsa.PrivateKey, signature string, t *testing.T) *http.Request {
-	r := test.MakeSimpleRequest("POST", "http://1.2.3.4/api/devices/v1/authentication/auth_requests", payload)
+	r := test.MakeSimpleRequest("POST",
+		"http://1.2.3.4/api/devices/v1/authentication/auth_requests",
+		payload)
 
 	b, err := json.Marshal(payload)
 	if err != nil {
@@ -220,16 +222,32 @@ func TestApiDevAuthSubmitAuthReq(t *testing.T) {
 			200,
 			"dummytoken",
 		},
+		{
+			//complete body + signature, auth ok, tenant token empty
+			makeAuthReq(
+				map[string]interface{}{
+					"id_data": "id-0001",
+					"pubkey":  pubkeyStr,
+				},
+				privkey,
+				"",
+				t),
+			"dummytoken",
+			nil,
+			200,
+			"dummytoken",
+		},
 	}
 
 	for i := range testCases {
 		tc := testCases[i]
 		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
-			da := mocks.DevAuthApp{}
+			da := &mocks.App{}
 			da.On("SubmitAuthRequest",
+				context.Background(),
 				mock.AnythingOfType("*model.AuthReq")).
 				Return(
-					func(r *model.AuthReq) string {
+					func(_ context.Context, r *model.AuthReq) string {
 						if tc.devAuthErr != nil {
 							return ""
 						}
@@ -237,15 +255,7 @@ func TestApiDevAuthSubmitAuthReq(t *testing.T) {
 					},
 					tc.devAuthErr)
 
-			da.On("WithContext",
-				mock.AnythingOfType("*api.RequestContext")).
-				Return(&da)
-
-			factory := func(l *log.Logger) (devauth.DevAuthApp, error) {
-				return &da, nil
-			}
-
-			apih := makeMockApiHandler(t, factory)
+			apih := makeMockApiHandler(t, da)
 
 			recorded := runTestRequest(t, apih, tc.req, tc.code, tc.body)
 			if tc.code == http.StatusOK {
@@ -282,7 +292,7 @@ func TestApiDevAuthUpdateStatusDevice(t *testing.T) {
 		},
 	}
 
-	mockaction := func(dev_id string, auth_id string) error {
+	mockaction := func(_ context.Context, dev_id string, auth_id string) error {
 		d, ok := devs[dev_id+","+auth_id]
 		if ok == false {
 			return store.ErrDevNotFound
@@ -292,20 +302,21 @@ func TestApiDevAuthUpdateStatusDevice(t *testing.T) {
 		}
 		return nil
 	}
-	da := mocks.DevAuthApp{}
-	da.On("AcceptDeviceAuth", mock.AnythingOfType("string"),
+	da := &mocks.App{}
+	da.On("AcceptDeviceAuth",
+		context.Background(),
+		mock.AnythingOfType("string"),
 		mock.AnythingOfType("string")).Return(mockaction)
-	da.On("RejectDeviceAuth", mock.AnythingOfType("string"),
+	da.On("RejectDeviceAuth",
+		context.Background(),
+		mock.AnythingOfType("string"),
 		mock.AnythingOfType("string")).Return(mockaction)
-	da.On("ResetDeviceAuth", mock.AnythingOfType("string"),
+	da.On("ResetDeviceAuth",
+		context.Background(),
+		mock.AnythingOfType("string"),
 		mock.AnythingOfType("string")).Return(mockaction)
-	da.On("WithContext", mock.AnythingOfType("*api.RequestContext")).Return(&da)
 
-	factory := func(l *log.Logger) (devauth.DevAuthApp, error) {
-		return &da, nil
-	}
-
-	apih := makeMockApiHandler(t, factory)
+	apih := makeMockApiHandler(t, da)
 	// enforce specific field naming in errors returned by API
 	updateRestErrorFieldName()
 
@@ -447,15 +458,13 @@ func TestApiDevAuthVerifyToken(t *testing.T) {
 		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
 			t.Parallel()
 
-			da := mocks.DevAuthApp{}
+			da := &mocks.App{}
 			da.On("VerifyToken",
+				context.Background(),
 				mock.AnythingOfType("string")).
 				Return(tc.err)
 
-			factory := func(l *log.Logger) (devauth.DevAuthApp, error) {
-				return &da, nil
-			}
-			apih := makeMockApiHandler(t, factory)
+			apih := makeMockApiHandler(t, da)
 			if len(tc.headers) > 0 {
 				tc.req.Header.Set("authorization", tc.headers["authorization"])
 			}
@@ -503,15 +512,13 @@ func TestApiDevAuthDeleteToken(t *testing.T) {
 		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
 			t.Parallel()
 
-			da := mocks.DevAuthApp{}
+			da := &mocks.App{}
 			da.On("RevokeToken",
+				context.Background(),
 				mock.AnythingOfType("string")).
 				Return(tc.err)
 
-			factory := func(l *log.Logger) (devauth.DevAuthApp, error) {
-				return &da, nil
-			}
-			apih := makeMockApiHandler(t, factory)
+			apih := makeMockApiHandler(t, da)
 			runTestRequest(t, apih, tc.req, tc.code, tc.body)
 		})
 	}
@@ -559,15 +566,13 @@ func TestApiGetDevice(t *testing.T) {
 		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
 			t.Parallel()
 
-			da := mocks.DevAuthApp{}
+			da := &mocks.App{}
 			da.On("GetDevice",
+				context.Background(),
 				mock.AnythingOfType("string")).
 				Return(tc.device, tc.err)
 
-			factory := func(l *log.Logger) (devauth.DevAuthApp, error) {
-				return &da, nil
-			}
-			apih := makeMockApiHandler(t, factory)
+			apih := makeMockApiHandler(t, da)
 			runTestRequest(t, apih, tc.req, tc.code, tc.body)
 		})
 	}
@@ -652,14 +657,13 @@ func TestApiGetDevices(t *testing.T) {
 		t.Run(fmt.Sprintf("tc %v", i), func(t *testing.T) {
 			t.Parallel()
 
-			da := mocks.DevAuthApp{}
-			da.On("GetDevices", tc.skip, tc.limit).Return(
+			da := &mocks.App{}
+			da.On("GetDevices",
+				context.Background(),
+				tc.skip, tc.limit).Return(
 				tc.devices, tc.err)
 
-			factory := func(l *log.Logger) (devauth.DevAuthApp, error) {
-				return &da, nil
-			}
-			apih := makeMockApiHandler(t, factory)
+			apih := makeMockApiHandler(t, da)
 			runTestRequest(t, apih, tc.req, tc.code, tc.body)
 		})
 	}
@@ -708,15 +712,13 @@ func TestApiDevAuthDecommissionDevice(t *testing.T) {
 		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
 			t.Parallel()
 
-			da := mocks.DevAuthApp{}
+			da := &mocks.App{}
 			da.On("DecommissionDevice",
+				context.Background(),
 				mock.AnythingOfType("string")).
 				Return(tc.err)
 
-			factory := func(l *log.Logger) (devauth.DevAuthApp, error) {
-				return &da, nil
-			}
-			apih := makeMockApiHandler(t, factory)
+			apih := makeMockApiHandler(t, da)
 			runTestRequest(t, apih, tc.req, tc.code, tc.body)
 		})
 	}

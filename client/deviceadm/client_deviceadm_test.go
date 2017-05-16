@@ -14,6 +14,7 @@
 package deviceadm
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -21,15 +22,15 @@ import (
 
 	ct "github.com/mendersoftware/deviceauth/client/testing"
 
-	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestGetClient(t *testing.T) {
 	t.Parallel()
 
-	c := NewClientWithLogger(ClientConfig{DevAdmAddr: "localhost:3333"},
-		log.New(log.Ctx{}))
+	c := NewClient(Config{
+		DevAdmAddr: "localhost:3333",
+	})
 	assert.NotNil(t, c)
 }
 
@@ -39,11 +40,13 @@ func TestClientReqSuccess(t *testing.T) {
 	s, rd := ct.NewMockServer(http.StatusNoContent)
 	defer s.Close()
 
-	c := NewClient(ClientConfig{
+	c := NewClient(Config{
 		DevAdmAddr: s.URL,
 	})
 
-	err := c.AddDevice(AdmReq{}, &http.Client{})
+	ctx := context.Background()
+
+	err := c.AddDevice(ctx, AdmReq{}, &http.Client{})
 	assert.NoError(t, err, "expected no errors")
 	assert.Equal(t, DevAdmDevicesUri, rd.Url.Path)
 }
@@ -54,11 +57,13 @@ func TestClientReqFail(t *testing.T) {
 	s, rd := ct.NewMockServer(http.StatusBadRequest)
 	defer s.Close()
 
-	c := NewClient(ClientConfig{
+	c := NewClient(Config{
 		DevAdmAddr: s.URL,
 	})
 
-	err := c.AddDevice(AdmReq{}, &http.Client{})
+	ctx := context.Background()
+
+	err := c.AddDevice(ctx, AdmReq{}, &http.Client{})
 	assert.Error(t, err, "expected an error")
 	assert.Equal(t, DevAdmDevicesUri, rd.Url.Path)
 }
@@ -66,11 +71,13 @@ func TestClientReqFail(t *testing.T) {
 func TestClientReqNoHost(t *testing.T) {
 	t.Parallel()
 
-	c := NewClient(ClientConfig{
+	c := NewClient(Config{
 		DevAdmAddr: "http://somehost:1234",
 	})
 
-	err := c.AddDevice(AdmReq{}, &http.Client{})
+	ctx := context.Background()
+
+	err := c.AddDevice(ctx, AdmReq{}, &http.Client{})
 
 	assert.Error(t, err, "expected an error")
 }
@@ -98,12 +105,13 @@ func TestClientTimeout(t *testing.T) {
 	}))
 
 	addDevUrl := s.URL + "/devices"
-	c := NewClient(ClientConfig{
+	c := NewClient(Config{
 		DevAdmAddr: addDevUrl,
 	})
 
 	t1 := time.Now()
-	err := c.AddDevice(AdmReq{},
+	ctx := context.Background()
+	err := c.AddDevice(ctx, AdmReq{},
 		&http.Client{Timeout: defaultReqTimeout})
 	t2 := time.Now()
 

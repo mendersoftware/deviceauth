@@ -153,11 +153,11 @@ class TestDevice(ManagementClient):
 
         # verify workflow was executed
         cc = ConductorClient()
-        r = cc.get_executed_workflows('decommission_device')
+        r = cc.get_workflows('decommission_device')
         assert r.status_code == 200
 
         res = r.json()
-        assert res['totalHits'] > 0
+        assert res['totalHits'] == 1
 
-        wf = [x for x in res['results'] if x['input']['request_id'] == 'delete_device']
+        wf = [x for x in res['results'] if x['input'] == '{device_id=' + ourdev.id + ', request_id=delete_device}']
         assert len(wf) == 1

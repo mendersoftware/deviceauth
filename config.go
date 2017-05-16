@@ -33,6 +33,12 @@ const (
 	SettingInventoryAddr        = "inventory_addr"
 	SettingInventoryAddrDefault = "http://mender-inventory:8080/"
 
+	SettingOrchestratorAddr        = "device_auth_orchestrator"
+	SettingOrchestratorAddrDefault = "http://mender-conductor:8080/"
+
+	SettingTenantAdmAddr        = "tenantadm_addr"
+	SettingTenantAdmAddrDefault = "http://mender-tenant-adm:8080/"
+
 	SettingServerPrivKeyPath        = "server_priv_key_path"
 	SettingServerPrivKeyPathDefault = "/etc/deviceauth/rsa/private.pem"
 
@@ -51,6 +57,8 @@ var (
 		{Key: SettingDb, Value: SettingDbDefault},
 		{Key: SettingDevAdmAddr, Value: SettingDevAdmAddrDefault},
 		{Key: SettingInventoryAddr, Value: SettingInventoryAddrDefault},
+		{Key: SettingOrchestratorAddr, Value: SettingOrchestratorAddrDefault},
+		{Key: SettingTenantAdmAddr, Value: SettingTenantAdmAddrDefault},
 		{Key: SettingServerPrivKeyPath, Value: SettingServerPrivKeyPathDefault},
 		{Key: SettingJWTIssuer, Value: SettingJWTIssuerDefault},
 		{Key: SettingJWTExpirationTimeout, Value: SettingJWTExpirationTimeoutDefault},

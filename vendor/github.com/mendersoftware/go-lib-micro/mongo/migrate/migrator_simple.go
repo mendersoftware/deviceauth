@@ -17,9 +17,10 @@ import (
 	"context"
 	"sort"
 
-	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/pkg/errors"
 	"gopkg.in/mgo.v2"
+
+	"github.com/mendersoftware/go-lib-micro/log"
 )
 
 // SimpleMigratior applies migrations by comparing `Version` of migrations
@@ -68,34 +69,37 @@ func (m *SimpleMigrator) Apply(ctx context.Context, target Version, migrations [
 
 	// try to apply migrations
 	for _, migration := range migrations {
-		if VersionIsLess(last, migration.Version()) {
+		mv := migration.Version()
+		if VersionIsLess(target, mv) {
+			l.Warnf("migration to version %s skipped, target version %s is lower",
+				mv, target)
+		} else if VersionIsLess(last, mv) {
 			// log, migration applied
 			l.Infof("applying migration from version %s to %s",
-				last, migration.Version())
+				last, mv)
 
 			// apply migration
 			if err := migration.Up(last); err != nil {
 				l.Errorf("migration from %s to %s failed: %s",
-					last, migration.Version(), err)
+					last, mv, err)
 
 				// migration from last to migration.Version() failed: err
 				return errors.Wrapf(err,
 					"failed to apply migration from %s to %s",
-					last, migration.Version())
+					last, mv)
 			}
 
-			if err := UpdateMigrationInfo(migration.Version(),
-				m.Session, m.Db); err != nil {
+			if err := UpdateMigrationInfo(mv, m.Session, m.Db); err != nil {
 
 				return errors.Wrapf(err,
 					"failed to record migration from %s to %s",
-					last, migration.Version())
+					last, mv)
 
 			}
-			last = migration.Version()
+			last = mv
 		} else {
 			// log migration already applied
-			l.Infof("migration to version %s skipped", migration.Version())
+			l.Infof("migration to version %s skipped", mv)
 		}
 	}
 

@@ -14,12 +14,12 @@
 package main
 
 import (
-	"crypto/rsa"
 	"net/http"
 
 	api_http "github.com/mendersoftware/deviceauth/api/http"
 	"github.com/mendersoftware/deviceauth/client/deviceadm"
 	"github.com/mendersoftware/deviceauth/client/inventory"
+	"github.com/mendersoftware/deviceauth/client/orchestrator"
 	"github.com/mendersoftware/deviceauth/config"
 	"github.com/mendersoftware/deviceauth/devauth"
 	"github.com/mendersoftware/deviceauth/jwt"
@@ -46,38 +46,6 @@ func SetupAPI(stacktype string) (*rest.Api, error) {
 	return api, nil
 }
 
-// DevAuthAppFor returns a factory function that creates DevAuthApp and sets it
-// up using `c` as configuration source and `key` as private key.
-func DevAuthAppFor(c config.Reader, key *rsa.PrivateKey) api_http.DevAuthFactory {
-	return func(l *log.Logger) (devauth.DevAuthApp, error) {
-		db, err := mongo.GetDataStoreMongo(c.GetString(SettingDb), l)
-		if err != nil {
-			return nil, errors.Wrap(err, "database connection failed")
-		}
-
-		jwtHandler := jwt.NewJWTAgent(jwt.JWTAgentConfig{
-			PrivateKey:        key,
-			ExpirationTimeout: int64(c.GetInt(SettingJWTExpirationTimeout)),
-			Issuer:            c.GetString(SettingJWTIssuer),
-		})
-
-		devAdmClientConf := deviceadm.ClientConfig{
-			DevAdmAddr: c.GetString(SettingDevAdmAddr),
-		}
-		invClientConf := inventory.ClientConfig{
-			InventoryAddr: c.GetString(SettingInventoryAddr),
-		}
-
-		devauth := devauth.NewDevAuth(db,
-			deviceadm.NewClient(devAdmClientConf),
-			inventory.NewClient(invClientConf),
-			jwtHandler)
-		devauth.UseLog(l)
-
-		return devauth, nil
-	}
-}
-
 func RunServer(c config.Reader) error {
 
 	l := log.New(log.Ctx{})
@@ -87,12 +55,39 @@ func RunServer(c config.Reader) error {
 		return errors.Wrap(err, "failed to read rsa private key")
 	}
 
+	db, err := mongo.GetDataStoreMongo(c.GetString(SettingDb))
+	if err != nil {
+		return errors.Wrap(err, "database connection failed")
+	}
+
+	jwtHandler := jwt.NewJWTAgent(jwt.JWTAgentConfig{
+		PrivateKey:        privKey,
+		ExpirationTimeout: int64(c.GetInt(SettingJWTExpirationTimeout)),
+		Issuer:            c.GetString(SettingJWTIssuer),
+	})
+
+	devAdmClientConf := deviceadm.Config{
+		DevAdmAddr: c.GetString(SettingDevAdmAddr),
+	}
+	invClientConf := inventory.Config{
+		InventoryAddr: c.GetString(SettingInventoryAddr),
+	}
+	orchClientConf := orchestrator.Config{
+		OrchestratorAddr: c.GetString(SettingOrchestratorAddr),
+	}
+
+	devauth := devauth.NewDevAuth(db,
+		deviceadm.NewClient(devAdmClientConf),
+		inventory.NewClient(invClientConf),
+		orchestrator.NewClient(orchClientConf),
+		jwtHandler)
+
 	api, err := SetupAPI(c.GetString(SettingMiddleware))
 	if err != nil {
 		return errors.Wrap(err, "API setup failed")
 	}
 
-	devauthapi := api_http.NewDevAuthApiHandler(DevAuthAppFor(c, privKey))
+	devauthapi := api_http.NewDevAuthApiHandlers(devauth)
 
 	apph, err := devauthapi.GetApp()
 	if err != nil {

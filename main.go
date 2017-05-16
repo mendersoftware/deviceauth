@@ -57,14 +57,9 @@ func main() {
 		l.Fatal("failed to connect to db")
 	}
 
-	err = db.Migrate(ctx, mongo.DbVersion, nil)
+	err = db.Migrate(ctx, mongo.DbVersion)
 	if err != nil {
-		l.Fatal("failed to run migrations")
-	}
-
-	err = db.Index()
-	if err != nil {
-		l.Fatal("failed to setup indexing")
+		l.Fatalf("failed to run migrations: %v", err)
 	}
 
 	l.Fatal(RunServer(config.Config))
