@@ -11,10 +11,6 @@
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
-
-// generate with:
-// mockery -name=DataStore
-
 package mocks
 
 import context "context"
@@ -300,13 +296,13 @@ func (_m *DataStore) UpdateAuthSet(ctx context.Context, orig model.AuthSet, mod 
 	return r0
 }
 
-// UpdateDevice provides a mock function with given fields: ctx, d
-func (_m *DataStore) UpdateDevice(ctx context.Context, d *model.Device) error {
-	ret := _m.Called(ctx, d)
+// UpdateDevice provides a mock function with given fields: ctx, d, up
+func (_m *DataStore) UpdateDevice(ctx context.Context, d model.Device, up model.DeviceUpdate) error {
+	ret := _m.Called(ctx, d, up)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *model.Device) error); ok {
-		r0 = rf(ctx, d)
+	if rf, ok := ret.Get(0).(func(context.Context, model.Device, model.DeviceUpdate) error); ok {
+		r0 = rf(ctx, d, up)
 	} else {
 		r0 = ret.Error(0)
 	}

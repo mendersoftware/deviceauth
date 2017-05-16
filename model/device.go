@@ -39,6 +39,15 @@ type Device struct {
 	AuthSets        []AuthSet `json:"auth_sets" bson:"-"`
 }
 
+type DeviceUpdate struct {
+	TenantToken     string     `json:"-" bson:"tenant_token,omitempty"`
+	PubKey          string     `json:"-" bson:",omitempty"`
+	IdData          string     `json:"id_data" bson:"id_data,omitempty"`
+	Status          string     `json:"-" bson:",omitempty"`
+	Decommissioning *bool      `json:"-" bson:",omitempty"`
+	UpdatedTs       *time.Time `json:"updated_ts" bson:"updated_ts,omitempty"`
+}
+
 func NewDevice(id, id_data, pubkey, tenant_token string) *Device {
 	now := time.Now()
 
