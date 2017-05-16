@@ -21,6 +21,7 @@ import (
 
 	"github.com/mendersoftware/deviceauth/model"
 	"github.com/mendersoftware/deviceauth/store"
+	uto "github.com/mendersoftware/deviceauth/utils/to"
 
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	ctxstore "github.com/mendersoftware/go-lib-micro/store"
@@ -167,13 +168,15 @@ func (db *DataStoreMongo) AddDevice(ctx context.Context, d model.Device) error {
 	return nil
 }
 
-func (db *DataStoreMongo) UpdateDevice(ctx context.Context, d *model.Device) error {
+func (db *DataStoreMongo) UpdateDevice(ctx context.Context,
+	d model.Device, updev model.DeviceUpdate) error {
+
 	s := db.session.Copy()
 	defer s.Close()
 
 	c := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
 
-	updev := makeUpdate(d)
+	updev.UpdatedTs = uto.TimePtr(time.Now().UTC())
 	update := bson.M{"$set": updev}
 
 	if err := c.UpdateId(d.Id, update); err != nil {
@@ -296,22 +299,6 @@ func (db *DataStoreMongo) Migrate(ctx context.Context, version string) error {
 	}
 
 	return nil
-}
-
-func makeUpdate(d *model.Device) *model.Device {
-	updev := &model.Device{}
-
-	if d.PubKey != "" {
-		updev.PubKey = d.PubKey
-	}
-
-	if d.Status != "" {
-		updev.Status = d.Status
-	}
-
-	updev.UpdatedTs = time.Now()
-
-	return updev
 }
 
 func (db *DataStoreMongo) AddAuthSet(ctx context.Context, set model.AuthSet) error {

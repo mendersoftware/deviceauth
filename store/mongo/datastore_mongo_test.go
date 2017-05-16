@@ -234,35 +234,49 @@ func TestStoreUpdateDevice(t *testing.T) {
 	err := setUpDevices(s, dbCtx)
 	assert.NoError(t, err, "failed to setup input data")
 
-	now := time.Now()
+	now := time.Now().UTC()
+
+	compareUpdateDev := func(t *testing.T, old model.Device,
+		dev model.Device, up model.DeviceUpdate) {
+
+		// check the fields we know are used
+		if up.IdData != "" {
+			assert.Equal(t, dev.IdData, up.IdData)
+		} else {
+			assert.Equal(t, dev.IdData, old.IdData)
+		}
+		if up.Decommissioning != nil {
+			assert.Equal(t, dev.Decommissioning, *up.Decommissioning)
+		} else {
+			assert.Equal(t, dev.Decommissioning, old.Decommissioning)
+		}
+	}
 
 	//test status updates
 	testCases := []struct {
 		id     string
-		status string
+		old    *model.Device
+		update model.DeviceUpdate
 		tenant string
 		outErr string
 	}{
 		{
 			id:     dev1.Id,
-			status: model.DevStatusAccepted,
+			old:    dev1,
+			update: model.DeviceUpdate{Decommissioning: to.BoolPtr(true)},
 			outErr: "",
 			tenant: tenant,
 		},
 		{
+			// other tenant's DB
 			id:     dev1.Id,
-			status: model.DevStatusAccepted,
+			update: model.DeviceUpdate{Decommissioning: to.BoolPtr(true)},
 			outErr: store.ErrDevNotFound.Error(),
-		},
-		{
-			id:     dev2.Id,
-			status: model.DevStatusRejected,
-			outErr: "",
-			tenant: tenant,
+			tenant: "",
 		},
 		{
 			id:     "id3",
-			status: model.DevStatusRejected,
+			update: model.DeviceUpdate{Status: model.DevStatusRejected},
 			outErr: store.ErrDevNotFound.Error(),
 			tenant: tenant,
 		},
@@ -278,9 +292,7 @@ func TestStoreUpdateDevice(t *testing.T) {
 				})
 			}
 
-			updev := &model.Device{Id: tc.id, Status: tc.status}
-
-			err = d.UpdateDevice(ctx, updev)
+			err = d.UpdateDevice(ctx, model.Device{Id: tc.id}, tc.update)
 			if tc.outErr != "" {
 				assert.EqualError(t, err, tc.outErr)
 			} else {
@@ -297,8 +309,7 @@ func TestStoreUpdateDevice(t *testing.T) {
 				err = c.FindId(tc.id).One(&found)
 				assert.NoError(t, err, "failed to find device")
 
-				//check all fields for equality - except UpdatedTs
-				assert.Equal(t, tc.status, found.Status)
+				compareUpdateDev(t, *tc.old, found, tc.update)
 
 				//check UpdatedTs was updated
 				assert.InEpsilon(t, now.Unix(), found.UpdatedTs.Unix(), 10)

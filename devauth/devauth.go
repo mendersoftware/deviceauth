@@ -255,8 +255,10 @@ func (d *DevAuth) DecommissionDevice(ctx context.Context, devId string) error {
 	l.Warnf("Decommission device with id: %s", devId)
 
 	// set decommissioning flag on the device
-	updev := &model.Device{Id: devId, Decommissioning: true}
-	if err := d.db.UpdateDevice(ctx, updev); err != nil {
+	updev := model.DeviceUpdate{
+		Decommissioning: to.BoolPtr(true),
+	}
+	if err := d.db.UpdateDevice(ctx, model.Device{Id: devId}, updev); err != nil {
 		return err
 	}
 

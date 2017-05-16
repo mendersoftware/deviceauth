@@ -656,7 +656,9 @@ func TestDevAuthDecommissionDevice(t *testing.T) {
 			co.On("SubmitDeviceDecommisioningJob", context.Background(), mock.AnythingOfType("orchestrator.DecommissioningReq")).Return(
 				tc.coSubmitDeviceDecommisioningJobErr)
 			db := mstore.DataStore{}
-			db.On("UpdateDevice", context.Background(), mock.AnythingOfType("*model.Device")).Return(
+			db.On("UpdateDevice", context.Background(),
+				mock.AnythingOfType("model.Device"),
+				mock.AnythingOfType("model.DeviceUpdate")).Return(
 				tc.dbUpdateDeviceErr)
 			db.On("DeleteAuthSetsForDevice", context.Background(), mock.AnythingOfType("string")).Return(
 				tc.dbDeleteAuthSetsForDeviceErr)
