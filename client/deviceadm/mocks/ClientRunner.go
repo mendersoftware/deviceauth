@@ -15,6 +15,7 @@ package mocks
 
 import context "context"
 import deviceadm "github.com/mendersoftware/deviceauth/client/deviceadm"
+import "github.com/mendersoftware/go-lib-micro/apiclient"
 import mock "github.com/stretchr/testify/mock"
 import requestid "github.com/mendersoftware/go-lib-micro/requestid"
 
@@ -24,7 +25,7 @@ type ClientRunner struct {
 }
 
 // AddDevice provides a mock function with given fields: ctx, req, client
-func (_m *ClientRunner) AddDevice(ctx context.Context, req deviceadm.AdmReq, client requestid.ApiRequester) error {
+func (_m *ClientRunner) AddDevice(ctx context.Context, req deviceadm.AdmReq, client apiclient.HttpRunner) error {
 	ret := _m.Called(ctx, req, client)
 
 	var r0 error
