@@ -15,10 +15,10 @@ package devauth
 
 import (
 	"context"
-	"net/http"
 	"time"
 
 	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/mendersoftware/go-lib-micro/apiclient"
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/mendersoftware/go-lib-micro/requestid"
@@ -46,10 +46,10 @@ const (
 )
 
 // helper for obtaining API clients
-type ApiClientGetter func() requestid.ApiRequester
+type ApiClientGetter func() apiclient.HttpRunner
 
-func simpleApiClientGetter() requestid.ApiRequester {
-	return &http.Client{}
+func simpleApiClientGetter() apiclient.HttpRunner {
+	return &apiclient.HttpApi{}
 }
 
 // this device auth service interface
