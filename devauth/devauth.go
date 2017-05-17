@@ -15,7 +15,6 @@ package devauth
 
 import (
 	"context"
-	"net/http"
 	"time"
 
 	"github.com/mendersoftware/deviceauth/client/deviceadm"
@@ -25,6 +24,7 @@ import (
 	"github.com/mendersoftware/deviceauth/model"
 	"github.com/mendersoftware/deviceauth/store"
 	uto "github.com/mendersoftware/deviceauth/utils/to"
+	"github.com/mendersoftware/go-lib-micro/apiclient"
 
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/mendersoftware/go-lib-micro/log"
@@ -44,10 +44,10 @@ const (
 )
 
 // helper for obtaining API clients
-type ApiClientGetter func() requestid.ApiRequester
+type ApiClientGetter func() apiclient.HttpRunner
 
-func simpleApiClientGetter() requestid.ApiRequester {
-	return &http.Client{}
+func simpleApiClientGetter() apiclient.HttpRunner {
+	return &apiclient.HttpApi{}
 }
 
 // this device auth service interface
