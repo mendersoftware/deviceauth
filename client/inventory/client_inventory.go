@@ -20,8 +20,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/mendersoftware/go-lib-micro/apiclient"
 	"github.com/mendersoftware/go-lib-micro/log"
-	"github.com/mendersoftware/go-lib-micro/requestid"
 	"github.com/pkg/errors"
 
 	"github.com/mendersoftware/deviceauth/utils"
@@ -44,7 +44,7 @@ type Config struct {
 
 // ClientRunner is an interface of inventory client
 type ClientRunner interface {
-	AddDevice(ctx context.Context, req AddReq, client requestid.ApiRequester) error
+	AddDevice(ctx context.Context, req AddReq, client apiclient.HttpRunner) error
 }
 
 // Client is an opaque implementation of inventory client. Implements
@@ -59,7 +59,7 @@ type AddReq struct {
 	Id string `json:"id"`
 }
 
-func (ic *Client) AddDevice(ctx context.Context, areq AddReq, client requestid.ApiRequester) error {
+func (ic *Client) AddDevice(ctx context.Context, areq AddReq, client apiclient.HttpRunner) error {
 
 	l := log.FromContext(ctx)
 

@@ -20,8 +20,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/mendersoftware/go-lib-micro/apiclient"
 	"github.com/mendersoftware/go-lib-micro/log"
-	"github.com/mendersoftware/go-lib-micro/requestid"
 	"github.com/pkg/errors"
 
 	"github.com/mendersoftware/deviceauth/utils"
@@ -44,7 +44,7 @@ type Config struct {
 
 // ClientRunner is an interface of device admission client
 type ClientRunner interface {
-	AddDevice(ctx context.Context, req AdmReq, client requestid.ApiRequester) error
+	AddDevice(ctx context.Context, req AdmReq, client apiclient.HttpRunner) error
 }
 
 // Client is an opaque implementation of device admission client. Implements
@@ -53,7 +53,8 @@ type Client struct {
 	conf Config
 }
 
-func (d *Client) AddDevice(ctx context.Context, admreq AdmReq, client requestid.ApiRequester) error {
+func (d *Client) AddDevice(ctx context.Context, admreq AdmReq,
+	client apiclient.HttpRunner) error {
 
 	l := log.FromContext(ctx)
 

@@ -19,10 +19,10 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/mendersoftware/go-lib-micro/apiclient"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/mendersoftware/deviceauth/client"
 	ct "github.com/mendersoftware/deviceauth/client/testing"
 )
 
@@ -71,7 +71,7 @@ func TestClient(t *testing.T) {
 				TenantAdmAddr: s.URL,
 			})
 
-			err := c.VerifyToken(context.Background(), tc.token, &client.HttpApi{})
+			err := c.VerifyToken(context.Background(), tc.token, &apiclient.HttpApi{})
 			if tc.err != nil {
 				assert.EqualError(t, err, tc.err.Error())
 			} else {

@@ -13,7 +13,7 @@
 //    limitations under the License.
 package mocks
 
-import client "github.com/mendersoftware/deviceauth/client"
+import apiclient "github.com/mendersoftware/go-lib-micro/apiclient"
 import context "context"
 import mock "github.com/stretchr/testify/mock"
 import tenant "github.com/mendersoftware/deviceauth/client/tenant"
@@ -23,13 +23,13 @@ type ClientRunner struct {
 	mock.Mock
 }
 
-// VerifyToken provides a mock function with given fields: ctx, token, _a2
-func (_m *ClientRunner) VerifyToken(ctx context.Context, token string, _a2 client.HttpRunner) error {
-	ret := _m.Called(ctx, token, _a2)
+// VerifyToken provides a mock function with given fields: ctx, token, client
+func (_m *ClientRunner) VerifyToken(ctx context.Context, token string, client apiclient.HttpRunner) error {
+	ret := _m.Called(ctx, token, client)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, client.HttpRunner) error); ok {
-		r0 = rf(ctx, token, _a2)
+	if rf, ok := ret.Get(0).(func(context.Context, string, apiclient.HttpRunner) error); ok {
+		r0 = rf(ctx, token, client)
 	} else {
 		r0 = ret.Error(0)
 	}

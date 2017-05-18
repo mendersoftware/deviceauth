@@ -20,12 +20,12 @@ import (
 	"testing"
 
 	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/mendersoftware/go-lib-micro/apiclient"
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/requestid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	"github.com/mendersoftware/deviceauth/client"
 	"github.com/mendersoftware/deviceauth/client/deviceadm"
 	mdevadm "github.com/mendersoftware/deviceauth/client/deviceadm/mocks"
 	"github.com/mendersoftware/deviceauth/client/inventory"
@@ -352,7 +352,7 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 				ct.On("VerifyToken",
 					mtesting.ContextMatcher(),
 					tc.inReq.TenantToken,
-					mock.MatchedBy(func(_ client.HttpRunner) bool { return true })).
+					mock.MatchedBy(func(_ apiclient.HttpRunner) bool { return true })).
 					Return(tc.tenantVerificationErr)
 				devauth = devauth.WithTenantVerification(&ct)
 			}
