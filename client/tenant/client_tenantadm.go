@@ -18,9 +18,9 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/mendersoftware/go-lib-micro/apiclient"
 	"github.com/pkg/errors"
 
-	"github.com/mendersoftware/deviceauth/client"
 	"github.com/mendersoftware/deviceauth/utils"
 )
 
@@ -45,10 +45,10 @@ type Config struct {
 
 // ClientRunner is an interface of inventory client
 type ClientRunner interface {
-	VerifyToken(ctx context.Context, token string, client client.HttpRunner) error
+	VerifyToken(ctx context.Context, token string, client apiclient.HttpRunner) error
 }
 
-// Client is an opaque implementation of inventory client. Implements
+// Client is an opaque implementation of tenant administrator client. Implements
 // ClientRunner interface
 type Client struct {
 	conf Config
@@ -56,7 +56,8 @@ type Client struct {
 
 // VerifyToken will execute a request to tenenatadm's endpoint for token
 // verification. Returns nil if verification was successful.
-func (tc *Client) VerifyToken(ctx context.Context, token string, client client.HttpRunner) error {
+func (tc *Client) VerifyToken(ctx context.Context, token string,
+	client apiclient.HttpRunner) error {
 
 	// TODO sanitize token
 
