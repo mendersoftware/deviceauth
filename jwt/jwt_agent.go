@@ -17,12 +17,12 @@ import (
 	"crypto/rsa"
 	"time"
 
-	"github.com/mendersoftware/deviceauth/model"
-
 	gjwt "github.com/dgrijalva/jwt-go"
 	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/pkg/errors"
 	"github.com/satori/go.uuid"
+
+	"github.com/mendersoftware/deviceauth/model"
 )
 
 var (

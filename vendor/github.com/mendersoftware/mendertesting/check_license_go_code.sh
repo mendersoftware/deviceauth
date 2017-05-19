@@ -22,7 +22,7 @@ for each in $(find . -type f \( ! -regex '.*/\..*' ! -path "./Godeps/*" ! -path 
   echo "Checking $each for correct license header"
   head -n $lines $each | diff -qu license.tmp - > /dev/null
   if [ ! "$?" -eq "0" ]; then
-    echo "Failed license check on $each"
+    echo "!!! FAILED license check on $each"
     ret=1
   else
     echo "License check passed on $each"

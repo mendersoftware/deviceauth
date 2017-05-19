@@ -11,19 +11,12 @@
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
-package devauth
+package apiclient
 
 import (
-	"github.com/mendersoftware/go-lib-micro/requestid"
-
-	"github.com/mendersoftware/deviceauth/api"
+	"net/http"
 )
 
-type DevAuthWithContext struct {
-	DevAuth
-	ctx *api.RequestContext
-}
-
-func (d *DevAuthWithContext) contextClientGetter() requestid.ApiRequester {
-	return requestid.NewTrackingApiClient(d.ctx.ReqId)
+type HttpRunner interface {
+	Do(r *http.Request) (*http.Response, error)
 }

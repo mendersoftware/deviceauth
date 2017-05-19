@@ -17,14 +17,14 @@ import (
 	"context"
 	"time"
 
-	"github.com/mendersoftware/deviceauth/model"
-
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	ctxstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/pkg/errors"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
+
+	"github.com/mendersoftware/deviceauth/model"
 )
 
 type migration_1_1_0 struct {

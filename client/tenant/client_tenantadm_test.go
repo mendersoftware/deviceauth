@@ -11,7 +11,7 @@
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
-package inventory
+package tenant
 
 import (
 	"context"
@@ -19,17 +19,17 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/mendersoftware/go-lib-micro/apiclient"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 
 	ct "github.com/mendersoftware/deviceauth/client/testing"
-	"github.com/mendersoftware/deviceauth/model"
 )
 
 func TestClientGet(t *testing.T) {
 	t.Parallel()
 
-	c := NewClient(Config{InventoryAddr: "http://foo"})
+	c := NewClient(Config{TenantAdmAddr: "http://foo"})
 	assert.NotNil(t, c)
 }
 
@@ -38,55 +38,45 @@ func TestClient(t *testing.T) {
 
 	tcs := []struct {
 		status int
-		dev    model.Device
-		expReq string
+		token  string
 		err    error
 	}{
 		{
-			status: http.StatusCreated,
-			dev:    model.Device{Id: "1234"},
-			expReq: `{"id": "1234"}`,
-			err:    nil,
-		},
-		{
-			// 409 Conflict is treated as success
-			status: http.StatusConflict,
-			dev:    model.Device{Id: "1234"},
-			expReq: `{"id": "1234"}`,
-			err:    nil,
-		},
-		{
-			status: http.StatusOK,
-			dev:    model.Device{Id: "1234"},
-			expReq: `{"id": "1234"}`,
-			err:    errors.New("device add request failed with status 200 OK: unexpected response status"),
-		},
-		{
 			status: http.StatusBadRequest,
-			dev:    model.Device{Id: "1234"},
-			expReq: `{"id": "1234"}`,
-			err:    errors.New("device add request failed with status 400 Bad Request: unexpected response status"),
+			err:    errors.New("token verification request returned unexpected status 400"),
+		},
+		{
+			// try some bogus status
+			status: http.StatusNotAcceptable,
+			err:    errors.New("token verification request returned unexpected status 406"),
+		},
+		{
+			// token verified ok
+			status: http.StatusOK,
+		},
+		{
+			status: http.StatusUnauthorized,
+			err:    ErrTokenVerificationFailed,
 		},
 	}
 
 	for i := range tcs {
 		tc := tcs[i]
-		t.Run(fmt.Sprintf("case %v %s", tc.status, tc.expReq), func(t *testing.T) {
+		t.Run(fmt.Sprintf("status %v", tc.status), func(t *testing.T) {
 			t.Parallel()
 
 			s, rd := ct.NewMockServer(tc.status)
 
 			c := NewClient(Config{
-				InventoryAddr: s.URL,
+				TenantAdmAddr: s.URL,
 			})
 
-			err := c.AddDevice(context.Background(), AddReq{Id: "1234"}, &http.Client{})
+			err := c.VerifyToken(context.Background(), tc.token, &apiclient.HttpApi{})
 			if tc.err != nil {
 				assert.EqualError(t, err, tc.err.Error())
 			} else {
 				assert.NoError(t, err)
-				assert.JSONEq(t, tc.expReq, string(rd.ReqBody))
-				assert.Equal(t, InventoryDevicesUri, rd.Url.Path)
+				assert.Equal(t, TenantVerifyUri, rd.Url.Path)
 			}
 			s.Close()
 		})

@@ -17,10 +17,10 @@ import (
 	"context"
 	"flag"
 
+	"github.com/mendersoftware/go-lib-micro/log"
+
 	"github.com/mendersoftware/deviceauth/config"
 	"github.com/mendersoftware/deviceauth/store/mongo"
-
-	"github.com/mendersoftware/go-lib-micro/log"
 )
 
 func main() {

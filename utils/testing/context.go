@@ -11,19 +11,18 @@
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
-package devauth
+package testing
 
 import (
-	"github.com/mendersoftware/go-lib-micro/requestid"
+	"context"
 
-	"github.com/mendersoftware/deviceauth/api"
+	"github.com/stretchr/testify/mock"
 )
 
-type DevAuthWithContext struct {
-	DevAuth
-	ctx *api.RequestContext
-}
-
-func (d *DevAuthWithContext) contextClientGetter() requestid.ApiRequester {
-	return requestid.NewTrackingApiClient(d.ctx.ReqId)
+// IsContext can be used as argument matcher for
+// github.com/stretchr/testify/mock compatible mocks
+func ContextMatcher() interface{} {
+	return mock.MatchedBy(func(c context.Context) bool {
+		return true
+	})
 }

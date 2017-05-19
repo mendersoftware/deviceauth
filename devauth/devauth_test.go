@@ -19,21 +19,26 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/mendersoftware/go-lib-micro/apiclient"
+	"github.com/mendersoftware/go-lib-micro/identity"
+	"github.com/mendersoftware/go-lib-micro/requestid"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+
 	"github.com/mendersoftware/deviceauth/client/deviceadm"
 	mdevadm "github.com/mendersoftware/deviceauth/client/deviceadm/mocks"
 	"github.com/mendersoftware/deviceauth/client/inventory"
 	minventory "github.com/mendersoftware/deviceauth/client/inventory/mocks"
 	morchestrator "github.com/mendersoftware/deviceauth/client/orchestrator/mocks"
+	"github.com/mendersoftware/deviceauth/client/tenant"
+	mtenant "github.com/mendersoftware/deviceauth/client/tenant/mocks"
 	"github.com/mendersoftware/deviceauth/jwt"
 	mjwt "github.com/mendersoftware/deviceauth/jwt/mocks"
 	"github.com/mendersoftware/deviceauth/model"
 	"github.com/mendersoftware/deviceauth/store"
 	mstore "github.com/mendersoftware/deviceauth/store/mocks"
-
-	"github.com/Azure/go-autorest/autorest/to"
-	"github.com/mendersoftware/go-lib-micro/requestid"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
+	mtesting "github.com/mendersoftware/deviceauth/utils/testing"
 )
 
 func TestDevAuthSubmitAuthRequest(t *testing.T) {
@@ -69,6 +74,9 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 		admissionNotified bool
 
 		devAdmErr error
+
+		tenantVerify          bool
+		tenantVerificationErr error
 
 		res string
 		err error
@@ -169,6 +177,70 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 
 			err: errors.New("devadm add device error: failed to add device"),
 		},
+		{
+			//new device - tenant token verification failed
+			inReq: req,
+
+			err: ErrDevAuthUnauthorized,
+
+			tenantVerify:          true,
+			tenantVerificationErr: tenant.ErrTokenVerificationFailed,
+		},
+		{
+			//new device - tenant token verification failed because of other reasons
+			inReq: req,
+
+			err: errors.New("request to verify tenant token failed"),
+
+			tenantVerify:          true,
+			tenantVerificationErr: errors.New("something something failed"),
+		},
+		{
+			//new device - tenant token required but not provided
+			inReq: model.AuthReq{
+				IdData:      idData,
+				TenantToken: "",
+				PubKey:      pubKey,
+			},
+
+			err: ErrDevAuthUnauthorized,
+
+			tenantVerify:          true,
+			tenantVerificationErr: errors.New("should not be called"),
+		},
+		{
+			//new device - tenant token is malformed, but was somehow verified ok
+			inReq: model.AuthReq{
+				IdData:      idData,
+				TenantToken: "tenant-foo",
+				PubKey:      pubKey,
+			},
+
+			err: ErrDevAuthUnauthorized,
+
+			tenantVerify: true,
+		},
+		{
+			// a known device with a correct tenant token
+			inReq: model.AuthReq{
+				IdData: idData,
+				// token with the following claims:
+				//   {
+				//      "sub": "bogusdevice",
+				//      "mender.tenant": "foobar"
+				//   }
+				TenantToken: "fake.eyJzdWIiOiJib2d1c2RldmljZSIsIm1lbmRlci50ZW5hbnQiOiJmb29iYXIifQ.fake",
+				PubKey:      pubKey,
+			},
+
+			addDeviceErr:  store.ErrObjectExists,
+			addAuthSetErr: store.ErrObjectExists,
+
+			admissionNotified: true,
+
+			tenantVerify: true,
+			err:          ErrDevAuthUnauthorized,
+		},
 	}
 
 	for tcidx := range testCases {
@@ -176,15 +248,28 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 		t.Run(fmt.Sprintf("tc: %d", tcidx), func(t *testing.T) {
 			t.Parallel()
 
+			// match context in mocks
+			ctxMatcher := mtesting.ContextMatcher()
+
+			if tc.tenantVerify {
+				// context must carry identity information if
+				// tenant verification is enabled
+				ctxMatcher = mock.MatchedBy(func(c context.Context) bool {
+					return assert.NotNil(t, identity.FromContext(c))
+				})
+			}
+
 			db := mstore.DataStore{}
 			db.On("AddDevice",
-				context.Background(),
+				ctxMatcher,
 				mock.MatchedBy(
 					func(d model.Device) bool {
 						return d.IdData == idData
 					})).Return(tc.addDeviceErr)
 
-			db.On("GetDeviceByIdentityData", context.Background(), idData).Return(
+			db.On("GetDeviceByIdentityData",
+				ctxMatcher,
+				idData).Return(
 				func(ctx context.Context, idata string) *model.Device {
 					if tc.getDevByIdErr == nil {
 						return &model.Device{
@@ -197,13 +282,13 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 				},
 				tc.getDevByIdErr)
 			db.On("AddAuthSet",
-				context.Background(),
+				ctxMatcher,
 				mock.MatchedBy(
 					func(m model.AuthSet) bool {
 						return m.DeviceId == devId
 					})).Return(tc.addAuthSetErr)
 			db.On("UpdateAuthSet",
-				context.Background(),
+				ctxMatcher,
 				mock.MatchedBy(
 					func(m model.AuthSet) bool {
 						return m.DeviceId == devId
@@ -215,7 +300,7 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 					})).Return(nil)
 
 			db.On("GetAuthSetByDataKey",
-				context.Background(),
+				ctxMatcher,
 				idData, pubKey).Return(
 				func(ctx context.Context, idata string, key string) *model.AuthSet {
 					if tc.getAuthSetErr == nil {
@@ -233,7 +318,7 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 				tc.getAuthSetErr)
 
 			db.On("AddToken",
-				context.Background(),
+				ctxMatcher,
 				mock.AnythingOfType("model.Token")).Return(nil)
 
 			cda := mdevadm.ClientRunner{}
@@ -241,7 +326,7 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 				// setup admission client mock only if admission
 				// was not notified yet as per test case
 				cda.On("AddDevice",
-					context.Background(),
+					ctxMatcher,
 					mock.MatchedBy(func(r deviceadm.AdmReq) bool {
 						return (r.AuthId == authId) &&
 							(r.IdData == idData) &&
@@ -261,8 +346,20 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 				}, nil)
 
 			devauth := NewDevAuth(&db, &cda, &cdi, nil, &jwt)
-			res, err := devauth.SubmitAuthRequest(context.Background(), &req)
 
+			if tc.tenantVerify {
+				ct := mtenant.ClientRunner{}
+				ct.On("VerifyToken",
+					mtesting.ContextMatcher(),
+					tc.inReq.TenantToken,
+					mock.MatchedBy(func(_ apiclient.HttpRunner) bool { return true })).
+					Return(tc.tenantVerificationErr)
+				devauth = devauth.WithTenantVerification(&ct)
+			}
+
+			res, err := devauth.SubmitAuthRequest(context.Background(), &tc.inReq)
+
+			t.Logf("error: %v", err)
 			assert.Equal(t, tc.res, res)
 			if tc.err != nil {
 				assert.EqualError(t, err, tc.err.Error())

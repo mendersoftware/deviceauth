@@ -20,9 +20,9 @@ import (
 	"testing"
 	"time"
 
-	ct "github.com/mendersoftware/deviceauth/client/testing"
-
 	"github.com/stretchr/testify/assert"
+
+	ct "github.com/mendersoftware/deviceauth/client/testing"
 )
 
 func TestGetClient(t *testing.T) {

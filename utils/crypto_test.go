@@ -18,8 +18,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/mendersoftware/deviceauth/test"
 	"github.com/stretchr/testify/assert"
+
+	test "github.com/mendersoftware/deviceauth/utils/testing"
 )
 
 func TestVerifyAuthReqSign(t *testing.T) {

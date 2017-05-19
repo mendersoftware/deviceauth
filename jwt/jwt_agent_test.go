@@ -19,9 +19,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mendersoftware/deviceauth/test"
-
 	"github.com/stretchr/testify/assert"
+
+	test "github.com/mendersoftware/deviceauth/utils/testing"
 )
 
 func TestNewJWTAgent(t *testing.T) {

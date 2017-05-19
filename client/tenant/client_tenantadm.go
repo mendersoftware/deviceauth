@@ -11,17 +11,14 @@
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
-package deviceadm
+package tenant
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"net/http"
 	"time"
 
 	"github.com/mendersoftware/go-lib-micro/apiclient"
-	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/pkg/errors"
 
 	"github.com/mendersoftware/deviceauth/utils"
@@ -29,71 +26,74 @@ import (
 
 const (
 	// devices endpoint
-	DevAdmDevicesUri = "/api/0.1.0/devices/"
+	TenantVerifyUri = "/api/internal/v1/tenantadm/tenants/verify"
 	// default request timeout, 10s?
 	defaultReqTimeout = time.Duration(10) * time.Second
 )
 
+var (
+	ErrTokenVerificationFailed = errors.New("token verification failed")
+)
+
 // ClientConfig conveys client configuration
 type Config struct {
-	// Device admission host
-	DevAdmAddr string
+	// Tenant administrator service address
+	TenantAdmAddr string
 	// Request timeout
 	Timeout time.Duration
 }
 
-// ClientRunner is an interface of device admission client
+// ClientRunner is an interface of inventory client
 type ClientRunner interface {
-	AddDevice(ctx context.Context, req AdmReq, client apiclient.HttpRunner) error
+	VerifyToken(ctx context.Context, token string, client apiclient.HttpRunner) error
 }
 
-// Client is an opaque implementation of device admission client. Implements
+// Client is an opaque implementation of tenant administrator client. Implements
 // ClientRunner interface
 type Client struct {
 	conf Config
 }
 
-func (d *Client) AddDevice(ctx context.Context, admreq AdmReq,
+// VerifyToken will execute a request to tenenatadm's endpoint for token
+// verification. Returns nil if verification was successful.
+func (tc *Client) VerifyToken(ctx context.Context, token string,
 	client apiclient.HttpRunner) error {
 
-	l := log.FromContext(ctx)
+	// TODO sanitize token
 
-	l.Debugf("add device %s for admission", admreq.DeviceId)
-
-	AdmReqJson, err := json.Marshal(admreq)
+	req, err := http.NewRequest(http.MethodPost,
+		utils.JoinURL(tc.conf.TenantAdmAddr, TenantVerifyUri),
+		nil)
 	if err != nil {
-		return errors.Wrapf(err, "failed to prepare device admission request")
+		return errors.Wrap(err, "failed to create request to tenant administrator")
 	}
 
-	contentReader := bytes.NewReader(AdmReqJson)
+	// tenant token is passed in Authorization header
+	req.Header.Add("Authorization", "Bearer "+token)
 
-	req, err := http.NewRequest(
-		http.MethodPut,
-		utils.JoinURL(d.conf.DevAdmAddr, DevAdmDevicesUri+admreq.AuthId),
-		contentReader)
-	if err != nil {
-		return errors.Wrapf(err, "failed to create request")
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-
-	// set the device admission request timeout
-	ctx, cancel := context.WithTimeout(ctx, d.conf.Timeout)
+	ctx, cancel := context.WithTimeout(ctx, tc.conf.Timeout)
 	defer cancel()
 
 	rsp, err := client.Do(req.WithContext(ctx))
 	if err != nil {
-		return errors.Wrapf(err, "failed to add device")
+		return errors.Wrap(err, "request to verify token failed")
 	}
 	defer rsp.Body.Close()
 
-	if rsp.StatusCode != http.StatusNoContent {
-		return errors.Errorf(
-			"device add request failed with status %v", rsp.Status)
+	switch rsp.StatusCode {
+
+	case http.StatusUnauthorized: // 401, verification result negative
+		return ErrTokenVerificationFailed
+
+	case http.StatusOK: // 200, token verified
+		return nil
+	default:
+		return errors.Errorf("token verification request returned unexpected status %v",
+			rsp.StatusCode)
 	}
-	return nil
 }
 
+// NewClient creates a client with given config.
 func NewClient(c Config) *Client {
 	if c.Timeout == 0 {
 		c.Timeout = defaultReqTimeout

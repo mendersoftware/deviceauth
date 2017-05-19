@@ -16,19 +16,20 @@ package main
 import (
 	"net/http"
 
+	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/mendersoftware/go-lib-micro/log"
+	"github.com/pkg/errors"
+
 	api_http "github.com/mendersoftware/deviceauth/api/http"
 	"github.com/mendersoftware/deviceauth/client/deviceadm"
 	"github.com/mendersoftware/deviceauth/client/inventory"
 	"github.com/mendersoftware/deviceauth/client/orchestrator"
+	"github.com/mendersoftware/deviceauth/client/tenant"
 	"github.com/mendersoftware/deviceauth/config"
 	"github.com/mendersoftware/deviceauth/devauth"
 	"github.com/mendersoftware/deviceauth/jwt"
 	"github.com/mendersoftware/deviceauth/keys"
 	"github.com/mendersoftware/deviceauth/store/mongo"
-
-	"github.com/ant0ine/go-json-rest/rest"
-	"github.com/mendersoftware/go-lib-micro/log"
-	"github.com/pkg/errors"
 )
 
 func SetupAPI(stacktype string) (*rest.Api, error) {
@@ -81,6 +82,16 @@ func RunServer(c config.Reader) error {
 		inventory.NewClient(invClientConf),
 		orchestrator.NewClient(orchClientConf),
 		jwtHandler)
+
+	if tadmAddr := c.GetString(SettingTenantAdmAddr); tadmAddr != "" {
+		l.Infof("settting up tenant verification")
+
+		tc := tenant.NewClient(tenant.Config{
+			TenantAdmAddr: tadmAddr,
+		})
+
+		devauth = devauth.WithTenantVerification(tc)
+	}
 
 	api, err := SetupAPI(c.GetString(SettingMiddleware))
 	if err != nil {

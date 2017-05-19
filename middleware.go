@@ -14,12 +14,14 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/mendersoftware/go-lib-micro/accesslog"
 	mctx "github.com/mendersoftware/go-lib-micro/context"
+	ctxhttpheader "github.com/mendersoftware/go-lib-micro/context/httpheader"
 	"github.com/mendersoftware/go-lib-micro/customheader"
 	"github.com/mendersoftware/go-lib-micro/identity"
 	dlog "github.com/mendersoftware/go-lib-micro/log"
@@ -86,6 +88,7 @@ var (
 			Updates: []mctx.UpdateContextFunc{
 				mctx.RepackLoggerToContext,
 				mctx.RepackRequestIdToContext,
+				preserveHeaders,
 			},
 		},
 		&identity.IdentityMiddleware{},
@@ -159,4 +162,8 @@ func SetupMiddleware(api *rest.Api, mwtype string) error {
 	})
 
 	return nil
+}
+
+func preserveHeaders(ctx context.Context, r *rest.Request) context.Context {
+	return ctxhttpheader.WithContext(ctx, r.Header, "Authorization")
 }

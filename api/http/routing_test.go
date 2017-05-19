@@ -22,6 +22,7 @@ import (
 
 	"github.com/ant0ine/go-json-rest/rest"
 	rtest "github.com/ant0ine/go-json-rest/rest/test"
+
 	"github.com/mendersoftware/deviceauth/utils"
 )
 
@@ -108,12 +109,12 @@ func TestAutogenOptionRoutes(t *testing.T) {
 
 	type expHandler map[string]rest.HandlerFunc
 	exp := map[string]expHandler{
-		"/foo": expHandler{
+		"/foo": {
 			http.MethodGet:     dummy,
 			http.MethodPost:    dummy,
 			http.MethodOptions: options,
 		},
-		"/bar": expHandler{
+		"/bar": {
 			http.MethodGet:     dummy,
 			http.MethodOptions: dummy,
 		},
