@@ -23,6 +23,7 @@ import (
 	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/mendersoftware/go-lib-micro/requestid"
 	"github.com/pkg/errors"
+	"github.com/satori/go.uuid"
 
 	"github.com/mendersoftware/deviceauth/client/deviceadm"
 	"github.com/mendersoftware/deviceauth/client/inventory"
@@ -74,14 +75,22 @@ type DevAuth struct {
 	cInv         inventory.ClientRunner
 	cOrch        orchestrator.ClientRunner
 	cTenant      tenant.ClientRunner
-	jwt          jwt.JWTAgentApp
+	jwt          jwt.JWTHandler
 	clientGetter ApiClientGetter
 	verifyTenant bool
+	config       Config
+}
+
+type Config struct {
+	// token issuer
+	Issuer string
+	// token expiration time
+	ExpirationTime int64
 }
 
 func NewDevAuth(d store.DataStore, cda deviceadm.ClientRunner,
 	ci inventory.ClientRunner, co orchestrator.ClientRunner,
-	jwt jwt.JWTAgentApp) *DevAuth {
+	jwt jwt.JWTHandler, config Config) *DevAuth {
 
 	return &DevAuth{
 		db:           d,
@@ -91,6 +100,7 @@ func NewDevAuth(d store.DataStore, cda deviceadm.ClientRunner,
 		jwt:          jwt,
 		clientGetter: simpleApiClientGetter,
 		verifyTenant: false,
+		config:       config,
 	}
 }
 
@@ -121,6 +131,12 @@ func (d *DevAuth) getDeviceFromAuthRequest(ctx context.Context, r *model.AuthReq
 	}
 
 	return dev, nil
+}
+
+func (d *DevAuth) signToken(ctx context.Context) jwt.SignFunc {
+	return func(t *jwt.Token) (string, error) {
+		return d.jwt.ToJWT(t)
+	}
 }
 
 func (d *DevAuth) SubmitAuthRequest(ctx context.Context, r *model.AuthReq) (string, error) {
@@ -161,12 +177,22 @@ func (d *DevAuth) SubmitAuthRequest(ctx context.Context, r *model.AuthReq) (stri
 
 	// request was already present in DB, check its status
 	if authSet.Status == model.DevStatusAccepted {
-		// make & give token, include aid when generating token
-		token, err := d.jwt.GenerateTokenSignRS256(authSet.DeviceId)
+		rawJwt := &jwt.Token{
+			Claims: jwt.Claims{
+				ID:        uuid.NewV4().String(),
+				Issuer:    d.config.Issuer,
+				ExpiresAt: time.Now().Unix() + d.config.ExpirationTime,
+				Subject:   authSet.DeviceId,
+			},
+		}
+
+		// sign and encode as JWT
+		raw, err := rawJwt.MarshalJWT(d.signToken(ctx))
 		if err != nil {
 			return "", errors.Wrap(err, "generate token error")
 		}
 
+		token := model.NewToken(rawJwt.Claims.ID, authSet.DeviceId, string(raw))
 		token = token.WithAuthSet(authSet)
 
 		if err := d.db.AddToken(ctx, *token); err != nil {
@@ -408,12 +434,14 @@ func (d *DevAuth) RevokeToken(ctx context.Context, token_id string) error {
 	return d.db.DeleteToken(ctx, token_id)
 }
 
-func (d *DevAuth) VerifyToken(ctx context.Context, token string) error {
+func (d *DevAuth) VerifyToken(ctx context.Context, raw string) error {
 
 	l := log.FromContext(ctx)
 
-	// validate signature and claims
-	jti, err := d.jwt.ValidateTokenSignRS256(token)
+	token := &jwt.Token{}
+
+	err := token.UnmarshalJWT([]byte(raw), d.jwt.FromJWT)
+	jti := token.Claims.ID
 	if err != nil {
 		if err == jwt.ErrTokenExpired {
 			l.Errorf("Token %s expired: %v", jti, err)
@@ -430,6 +458,7 @@ func (d *DevAuth) VerifyToken(ctx context.Context, token string) error {
 		l.Errorf("Token %s invalid: %v", jti, err)
 		return jwt.ErrTokenInvalid
 	}
+
 	// check if token is in the system
 	tok, err := d.db.GetToken(ctx, jti)
 	if err != nil {
