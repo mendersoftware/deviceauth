@@ -20,9 +20,7 @@ import (
 	"testing"
 
 	"github.com/Azure/go-autorest/autorest/to"
-	"github.com/mendersoftware/go-lib-micro/apiclient"
 	"github.com/mendersoftware/go-lib-micro/identity"
-	"github.com/mendersoftware/go-lib-micro/requestid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
@@ -333,7 +331,7 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 							(r.DeviceId == devId) &&
 							(r.PubKey == pubKey)
 					}),
-					mock.MatchedBy(func(_ requestid.ApiRequester) bool { return true })).
+					mock.AnythingOfType("*apiclient.HttpApi")).
 					Return(tc.devAdmErr)
 			}
 
@@ -352,7 +350,7 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 				ct.On("VerifyToken",
 					mtesting.ContextMatcher(),
 					tc.inReq.TenantToken,
-					mock.MatchedBy(func(_ apiclient.HttpRunner) bool { return true })).
+					mock.AnythingOfType("*apiclient.HttpApi")).
 					Return(tc.tenantVerificationErr)
 				devauth = devauth.WithTenantVerification(&ct)
 			}
@@ -422,8 +420,9 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 			}
 
 			inv := minventory.ClientRunner{}
-			inv.On("AddDevice", context.Background(), inventory.AddReq{Id: "dummy_devid"},
-				mock.MatchedBy(func(_ requestid.ApiRequester) bool { return true })).
+			inv.On("AddDevice", context.Background(),
+				inventory.AddReq{Id: "dummy_devid"},
+				mock.AnythingOfType("*apiclient.HttpApi")).
 				Return(tc.invErr)
 
 			devauth := NewDevAuth(&db, nil, &inv, nil, nil)
