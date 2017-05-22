@@ -186,6 +186,14 @@ func (d *DevAuth) SubmitAuthRequest(ctx context.Context, r *model.AuthReq) (stri
 			},
 		}
 
+		if d.verifyTenant {
+			// update token tenant claim if needed
+			ident := identity.FromContext(ctx)
+			if ident != nil && ident.Tenant != "" {
+				rawJwt.Claims.Tenant = ident.Tenant
+			}
+		}
+
 		// sign and encode as JWT
 		raw, err := rawJwt.MarshalJWT(d.signToken(ctx))
 		if err != nil {
@@ -457,6 +465,13 @@ func (d *DevAuth) VerifyToken(ctx context.Context, raw string) error {
 		}
 		l.Errorf("Token %s invalid: %v", jti, err)
 		return jwt.ErrTokenInvalid
+	}
+
+	if d.verifyTenant {
+		if token.Claims.Tenant == "" {
+			l.Errorf("Token %s has no tenant claim: %v", jti, err)
+			return jwt.ErrTokenInvalid
+		}
 	}
 
 	// check if token is in the system

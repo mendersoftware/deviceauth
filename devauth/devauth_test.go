@@ -267,6 +267,36 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 			tenantVerify: true,
 			err:          ErrDevAuthUnauthorized,
 		},
+		{
+			// a known device of with a correct tenant token, hand
+			// out a token with tenant claim in it
+			desc: "known, accepted, tenant, give out token with tenant claim",
+
+			inReq: model.AuthReq{
+				IdData: idData,
+				// token with the following claims:
+				//   {
+				//      "sub": "bogusdevice",
+				//      "mender.tenant": "foobar"
+				//   }
+				TenantToken: "fake.eyJzdWIiOiJib2d1c2RldmljZSIsIm1lbmRlci50ZW5hbnQiOiJmb29iYXIifQ.fake",
+				PubKey:      pubKey,
+			},
+
+			addDeviceErr:  store.ErrObjectExists,
+			addAuthSetErr: store.ErrObjectExists,
+
+			getDevByIdKey: pubKey,
+			getDevByKeyId: devId,
+
+			admissionNotified: true,
+
+			tenantVerify: true,
+
+			devStatus: model.DevStatusAccepted,
+
+			res: "dummytoken",
+		},
 	}
 
 	for tcidx := range testCases {
@@ -368,8 +398,11 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 			jwth := mjwt.Handler{}
 			jwth.On("ToJWT",
 				mock.MatchedBy(func(jt *jwt.Token) bool {
+					t.Logf("token: %v", jt)
 					return assert.NotNil(t, jt) &&
-						assert.Equal(t, devId, jt.Claims.Subject)
+						assert.Equal(t, devId, jt.Claims.Subject) &&
+						(tc.tenantVerify == false ||
+							assert.Equal(t, "foobar", jt.Claims.Tenant))
 				})).
 				Return("dummytoken", nil)
 
@@ -621,6 +654,8 @@ func TestDevAuthVerifyToken(t *testing.T) {
 
 		dev          *model.Device
 		getDeviceErr error
+
+		tenantVerify bool
 	}{
 		{
 			tokenString:      "expired",
@@ -717,6 +752,18 @@ func TestDevAuthVerifyToken(t *testing.T) {
 				Decommissioning: true,
 			},
 		},
+		{
+			tokenString:      "missing-tenant-claim",
+			tokenValidateErr: jwt.ErrTokenInvalid,
+
+			jwToken: &jwt.Token{
+				Claims: jwt.Claims{
+					ID: "missing-tenant-claim",
+				},
+			},
+
+			tenantVerify: true,
+		},
 	}
 
 	for i := range testCases {
@@ -728,6 +775,10 @@ func TestDevAuthVerifyToken(t *testing.T) {
 			ja := &mjwt.Handler{}
 
 			devauth := NewDevAuth(db, nil, nil, nil, ja, Config{})
+			if tc.tenantVerify {
+				// ok to pass nil tenantadm client here
+				devauth = devauth.WithTenantVerification(nil)
+			}
 
 			// ja.On("FromJWT", tc.tokenString).Return(tc.jwToken, tc.validateErr)
 			ja.On("FromJWT", tc.tokenString).Return(
