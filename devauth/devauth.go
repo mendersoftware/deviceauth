@@ -75,7 +75,7 @@ type DevAuth struct {
 	cInv         inventory.ClientRunner
 	cOrch        orchestrator.ClientRunner
 	cTenant      tenant.ClientRunner
-	jwt          jwt.JWTHandler
+	jwt          jwt.Handler
 	clientGetter ApiClientGetter
 	verifyTenant bool
 	config       Config
@@ -90,7 +90,7 @@ type Config struct {
 
 func NewDevAuth(d store.DataStore, cda deviceadm.ClientRunner,
 	ci inventory.ClientRunner, co orchestrator.ClientRunner,
-	jwt jwt.JWTHandler, config Config) *DevAuth {
+	jwt jwt.Handler, config Config) *DevAuth {
 
 	return &DevAuth{
 		db:           d,

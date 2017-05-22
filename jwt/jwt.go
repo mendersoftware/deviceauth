@@ -25,8 +25,8 @@ var (
 	ErrTokenInvalid = errors.New("jwt: token invalid")
 )
 
-// JWTHandler jwt generator/verifier
-type JWTHandler interface {
+// Handler jwt generator/verifier
+type Handler interface {
 	ToJWT(t *Token) (string, error)
 	// FromJWT parses the token and does basic validity checks (Claims.Valid().
 	// returns:

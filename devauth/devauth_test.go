@@ -365,7 +365,7 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 
 			cdi := minventory.ClientRunner{}
 
-			jwth := mjwt.JWTHandler{}
+			jwth := mjwt.Handler{}
 			jwth.On("ToJWT",
 				mock.MatchedBy(func(jt *jwt.Token) bool {
 					return assert.NotNil(t, jt) &&
@@ -725,7 +725,7 @@ func TestDevAuthVerifyToken(t *testing.T) {
 			t.Parallel()
 
 			db := &mstore.DataStore{}
-			ja := &mjwt.JWTHandler{}
+			ja := &mjwt.Handler{}
 
 			devauth := NewDevAuth(db, nil, nil, nil, ja, Config{})
 
