@@ -26,6 +26,7 @@ type Claims struct {
 	NotBefore int64  `json:"nbf,omitempty"`
 	Subject   string `json:"sub,omitempty"`
 	Scope     string `json:"scp,omitempty"`
+	Tenant    string `json:"mender.tenant,omitempty"`
 }
 
 // Valid checks if claims are valid. Returns error if validation fails.

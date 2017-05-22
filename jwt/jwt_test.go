@@ -45,6 +45,15 @@ func TestJWTHandlerRS256GenerateToken(t *testing.T) {
 			},
 			expiresInSec: 3600,
 		},
+		"ok, with tenant": {
+			privKey: loadPrivKey("./testdata/private.pem", t),
+			claims: Claims{
+				Issuer:  "Mender",
+				Subject: "foo",
+				Tenant:  "foobar",
+			},
+			expiresInSec: 3600,
+		},
 	}
 
 	for name, tc := range testCases {
@@ -56,7 +65,17 @@ func TestJWTHandlerRS256GenerateToken(t *testing.T) {
 		})
 		assert.NoError(t, err)
 
-		_ = parseGeneratedTokenRS256(t, string(raw), tc.privKey)
+		parsed := parseGeneratedTokenRS256(t, string(raw), tc.privKey)
+		if assert.NotNil(t, parsed) {
+			mc := parsed.Claims.(jwtgo.MapClaims)
+			assert.Equal(t, tc.claims.Issuer, mc["iss"])
+			assert.Equal(t, tc.claims.Subject, mc["sub"])
+			if tc.claims.Tenant != "" {
+				assert.Equal(t, tc.claims.Tenant, mc["mender.tenant"])
+			} else {
+				assert.Nil(t, mc["mender.tenant"])
+			}
+		}
 	}
 }
 
