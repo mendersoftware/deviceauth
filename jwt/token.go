@@ -42,11 +42,18 @@ func (t *Token) MarshalJWT(sign SignFunc) ([]byte, error) {
 	return []byte(signed), nil
 }
 
+// UnmarshalJWT unmarshals raw JWT data into Token. UnpackVerifyFunc does the
+// actual heavy-lifting of parsing and deserializing base64'ed JWT. Returns an
+// error if `uv` failed, however if `uv` returns a token `t` will be updated as
+// well (may happen if token is valid wrt. to structure & signature, but
+// expired).
 func (t *Token) UnmarshalJWT(raw []byte, uv UnpackVerifyFunc) error {
 	tok, err := uv(string(raw))
+	if tok != nil {
+		*t = *tok
+	}
 	if err != nil {
 		return err
 	}
-	*t = *tok
 	return nil
 }
