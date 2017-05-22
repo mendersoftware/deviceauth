@@ -365,13 +365,15 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 
 			cdi := minventory.ClientRunner{}
 
-			jwt := mjwt.JWTAgentApp{}
-			jwt.On("GenerateTokenSignRS256", mock.AnythingOfType("string")).Return(
-				func(devid string) *model.Token {
-					return model.NewToken("", devId, "dummytoken")
-				}, nil)
+			jwth := mjwt.JWTHandler{}
+			jwth.On("ToJWT",
+				mock.MatchedBy(func(jt *jwt.Token) bool {
+					return assert.NotNil(t, jt) &&
+						assert.Equal(t, devId, jt.Claims.Subject)
+				})).
+				Return("dummytoken", nil)
 
-			devauth := NewDevAuth(&db, &cda, &cdi, nil, &jwt)
+			devauth := NewDevAuth(&db, &cda, &cdi, nil, &jwth, Config{})
 
 			if tc.tenantVerify {
 				ct := mtenant.ClientRunner{}
@@ -453,7 +455,7 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 				mock.AnythingOfType("*apiclient.HttpApi")).
 				Return(tc.invErr)
 
-			devauth := NewDevAuth(&db, nil, &inv, nil, nil)
+			devauth := NewDevAuth(&db, nil, &inv, nil, nil, Config{})
 			err := devauth.AcceptDeviceAuth(context.Background(), "dummy_devid", "dummy_aid")
 
 			if tc.outErr != "" {
@@ -519,7 +521,7 @@ func TestDevAuthRejectDevice(t *testing.T) {
 			db.On("DeleteTokenByDevId", context.Background(), "dummy_devid").Return(
 				tc.dbDelDevTokenErr)
 
-			devauth := NewDevAuth(&db, nil, nil, nil, nil)
+			devauth := NewDevAuth(&db, nil, nil, nil, nil, Config{})
 			err := devauth.RejectDeviceAuth(context.Background(), "dummy_devid", "dummy_aid")
 
 			if tc.dbErr != nil || (tc.dbDelDevTokenErr != nil &&
@@ -586,7 +588,7 @@ func TestDevAuthResetDevice(t *testing.T) {
 			db.On("DeleteTokenByDevId", context.Background(), "dummy_devid").Return(
 				tc.dbDelDevTokenErr)
 
-			devauth := NewDevAuth(&db, nil, nil, nil, nil)
+			devauth := NewDevAuth(&db, nil, nil, nil, nil, Config{})
 			err := devauth.ResetDeviceAuth(context.Background(), "dummy_devid", "dummy_aid")
 
 			if tc.dbErr != nil ||
@@ -608,7 +610,7 @@ func TestDevAuthVerifyToken(t *testing.T) {
 		tokenString      string
 		tokenValidateErr error
 
-		jti         string
+		jwToken     *jwt.Token
 		validateErr error
 
 		token       *model.Token
@@ -624,21 +626,29 @@ func TestDevAuthVerifyToken(t *testing.T) {
 			tokenString:      "expired",
 			tokenValidateErr: jwt.ErrTokenExpired,
 
-			jti:         "expired",
+			jwToken: &jwt.Token{
+				Claims: jwt.Claims{
+					ID: "expired",
+				},
+			},
 			validateErr: jwt.ErrTokenExpired,
 		},
 		{
 			tokenString:      "bad",
 			tokenValidateErr: jwt.ErrTokenInvalid,
 
-			jti:         "bad",
+			jwToken:     nil,
 			validateErr: jwt.ErrTokenInvalid,
 		},
 		{
 			tokenString:      "good-no-auth",
 			tokenValidateErr: store.ErrDevNotFound,
 
-			jti: "good-no-auth",
+			jwToken: &jwt.Token{
+				Claims: jwt.Claims{
+					ID: "good-no-auth",
+				},
+			},
 			token: &model.Token{
 				Id:        "good-no-auth",
 				AuthSetId: "not-found",
@@ -647,7 +657,11 @@ func TestDevAuthVerifyToken(t *testing.T) {
 		},
 		{
 			tokenString: "good-accepted",
-			jti:         "good-accepted",
+			jwToken: &jwt.Token{
+				Claims: jwt.Claims{
+					ID: "good-accepted",
+				},
+			},
 			token: &model.Token{
 				Id:        "good-accepted",
 				AuthSetId: "foo",
@@ -666,7 +680,11 @@ func TestDevAuthVerifyToken(t *testing.T) {
 			tokenString:      "good-rejected",
 			tokenValidateErr: jwt.ErrTokenInvalid,
 
-			jti: "good-rejected",
+			jwToken: &jwt.Token{
+				Claims: jwt.Claims{
+					ID: "good-rejected",
+				},
+			},
 			token: &model.Token{
 				Id:        "good-rejected",
 				AuthSetId: "foo",
@@ -680,7 +698,11 @@ func TestDevAuthVerifyToken(t *testing.T) {
 			tokenString:      "good-accepted-decommissioning",
 			tokenValidateErr: jwt.ErrTokenInvalid,
 
-			jti: "good-accepted-decommissioning",
+			jwToken: &jwt.Token{
+				Claims: jwt.Claims{
+					ID: "good-accepted-decommissioning",
+				},
+			},
 			token: &model.Token{
 				Id:        "good-accepted-decommissioning",
 				AuthSetId: "foo",
@@ -703,17 +725,28 @@ func TestDevAuthVerifyToken(t *testing.T) {
 			t.Parallel()
 
 			db := &mstore.DataStore{}
-			ja := &mjwt.JWTAgentApp{}
+			ja := &mjwt.JWTHandler{}
 
-			devauth := NewDevAuth(db, nil, nil, nil, ja)
+			devauth := NewDevAuth(db, nil, nil, nil, ja, Config{})
 
-			ja.On("ValidateTokenSignRS256", tc.tokenString).Return(tc.jti, tc.validateErr)
+			// ja.On("FromJWT", tc.tokenString).Return(tc.jwToken, tc.validateErr)
+			ja.On("FromJWT", tc.tokenString).Return(
+				func(s string) *jwt.Token {
+					t.Logf("string: %v return %+v", s, tc.jwToken)
+					return tc.jwToken
+				}, tc.validateErr)
 
 			if tc.validateErr == jwt.ErrTokenExpired {
-				db.On("DeleteToken", context.Background(), tc.jti).Return(nil)
+				db.On("DeleteToken",
+					context.Background(),
+					tc.jwToken.Claims.ID).Return(nil)
 			}
 
-			db.On("GetToken", context.Background(), tc.jti).Return(tc.token, tc.getTokenErr)
+			if tc.jwToken != nil {
+				db.On("GetToken", context.Background(),
+					tc.jwToken.Claims.ID).
+					Return(tc.token, tc.getTokenErr)
+			}
 
 			if tc.token != nil {
 				db.On("GetAuthSetById", context.Background(),
@@ -791,7 +824,7 @@ func TestDevAuthDecommissionDevice(t *testing.T) {
 			db.On("DeleteDevice", context.Background(), mock.AnythingOfType("string")).Return(
 				tc.dbDeleteDeviceErr)
 
-			devauth := NewDevAuth(&db, nil, nil, &co, nil)
+			devauth := NewDevAuth(&db, nil, nil, &co, nil, Config{})
 			err := devauth.DecommissionDevice(context.Background(), "devId")
 
 			if tc.outErr != "" {
