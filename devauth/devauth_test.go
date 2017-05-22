@@ -54,6 +54,8 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 	}
 
 	testCases := []struct {
+		desc string
+
 		inReq model.AuthReq
 
 		devStatus string
@@ -81,6 +83,8 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 	}{
 		{
 			// pretend we failed to add device to DB
+			desc: "db add fail",
+
 			inReq:        req,
 			addDeviceErr: errors.New("failed"),
 			err:          errors.New("failed"),
@@ -89,6 +93,8 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 			//existing device, existing auth set, auth set accepted,
 			//admission was notified, so we should get a token right
 			//away
+			desc: "known, accepted, give out token",
+
 			inReq: req,
 
 			addDeviceErr:  store.ErrObjectExists,
@@ -105,6 +111,8 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 		{
 			//existing device, existing auth set, auth set rejected,
 			//no token
+			desc: "known, rejected",
+
 			inReq: req,
 
 			addDeviceErr:  store.ErrObjectExists,
@@ -120,6 +128,8 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 		},
 		{
 			//existing, pending device
+			desc: "known, pending",
+
 			inReq: req,
 
 			addDeviceErr:  store.ErrObjectExists,
@@ -135,6 +145,8 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 		},
 		{
 			//new device
+			desc: "new device",
+
 			inReq: req,
 
 			devStatus: model.DevStatusPending,
@@ -147,6 +159,8 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 		{
 			//known device, adding returns that device exists, but
 			//trying to fetch it fails
+			desc: "known, device fetch data fail",
+
 			inReq: req,
 
 			addDeviceErr: store.ErrObjectExists,
@@ -157,6 +171,8 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 		},
 		{
 			//known device and auth set, but fetching auth set fails
+			desc: "known, auth set fetch fail",
+
 			inReq: req,
 
 			addDeviceErr:  store.ErrObjectExists,
@@ -168,6 +184,8 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 		},
 		{
 			//new device - admission error
+			desc: "new device, admission request fail",
+
 			inReq: req,
 
 			getDevByKeyId: devId,
@@ -177,6 +195,8 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 		},
 		{
 			//new device - tenant token verification failed
+			desc: "new device, tenant token verification fail",
+
 			inReq: req,
 
 			err: ErrDevAuthUnauthorized,
@@ -186,6 +206,8 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 		},
 		{
 			//new device - tenant token verification failed because of other reasons
+			desc: "new device, tenant token other fail",
+
 			inReq: req,
 
 			err: errors.New("request to verify tenant token failed"),
@@ -195,6 +217,8 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 		},
 		{
 			//new device - tenant token required but not provided
+			desc: "new device, missing but required tenant token",
+
 			inReq: model.AuthReq{
 				IdData:      idData,
 				TenantToken: "",
@@ -208,6 +232,8 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 		},
 		{
 			//new device - tenant token is malformed, but was somehow verified ok
+			desc: "new device, malformed tenant token",
+
 			inReq: model.AuthReq{
 				IdData:      idData,
 				TenantToken: "tenant-foo",
@@ -220,6 +246,8 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 		},
 		{
 			// a known device with a correct tenant token
+			desc: "known, correct tenant token",
+
 			inReq: model.AuthReq{
 				IdData: idData,
 				// token with the following claims:
@@ -243,7 +271,7 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 
 	for tcidx := range testCases {
 		tc := testCases[tcidx]
-		t.Run(fmt.Sprintf("tc: %d", tcidx), func(t *testing.T) {
+		t.Run(fmt.Sprintf("tc: %s", tc.desc), func(t *testing.T) {
 			t.Parallel()
 
 			// match context in mocks
