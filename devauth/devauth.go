@@ -443,7 +443,7 @@ func (d *DevAuth) VerifyToken(ctx context.Context, raw string) error {
 	err := token.UnmarshalJWT([]byte(raw), d.jwt.FromJWT)
 	jti := token.Claims.ID
 	if err != nil {
-		if err == jwt.ErrTokenExpired {
+		if err == jwt.ErrTokenExpired && jti != "" {
 			l.Errorf("Token %s expired: %v", jti, err)
 			err := d.db.DeleteToken(ctx, jti)
 			if err == store.ErrTokenNotFound {
