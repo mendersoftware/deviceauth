@@ -56,12 +56,14 @@ func (j *JWTHandlerRS256) ToJWT(token *Token) (string, error) {
 }
 
 func (j *JWTHandlerRS256) FromJWT(tokstr string) (*Token, error) {
-	jwttoken, err := jwtgo.ParseWithClaims(tokstr, &Claims{}, func(token *jwtgo.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwtgo.SigningMethodRSA); !ok {
-			return nil, errors.New("unexpected signing method: " + token.Method.Alg())
-		}
-		return &j.privKey.PublicKey, nil
-	})
+	jwttoken, err := jwtgo.ParseWithClaims(tokstr, &Claims{},
+		func(token *jwtgo.Token) (interface{}, error) {
+			if _, ok := token.Method.(*jwtgo.SigningMethodRSA); !ok {
+				return nil, errors.New("unexpected signing method: " + token.Method.Alg())
+			}
+			return &j.privKey.PublicKey, nil
+		},
+	)
 
 	// our Claims return Mender-specific validation errors
 	// go-jwt will wrap them in a generic ValidationError - unwrap and return directly
