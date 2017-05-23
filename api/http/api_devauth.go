@@ -255,7 +255,9 @@ func (d *DevAuthApiHandlers) VerifyTokenHandler(w rest.ResponseWriter, r *rest.R
 	tokenStr, err := extractToken(r.Header)
 	if err != nil {
 		rest_utils.RestErrWithLog(w, r, l, ErrNoAuthHeader, http.StatusUnauthorized)
+		return
 	}
+
 	// verify token
 	err = d.devAuth.VerifyToken(ctx, tokenStr)
 	code := http.StatusOK

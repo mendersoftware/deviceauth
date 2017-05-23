@@ -54,6 +54,8 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 	}
 
 	testCases := []struct {
+		desc string
+
 		inReq model.AuthReq
 
 		devStatus string
@@ -81,6 +83,8 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 	}{
 		{
 			// pretend we failed to add device to DB
+			desc: "db add fail",
+
 			inReq:        req,
 			addDeviceErr: errors.New("failed"),
 			err:          errors.New("failed"),
@@ -89,6 +93,8 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 			//existing device, existing auth set, auth set accepted,
 			//admission was notified, so we should get a token right
 			//away
+			desc: "known, accepted, give out token",
+
 			inReq: req,
 
 			addDeviceErr:  store.ErrObjectExists,
@@ -105,6 +111,8 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 		{
 			//existing device, existing auth set, auth set rejected,
 			//no token
+			desc: "known, rejected",
+
 			inReq: req,
 
 			addDeviceErr:  store.ErrObjectExists,
@@ -120,6 +128,8 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 		},
 		{
 			//existing, pending device
+			desc: "known, pending",
+
 			inReq: req,
 
 			addDeviceErr:  store.ErrObjectExists,
@@ -135,6 +145,8 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 		},
 		{
 			//new device
+			desc: "new device",
+
 			inReq: req,
 
 			devStatus: model.DevStatusPending,
@@ -147,6 +159,8 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 		{
 			//known device, adding returns that device exists, but
 			//trying to fetch it fails
+			desc: "known, device fetch data fail",
+
 			inReq: req,
 
 			addDeviceErr: store.ErrObjectExists,
@@ -157,6 +171,8 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 		},
 		{
 			//known device and auth set, but fetching auth set fails
+			desc: "known, auth set fetch fail",
+
 			inReq: req,
 
 			addDeviceErr:  store.ErrObjectExists,
@@ -168,6 +184,8 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 		},
 		{
 			//new device - admission error
+			desc: "new device, admission request fail",
+
 			inReq: req,
 
 			getDevByKeyId: devId,
@@ -177,6 +195,8 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 		},
 		{
 			//new device - tenant token verification failed
+			desc: "new device, tenant token verification fail",
+
 			inReq: req,
 
 			err: ErrDevAuthUnauthorized,
@@ -186,6 +206,8 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 		},
 		{
 			//new device - tenant token verification failed because of other reasons
+			desc: "new device, tenant token other fail",
+
 			inReq: req,
 
 			err: errors.New("request to verify tenant token failed"),
@@ -195,6 +217,8 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 		},
 		{
 			//new device - tenant token required but not provided
+			desc: "new device, missing but required tenant token",
+
 			inReq: model.AuthReq{
 				IdData:      idData,
 				TenantToken: "",
@@ -208,6 +232,8 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 		},
 		{
 			//new device - tenant token is malformed, but was somehow verified ok
+			desc: "new device, malformed tenant token",
+
 			inReq: model.AuthReq{
 				IdData:      idData,
 				TenantToken: "tenant-foo",
@@ -220,6 +246,8 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 		},
 		{
 			// a known device with a correct tenant token
+			desc: "known, correct tenant token",
+
 			inReq: model.AuthReq{
 				IdData: idData,
 				// token with the following claims:
@@ -239,11 +267,41 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 			tenantVerify: true,
 			err:          ErrDevAuthUnauthorized,
 		},
+		{
+			// a known device of with a correct tenant token, hand
+			// out a token with tenant claim in it
+			desc: "known, accepted, tenant, give out token with tenant claim",
+
+			inReq: model.AuthReq{
+				IdData: idData,
+				// token with the following claims:
+				//   {
+				//      "sub": "bogusdevice",
+				//      "mender.tenant": "foobar"
+				//   }
+				TenantToken: "fake.eyJzdWIiOiJib2d1c2RldmljZSIsIm1lbmRlci50ZW5hbnQiOiJmb29iYXIifQ.fake",
+				PubKey:      pubKey,
+			},
+
+			addDeviceErr:  store.ErrObjectExists,
+			addAuthSetErr: store.ErrObjectExists,
+
+			getDevByIdKey: pubKey,
+			getDevByKeyId: devId,
+
+			admissionNotified: true,
+
+			tenantVerify: true,
+
+			devStatus: model.DevStatusAccepted,
+
+			res: "dummytoken",
+		},
 	}
 
 	for tcidx := range testCases {
 		tc := testCases[tcidx]
-		t.Run(fmt.Sprintf("tc: %d", tcidx), func(t *testing.T) {
+		t.Run(fmt.Sprintf("tc: %s", tc.desc), func(t *testing.T) {
 			t.Parallel()
 
 			// match context in mocks
@@ -337,13 +395,18 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 
 			cdi := minventory.ClientRunner{}
 
-			jwt := mjwt.JWTAgentApp{}
-			jwt.On("GenerateTokenSignRS256", mock.AnythingOfType("string")).Return(
-				func(devid string) *model.Token {
-					return model.NewToken("", devId, "dummytoken")
-				}, nil)
+			jwth := mjwt.Handler{}
+			jwth.On("ToJWT",
+				mock.MatchedBy(func(jt *jwt.Token) bool {
+					t.Logf("token: %v", jt)
+					return assert.NotNil(t, jt) &&
+						assert.Equal(t, devId, jt.Claims.Subject) &&
+						(tc.tenantVerify == false ||
+							assert.Equal(t, "foobar", jt.Claims.Tenant))
+				})).
+				Return("dummytoken", nil)
 
-			devauth := NewDevAuth(&db, &cda, &cdi, nil, &jwt)
+			devauth := NewDevAuth(&db, &cda, &cdi, nil, &jwth, Config{})
 
 			if tc.tenantVerify {
 				ct := mtenant.ClientRunner{}
@@ -425,7 +488,7 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 				mock.AnythingOfType("*apiclient.HttpApi")).
 				Return(tc.invErr)
 
-			devauth := NewDevAuth(&db, nil, &inv, nil, nil)
+			devauth := NewDevAuth(&db, nil, &inv, nil, nil, Config{})
 			err := devauth.AcceptDeviceAuth(context.Background(), "dummy_devid", "dummy_aid")
 
 			if tc.outErr != "" {
@@ -491,7 +554,7 @@ func TestDevAuthRejectDevice(t *testing.T) {
 			db.On("DeleteTokenByDevId", context.Background(), "dummy_devid").Return(
 				tc.dbDelDevTokenErr)
 
-			devauth := NewDevAuth(&db, nil, nil, nil, nil)
+			devauth := NewDevAuth(&db, nil, nil, nil, nil, Config{})
 			err := devauth.RejectDeviceAuth(context.Background(), "dummy_devid", "dummy_aid")
 
 			if tc.dbErr != nil || (tc.dbDelDevTokenErr != nil &&
@@ -558,7 +621,7 @@ func TestDevAuthResetDevice(t *testing.T) {
 			db.On("DeleteTokenByDevId", context.Background(), "dummy_devid").Return(
 				tc.dbDelDevTokenErr)
 
-			devauth := NewDevAuth(&db, nil, nil, nil, nil)
+			devauth := NewDevAuth(&db, nil, nil, nil, nil, Config{})
 			err := devauth.ResetDeviceAuth(context.Background(), "dummy_devid", "dummy_aid")
 
 			if tc.dbErr != nil ||
@@ -580,7 +643,7 @@ func TestDevAuthVerifyToken(t *testing.T) {
 		tokenString      string
 		tokenValidateErr error
 
-		jti         string
+		jwToken     *jwt.Token
 		validateErr error
 
 		token       *model.Token
@@ -591,26 +654,36 @@ func TestDevAuthVerifyToken(t *testing.T) {
 
 		dev          *model.Device
 		getDeviceErr error
+
+		tenantVerify bool
 	}{
 		{
 			tokenString:      "expired",
 			tokenValidateErr: jwt.ErrTokenExpired,
 
-			jti:         "expired",
+			jwToken: &jwt.Token{
+				Claims: jwt.Claims{
+					ID: "expired",
+				},
+			},
 			validateErr: jwt.ErrTokenExpired,
 		},
 		{
 			tokenString:      "bad",
 			tokenValidateErr: jwt.ErrTokenInvalid,
 
-			jti:         "bad",
+			jwToken:     nil,
 			validateErr: jwt.ErrTokenInvalid,
 		},
 		{
 			tokenString:      "good-no-auth",
 			tokenValidateErr: store.ErrDevNotFound,
 
-			jti: "good-no-auth",
+			jwToken: &jwt.Token{
+				Claims: jwt.Claims{
+					ID: "good-no-auth",
+				},
+			},
 			token: &model.Token{
 				Id:        "good-no-auth",
 				AuthSetId: "not-found",
@@ -619,7 +692,11 @@ func TestDevAuthVerifyToken(t *testing.T) {
 		},
 		{
 			tokenString: "good-accepted",
-			jti:         "good-accepted",
+			jwToken: &jwt.Token{
+				Claims: jwt.Claims{
+					ID: "good-accepted",
+				},
+			},
 			token: &model.Token{
 				Id:        "good-accepted",
 				AuthSetId: "foo",
@@ -638,7 +715,11 @@ func TestDevAuthVerifyToken(t *testing.T) {
 			tokenString:      "good-rejected",
 			tokenValidateErr: jwt.ErrTokenInvalid,
 
-			jti: "good-rejected",
+			jwToken: &jwt.Token{
+				Claims: jwt.Claims{
+					ID: "good-rejected",
+				},
+			},
 			token: &model.Token{
 				Id:        "good-rejected",
 				AuthSetId: "foo",
@@ -652,7 +733,11 @@ func TestDevAuthVerifyToken(t *testing.T) {
 			tokenString:      "good-accepted-decommissioning",
 			tokenValidateErr: jwt.ErrTokenInvalid,
 
-			jti: "good-accepted-decommissioning",
+			jwToken: &jwt.Token{
+				Claims: jwt.Claims{
+					ID: "good-accepted-decommissioning",
+				},
+			},
 			token: &model.Token{
 				Id:        "good-accepted-decommissioning",
 				AuthSetId: "foo",
@@ -667,6 +752,18 @@ func TestDevAuthVerifyToken(t *testing.T) {
 				Decommissioning: true,
 			},
 		},
+		{
+			tokenString:      "missing-tenant-claim",
+			tokenValidateErr: jwt.ErrTokenInvalid,
+
+			jwToken: &jwt.Token{
+				Claims: jwt.Claims{
+					ID: "missing-tenant-claim",
+				},
+			},
+
+			tenantVerify: true,
+		},
 	}
 
 	for i := range testCases {
@@ -675,17 +772,32 @@ func TestDevAuthVerifyToken(t *testing.T) {
 			t.Parallel()
 
 			db := &mstore.DataStore{}
-			ja := &mjwt.JWTAgentApp{}
+			ja := &mjwt.Handler{}
 
-			devauth := NewDevAuth(db, nil, nil, nil, ja)
-
-			ja.On("ValidateTokenSignRS256", tc.tokenString).Return(tc.jti, tc.validateErr)
-
-			if tc.validateErr == jwt.ErrTokenExpired {
-				db.On("DeleteToken", context.Background(), tc.jti).Return(nil)
+			devauth := NewDevAuth(db, nil, nil, nil, ja, Config{})
+			if tc.tenantVerify {
+				// ok to pass nil tenantadm client here
+				devauth = devauth.WithTenantVerification(nil)
 			}
 
-			db.On("GetToken", context.Background(), tc.jti).Return(tc.token, tc.getTokenErr)
+			// ja.On("FromJWT", tc.tokenString).Return(tc.jwToken, tc.validateErr)
+			ja.On("FromJWT", tc.tokenString).Return(
+				func(s string) *jwt.Token {
+					t.Logf("string: %v return %+v", s, tc.jwToken)
+					return tc.jwToken
+				}, tc.validateErr)
+
+			if tc.validateErr == jwt.ErrTokenExpired {
+				db.On("DeleteToken",
+					context.Background(),
+					tc.jwToken.Claims.ID).Return(nil)
+			}
+
+			if tc.jwToken != nil {
+				db.On("GetToken", context.Background(),
+					tc.jwToken.Claims.ID).
+					Return(tc.token, tc.getTokenErr)
+			}
 
 			if tc.token != nil {
 				db.On("GetAuthSetById", context.Background(),
@@ -763,7 +875,7 @@ func TestDevAuthDecommissionDevice(t *testing.T) {
 			db.On("DeleteDevice", context.Background(), mock.AnythingOfType("string")).Return(
 				tc.dbDeleteDeviceErr)
 
-			devauth := NewDevAuth(&db, nil, nil, &co, nil)
+			devauth := NewDevAuth(&db, nil, nil, &co, nil, Config{})
 			err := devauth.DecommissionDevice(context.Background(), "devId")
 
 			if tc.outErr != "" {

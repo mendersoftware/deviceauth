@@ -61,11 +61,7 @@ func RunServer(c config.Reader) error {
 		return errors.Wrap(err, "database connection failed")
 	}
 
-	jwtHandler := jwt.NewJWTAgent(jwt.JWTAgentConfig{
-		PrivateKey:        privKey,
-		ExpirationTimeout: int64(c.GetInt(SettingJWTExpirationTimeout)),
-		Issuer:            c.GetString(SettingJWTIssuer),
-	})
+	jwtHandler := jwt.NewJWTHandlerRS256(privKey)
 
 	devAdmClientConf := deviceadm.Config{
 		DevAdmAddr: c.GetString(SettingDevAdmAddr),
@@ -81,7 +77,11 @@ func RunServer(c config.Reader) error {
 		deviceadm.NewClient(devAdmClientConf),
 		inventory.NewClient(invClientConf),
 		orchestrator.NewClient(orchClientConf),
-		jwtHandler)
+		jwtHandler,
+		devauth.Config{
+			Issuer:         c.GetString(SettingJWTIssuer),
+			ExpirationTime: int64(c.GetInt(SettingJWTExpirationTimeout)),
+		})
 
 	if tadmAddr := c.GetString(SettingTenantAdmAddr); tadmAddr != "" {
 		l.Infof("settting up tenant verification")
