@@ -57,8 +57,8 @@ class Device(object):
 
 
 class DevAuthorizer(object):
-    def __init__(self):
-        self.tenant_token = "dummy"
+    def __init__(self, tenant_token=""):
+        self.tenant_token = tenant_token
 
     def make_req_payload(self, dev):
         """Make auth request for given device. Returns a tuple (payload, signature)"""
