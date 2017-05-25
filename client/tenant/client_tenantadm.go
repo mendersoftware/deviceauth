@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/mendersoftware/go-lib-micro/apiclient"
+	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/pkg/errors"
 
 	"github.com/mendersoftware/deviceauth/utils"
@@ -59,11 +60,13 @@ type Client struct {
 func (tc *Client) VerifyToken(ctx context.Context, token string,
 	client apiclient.HttpRunner) error {
 
+	l := log.FromContext(ctx)
+
 	// TODO sanitize token
 
-	req, err := http.NewRequest(http.MethodPost,
-		utils.JoinURL(tc.conf.TenantAdmAddr, TenantVerifyUri),
-		nil)
+	url := utils.JoinURL(tc.conf.TenantAdmAddr, TenantVerifyUri)
+
+	req, err := http.NewRequest(http.MethodPost, url, nil)
 	if err != nil {
 		return errors.Wrap(err, "failed to create request to tenant administrator")
 	}
@@ -76,6 +79,7 @@ func (tc *Client) VerifyToken(ctx context.Context, token string,
 
 	rsp, err := client.Do(req.WithContext(ctx))
 	if err != nil {
+		l.Errorf("tenantadm request failed: %v", err)
 		return errors.Wrap(err, "request to verify token failed")
 	}
 	defer rsp.Body.Close()
