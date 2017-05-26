@@ -147,7 +147,9 @@ class TestDevice(ManagementClient):
 
         # delete our device
         # use a predetermined request id to correlate with executed workflows
-        self.delete_device(ourdev.id, {'X-MEN-RequestID':'delete_device'})
+        rsp = self.delete_device(ourdev.id, {'X-MEN-RequestID':'delete_device'})
+        assert rsp.status_code == 204
+
         found = mc.find_device_by_identity(dev.identity)
         assert not found
 
