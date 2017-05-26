@@ -15,6 +15,7 @@ package main
 
 import (
 	"net/http"
+	"time"
 
 	api_http "github.com/mendersoftware/deviceauth/api/http"
 	"github.com/mendersoftware/deviceauth/client/deviceadm"
@@ -74,6 +75,7 @@ func RunServer(c config.Reader) error {
 	}
 	orchClientConf := orchestrator.Config{
 		OrchestratorAddr: c.GetString(SettingOrchestratorAddr),
+		Timeout:          time.Duration(30) * time.Second,
 	}
 
 	devauth := devauth.NewDevAuth(db,
