@@ -127,14 +127,14 @@ class SimpleManagementClient(ManagementClient):
             kwargs['Authorization'] = 'Bearer foo'
         return self.client.devices.get_devices_id(**kwargs).result()[0]
 
-    def find_device_by_identity(self, identity):
+    def find_device_by_identity(self, identity, **kwargs):
         page = 1
         per_page = 100
         self.log.debug('find device with identity: %s', identity)
 
         while True:
             self.log.debug('trying page %d', page)
-            devs = self.list_devices(page=page, per_page=per_page)
+            devs = self.list_devices(page=page, per_page=per_page, **kwargs)
             for dev in devs:
                 if dev.id_data == identity:
                     # found
