@@ -11,6 +11,7 @@ services:
             - mender-device-auth
             - mender-inventory
             - mender-conductor
+        command: -k 'not MultiTenant'
     mender-device-auth:
             # built/tagged locally and only used for testing
             image: mendersoftware/deviceauth:prtest
