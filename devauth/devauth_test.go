@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/Azure/go-autorest/autorest/to"
+	ctxhttpheader "github.com/mendersoftware/go-lib-micro/context/httpheader"
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -309,9 +310,14 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 
 			if tc.tenantVerify {
 				// context must carry identity information if
-				// tenant verification is enabled
+				// tenant verification is enabled, also it must
+				// be set up with http Authorization header to
+				// use in outgoing requests (via
+				// go-lib-micro/context/httpheader packaage)
 				ctxMatcher = mock.MatchedBy(func(c context.Context) bool {
-					return assert.NotNil(t, identity.FromContext(c))
+					return assert.NotNil(t, identity.FromContext(c)) &&
+						assert.NotEmpty(t,
+							ctxhttpheader.FromContext(c, "Authorization"))
 				})
 			}
 

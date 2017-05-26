@@ -15,10 +15,13 @@ package devauth
 
 import (
 	"context"
+	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/mendersoftware/go-lib-micro/apiclient"
+	ctxhttpheader "github.com/mendersoftware/go-lib-micro/context/httpheader"
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/mendersoftware/go-lib-micro/requestid"
@@ -139,6 +142,27 @@ func (d *DevAuth) signToken(ctx context.Context) jwt.SignFunc {
 	}
 }
 
+// tenantWithContext will update `ctx` with tenant related data
+func tenantWithContext(ctx context.Context, tenantToken string) (context.Context, error) {
+	ident, err := identity.ExtractIdentity(tenantToken)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to extract identity from tenant token")
+	}
+
+	// update context to store the identity of the caller
+	ctx = identity.WithContext(ctx, &ident)
+
+	// setup authorization header so that outgoing requests are done for
+	// *this* tenant
+	ctx = ctxhttpheader.WithContext(ctx,
+		http.Header{
+			"Authorization": []string{fmt.Sprintf("Bearer %s", tenantToken)},
+		},
+		"Authorization")
+
+	return ctx, nil
+}
+
 func (d *DevAuth) SubmitAuthRequest(ctx context.Context, r *model.AuthReq) (string, error) {
 	l := log.FromContext(ctx)
 
@@ -159,15 +183,14 @@ func (d *DevAuth) SubmitAuthRequest(ctx context.Context, r *model.AuthReq) (stri
 			return "", errors.New("request to verify tenant token failed")
 		}
 
-		ident, err := identity.ExtractIdentity(r.TenantToken)
-		l.Infof("identity %v", ident)
+		tCtx, err := tenantWithContext(ctx, r.TenantToken)
 		if err != nil {
-			l.Errorf("failed to extract identity: %v", err)
+			l.Errorf("failed to setup tenant context: %v", err)
 			return "", ErrDevAuthUnauthorized
 		}
 
-		// update context to store the identity of the caller
-		ctx = identity.WithContext(ctx, &ident)
+		// update context
+		ctx = tCtx
 	}
 
 	authSet, err := d.processAuthRequest(ctx, r)
