@@ -1,8 +1,12 @@
+import json
+import os
+
 import bravado
 import pytest
 
 from client import ManagementClient, SimpleManagementClient, BaseDevicesApiClient, ConductorClient
 from common import Device, DevAuthorizer, device_auth_req, make_devid
+import mockserver
 
 
 class TestDevice(ManagementClient):
@@ -145,21 +149,30 @@ class TestDevice(ManagementClient):
         ourdev = mc.find_device_by_identity(dev.identity)
         assert ourdev
 
-        # delete our device
-        # use a predetermined request id to correlate with executed workflows
-        rsp = self.delete_device(ourdev.id, {'X-MEN-RequestID':'delete_device'})
-        assert rsp.status_code == 204
+        # handler for orchestrator's job endpoint
+        def decommission_device_handler(request):
+            dreq = json.loads(request.body.decode())
+            self.log.info('decommision request %s', dreq)
+            # verify that devauth tries to decommision correct device
+            assert dreq.get('device_id', None) == ourdev.id
+            # test is enforcing particular request ID
+            assert dreq.get('request_id', None) == 'delete_device'
+            return (200, {}, '')
+
+        handlers = [
+            ('POST', '/api/workflow/decommission_device', decommission_device_handler),
+        ]
+        with mockserver.run_fake(get_fake_orchestrator_addr(),
+                                 handlers=handlers) as server:
+
+            rsp = self.delete_device(ourdev.id, {'X-MEN-RequestID':'delete_device'})
+            self.log.info('decommission request finished with status: %s',
+                          rsp.status_code)
+            assert rsp.status_code == 204
 
         found = mc.find_device_by_identity(dev.identity)
         assert not found
 
-        # verify workflow was executed
-        cc = ConductorClient()
-        r = cc.get_workflows('decommission_device')
-        assert r.status_code == 200
 
-        res = r.json()
-        assert res['totalHits'] == 1
-
-        wf = [x for x in res['results'] if x['input'] == '{device_id=' + ourdev.id + ', request_id=delete_device}']
-        assert len(wf) == 1
+def get_fake_orchestrator_addr():
+    return os.environ.get('FAKE_ORCHESTRATOR_ADDR', '0.0.0.0:9998')
