@@ -12,8 +12,7 @@ HOST=${HOST="mender-device-auth:8080"}
 [ $$ -eq 1 ] && {
     echo "-- running in container, wait for other services"
     # wait 10s for containters to start and
-    # about 90s for condactor to load workflow definitions
-    sleep 100
+    sleep 10
 }
 
 py.test-3 -s --tb=short --host $HOST \
