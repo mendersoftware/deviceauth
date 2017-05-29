@@ -15,8 +15,6 @@ env:
     matrix:
         - JOB_TYPE=compile_and_basic_tests
         - JOB_TYPE=compile_and_acceptance_tests
-        - JOB_TYPE=compile_and_integration_tests_fast
-        - JOB_TYPE=compile_and_integration_tests_slow
 
     global:
         # Should be encrypted or set as private travis variables (in travis settings):
@@ -125,15 +123,10 @@ script:
         TESTS_DIR=$PWD/tests ./tests/run-test-environment "acceptance" $PWD/integration ./tests/docker-compose.yml;
       fi
 
-    - if [ "$JOB_TYPE" = compile_and_integration_tests_fast ]; then
+    - if [ "$JOB_TYPE" = compile_and_basic_tests ] ; then
         sudo docker build -t $DOCKER_REPOSITORY:pr .;
-        ( cd $PWD/integration/tests && bash run.sh --runfast --docker-compose-file=../../tests/docker-compose-integration.yml );
       fi
 
-    - if [ "$JOB_TYPE" = compile_and_integration_tests_slow ]; then
-        sudo docker build -t $DOCKER_REPOSITORY:pr .;
-        ( cd $PWD/integration/tests && bash run.sh --runslow --docker-compose-file=../../tests/docker-compose-integration.yml );
-      fi
 
 after_success:
     # Integrate with https://codecov.io
@@ -145,12 +138,13 @@ after_success:
         bash <(curl -s https://codecov.io/bash) -F acceptance ;
       fi
 
+
 before_deploy:
     # Master is always lastest
     - if [ ! -z "$TRAVIS_TAG" ]; then export IMAGE_TAG=$TRAVIS_TAG; else export IMAGE_TAG=$TRAVIS_BRANCH; fi
 
     # Upload image to docker registry only on PUSH
-    - if [ "$JOB_TYPE" = compile_and_integration_tests_slow -o "$JOB_TYPE" = compile_and_integration_tests_fast ]; then
+    - if [ "$JOB_TYPE" = compile_and_basic_tests ]; then
         docker tag $DOCKER_REPOSITORY:pr $DOCKER_REPOSITORY:$IMAGE_TAG;
         docker login --email=$DOCKER_HUB_EMAIL --username=$DOCKER_HUB_USERNAME --password=$DOCKER_HUB_PASSWORD;
         docker push $DOCKER_REPOSITORY:$IMAGE_TAG;
@@ -171,4 +165,19 @@ deploy:
         acl: public_read
         on:
             repo: $TRAVIS_REPO_SLUG
+            all_branches: true
+
+    # Force before_deploy for branches
+    -
+        provider: script
+        script: /bin/true 
+        on:
+            all_branches: true
+
+    # Force before_deploy for tags
+    -
+        provider: script
+        script: /bin/true 
+        on:
+            tags: true
             all_branches: true
