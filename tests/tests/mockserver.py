@@ -48,7 +48,7 @@ class MockRequestHandler(tornado.web.RequestHandler):
             if method == self.request.method and \
                uri == self.request.uri and callback:
 
-                status, headers, body = callback()
+                status, headers, body = callback(self.request)
                 # set status
                 self.set_status(status)
 
@@ -150,7 +150,14 @@ class MockServer:
 @contextmanager
 def run_fake(listen_addr, handlers=[]):
     """run_fake acts as a context manager and can be used to create a tenantadm
-    server listening on `listen_addr`"""
+    server listening on `listen_addr`.
+
+    `handlers` is a list of tuples: (<http-method>, <uri>, <callable>.). Each
+    callable takes a single request argument (compatible with
+    `tornado.httputil.HTTPServerRequest`) and returns a tuple (<status-code>,
+    <headers-dict>, <body>).
+
+    """
     sp = listen_addr.split(':')
     host, port = sp[0], int(sp[1]) if len(sp) > 1 else 9999
 
@@ -164,13 +171,22 @@ def run_fake(listen_addr, handlers=[]):
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
 
+    def verify_maybe(request):
+        status = 400
+        body = 'Set `X-Please-Verify: true` to get 200 OK back'
+        if request.headers.get('X-Please-Verify', None) == 'true':
+            status = 200
+            body = 'verified OK'
+        return (status, {}, body)
+
     handlers = [
         ('POST', '/api/internal/v1/tenantadm/tenants/verify',
-         lambda: (200, {'Foo': 'bar'}, '')),
+         lambda _: (200, {'Foo': 'bar'}, '')),
         ('POST', '/api/internal/v1/tenantadm/tenants/verify/bad',
-         lambda: (401, {}, '')),
+         lambda _: (401, {}, '')),
+        ('POST', '/api/internal/v1/tenantadm/tenants/verify/maybe', verify_maybe),
         ('POST', '/api/internal/v1/tenantadm/tenants/login',
-         lambda: (200, {}, 'token-token')),
+         lambda _: (200, {}, 'token-token')),
     ]
     with run_fake('0.0.0.0:9999', handlers=handlers) as server:
         server.wait()

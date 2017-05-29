@@ -20,7 +20,7 @@ from client import BaseDevicesApiClient, ManagementClient, \
     SimpleManagementClient
 from common import Device, DevAuthorizer, device_auth_req
 
-import tenantadm
+import mockserver
 
 def get_fake_tenantadm_addr():
     return os.environ.get('FAKE_TENANTADM_ADDR', '0.0.0.0:9999')
@@ -51,9 +51,9 @@ class TestMultiTenant(ManagementClient):
 
         handlers = [
             ('POST', '/api/internal/v1/tenantadm/tenants/verify',
-             lambda: (401, {}, '')),
+             lambda _: (401, {}, '')),
         ]
-        with tenantadm.run_fake(get_fake_tenantadm_addr(),
+        with mockserver.run_fake(get_fake_tenantadm_addr(),
                                 handlers=handlers) as fake:
             rsp = device_auth_req(url, da, d)
             assert rsp.status_code == 401
@@ -69,12 +69,12 @@ class TestMultiTenant(ManagementClient):
 
         handlers = [
             ('POST', '/api/internal/v1/tenantadm/tenants/verify',
-             lambda: (200, {}, {
+             lambda _: (200, {}, {
                  'id': '507f191e810c19729de860ea',
                  'name': 'Acme',
              })),
         ]
-        with tenantadm.run_fake(get_fake_tenantadm_addr(),
+        with mockserver.run_fake(get_fake_tenantadm_addr(),
                                 handlers=handlers) as fake:
             rsp = device_auth_req(url, da, d)
             assert rsp.status_code == 401
