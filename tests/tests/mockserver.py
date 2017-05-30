@@ -81,7 +81,7 @@ class MockServer:
     def _start_loop_thread(self, sync):
         """Thread.run() callback that starts the loop and signals that it has started
         by setting `sync` to True"""
-        self.log.info('starting test tenantadm server in thread')
+        self.log.info('starting test server in thread')
 
         host, port = self.listen[0], self.listen[1]
 
@@ -98,7 +98,7 @@ class MockServer:
 
     def _stop_loop_thread(self):
         """In IO loop callback to stop the loop"""
-        self.log.info('stopping test tenantadm server')
+        self.log.info('stopping test server')
         self.loop.stop()
 
     def run_thread_and_sync(self):
@@ -115,14 +115,14 @@ class MockServer:
         # wait for the loop to be stated
         futures.wait([sync])
 
-        self.log.info('tenantadm thread started')
+        self.log.info('test server thread started')
 
         return self
 
     def stop_thread_and_wait(self):
         """Stop the server running in separate thread and wait its IO loop to finish"""
 
-        self.log.info('tenantadm stop..')
+        self.log.info('test server stop..')
         if not self.thread:
             return
 
@@ -147,7 +147,7 @@ class MockServer:
 
 @contextmanager
 def run_fake(listen_addr, handlers=[]):
-    """run_fake acts as a context manager and can be used to create a tenantadm
+    """run_fake acts as a context manager and can be used to create a mock
     server listening on `listen_addr`.
 
     `handlers` is a list of tuples: (<http-method>, <uri>, <callable>). Each
