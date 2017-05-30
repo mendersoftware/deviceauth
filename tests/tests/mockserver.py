@@ -24,8 +24,9 @@ import tornado.ioloop
 class MockRequestHandler(tornado.web.RequestHandler):
     log = logging.getLogger('MockRequestHandler')
 
-    def initialize(self, handlers=[]):
-        self.handlers = handlers
+    def initialize(self, method='GET', cb=None):
+        self.method = method
+        self.callback = cb
 
     def post(self, *args, **kwargs):
         self._run_handlers(*args, **kwargs)
@@ -43,38 +44,35 @@ class MockRequestHandler(tornado.web.RequestHandler):
         self._run_handlers(*args, **kwargs)
 
     def _run_handlers(self, *args, **kwargs):
-        for method, uri, callback in self.handlers:
-            # find and execute matching handler
-            if method == self.request.method and \
-               uri == self.request.uri and callback:
-
-                status, headers, body = callback(self.request)
-                # set status
-                self.set_status(status)
-
-                # set headers
-                for hdr, val in headers.items():
-                    self.add_header(hdr, val)
-
-                # push body
-                if body:
-                    self.write(body)
-
-                self.finish()
-
-                break
-        else:
+        if self.request.method != self.method or \
+           not self.callback:
             self.log.error('no handler for request %s', self.request)
             raise tornado.web.HTTPError(405)
+
+        status, headers, body = self.callback(self.request, *args, **kwargs)
+        # set status
+        self.set_status(status)
+
+        # set headers
+        for hdr, val in headers.items():
+            self.add_header(hdr, val)
+
+        # push body
+        if body:
+            self.write(body)
+
+        self.finish()
 
 
 class MockServer:
     log = logging.getLogger('MockServer')
 
     def __init__(self, listen=('0.0.0.0', 9999), handlers=[]):
-        self.app = tornado.web.Application([
-            (r"/.*", MockRequestHandler, dict(handlers=handlers)),
-        ])
+        th = []
+        for method, path, cb in handlers:
+            th.append((path, MockRequestHandler, {'method': method, 'cb': cb}))
+
+        self.app = tornado.web.Application(th)
 
         self.listen = listen
         self.thread = None
@@ -152,10 +150,12 @@ def run_fake(listen_addr, handlers=[]):
     """run_fake acts as a context manager and can be used to create a tenantadm
     server listening on `listen_addr`.
 
-    `handlers` is a list of tuples: (<http-method>, <uri>, <callable>.). Each
-    callable takes a single request argument (compatible with
-    `tornado.httputil.HTTPServerRequest`) and returns a tuple (<status-code>,
-    <headers-dict>, <body>).
+    `handlers` is a list of tuples: (<http-method>, <uri>, <callable>). Each
+    callable takes a request argument (compatible with
+    `tornado.httputil.HTTPServerRequest`) as its first argument and returns a
+    tuple (<status-code>, <headers-dict>, <body>). You can use Tornado's
+    routing facilities to have path elements become arguments to callbacks, see
+    http://www.tornadoweb.org/en/stable/web.html for more details.
 
     """
     sp = listen_addr.split(':')
@@ -179,6 +179,16 @@ if __name__ == '__main__':
             body = 'verified OK'
         return (status, {}, body)
 
+    def get_tenant(request, tenant_id):
+        """Example handler for GET operation on tenants. The method
+        receives tenant ID as path argument. Further query arguments
+        are accessed through `request.query_arguments`.
+        """
+        logging.info('arguments: %s', request.query_arguments)
+        if not tenant_id:
+            return (404, {}, 'no tenant')
+        return (200, {}, 'tenant {:d}'.format(int(tenant_id)))
+
     handlers = [
         ('POST', '/api/internal/v1/tenantadm/tenants/verify',
          lambda _: (200, {'Foo': 'bar'}, '')),
@@ -187,6 +197,7 @@ if __name__ == '__main__':
         ('POST', '/api/internal/v1/tenantadm/tenants/verify/maybe', verify_maybe),
         ('POST', '/api/internal/v1/tenantadm/tenants/login',
          lambda _: (200, {}, 'token-token')),
+        ('GET', '/api/internal/v1/tenantadm/tenant/(.*)', get_tenant),
     ]
     with run_fake('0.0.0.0:9999', handlers=handlers) as server:
         server.wait()
