@@ -6,6 +6,8 @@ from client import BaseDevicesApiClient, ManagementClient, \
     SimpleInternalClient, SimpleManagementClient
 from common import Device, DevAuthorizer, device_auth_req, \
     make_devid, explode_jwt
+import deviceadm
+import inventory
 
 
 class TestToken(ManagementClient):
@@ -20,8 +22,9 @@ class TestToken(ManagementClient):
         url = self.devapi.make_api_url("/auth_requests")
 
         # poke devauth so that device appears
-        rsp = device_auth_req(url, da, d)
-        assert rsp.status_code == 401
+        with deviceadm.run_fake_for_device(d) as server:
+            rsp = device_auth_req(url, da, d)
+            assert rsp.status_code == 401
 
         # try to find our devices in all devices listing
         mc = SimpleManagementClient()
@@ -33,13 +36,15 @@ class TestToken(ManagementClient):
         aid = dev.auth_sets[0].id
 
         try:
-            self.accept_device(devid, aid)
+            with inventory.run_fake_for_device_id(devid) as server:
+                self.accept_device(devid, aid)
         except bravado.exception.HTTPError as e:
             assert e.response.status_code == 204
 
         # device is accepted, we should get a token now
-        rsp = device_auth_req(url, da, d)
-        assert rsp.status_code == 200
+        with deviceadm.run_fake_for_device(d) as server:
+            rsp = device_auth_req(url, da, d)
+            assert rsp.status_code == 200
 
         da.parse_rsp_payload(d, rsp.text)
 

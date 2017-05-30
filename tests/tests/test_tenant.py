@@ -21,6 +21,8 @@ from client import BaseDevicesApiClient, ManagementClient, \
 from common import Device, DevAuthorizer, device_auth_req
 
 import mockserver
+import deviceadm
+
 
 def get_fake_tenantadm_addr():
     return os.environ.get('FAKE_TENANTADM_ADDR', '0.0.0.0:9999')
@@ -76,8 +78,9 @@ class TestMultiTenant(ManagementClient):
         ]
         with mockserver.run_fake(get_fake_tenantadm_addr(),
                                 handlers=handlers) as fake:
-            rsp = device_auth_req(url, da, d)
-            assert rsp.status_code == 401
+            with deviceadm.run_fake_for_device(d) as fakedevadm:
+                rsp = device_auth_req(url, da, d)
+                assert rsp.status_code == 401
 
         # device should be appear in devices listing
         self.verify_tenant_dev_present(d.identity, tenant='foobar')
