@@ -17,6 +17,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io/ioutil"
 	"net/http"
 	"time"
 
@@ -95,6 +96,13 @@ func (co *Client) SubmitDeviceDecommisioningJob(ctx context.Context, decommissio
 	defer rsp.Body.Close()
 
 	if rsp.StatusCode != http.StatusOK {
+		body, err := ioutil.ReadAll(rsp.Body)
+		if err != nil {
+			body = []byte("<failed to read>")
+		}
+		l.Errorf("decommision request %s %s failed with status %v, response text: %s",
+			req.Method, req.URL, rsp.Status, body)
+
 		return errors.Errorf(
 			"submit decommissioning request failed with status %v", rsp.Status)
 	}

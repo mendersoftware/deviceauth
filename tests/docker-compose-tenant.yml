@@ -8,20 +8,21 @@ services:
             - "${TESTS_DIR}:/testing"
         depends_on:
             - mender-device-auth
-        command: -k 'not MultiTenant'
+        # run multi tenant tests only
+        command: -k TestMultiTenant
         environment:
             # run mocked services
-            FAKE_ORCHESTRATOR_ADDR: "0.0.0.0:9998"
+            FAKE_TENANTADM_ADDR: "0.0.0.0:9999"
             FAKE_ADMISSION_ADDR: "0.0.0.0:9997"
             FAKE_INVENTORY_ADDR: "0.0.0.0:9996"
     mender-device-auth:
             # built/tagged locally and only used for testing
             image: mendersoftware/deviceauth:prtest
             volumes:
-                 - "${TESTS_DIR}:/testing"
+                  - "${TESTS_DIR}:/testing"
             environment:
                 # acceptance container will be running mocks for a couple of
                 # services, direct deviceauth there
-                DEVICEAUTH_DEVICE_AUTH_ORCHESTRATOR: "http://acceptance:9998/"
+                DEVICEAUTH_TENANTADM_ADDR: "http://acceptance:9999/"
                 DEVICEAUTH_DEVADM_ADDR: "http://acceptance:9997/"
                 DEVICEAUTH_INVENTORY_ADDR: "http://acceptance:9996/"

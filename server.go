@@ -15,6 +15,7 @@ package main
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/mendersoftware/go-lib-micro/log"
@@ -71,6 +72,7 @@ func RunServer(c config.Reader) error {
 	}
 	orchClientConf := orchestrator.Config{
 		OrchestratorAddr: c.GetString(SettingOrchestratorAddr),
+		Timeout:          time.Duration(30) * time.Second,
 	}
 
 	devauth := devauth.NewDevAuth(db,
