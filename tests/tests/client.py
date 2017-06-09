@@ -107,6 +107,7 @@ class ManagementClient(SwaggerApiClient):
         # fall back to 'requests'
         #   return self.client.devices.delete_devices_id(id=devid, **kwargs)
         rsp = requests.delete(self.make_api_url('/devices/{}'.format(devid)), headers = headers)
+        return rsp
 
 class SimpleManagementClient(ManagementClient):
     """Management API client. Cannot be used as pytest base class"""
