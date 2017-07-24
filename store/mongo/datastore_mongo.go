@@ -51,7 +51,9 @@ var (
 )
 
 type DataStoreMongo struct {
-	session *mgo.Session
+	session     *mgo.Session
+	automigrate bool
+	multitenant bool
 }
 
 func GetDataStoreMongo(db string) (*DataStoreMongo, error) {
@@ -415,4 +417,14 @@ func (db *DataStoreMongo) DeleteAuthSetsForDevice(ctx context.Context, devid str
 	}
 
 	return nil
+}
+
+func (db *DataStoreMongo) WithMultitenant() *DataStoreMongo {
+	db.multitenant = true
+	return db
+}
+
+func (db *DataStoreMongo) WithAutomigrate() *DataStoreMongo {
+	db.automigrate = true
+	return db
 }
