@@ -72,6 +72,7 @@ func getDb(ctx context.Context) *DataStoreMongo {
 	db.Wipe()
 
 	ds := NewDataStoreMongoWithSession(db.Session())
+	ds = ds.WithAutomigrate()
 	ds.Migrate(ctx, DbVersion)
 
 	return ds
