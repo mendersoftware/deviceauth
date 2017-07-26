@@ -34,12 +34,6 @@ func init() {
 	flag.Parse()
 }
 
-func TestHandleConfigFile(t *testing.T) {
-	t.Parallel()
-
-	HandleConfigFile("", false, nil)
-}
-
 func TestRunMain(t *testing.T) {
 	if !runAcceptanceTests {
 		t.Skip()
