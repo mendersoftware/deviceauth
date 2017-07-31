@@ -26,6 +26,10 @@ import (
 )
 
 func main() {
+	doMain(os.Args)
+}
+
+func doMain(args []string) {
 	var configPath string
 	var debug bool
 
@@ -83,7 +87,7 @@ func main() {
 		return nil
 	}
 
-	app.Run(os.Args)
+	app.Run(args)
 }
 
 func cmdServer(args *cli.Context) error {
