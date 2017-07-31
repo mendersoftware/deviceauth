@@ -1,4 +1,4 @@
-// Copyright 2016 Mender Software AS
+// Copyright 2017 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -44,4 +44,13 @@ func TestDbFromContext(t *testing.T) {
 	}
 	db := DbFromContext(identity.WithContext(ctx, &id), "foo")
 	assert.Equal(t, db, "foo-bar")
+}
+
+func TestIsTenantDb(t *testing.T) {
+	matcher := IsTenantDb("servicedb")
+
+	assert.True(t, matcher("servicedb-tenant1"))
+	assert.False(t, matcher("servicedb"))
+	assert.False(t, matcher("servicedbtenant1"))
+
 }
