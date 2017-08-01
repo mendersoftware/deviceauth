@@ -8,7 +8,7 @@ COPY ./config.yaml /etc/deviceauth/
 # mount your private key at /etc/deviceauth/rsa/private.pem
 RUN mkdir /etc/deviceauth/rsa
 
-ENTRYPOINT ["/usr/bin/deviceauth", "-config", "/etc/deviceauth/config.yaml"]
+ENTRYPOINT ["/usr/bin/deviceauth", "--config", "/etc/deviceauth/config.yaml"]
 
 COPY ./deviceauth /usr/bin/
 
