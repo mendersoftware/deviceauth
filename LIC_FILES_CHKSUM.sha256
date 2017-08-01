@@ -34,6 +34,7 @@ feb6d17a0e7a64e5ab0f7e2b0e0ee3e69c1a6396626fd554dc0cddaa06851b44  vendor/github.
 f71d43124a8b70fbaef7c835d1639e89a7acdb252b05dda35652247902880724  vendor/github.com/dgrijalva/jwt-go/LICENSE
 f56f51f3aac08674202e9c399e4f32e733c12953c09e15464b0cc3227ac442c0  vendor/github.com/satori/go.uuid/LICENSE
 fde7d610b9b95fc5a6304055c4dae951025b630aaa42a24e95ebf76675ae832c  vendor/github.com/stretchr/objx/LICENSE.md
+da277af11b85227490377fbcac6afccc68be560c4fff36ac05ca62de55345fd7  vendor/github.com/urfave/cli/LICENSE
 
 #
 # Basically MIT (but with a "colorful" language!)

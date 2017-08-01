@@ -1,4 +1,4 @@
-// Copyright 2016 Mender Software AS
+// Copyright 2017 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -39,6 +39,7 @@ func TestSimpleMigratorApply(t *testing.T) {
 	}
 
 	testCases := map[string]struct {
+		Automigrate     bool
 		InputMigrations []MigrationEntry
 		InputVersion    Version
 
@@ -48,6 +49,7 @@ func TestSimpleMigratorApply(t *testing.T) {
 		OutputError   error
 	}{
 		"ok - empty state": {
+			Automigrate:     true,
 			InputMigrations: nil,
 			InputVersion:    MakeVersion(1, 0, 0),
 
@@ -55,6 +57,18 @@ func TestSimpleMigratorApply(t *testing.T) {
 		},
 
 		"ok - already has version": {
+			Automigrate: true,
+			InputMigrations: []MigrationEntry{
+				{
+					Version:   MakeVersion(1, 0, 0),
+					Timestamp: time.Now(),
+				},
+			},
+			InputVersion:  MakeVersion(1, 0, 0),
+			OutputVersion: MakeVersion(1, 0, 0),
+		},
+		"ok - already has version, no automigrate": {
+			Automigrate: false,
 			InputMigrations: []MigrationEntry{
 				{
 					Version:   MakeVersion(1, 0, 0),
@@ -65,6 +79,7 @@ func TestSimpleMigratorApply(t *testing.T) {
 			OutputVersion: MakeVersion(1, 0, 0),
 		},
 		"ok - add default target version": {
+			Automigrate: true,
 			InputMigrations: []MigrationEntry{
 				{
 					Version:   MakeVersion(1, 0, 0),
@@ -74,7 +89,20 @@ func TestSimpleMigratorApply(t *testing.T) {
 			InputVersion:  MakeVersion(1, 1, 0),
 			OutputVersion: MakeVersion(1, 1, 0),
 		},
+		"ok - add default target version, no automigrate": {
+			Automigrate: false,
+			InputMigrations: []MigrationEntry{
+				{
+					Version:   MakeVersion(1, 0, 0),
+					Timestamp: time.Now(),
+				},
+			},
+			InputVersion:  MakeVersion(1, 1, 0),
+			OutputVersion: MakeVersion(1, 0, 0),
+			OutputError:   errors.New("db needs migration: test has version 1.0.0, needs version 1.1.0"),
+		},
 		"ok - ran migrations": {
+			Automigrate: true,
 			InputMigrations: []MigrationEntry{
 				{
 					Version:   MakeVersion(1, 0, 0),
@@ -93,7 +121,29 @@ func TestSimpleMigratorApply(t *testing.T) {
 				makeMigration(MakeVersion(1, 1, 0), MakeVersion(1, 0, 1), nil),
 			},
 		},
+		"ok - ran migrations, no automigrate": {
+			Automigrate: false,
+			InputMigrations: []MigrationEntry{
+				{
+					Version:   MakeVersion(1, 0, 0),
+					Timestamp: time.Now(),
+				},
+				{
+					Version:   MakeVersion(1, 0, 1),
+					Timestamp: time.Now(),
+				},
+			},
+			InputVersion:  MakeVersion(1, 1, 0),
+			OutputVersion: MakeVersion(1, 0, 1),
+
+			Migrators: []Migration{
+				makeMigration(MakeVersion(1, 0, 1), MakeVersion(1, 0, 0), nil),
+				makeMigration(MakeVersion(1, 1, 0), MakeVersion(1, 0, 1), nil),
+			},
+			OutputError: errors.New("db needs migration: test has version 1.0.1, needs version 1.1.0"),
+		},
 		"ok - migration to lower": {
+			Automigrate:     true,
 			InputMigrations: nil,
 			InputVersion:    MakeVersion(0, 1, 0),
 			OutputVersion:   MakeVersion(0, 1, 0),
@@ -104,6 +154,7 @@ func TestSimpleMigratorApply(t *testing.T) {
 			},
 		},
 		"err - failed migration": {
+			Automigrate: true,
 			InputMigrations: []MigrationEntry{
 				{
 					Version:   MakeVersion(1, 0, 0),
@@ -138,7 +189,7 @@ func TestSimpleMigratorApply(t *testing.T) {
 			}
 
 			//test
-			m := &SimpleMigrator{Session: session, Db: "test"}
+			m := &SimpleMigrator{Session: session, Db: "test", Automigrate: tc.Automigrate}
 			err := m.Apply(context.Background(), tc.InputVersion, tc.Migrators)
 			if tc.OutputError != nil {
 				assert.Error(t, err)
@@ -159,4 +210,10 @@ func TestSimpleMigratorApply(t *testing.T) {
 			session.Close()
 		})
 	}
+}
+
+func TestErrNeedsMigration(t *testing.T) {
+	err := errors.New("db needs migration: mydbname has version 1.0.0, needs version 1.1.0")
+
+	assert.True(t, IsErrNeedsMigration(err))
 }

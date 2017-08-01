@@ -18,6 +18,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/signal"
+	"strings"
 	"testing"
 
 	"github.com/mendersoftware/go-lib-micro/log"
@@ -25,19 +26,18 @@ import (
 
 var runAcceptanceTests bool
 
+// used for parsing '-cli-args' for urfave/cli when running acceptance tests
+// this is because of a conflict between urfave/cli and regular go flags required for testing (can't mix the two)
+var cliArgsRaw string
+
 func init() {
 	// disable logging thile running unit tests
 	// default application settup couses to mich noice
 	log.Log.Out = ioutil.Discard
 
 	flag.BoolVar(&runAcceptanceTests, "acceptance-tests", false, "set flag when running acceptance tests")
+	flag.StringVar(&cliArgsRaw, "cli-args", "", "for passing urfave/cli args (single string) when golang flags are specified (avoids conflict)")
 	flag.Parse()
-}
-
-func TestHandleConfigFile(t *testing.T) {
-	t.Parallel()
-
-	HandleConfigFile("", false, nil)
 }
 
 func TestRunMain(t *testing.T) {
@@ -45,7 +45,16 @@ func TestRunMain(t *testing.T) {
 		t.Skip()
 	}
 
-	go main()
+	// parse '-cli-args', remember about binary name at idx 0
+	var cliArgs []string
+
+	if cliArgsRaw != "" {
+		cliArgs = []string{os.Args[0]}
+		splitArgs := strings.Split(cliArgsRaw, " ")
+		cliArgs = append(cliArgs, splitArgs...)
+	}
+
+	go doMain(cliArgs)
 
 	stopChan := make(chan os.Signal)
 	signal.Notify(stopChan, os.Interrupt)
