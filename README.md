@@ -1,5 +1,5 @@
-[![Build Status](https://travis-ci.org/mendersoftware/deviceauth.svg?branch=master)](https://travis-ci.org/mendersoftware/deviceauth)
-[![codecov](https://codecov.io/gh/mendersoftware/deviceauth/branch/master/graph/badge.svg)](https://codecov.io/gh/mendersoftware/deviceauth)
+[![Build Status](https://travis-ci.org/mendersoftware/deviceauth.svg?branch=1.2.x)](https://travis-ci.org/mendersoftware/deviceauth)
+[![codecov](https://codecov.io/gh/mendersoftware/deviceauth/branch/1.2.x/graph/badge.svg)](https://codecov.io/gh/mendersoftware/deviceauth)
 [![Go Report Card](https://goreportcard.com/badge/github.com/mendersoftware/deviceauth)](https://goreportcard.com/report/github.com/mendersoftware/deviceauth)
 [![Docker pulls](https://img.shields.io/docker/pulls/mendersoftware/deviceauth.svg?maxAge=3600)](https://hub.docker.com/r/mendersoftware/deviceauth/)
 
