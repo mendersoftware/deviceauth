@@ -1,13 +1,59 @@
-#mongo: mongo-device-auth
-#devadm_url_add: "http://mender-device-adm:8080/api/0.1.0/devices"
-#server_priv_key_path: "/etc/deviceauth/rsa/private.pem"
+# API server listen address
+# Defauls to: ":8080" which will listen on all avalable interfaces.
+# Overwrite with environment variable: DEVICEAUTH_LISTEN
+
+# listen: :8080
 
 # HTTP Server middleware environment
 # Available values:
-#   dev
-#       development environment
-#   prod
-#       production environment
-#
+#   dev - development environment
+#   prod - production environment
 # Defaults to: prod
-#middleware: dev
+# Overwrite with environment variable: DEVICEAUTH_MIDDLEWARE
+
+# middleware: dev
+
+# Mongodb connection string
+# Defaults to: mongo-device-adm
+# Overwrite with environment variable: DEVICEAUTH_MONGO
+
+# mongo: mongo-device-auth
+
+# Device admission service address
+# Defaults to: http://mender-device-adm:8080
+# Overwrite with environment variable: DEVICEAUTH_DEVADM_ADDR
+
+# devadm_addr: http://mender-device-auth:8080
+
+# Inventory service address
+# Defaults to: http://mender-inventory:8080
+# Overwrite with environment variable: DEVICEAUTH_INVENTORY_ADDR
+
+# inventory_addr: http://mender-inventory:8080
+
+# Conductor service address
+# Defaults to: http://mender-conductor:8080
+# Overwrite with environment variable: DEVICEAUTH_DEVICE_AUTH_ORCHESTRATOR
+
+# device_auth_orchestrator:  http://mender-conductor:8080
+
+# Tenant administration service address (optional)
+# Defaults to: none
+# Overwrite with environment variable: DEVICEAUTH_TENANTADM_ADDR
+
+# device_auth_orchestrator:  http://tenantadm
+
+# Private key path - used for JWT signing
+# Defaults to: /etc/deviceauth/rsa/private.pem
+
+# server_priv_key_path: /etc/deviceauth/rsa/private.pem
+
+# JWT issuer ('iss' claim)
+# Defaults to: Mender
+
+# jwt_issuer: Mender
+
+# JWT expiration in seconds ('exp' claim)
+# Defaults to: "604800" (one week)
+
+# jwt_exp_timeout: 604800
