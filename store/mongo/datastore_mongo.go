@@ -455,3 +455,34 @@ func (db *DataStoreMongo) WithAutomigrate() *DataStoreMongo {
 	db.automigrate = true
 	return db
 }
+
+func (db *DataStoreMongo) EnsureIndexes(ctx context.Context, s *mgo.Session) error {
+
+	// devices collection
+	err := s.DB(ctxstore.DbFromContext(ctx, DbName)).
+		C(DbDevicesColl).EnsureIndex(mgo.Index{
+		Unique: true,
+		// identity data shall be unique within collection
+		Key:        []string{model.DevKeyIdData},
+		Name:       indexDevices_IdentityData,
+		Background: false,
+	})
+	if err != nil {
+		return err
+	}
+
+	// auth requests
+	return s.DB(ctxstore.DbFromContext(ctx, DbName)).
+		C(DbAuthSetColl).EnsureIndex(mgo.Index{
+		Unique: true,
+		// tuple (device ID,identity, public key) shall be unique within
+		// collection
+		Key: []string{
+			model.AuthSetKeyDeviceId,
+			model.AuthSetKeyIdData,
+			model.AuthSetKeyPubKey,
+		},
+		Name:       indexAuthSet_DeviceId_IdentityData_PubKey,
+		Background: false,
+	})
+}
