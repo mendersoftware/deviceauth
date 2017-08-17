@@ -158,6 +158,10 @@ func (db *DataStoreMongo) AddDevice(ctx context.Context, d model.Device) error {
 	s := db.session.Copy()
 	defer s.Close()
 
+	if err := db.EnsureIndexes(ctx, s); err != nil {
+		return err
+	}
+
 	c := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
 
 	d.Id = bson.NewObjectId().Hex()
@@ -212,6 +216,10 @@ func (db *DataStoreMongo) DeleteDevice(ctx context.Context, id string) error {
 func (db *DataStoreMongo) AddToken(ctx context.Context, t model.Token) error {
 	s := db.session.Copy()
 	defer s.Close()
+
+	if err := db.EnsureIndexes(ctx, s); err != nil {
+		return err
+	}
 
 	c := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbTokensColl)
 
@@ -333,6 +341,10 @@ func (db *DataStoreMongo) Migrate(ctx context.Context, version string) error {
 func (db *DataStoreMongo) AddAuthSet(ctx context.Context, set model.AuthSet) error {
 	s := db.session.Copy()
 	defer s.Close()
+
+	if err := db.EnsureIndexes(ctx, s); err != nil {
+		return err
+	}
 
 	c := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbAuthSetColl)
 
