@@ -57,7 +57,16 @@ func RunServer(c config.Reader) error {
 		return errors.Wrap(err, "failed to read rsa private key")
 	}
 
-	db, err := mongo.GetDataStoreMongo(c.GetString(SettingDb))
+	db, err := mongo.NewDataStoreMongo(
+		mongo.DataStoreMongoConfig{
+			ConnectionString: c.GetString(SettingDb),
+
+			SSL:           c.GetBool(SettingDbSSL),
+			SSLSkipVerify: c.GetBool(SettingDbSSLSkipVerify),
+
+			Username: c.GetString(SettingDbUsername),
+			Password: c.GetString(SettingDbPassword),
+		})
 	if err != nil {
 		return errors.Wrap(err, "database connection failed")
 	}

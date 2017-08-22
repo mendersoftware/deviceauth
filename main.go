@@ -100,7 +100,16 @@ func cmdServer(args *cli.Context) error {
 		config.Config.Set(SettingMiddleware, EnvDev)
 	}
 
-	db, err := mongo.NewDataStoreMongo(config.Config.GetString(SettingDb))
+	db, err := mongo.NewDataStoreMongo(
+		mongo.DataStoreMongoConfig{
+			ConnectionString: config.Config.GetString(SettingDb),
+
+			SSL:           config.Config.GetBool(SettingDbSSL),
+			SSLSkipVerify: config.Config.GetBool(SettingDbSSLSkipVerify),
+
+			Username: config.Config.GetString(SettingDbUsername),
+			Password: config.Config.GetString(SettingDbPassword),
+		})
 	if err != nil {
 		return cli.NewExitError(
 			fmt.Sprintf("failed to connect to db: %v", err),
