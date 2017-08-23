@@ -217,6 +217,24 @@ func TestStoreAddDevice(t *testing.T) {
 		IdData: "iddata",
 	})
 	assert.EqualError(t, err, store.ErrObjectExists.Error())
+
+	// add device with identical identity data but for different tenant
+	ctx = identity.WithContext(context.Background(), &identity.Identity{
+		Tenant: "bar",
+	})
+
+	err = d.AddDevice(ctx, model.Device{
+		Id:     "foobar",
+		IdData: "iddata",
+	})
+	assert.NoError(t, err, "failed to add device")
+
+	// add device with identical identity data
+	err = d.AddDevice(ctx, model.Device{
+		Id:     "foobar",
+		IdData: "iddata",
+	})
+	assert.EqualError(t, err, store.ErrObjectExists.Error())
 }
 
 func TestStoreUpdateDevice(t *testing.T) {

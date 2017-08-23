@@ -197,6 +197,10 @@ func (db *DataStoreMongo) AddDevice(ctx context.Context, d model.Device) error {
 	s := db.session.Copy()
 	defer s.Close()
 
+	if err := db.EnsureIndexes(ctx, s); err != nil {
+		return err
+	}
+
 	c := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
 
 	d.Id = bson.NewObjectId().Hex()
@@ -251,6 +255,10 @@ func (db *DataStoreMongo) DeleteDevice(ctx context.Context, id string) error {
 func (db *DataStoreMongo) AddToken(ctx context.Context, t model.Token) error {
 	s := db.session.Copy()
 	defer s.Close()
+
+	if err := db.EnsureIndexes(ctx, s); err != nil {
+		return err
+	}
 
 	c := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbTokensColl)
 
@@ -373,6 +381,10 @@ func (db *DataStoreMongo) AddAuthSet(ctx context.Context, set model.AuthSet) err
 	s := db.session.Copy()
 	defer s.Close()
 
+	if err := db.EnsureIndexes(ctx, s); err != nil {
+		return err
+	}
+
 	c := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbAuthSetColl)
 
 	set.Id = bson.NewObjectId().Hex()
@@ -493,4 +505,35 @@ func (db *DataStoreMongo) WithMultitenant() *DataStoreMongo {
 func (db *DataStoreMongo) WithAutomigrate() *DataStoreMongo {
 	db.automigrate = true
 	return db
+}
+
+func (db *DataStoreMongo) EnsureIndexes(ctx context.Context, s *mgo.Session) error {
+
+	// devices collection
+	err := s.DB(ctxstore.DbFromContext(ctx, DbName)).
+		C(DbDevicesColl).EnsureIndex(mgo.Index{
+		Unique: true,
+		// identity data shall be unique within collection
+		Key:        []string{model.DevKeyIdData},
+		Name:       indexDevices_IdentityData,
+		Background: false,
+	})
+	if err != nil {
+		return err
+	}
+
+	// auth requests
+	return s.DB(ctxstore.DbFromContext(ctx, DbName)).
+		C(DbAuthSetColl).EnsureIndex(mgo.Index{
+		Unique: true,
+		// tuple (device ID,identity, public key) shall be unique within
+		// collection
+		Key: []string{
+			model.AuthSetKeyDeviceId,
+			model.AuthSetKeyIdData,
+			model.AuthSetKeyPubKey,
+		},
+		Name:       indexAuthSet_DeviceId_IdentityData_PubKey,
+		Background: false,
+	})
 }
