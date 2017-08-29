@@ -465,6 +465,23 @@ func (d *DevAuth) RevokeToken(ctx context.Context, token_id string) error {
 	return d.db.DeleteToken(ctx, token_id)
 }
 
+func verifyTenantClaim(ctx context.Context, verifyTenant bool, tenant string) error {
+
+	l := log.FromContext(ctx)
+
+	if verifyTenant {
+		if tenant == "" {
+			l.Errorf("No tenant claim in the token")
+			return jwt.ErrTokenInvalid
+		}
+	} else if tenant != "" {
+		l.Errorf("Unexpected tenant claim: %s in the token", tenant)
+		return jwt.ErrTokenInvalid
+	}
+
+	return nil
+}
+
 func (d *DevAuth) VerifyToken(ctx context.Context, raw string) error {
 
 	l := log.FromContext(ctx)
@@ -490,11 +507,8 @@ func (d *DevAuth) VerifyToken(ctx context.Context, raw string) error {
 		return jwt.ErrTokenInvalid
 	}
 
-	if d.verifyTenant {
-		if token.Claims.Tenant == "" {
-			l.Errorf("Token %s has no tenant claim: %v", jti, err)
-			return jwt.ErrTokenInvalid
-		}
+	if err := verifyTenantClaim(ctx, d.verifyTenant, token.Claims.Tenant); err != nil {
+		return err
 	}
 
 	// check if token is in the system
