@@ -12,3 +12,4 @@ ENTRYPOINT ["/usr/bin/deviceauth", "--config", "/etc/deviceauth/config.yaml"]
 
 COPY ./deviceauth /usr/bin/
 
+RUN apk add --update ca-certificates && update-ca-certificates
