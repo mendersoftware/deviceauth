@@ -206,6 +206,7 @@ func (d *DevAuth) SubmitAuthRequest(ctx context.Context, r *model.AuthReq) (stri
 				Issuer:    d.config.Issuer,
 				ExpiresAt: time.Now().Unix() + d.config.ExpirationTime,
 				Subject:   authSet.DeviceId,
+				Device:    true,
 			},
 		}
 
@@ -504,6 +505,10 @@ func (d *DevAuth) VerifyToken(ctx context.Context, raw string) error {
 			return jwt.ErrTokenExpired
 		}
 		l.Errorf("Token %s invalid: %v", jti, err)
+		return jwt.ErrTokenInvalid
+	}
+
+	if token.Claims.Device != true {
 		return jwt.ErrTokenInvalid
 	}
 

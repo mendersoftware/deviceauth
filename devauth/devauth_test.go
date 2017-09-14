@@ -687,7 +687,8 @@ func TestDevAuthVerifyToken(t *testing.T) {
 
 			jwToken: &jwt.Token{
 				Claims: jwt.Claims{
-					ID: "good-no-auth",
+					ID:     "good-no-auth",
+					Device: true,
 				},
 			},
 			token: &model.Token{
@@ -700,7 +701,8 @@ func TestDevAuthVerifyToken(t *testing.T) {
 			tokenString: "good-accepted",
 			jwToken: &jwt.Token{
 				Claims: jwt.Claims{
-					ID: "good-accepted",
+					ID:     "good-accepted",
+					Device: true,
 				},
 			},
 			token: &model.Token{
@@ -723,7 +725,8 @@ func TestDevAuthVerifyToken(t *testing.T) {
 
 			jwToken: &jwt.Token{
 				Claims: jwt.Claims{
-					ID: "good-rejected",
+					ID:     "good-rejected",
+					Device: true,
 				},
 			},
 			token: &model.Token{
@@ -741,7 +744,8 @@ func TestDevAuthVerifyToken(t *testing.T) {
 
 			jwToken: &jwt.Token{
 				Claims: jwt.Claims{
-					ID: "good-accepted-decommissioning",
+					ID:     "good-accepted-decommissioning",
+					Device: true,
 				},
 			},
 			token: &model.Token{
@@ -799,7 +803,7 @@ func TestDevAuthVerifyToken(t *testing.T) {
 					tc.jwToken.Claims.ID).Return(nil)
 			}
 
-			if tc.jwToken != nil {
+			if tc.token != nil {
 				db.On("GetToken", context.Background(),
 					tc.jwToken.Claims.ID).
 					Return(tc.token, tc.getTokenErr)
@@ -810,7 +814,7 @@ func TestDevAuthVerifyToken(t *testing.T) {
 					tc.token.AuthSetId).Return(tc.auth, tc.getAuthErr)
 				// devauth will ask for a device if auth set is
 				// found and accepted
-				if tc.auth != nil {
+				if tc.dev != nil {
 					db.On("GetDeviceById", context.Background(),
 						tc.auth.DeviceId).Return(tc.dev, tc.getDeviceErr)
 				}
@@ -822,6 +826,8 @@ func TestDevAuthVerifyToken(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
+			ja.AssertExpectations(t)
+			db.AssertExpectations(t)
 
 		})
 	}
