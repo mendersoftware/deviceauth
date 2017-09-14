@@ -509,6 +509,7 @@ func (d *DevAuth) VerifyToken(ctx context.Context, raw string) error {
 	}
 
 	if token.Claims.Device != true {
+		l.Errorf("not a device token")
 		return jwt.ErrTokenInvalid
 	}
 
