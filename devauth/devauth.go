@@ -372,8 +372,9 @@ func (d *DevAuth) DecommissionDevice(ctx context.Context, devId string) error {
 	if err := d.cOrch.SubmitDeviceDecommisioningJob(
 		ctx,
 		orchestrator.DecommissioningReq{
-			DeviceId:  devId,
-			RequestId: reqId,
+			DeviceId:      devId,
+			RequestId:     reqId,
+			Authorization: ctxhttpheader.FromContext(ctx, "Authorization"),
 		}); err != nil {
 		return errors.Wrap(err, "submit device decommissioning job error")
 	}

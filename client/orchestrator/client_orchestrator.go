@@ -40,6 +40,9 @@ type DecommissioningReq struct {
 	DeviceId string `json:"device_id"`
 	// Request ID
 	RequestId string `json:"request_id"`
+	// User authorization, eg. the value of Authorization header of incoming
+	// HTTP request
+	Authorization string `json:"authorization"`
 }
 
 // Config conveys client configuration
