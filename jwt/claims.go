@@ -27,6 +27,7 @@ type Claims struct {
 	Subject   string `json:"sub,omitempty"`
 	Scope     string `json:"scp,omitempty"`
 	Tenant    string `json:"mender.tenant,omitempty"`
+	Device    bool   `json:"mender.device,omitempty"`
 }
 
 // Valid checks if claims are valid. Returns error if validation fails.

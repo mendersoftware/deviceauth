@@ -58,6 +58,7 @@ class TestToken(ManagementClient):
         assert 'exp' in tclaims
         assert 'sub' in tclaims and tclaims['sub'] == devid
         assert 'iss' in tclaims and tclaims['iss'] == 'Mender'
+        assert 'mender.device' in tclaims and tclaims['mender.device'] == True
         # TODO: signature verification?
 
         # verify token; the token is to be placed in the Authorization header
