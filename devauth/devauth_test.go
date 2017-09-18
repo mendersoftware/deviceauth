@@ -29,6 +29,7 @@ import (
 	mdevadm "github.com/mendersoftware/deviceauth/client/deviceadm/mocks"
 	"github.com/mendersoftware/deviceauth/client/inventory"
 	minventory "github.com/mendersoftware/deviceauth/client/inventory/mocks"
+	"github.com/mendersoftware/deviceauth/client/orchestrator"
 	morchestrator "github.com/mendersoftware/deviceauth/client/orchestrator/mocks"
 	"github.com/mendersoftware/deviceauth/client/tenant"
 	mtenant "github.com/mendersoftware/deviceauth/client/tenant/mocks"
@@ -837,31 +838,39 @@ func TestDevAuthDecommissionDevice(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
-		dbUpdateDeviceErr                  error
-		dbDeleteAuthSetsForDeviceErr       error
-		dbDeleteTokenByDevIdErr            error
-		dbDeleteDeviceErr                  error
+		devId string
+
+		dbUpdateDeviceErr            error
+		dbDeleteAuthSetsForDeviceErr error
+		dbDeleteTokenByDevIdErr      error
+		dbDeleteDeviceErr            error
+
 		coSubmitDeviceDecommisioningJobErr error
 
 		outErr string
 	}{
 		{
+			devId:             "devId1",
 			dbUpdateDeviceErr: errors.New("UpdateDevice Error"),
 			outErr:            "UpdateDevice Error",
 		},
 		{
+			devId: "devId2",
 			dbDeleteAuthSetsForDeviceErr: errors.New("DeleteAuthSetsForDevice Error"),
 			outErr: "db delete device authorization sets error: DeleteAuthSetsForDevice Error",
 		},
 		{
+			devId: "devId3",
 			dbDeleteTokenByDevIdErr: errors.New("DeleteTokenByDevId Error"),
 			outErr:                  "db delete device tokens error: DeleteTokenByDevId Error",
 		},
 		{
+			devId:             "devId4",
 			dbUpdateDeviceErr: errors.New("DeleteDevice Error"),
 			outErr:            "DeleteDevice Error",
 		},
 		{
+			devId: "devId5",
 			coSubmitDeviceDecommisioningJobErr: errors.New("SubmitDeviceDecommisioningJob Error"),
 			outErr: "submit device decommissioning job error: SubmitDeviceDecommisioningJob Error",
 		},
@@ -873,22 +882,31 @@ func TestDevAuthDecommissionDevice(t *testing.T) {
 			t.Parallel()
 
 			co := morchestrator.ClientRunner{}
-			co.On("SubmitDeviceDecommisioningJob", context.Background(), mock.AnythingOfType("orchestrator.DecommissioningReq")).Return(
-				tc.coSubmitDeviceDecommisioningJobErr)
+			co.On("SubmitDeviceDecommisioningJob", context.Background(),
+				orchestrator.DecommissioningReq{
+					DeviceId: tc.devId,
+				}).
+				Return(tc.coSubmitDeviceDecommisioningJobErr)
+
 			db := mstore.DataStore{}
 			db.On("UpdateDevice", context.Background(),
-				mock.AnythingOfType("model.Device"),
-				mock.AnythingOfType("model.DeviceUpdate")).Return(
+				model.Device{Id: tc.devId},
+				model.DeviceUpdate{
+					Decommissioning: to.BoolPtr(true),
+				}).Return(
 				tc.dbUpdateDeviceErr)
-			db.On("DeleteAuthSetsForDevice", context.Background(), mock.AnythingOfType("string")).Return(
+			db.On("DeleteAuthSetsForDevice", context.Background(),
+				tc.devId).Return(
 				tc.dbDeleteAuthSetsForDeviceErr)
-			db.On("DeleteTokenByDevId", context.Background(), mock.AnythingOfType("string")).Return(
+			db.On("DeleteTokenByDevId", context.Background(),
+				tc.devId).Return(
 				tc.dbDeleteTokenByDevIdErr)
-			db.On("DeleteDevice", context.Background(), mock.AnythingOfType("string")).Return(
+			db.On("DeleteDevice", context.Background(),
+				tc.devId).Return(
 				tc.dbDeleteDeviceErr)
 
 			devauth := NewDevAuth(&db, nil, nil, &co, nil, Config{})
-			err := devauth.DecommissionDevice(context.Background(), "devId")
+			err := devauth.DecommissionDevice(context.Background(), tc.devId)
 
 			if tc.outErr != "" {
 				assert.EqualError(t, err, tc.outErr)
