@@ -17,6 +17,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"testing"
 
 	"github.com/Azure/go-autorest/autorest/to"
@@ -846,6 +847,7 @@ func TestDevAuthDecommissionDevice(t *testing.T) {
 		dbDeleteDeviceErr            error
 
 		coSubmitDeviceDecommisioningJobErr error
+		coAuthorization                    string
 
 		outErr string
 	}{
@@ -874,6 +876,10 @@ func TestDevAuthDecommissionDevice(t *testing.T) {
 			coSubmitDeviceDecommisioningJobErr: errors.New("SubmitDeviceDecommisioningJob Error"),
 			outErr: "submit device decommissioning job error: SubmitDeviceDecommisioningJob Error",
 		},
+		{
+			devId:           "devId6",
+			coAuthorization: "Bearer foobar",
+		},
 	}
 
 	for i := range testCases {
@@ -881,32 +887,41 @@ func TestDevAuthDecommissionDevice(t *testing.T) {
 		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
 			t.Parallel()
 
+			ctx := context.Background()
+
+			if tc.coAuthorization != "" {
+				ctx = ctxhttpheader.WithContext(ctx, http.Header{
+					"Authorization": []string{tc.coAuthorization},
+				}, "Authorization")
+			}
+
 			co := morchestrator.ClientRunner{}
-			co.On("SubmitDeviceDecommisioningJob", context.Background(),
+			co.On("SubmitDeviceDecommisioningJob", ctx,
 				orchestrator.DecommissioningReq{
-					DeviceId: tc.devId,
+					DeviceId:      tc.devId,
+					Authorization: tc.coAuthorization,
 				}).
 				Return(tc.coSubmitDeviceDecommisioningJobErr)
 
 			db := mstore.DataStore{}
-			db.On("UpdateDevice", context.Background(),
+			db.On("UpdateDevice", ctx,
 				model.Device{Id: tc.devId},
 				model.DeviceUpdate{
 					Decommissioning: to.BoolPtr(true),
 				}).Return(
 				tc.dbUpdateDeviceErr)
-			db.On("DeleteAuthSetsForDevice", context.Background(),
+			db.On("DeleteAuthSetsForDevice", ctx,
 				tc.devId).Return(
 				tc.dbDeleteAuthSetsForDeviceErr)
-			db.On("DeleteTokenByDevId", context.Background(),
+			db.On("DeleteTokenByDevId", ctx,
 				tc.devId).Return(
 				tc.dbDeleteTokenByDevIdErr)
-			db.On("DeleteDevice", context.Background(),
+			db.On("DeleteDevice", ctx,
 				tc.devId).Return(
 				tc.dbDeleteDeviceErr)
 
 			devauth := NewDevAuth(&db, nil, nil, &co, nil, Config{})
-			err := devauth.DecommissionDevice(context.Background(), tc.devId)
+			err := devauth.DecommissionDevice(ctx, tc.devId)
 
 			if tc.outErr != "" {
 				assert.EqualError(t, err, tc.outErr)
