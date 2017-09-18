@@ -167,6 +167,8 @@ class TestDevice(ManagementClient):
             assert dreq.get('device_id', None) == ourdev.id
             # test is enforcing particular request ID
             assert dreq.get('request_id', None) == 'delete_device'
+            # test is enforcing particular request ID
+            assert dreq.get('authorization', None) == 'Bearer foobar'
             return (200, {}, '')
 
         handlers = [
@@ -175,7 +177,10 @@ class TestDevice(ManagementClient):
         with mockserver.run_fake(get_fake_orchestrator_addr(),
                                  handlers=handlers) as server:
 
-            rsp = self.delete_device(ourdev.id, {'X-MEN-RequestID':'delete_device'})
+            rsp = self.delete_device(ourdev.id, {
+                'X-MEN-RequestID':'delete_device',
+                'Authorization': 'Bearer foobar',
+            })
             self.log.info('decommission request finished with status: %s',
                           rsp.status_code)
             assert rsp.status_code == 204
