@@ -484,10 +484,24 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 			t.Parallel()
 
 			db := mstore.DataStore{}
-			db.On("GetAuthSetById", context.Background(), "dummy_aid").Return(tc.aset, tc.dbGetErr)
+			db.On("GetAuthSetById",
+				context.Background(), "dummy_aid").Return(tc.aset, tc.dbGetErr)
 			if tc.aset != nil {
-				db.On("UpdateAuthSet", context.Background(), *tc.aset,
-					model.AuthSetUpdate{Status: model.DevStatusAccepted}).Return(tc.dbUpdateErr)
+				// for rejecting all auth sets
+				db.On("UpdateAuthSet", context.Background(),
+					model.AuthSet{
+						DeviceId: tc.aset.DeviceId,
+						Status:   model.DevStatusAccepted,
+					},
+					model.AuthSetUpdate{
+						Status: model.DevStatusRejected,
+					}).Return(nil)
+				// for accepting a single one
+				db.On("UpdateAuthSet", context.Background(),
+					*tc.aset,
+					model.AuthSetUpdate{
+						Status: model.DevStatusAccepted,
+					}).Return(tc.dbUpdateErr)
 			}
 
 			inv := minventory.ClientRunner{}
