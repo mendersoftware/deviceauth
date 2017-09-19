@@ -846,6 +846,14 @@ func TestUpdateAuthSetMultiple(t *testing.T) {
 	db := getDb(ctx)
 	defer db.session.Close()
 
+	// no authset raises an error
+	err := db.UpdateAuthSet(ctx, model.AuthSet{
+		DeviceId: "1",
+	}, model.AuthSetUpdate{
+		Status: model.DevStatusRejected,
+	})
+	assert.EqualError(t, err, store.ErrAuthSetNotFound.Error())
+
 	asin := model.AuthSet{
 		IdData:   "foobar",
 		DeviceId: "1",
@@ -859,7 +867,7 @@ func TestUpdateAuthSetMultiple(t *testing.T) {
 		assert.NoError(t, err)
 	}
 	// add another one that is pending
-	err := db.AddAuthSet(ctx, model.AuthSet{
+	err = db.AddAuthSet(ctx, model.AuthSet{
 		IdData:    "foobar",
 		PubKey:    "pubkey-5",
 		DeviceId:  "1",
