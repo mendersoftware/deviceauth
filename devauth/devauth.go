@@ -447,8 +447,8 @@ func (d *DevAuth) setAuthSetStatus(ctx context.Context, device_id string, auth_i
 			},
 			model.AuthSetUpdate{
 				Status: model.DevStatusRejected,
-			}); err != nil {
-			return err
+			}); err != nil && err != store.ErrAuthSetNotFound {
+			return errors.Wrap(err, "failed to reject auth sets")
 		}
 	}
 

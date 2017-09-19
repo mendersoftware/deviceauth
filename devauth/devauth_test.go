@@ -443,10 +443,11 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
-		aset        *model.AuthSet
-		dbUpdateErr error
-		dbGetErr    error
-		invErr      error
+		aset                      *model.AuthSet
+		dbUpdateErr               error
+		dbUpdateRevokeAuthSetsErr error
+		dbGetErr                  error
+		invErr                    error
 
 		outErr string
 	}{
@@ -476,6 +477,21 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 			invErr: errors.New("inventory failed"),
 			outErr: "inventory device add error: failed to add device to inventory: inventory failed",
 		},
+		{
+			aset: &model.AuthSet{
+				Id:       "dummy_aid",
+				DeviceId: "dummy_devid",
+			},
+			dbUpdateRevokeAuthSetsErr: store.ErrAuthSetNotFound,
+		},
+		{
+			aset: &model.AuthSet{
+				Id:       "dummy_aid",
+				DeviceId: "dummy_devid",
+			},
+			dbUpdateRevokeAuthSetsErr: errors.New("foobar"),
+			outErr: "failed to reject auth sets: foobar",
+		},
 	}
 
 	for idx := range testCases {
@@ -495,7 +511,7 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 					},
 					model.AuthSetUpdate{
 						Status: model.DevStatusRejected,
-					}).Return(nil)
+					}).Return(tc.dbUpdateRevokeAuthSetsErr)
 				// for accepting a single one
 				db.On("UpdateAuthSet", context.Background(),
 					*tc.aset,
