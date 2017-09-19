@@ -15,13 +15,12 @@ package main
 
 import (
 	"flag"
-	"io/ioutil"
 	"os"
 	"os/signal"
 	"strings"
 	"testing"
 
-	"github.com/mendersoftware/go-lib-micro/log"
+	tlog "github.com/mendersoftware/go-lib-micro/log/testing"
 )
 
 var runAcceptanceTests bool
@@ -31,9 +30,7 @@ var runAcceptanceTests bool
 var cliArgsRaw string
 
 func init() {
-	// disable logging thile running unit tests
-	// default application settup couses to mich noice
-	log.Log.Out = ioutil.Discard
+	tlog.MaybeDiscardLogs()
 
 	flag.BoolVar(&runAcceptanceTests, "acceptance-tests", false, "set flag when running acceptance tests")
 	flag.StringVar(&cliArgsRaw, "cli-args", "", "for passing urfave/cli args (single string) when golang flags are specified (avoids conflict)")
