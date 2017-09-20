@@ -175,6 +175,28 @@ paths:
           schema:
             $ref: '#/definitions/Error'
 
+  /limits/max_devices:
+    get:
+      summary: Obtain limit of accepted devices.
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          type: string
+          format: Bearer [token]
+          description: |
+            Contains the JWT token issued by the User Administration and
+            Authentication Service.
+      responses:
+        200:
+          description: Usage statistics and limits.
+          schema:
+            $ref: '#/definitions/Limit'
+        500:
+          description: Internal server error.
+          schema:
+            $ref: '#/definitions/Error'
+
 definitions:
   Status:
     description: Admission status of the device.
@@ -191,6 +213,17 @@ definitions:
     example:
       application/json:
           status: "accepted"
+  Limit:
+    description: Limit definition
+    type: object
+    properties:
+      limit:
+        type: integer
+    required:
+      - limit
+    example:
+      application/json:
+        limit: 123
   Device:
     type: object
     properties:
