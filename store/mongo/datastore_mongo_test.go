@@ -826,6 +826,99 @@ func TestStoreAuthSet(t *testing.T) {
 	asets, err = db.GetAuthSetsForDevice(ctx, "1")
 	assert.NoError(t, err)
 	assert.Len(t, asets, 2)
+
+	// update nonexistent auth set
+	err = db.UpdateAuthSet(ctx, model.AuthSet{Id: "1234"},
+		model.AuthSetUpdate{
+			Status: model.DevStatusAccepted,
+		})
+	assert.Error(t, err)
+}
+
+func TestUpdateAuthSetMultiple(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestGetDevices in short mode.")
+	}
+
+	ctx := identity.WithContext(context.Background(), &identity.Identity{
+		Tenant: "foo",
+	})
+	db := getDb(ctx)
+	defer db.session.Close()
+
+	// no authset raises an error
+	err := db.UpdateAuthSet(ctx, model.AuthSet{
+		DeviceId: "1",
+	}, model.AuthSetUpdate{
+		Status: model.DevStatusRejected,
+	})
+	assert.EqualError(t, err, store.ErrAuthSetNotFound.Error())
+
+	asin := model.AuthSet{
+		IdData:   "foobar",
+		DeviceId: "1",
+		Status:   model.DevStatusAccepted,
+	}
+	// add 5 auth sets, all with status 'accepted'
+	for i := 0; i < 5; i++ {
+		asin.PubKey = fmt.Sprintf("pubkey-%d", i)
+		asin.Timestamp = uto.TimePtr(time.Now())
+		err := db.AddAuthSet(ctx, asin)
+		assert.NoError(t, err)
+	}
+	// add another one that is pending
+	err = db.AddAuthSet(ctx, model.AuthSet{
+		IdData:    "foobar",
+		PubKey:    "pubkey-5",
+		DeviceId:  "1",
+		Status:    model.DevStatusPending,
+		Timestamp: uto.TimePtr(time.Now()),
+	})
+	assert.NoError(t, err)
+
+	// update all accepted to rejected in a single call
+	err = db.UpdateAuthSet(ctx, model.AuthSet{
+		DeviceId: "1",
+		Status:   model.DevStatusAccepted,
+	}, model.AuthSetUpdate{
+		Status: model.DevStatusRejected,
+	})
+	assert.NoError(t, err)
+
+	asets, err := db.GetAuthSetsForDevice(ctx, "1")
+	assert.NoError(t, err)
+	assert.Len(t, asets, 6)
+	for idx, aset := range asets {
+		if idx < 5 {
+			assert.Equal(t, model.DevStatusRejected, aset.Status)
+		} else {
+			// last one is pending
+			assert.Equal(t, model.DevStatusPending, aset.Status)
+		}
+	}
+
+	// update one but last authset to accepted
+	but_last := asets[len(asets)-2]
+	err = db.UpdateAuthSet(ctx, model.AuthSet{
+		Id: but_last.Id,
+	}, model.AuthSetUpdate{
+		Status: model.DevStatusAccepted,
+	})
+
+	// verify that all but last are
+	asets, err = db.GetAuthSetsForDevice(ctx, "1")
+	assert.NoError(t, err)
+	assert.Len(t, asets, 6)
+	for idx, aset := range asets {
+		if aset.Id == but_last.Id {
+			assert.Equal(t, model.DevStatusAccepted, aset.Status)
+		} else if idx < 5 {
+			assert.Equal(t, model.DevStatusRejected, aset.Status)
+		} else {
+			assert.Equal(t, model.DevStatusPending, aset.Status)
+		}
+	}
+
 }
 
 func TestStoreDeleteDevice(t *testing.T) {

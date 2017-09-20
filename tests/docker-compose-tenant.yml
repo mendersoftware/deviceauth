@@ -26,3 +26,4 @@ services:
                 DEVICEAUTH_TENANTADM_ADDR: "http://acceptance:9999/"
                 DEVICEAUTH_DEVADM_ADDR: "http://acceptance:9997/"
                 DEVICEAUTH_INVENTORY_ADDR: "http://acceptance:9996/"
+                TESTING_LOGS: "1"

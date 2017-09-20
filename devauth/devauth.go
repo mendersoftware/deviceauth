@@ -437,6 +437,21 @@ func (d *DevAuth) setAuthSetStatus(ctx context.Context, device_id string, auth_i
 		}
 	}
 
+	// if accepting an auth set
+	if status == model.DevStatusAccepted {
+		// reject all accepted auth sets for this device first
+		if err := d.db.UpdateAuthSet(ctx,
+			model.AuthSet{
+				DeviceId: device_id,
+				Status:   model.DevStatusAccepted,
+			},
+			model.AuthSetUpdate{
+				Status: model.DevStatusRejected,
+			}); err != nil && err != store.ErrAuthSetNotFound {
+			return errors.Wrap(err, "failed to reject auth sets")
+		}
+	}
+
 	if err := d.db.UpdateAuthSet(ctx, *aset, model.AuthSetUpdate{
 		Status: status,
 	}); err != nil {

@@ -470,9 +470,11 @@ func (db *DataStoreMongo) UpdateAuthSet(ctx context.Context, orig model.AuthSet,
 
 	c := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbAuthSetColl)
 
-	err := c.Update(orig, bson.M{"$set": mod})
+	ci, err := c.UpdateAll(orig, bson.M{"$set": mod})
 	if err != nil {
 		return errors.Wrap(err, "failed to update auth set")
+	} else if ci.Updated == 0 {
+		return store.ErrAuthSetNotFound
 	}
 
 	return nil
