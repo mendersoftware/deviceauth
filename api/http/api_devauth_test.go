@@ -798,3 +798,73 @@ func TestApiDevAuthPutTenantLimit(t *testing.T) {
 		})
 	}
 }
+
+func TestApiDevAuthGetLimit(t *testing.T) {
+	t.Parallel()
+
+	// enforce specific field naming in errors returned by API
+	updateRestErrorFieldName()
+
+	tcases := []struct {
+		limit string
+
+		daLimit *model.Limit
+		daErr   error
+
+		code int
+		body string
+	}{
+		{
+			limit: "max_devices",
+
+			daLimit: &model.Limit{
+				Name:  model.LimitMaxDeviceCount,
+				Value: 123,
+			},
+			daErr: nil,
+
+			code: http.StatusOK,
+			body: string(asJSON(
+				model.Limit{
+					Name:  model.LimitMaxDeviceCount,
+					Value: 123,
+				},
+			)),
+		},
+		{
+			limit: "bogus",
+
+			code: http.StatusBadRequest,
+			body: RestError("unsupported limit bogus"),
+		},
+		{
+			limit: "max_devices",
+
+			daLimit: nil,
+			daErr:   errors.New("generic error"),
+
+			code: http.StatusInternalServerError,
+			body: RestError("internal error"),
+		},
+	}
+
+	for i := range tcases {
+		tc := tcases[i]
+		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			t.Parallel()
+
+			req := test.MakeSimpleRequest("GET",
+				"http://1.2.3.4/api/management/v1/devauth/limits/"+tc.limit,
+				nil)
+
+			da := &mocks.App{}
+			da.On("GetLimit",
+				context.Background(),
+				tc.limit).
+				Return(tc.daLimit, tc.daErr)
+
+			apih := makeMockApiHandler(t, da)
+			runTestRequest(t, apih, req, tc.code, tc.body)
+		})
+	}
+}
