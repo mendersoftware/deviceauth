@@ -1071,3 +1071,127 @@ func TestStoreDeleteAuthSetsForDevice(t *testing.T) {
 		})
 	}
 }
+
+func TestPutLimit(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestStoreDeleteAuthSetsForDevice in short mode.")
+	}
+
+	lim1 := model.Limit{
+		Name:  "foo",
+		Value: 123,
+	}
+	lim2 := model.Limit{
+		Name:  "bar",
+		Value: 456,
+	}
+
+	dbCtx := identity.WithContext(context.Background(), &identity.Identity{
+		Tenant: tenant,
+	})
+	db := getDb(dbCtx)
+	defer db.session.Close()
+	s := db.session.Copy()
+	defer s.Close()
+
+	coll := s.DB(ctxstore.DbFromContext(dbCtx, DbName)).C(DbLimitsColl)
+	assert.NoError(t, coll.Insert(lim1, lim2))
+
+	dbCtxOtherTenant := identity.WithContext(context.Background(), &identity.Identity{
+		Tenant: "other-" + tenant,
+	})
+	collOtherTenant := s.DB(ctxstore.DbFromContext(dbCtxOtherTenant,
+		DbName)).C(DbLimitsColl)
+	assert.NoError(t, collOtherTenant.Insert(lim1, lim2))
+
+	var lim model.Limit
+
+	assert.NoError(t, coll.FindId("foo").One(&lim))
+
+	// empty limit name
+	err := db.PutLimit(dbCtx, model.Limit{Name: "", Value: 123})
+	assert.Error(t, err)
+
+	// update
+	err = db.PutLimit(dbCtx, model.Limit{Name: "foo", Value: 999})
+	assert.NoError(t, err)
+	assert.NoError(t, coll.FindId("foo").One(&lim))
+	assert.EqualValues(t, model.Limit{Name: "foo", Value: 999}, lim)
+
+	// insert
+	err = db.PutLimit(dbCtx, model.Limit{Name: "baz", Value: 9809899990})
+	assert.NoError(t, err)
+	assert.NoError(t, coll.FindId("baz").One(&lim))
+	assert.EqualValues(t, model.Limit{Name: "baz", Value: 9809899990}, lim)
+
+	// switch tenants
+
+	// the other-tenant limit 'foo' was not modified
+	assert.NoError(t, collOtherTenant.FindId("foo").One(&lim))
+	assert.EqualValues(t, lim1, lim)
+
+	// update
+	err = db.PutLimit(dbCtxOtherTenant, model.Limit{Name: "bar", Value: 1234})
+	assert.NoError(t, err)
+	assert.NoError(t, collOtherTenant.FindId("bar").One(&lim))
+	assert.EqualValues(t, model.Limit{Name: "bar", Value: 1234}, lim)
+	// original tenant is unmodified
+	assert.NoError(t, coll.FindId("bar").One(&lim))
+	assert.EqualValues(t, lim2, lim)
+
+}
+
+func TestGetLimit(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestStoreDeleteAuthSetsForDevice in short mode.")
+	}
+
+	lim1 := model.Limit{
+		Name:  "foo",
+		Value: 123,
+	}
+	lim2 := model.Limit{
+		Name:  "bar",
+		Value: 456,
+	}
+	lim3OtherTenant := model.Limit{
+		Name:  "bar",
+		Value: 920,
+	}
+
+	dbCtx := identity.WithContext(context.Background(), &identity.Identity{
+		Tenant: tenant,
+	})
+	db := getDb(dbCtx)
+	defer db.session.Close()
+	s := db.session.Copy()
+	defer s.Close()
+
+	coll := s.DB(ctxstore.DbFromContext(dbCtx, DbName)).C(DbLimitsColl)
+	assert.NoError(t, coll.Insert(lim1, lim2))
+
+	dbCtxOtherTenant := identity.WithContext(context.Background(), &identity.Identity{
+		Tenant: "other-" + tenant,
+	})
+	collOtherTenant := s.DB(ctxstore.DbFromContext(dbCtxOtherTenant,
+		DbName)).C(DbLimitsColl)
+	assert.NoError(t, collOtherTenant.Insert(lim3OtherTenant))
+
+	// check if value is fetched correctly
+	lim, err := db.GetLimit(dbCtx, "foo")
+	assert.NoError(t, err)
+	assert.EqualValues(t, lim1, *lim)
+
+	// try with something that does not exist
+	lim, err = db.GetLimit(dbCtx, "nonexistent-foo")
+	assert.EqualError(t, err, store.ErrLimitNotFound.Error())
+	assert.Nil(t, lim)
+
+	// switch tenants
+	lim, err = db.GetLimit(dbCtxOtherTenant, "foo")
+	assert.EqualError(t, err, store.ErrLimitNotFound.Error())
+
+	lim, err = db.GetLimit(dbCtxOtherTenant, "bar")
+	assert.NoError(t, err)
+	assert.EqualValues(t, lim3OtherTenant, *lim)
+}
