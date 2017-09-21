@@ -38,7 +38,77 @@ paths:
             description: Unexpected error.
             schema:
               $ref: '#/definitions/Error'
+  /tenant/{tenant_id}/limits/max-device-count:
+    get:
+      summary: Max device count limit
+      parameters:
+        - name: tenant_id
+          in: path
+          type: string
+          description: Tenant ID.
+          required: true
+      responses:
+        200:
+          description: Successful response.
+          schema:
+            title: MaxDeviceCountLimit
+            schema:
+              $ref: "#/definitions/Limit"
+            example:
+              application/json:
+                - limit: "10"
+        400:
+          description: |
+            Invalid parameters. See error message for details.
+          schema:
+            $ref: "#/definitions/Error"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/Error"
+    put:
+      summary: Update max device count limit
+      parameters:
+        - name: tenant_id
+          in: path
+          type: string
+          description: Tenant ID.
+          required: true
+        - name: limit
+          in: body
+          required: true
+          schema:
+            $ref: "#/definitions/Limit"
+      responses:
+        204:
+          description: Limit information updated.
+        400:
+          description: |
+              The request body is malformed.
+          schema:
+            $ref: "#/definitions/Error"
+        404:
+          description: |
+                The tenant does not exist.
+          schema:
+            $ref: '#/definitions/Error'
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/Error"
+
 definitions:
+  Limit:
+    description: Tenant account limit.
+    type: object
+    properties:
+      limit:
+        type: integer
+    required:
+      - limit
+    example:
+      application/json:
+        limit: 123
   Error:
     description: Error descriptor.
     type: object
