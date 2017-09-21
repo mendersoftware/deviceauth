@@ -1019,3 +1019,67 @@ func TestDevAuthSetTenantLimit(t *testing.T) {
 		})
 	}
 }
+
+func TestDevAuthGetLimit(t *testing.T) {
+	t.Parallel()
+
+	testCases := map[string]struct {
+		inName string
+
+		dbLimit *model.Limit
+		dbErr   error
+
+		outLimit *model.Limit
+		outErr   error
+	}{
+		"ok": {
+			inName: "max_devices",
+
+			dbLimit: &model.Limit{Name: "max_devices", Value: 123},
+			dbErr:   nil,
+
+			outLimit: &model.Limit{Name: "max_devices", Value: 123},
+			outErr:   nil,
+		},
+		"limit not found": {
+			inName: "max_devices",
+
+			dbLimit: nil,
+			dbErr:   store.ErrLimitNotFound,
+
+			outLimit: &model.Limit{Name: "max_devices", Value: 0},
+			outErr:   nil,
+		},
+		"generic error": {
+			inName: "max_devices",
+
+			dbLimit: nil,
+			dbErr:   errors.New("db error"),
+
+			outLimit: nil,
+			outErr:   errors.New("db error"),
+		},
+	}
+
+	for i := range testCases {
+		tc := testCases[i]
+		t.Run(fmt.Sprintf("tc %s", i), func(t *testing.T) {
+			t.Parallel()
+
+			ctx := context.Background()
+
+			db := mstore.DataStore{}
+			db.On("GetLimit", ctx, tc.inName).Return(tc.dbLimit, tc.dbErr)
+
+			devauth := NewDevAuth(&db, nil, nil, nil, nil, Config{})
+			limit, err := devauth.GetLimit(ctx, tc.inName)
+
+			if tc.outErr != nil {
+				assert.EqualError(t, err, tc.outErr.Error())
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, *tc.outLimit, *limit)
+			}
+		})
+	}
+}
