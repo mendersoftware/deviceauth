@@ -338,6 +338,13 @@ func (d *DevAuthApiHandlers) PutTenantLimitHandler(w rest.ResponseWriter, r *res
 	tenantId := r.PathParam("id")
 	reqLimitName := r.PathParam("name")
 
+	if !model.IsValidLimit(reqLimitName) {
+		rest_utils.RestErrWithLog(w, r, l,
+			errors.Errorf("unsupported limit %v", reqLimitName),
+			http.StatusBadRequest)
+		return
+	}
+
 	var value LimitValue
 	err := r.DecodeJsonPayload(&value)
 	if err != nil {
@@ -348,17 +355,7 @@ func (d *DevAuthApiHandlers) PutTenantLimitHandler(w rest.ResponseWriter, r *res
 
 	limit := model.Limit{
 		Value: value.Limit,
-	}
-
-	if reqLimitName == "max-device-count" {
-		limit.Name = model.LimitMaxDeviceCount
-	}
-
-	if limit.Name == "" {
-		rest_utils.RestErrWithLog(w, r, l,
-			errors.Errorf("unsupported limit %v", reqLimitName),
-			http.StatusBadRequest)
-		return
+		Name:  reqLimitName,
 	}
 
 	if err := d.devAuth.SetTenantLimit(ctx, tenantId, limit); err != nil {

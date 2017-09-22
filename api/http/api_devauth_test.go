@@ -740,7 +740,7 @@ func TestApiDevAuthPutTenantLimit(t *testing.T) {
 	}{
 		{
 			req: test.MakeSimpleRequest("PUT",
-				"http://1.2.3.4/api/internal/v1/devauth/tenant/foo/limits/max-device-count",
+				"http://1.2.3.4/api/internal/v1/devauth/tenant/foo/limits/max_devices",
 				map[string]int{
 					"limit": 123,
 				}),
@@ -753,7 +753,7 @@ func TestApiDevAuthPutTenantLimit(t *testing.T) {
 		},
 		{
 			req: test.MakeSimpleRequest("PUT",
-				"http://1.2.3.4/api/internal/v1/devauth/tenant/foo/limits/max-device-count",
+				"http://1.2.3.4/api/internal/v1/devauth/tenant/foo/limits/max_devices",
 				[]string{"garbage"}),
 			code: http.StatusBadRequest,
 			body: RestError("failed to decode limit request: json: cannot unmarshal array into Go value of type http.LimitValue"),
@@ -769,7 +769,7 @@ func TestApiDevAuthPutTenantLimit(t *testing.T) {
 		},
 		{
 			req: test.MakeSimpleRequest("PUT",
-				"http://1.2.3.4/api/internal/v1/devauth/tenant/foo/limits/max-device-count",
+				"http://1.2.3.4/api/internal/v1/devauth/tenant/foo/limits/max_devices",
 				map[string]int{
 					"limit": 123,
 				}),
