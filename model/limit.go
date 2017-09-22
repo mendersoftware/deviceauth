@@ -14,7 +14,11 @@
 package model
 
 const (
-	LimitMaxDeviceCount = "max_device_count"
+	LimitMaxDeviceCount = "max_devices"
+)
+
+var (
+	ValidLimits = []string{LimitMaxDeviceCount}
 )
 
 type Limit struct {
@@ -24,4 +28,13 @@ type Limit struct {
 
 func (l Limit) IsLess(what uint64) bool {
 	return what < l.Value
+}
+
+func IsValidLimit(name string) bool {
+	for _, n := range ValidLimits {
+		if name == n {
+			return true
+		}
+	}
+	return false
 }
