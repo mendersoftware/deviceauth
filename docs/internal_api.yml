@@ -38,7 +38,7 @@ paths:
             description: Unexpected error.
             schema:
               $ref: '#/definitions/Error'
-  /tenant/{tenant_id}/limits/max-device-count:
+  /tenant/{tenant_id}/limits/max_devices:
     get:
       summary: Max device count limit
       parameters:
