@@ -16,9 +16,9 @@ paths:
     post:
      summary: Check the validity of a token
      description: |
-        Besides the basic validity check, checks the token expiration time and user-initiated token revocation.
-
-        Services which intend to use it should be correctly set up in the gateway's configuration.
+        Besides the basic validity check, checks the token expiration time and
+        user-initiated token revocation. Services which intend to use it should
+        be correctly set up in the gateway\'s configuration.
      parameters:
        - name: Authorization
          in: header
