@@ -28,6 +28,8 @@ var (
 	ErrTokenNotFound = errors.New("token not found")
 	// authorization set not found
 	ErrAuthSetNotFound = errors.New("authorization set not found")
+	// limit  set not found
+	ErrLimitNotFound = errors.New("limit not found")
 	// device already exists
 	ErrObjectExists = errors.New("object exists")
 )
@@ -78,4 +80,10 @@ type DataStore interface {
 
 	// deletes device token
 	DeleteTokenByDevId(ctx context.Context, dev_id string) error
+
+	// put limit information into data store
+	PutLimit(ctx context.Context, lim model.Limit) error
+
+	// fetch limit information from data store
+	GetLimit(ctx context.Context, name string) (*model.Limit, error)
 }

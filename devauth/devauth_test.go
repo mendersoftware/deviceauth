@@ -961,3 +961,61 @@ func TestDevAuthDecommissionDevice(t *testing.T) {
 		})
 	}
 }
+
+func TestDevAuthSetTenantLimit(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		tenantId string
+
+		dbPutLimitErr error
+		limit         model.Limit
+
+		outErr string
+	}{
+		{
+			tenantId:      "tenant1",
+			dbPutLimitErr: errors.New("PutLimit error"),
+			outErr:        "failed to save limit {foobar 1234} for tenant tenant1 to database: PutLimit error",
+			limit: model.Limit{
+				Name:  "foobar",
+				Value: 1234,
+			},
+		},
+		{
+			tenantId: "tenant2",
+			limit: model.Limit{
+				Name:  "foobar2",
+				Value: 9999999,
+			},
+		},
+	}
+
+	for i := range testCases {
+		tc := testCases[i]
+		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			t.Parallel()
+
+			ctx := context.Background()
+
+			db := mstore.DataStore{}
+			db.On("PutLimit",
+				mock.MatchedBy(func(ctx context.Context) bool {
+					ident := identity.FromContext(ctx)
+					return assert.NotNil(t, ident) &&
+						assert.Equal(t, tc.tenantId, ident.Tenant)
+				}),
+				tc.limit).
+				Return(tc.dbPutLimitErr)
+
+			devauth := NewDevAuth(&db, nil, nil, nil, nil, Config{})
+			err := devauth.SetTenantLimit(ctx, tc.tenantId, tc.limit)
+
+			if tc.outErr != "" {
+				assert.EqualError(t, err, tc.outErr)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}

@@ -39,6 +39,7 @@ const (
 	DbDevicesColl = "devices"
 	DbAuthSetColl = "auth_sets"
 	DbTokensColl  = "tokens"
+	DbLimitsColl  = "limits"
 
 	indexDevices_IdentityData                 = "devices:IdentityData"
 	indexAuthSet_DeviceId_IdentityData_PubKey = "auth_sets:DeviceId:IdData:PubKey"
@@ -538,4 +539,40 @@ func (db *DataStoreMongo) EnsureIndexes(ctx context.Context, s *mgo.Session) err
 		Name:       indexAuthSet_DeviceId_IdentityData_PubKey,
 		Background: false,
 	})
+}
+
+func (db *DataStoreMongo) PutLimit(ctx context.Context, lim model.Limit) error {
+	if lim.Name == "" {
+		return errors.New("empty limit name")
+	}
+
+	s := db.session.Copy()
+	defer s.Close()
+
+	c := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbLimitsColl)
+
+	_, err := c.UpsertId(lim.Name, lim)
+	if err != nil {
+		return errors.Wrap(err, "failed to set or update limit")
+	}
+
+	return nil
+}
+
+func (db *DataStoreMongo) GetLimit(ctx context.Context, name string) (*model.Limit, error) {
+	s := db.session.Copy()
+	defer s.Close()
+
+	c := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbLimitsColl)
+
+	var lim model.Limit
+	err := c.FindId(name).One(&lim)
+	if err != nil {
+		if err == mgo.ErrNotFound {
+			return nil, store.ErrLimitNotFound
+		}
+		return nil, errors.Wrap(err, "failed to update auth set")
+	}
+
+	return &lim, nil
 }

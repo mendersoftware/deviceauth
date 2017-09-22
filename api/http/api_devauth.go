@@ -40,6 +40,7 @@ const (
 
 	// internal API
 	uriTokenVerify = "/api/internal/v1/devauth/tokens/verify"
+	uriTenantLimit = "/api/internal/v1/devauth/tenant/:id/limits/:name"
 
 	HdrAuthReqSign = "X-MEN-Signature"
 )
@@ -78,6 +79,8 @@ func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
 		rest.Post(uriTokenVerify, d.VerifyTokenHandler),
 
 		rest.Put(uriDeviceStatus, d.UpdateDeviceStatusHandler),
+
+		rest.Put(uriTenantLimit, d.PutTenantLimitHandler),
 	}
 
 	app, err := rest.MakeRouter(
@@ -317,6 +320,49 @@ func (d *DevAuthApiHandlers) UpdateDeviceStatusHandler(w rest.ResponseWriter, r 
 		default:
 			rest_utils.RestErrWithLogInternal(w, r, l, err)
 		}
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+type LimitValue struct {
+	Limit uint64 `json:"limit"`
+}
+
+func (d *DevAuthApiHandlers) PutTenantLimitHandler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+
+	l := log.FromContext(ctx)
+
+	tenantId := r.PathParam("id")
+	reqLimitName := r.PathParam("name")
+
+	var value LimitValue
+	err := r.DecodeJsonPayload(&value)
+	if err != nil {
+		err = errors.Wrap(err, "failed to decode limit request")
+		rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		return
+	}
+
+	limit := model.Limit{
+		Value: value.Limit,
+	}
+
+	if reqLimitName == "max-device-count" {
+		limit.Name = model.LimitMaxDeviceCount
+	}
+
+	if limit.Name == "" {
+		rest_utils.RestErrWithLog(w, r, l,
+			errors.Errorf("unsupported limit %v", reqLimitName),
+			http.StatusBadRequest)
+		return
+	}
+
+	if err := d.devAuth.SetTenantLimit(ctx, tenantId, limit); err != nil {
+		rest_utils.RestErrWithLogInternal(w, r, l, err)
 		return
 	}
 

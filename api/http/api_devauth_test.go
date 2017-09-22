@@ -723,3 +723,78 @@ func TestApiDevAuthDecommissionDevice(t *testing.T) {
 		})
 	}
 }
+
+func TestApiDevAuthPutTenantLimit(t *testing.T) {
+	t.Parallel()
+
+	// enforce specific field naming in errors returned by API
+	updateRestErrorFieldName()
+
+	tcases := []struct {
+		req    *http.Request
+		code   int
+		body   string
+		tenant string
+		limit  model.Limit
+		err    error
+	}{
+		{
+			req: test.MakeSimpleRequest("PUT",
+				"http://1.2.3.4/api/internal/v1/devauth/tenant/foo/limits/max-device-count",
+				map[string]int{
+					"limit": 123,
+				}),
+			limit: model.Limit{
+				Name:  model.LimitMaxDeviceCount,
+				Value: 123,
+			},
+			tenant: "foo",
+			code:   http.StatusNoContent,
+		},
+		{
+			req: test.MakeSimpleRequest("PUT",
+				"http://1.2.3.4/api/internal/v1/devauth/tenant/foo/limits/max-device-count",
+				[]string{"garbage"}),
+			code: http.StatusBadRequest,
+			body: RestError("failed to decode limit request: json: cannot unmarshal array into Go value of type http.LimitValue"),
+		},
+		{
+			req: test.MakeSimpleRequest("PUT",
+				"http://1.2.3.4/api/internal/v1/devauth/tenant/foo/limits/bogus-limit",
+				map[string]int{
+					"limit": 123,
+				}),
+			code: http.StatusBadRequest,
+			body: RestError("unsupported limit bogus-limit"),
+		},
+		{
+			req: test.MakeSimpleRequest("PUT",
+				"http://1.2.3.4/api/internal/v1/devauth/tenant/foo/limits/max-device-count",
+				map[string]int{
+					"limit": 123,
+				}),
+			tenant: "foo",
+			limit:  model.Limit{Name: model.LimitMaxDeviceCount, Value: 123},
+			code:   http.StatusInternalServerError,
+			err:    errors.New("failed"),
+			body:   RestError("internal error"),
+		},
+	}
+
+	for i := range tcases {
+		tc := tcases[i]
+		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			t.Parallel()
+
+			da := &mocks.App{}
+			da.On("SetTenantLimit",
+				context.Background(),
+				tc.tenant,
+				tc.limit).
+				Return(tc.err)
+
+			apih := makeMockApiHandler(t, da)
+			runTestRequest(t, apih, tc.req, tc.code, tc.body)
+		})
+	}
+}
