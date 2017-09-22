@@ -561,6 +561,27 @@ func TestStoreDeleteTokenByDevId(t *testing.T) {
 	}
 }
 
+func verifyIndexes(t *testing.T, coll *mgo.Collection, expected []mgo.Index) {
+	idxs, err := coll.Indexes()
+	assert.NoError(t, err)
+
+	assert.Len(t, idxs, 1+len(expected))
+	for _, expectedIdx := range expected {
+		t.Logf("looking for: %+v", expectedIdx)
+		found := false
+		for _, idx := range idxs {
+			t.Logf("index: %+v", idx)
+			if idx.Name == expectedIdx.Name {
+				t.Logf("found same index, comparing")
+				found = true
+				assert.EqualValues(t, expectedIdx, idx)
+				break
+			}
+		}
+		assert.True(t, found, "index %v was not found", expectedIdx)
+	}
+}
+
 func TestStoreMigrate(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping TestMigrate in short mode.")
@@ -643,6 +664,26 @@ func TestStoreMigrate(t *testing.T) {
 						// the last migration should match what we want
 						v, _ := migrate.NewVersion(tc.version)
 						assert.Equal(t, *v, out[len(out)-1].Version)
+
+						// verify that all indexes are created
+						verifyIndexes(t, db.session.DB(d).C(DbDevicesColl),
+							[]mgo.Index{{
+								Unique:     true,
+								Key:        []string{model.DevKeyIdData},
+								Name:       indexDevices_IdentityData,
+								Background: false,
+							}})
+						verifyIndexes(t, db.session.DB(d).C(DbAuthSetColl),
+							[]mgo.Index{{
+								Unique: true,
+								Key: []string{
+									model.AuthSetKeyDeviceId,
+									model.AuthSetKeyIdData,
+									model.AuthSetKeyPubKey,
+								},
+								Name:       indexAuthSet_DeviceId_IdentityData_PubKey,
+								Background: false,
+							}})
 					}
 				}
 
