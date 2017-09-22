@@ -87,11 +87,6 @@ paths:
               The request body is malformed.
           schema:
             $ref: "#/definitions/Error"
-        404:
-          description: |
-                The tenant does not exist.
-          schema:
-            $ref: '#/definitions/Error'
         500:
           description: Internal server error.
           schema:
