@@ -70,6 +70,8 @@ type App interface {
 
 	RevokeToken(ctx context.Context, token_id string) error
 	VerifyToken(ctx context.Context, token string) error
+
+	SetTenantLimit(ctx context.Context, tenant_id string, limit model.Limit) error
 }
 
 type DevAuth struct {
@@ -578,4 +580,22 @@ func (d *DevAuth) WithTenantVerification(c tenant.ClientRunner) *DevAuth {
 	d.cTenant = c
 	d.verifyTenant = true
 	return d
+}
+
+func (d *DevAuth) SetTenantLimit(ctx context.Context, tenant_id string, limit model.Limit) error {
+	l := log.FromContext(ctx)
+
+	ctx = identity.WithContext(ctx, &identity.Identity{
+		Tenant: tenant_id,
+	})
+
+	l.Infof("setting limit %v for tenant %v", limit, tenant_id)
+
+	if err := d.db.PutLimit(ctx, limit); err != nil {
+		l.Errorf("failed to save limit %v for tenant %v to database: %v",
+			limit, tenant_id, err)
+		return errors.Wrapf(err, "failed to save limit %v for tenant %v to database",
+			limit, tenant_id)
+	}
+	return nil
 }

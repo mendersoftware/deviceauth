@@ -162,6 +162,20 @@ func (_m *App) RevokeToken(ctx context.Context, token_id string) error {
 	return r0
 }
 
+// SetTenantLimit provides a mock function with given fields: ctx, tenant_id, limit
+func (_m *App) SetTenantLimit(ctx context.Context, tenant_id string, limit model.Limit) error {
+	ret := _m.Called(ctx, tenant_id, limit)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, model.Limit) error); ok {
+		r0 = rf(ctx, tenant_id, limit)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // SubmitAuthRequest provides a mock function with given fields: ctx, r
 func (_m *App) SubmitAuthRequest(ctx context.Context, r *model.AuthReq) (string, error) {
 	ret := _m.Called(ctx, r)
