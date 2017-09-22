@@ -54,3 +54,12 @@ func TestIsTenantDb(t *testing.T) {
 	assert.False(t, matcher("servicedbtenant1"))
 
 }
+
+func TestTenantFromDbName(t *testing.T) {
+
+	assert.Equal(t, "tenant1", TenantFromDbName("ser-vice_dev-adm-tenant1", "ser-vice_dev-adm"))
+	assert.Equal(t, "", TenantFromDbName("-tenant1", "service_devadm"))
+	assert.Equal(t, "", TenantFromDbName("service_devadm", "service_devadm"))
+	assert.Equal(t, "198273913adsjhakdh",
+		TenantFromDbName("123__--afff-198273913adsjhakdh", "123__--afff"))
+}

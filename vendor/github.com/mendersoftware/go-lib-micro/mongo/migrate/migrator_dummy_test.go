@@ -15,6 +15,7 @@ package migrate_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -29,22 +30,49 @@ func TestDummyMigratorApply(t *testing.T) {
 	}
 
 	testCases := map[string]struct {
-		InputMigration *MigrationEntry
-		InputVersion   Version
+		Automigrate     bool
+		InputMigrations []*MigrationEntry
+		InputVersion    Version
 
 		OutputVersion Version
+		OutputError   error
 	}{
-		"ok - empty state": {
-			InputMigration: nil,
-			InputVersion:   Version{Major: 1, Minor: 0, Patch: 0},
+		"ok - empty state, automigrate": {
+			Automigrate:     true,
+			InputMigrations: []*MigrationEntry{},
+			InputVersion:    Version{Major: 1, Minor: 0, Patch: 0},
 
 			OutputVersion: Version{Major: 1, Minor: 0, Patch: 0},
 		},
 
-		"ok - already has version": {
-			InputMigration: &MigrationEntry{
-				Version:   Version{Major: 1, Minor: 0, Patch: 0},
-				Timestamp: time.Now(),
+		"ok - already has version, automigrate": {
+			Automigrate: true,
+			InputMigrations: []*MigrationEntry{
+				&MigrationEntry{
+					Version:   Version{Major: 1, Minor: 0, Patch: 0},
+					Timestamp: time.Now(),
+				},
+			},
+			InputVersion:  Version{Major: 1, Minor: 0, Patch: 0},
+			OutputVersion: Version{Major: 1, Minor: 0, Patch: 0},
+		},
+
+		"ok - empty state, no automigrate": {
+			Automigrate:     false,
+			InputMigrations: []*MigrationEntry{},
+			InputVersion:    Version{Major: 1, Minor: 0, Patch: 0},
+
+			OutputVersion: Version{Major: 0, Minor: 0, Patch: 0},
+			OutputError:   errors.New("db needs migration: test has version 0.0.0, needs version 1.0.0"),
+		},
+
+		"ok - already has version, no automigrate": {
+			Automigrate: false,
+			InputMigrations: []*MigrationEntry{
+				&MigrationEntry{
+					Version:   Version{Major: 1, Minor: 0, Patch: 0},
+					Timestamp: time.Now(),
+				},
 			},
 			InputVersion:  Version{Major: 1, Minor: 0, Patch: 0},
 			OutputVersion: Version{Major: 1, Minor: 0, Patch: 0},
@@ -57,20 +85,24 @@ func TestDummyMigratorApply(t *testing.T) {
 		//setup
 		db.Wipe()
 		session := db.Session()
-		if tc.InputMigration != nil {
-			err := session.DB("test").C(DbMigrationsColl).Insert(tc.InputMigration)
+		for _, m := range tc.InputMigrations {
+			err := session.DB("test").C(DbMigrationsColl).Insert(m)
 			assert.NoError(t, err)
 		}
 
 		//test
-		m := &DummyMigrator{Session: session, Db: "test"}
+		m := &DummyMigrator{Session: session, Db: "test", Automigrate: tc.Automigrate}
 		m.Apply(context.Background(), tc.InputVersion, nil)
 
 		//verify
 		var out []MigrationEntry
 		session.DB("test").C(DbMigrationsColl).Find(nil).All(&out)
-		assert.Len(t, out, 1)
-		assert.Equal(t, tc.OutputVersion, out[0].Version)
+		if tc.Automigrate {
+			assert.Len(t, out, 1)
+			assert.Equal(t, tc.OutputVersion, out[0].Version)
+		} else {
+			assert.Len(t, out, len(tc.InputMigrations))
+		}
 		session.Close()
 	}
 }
