@@ -37,6 +37,7 @@ const (
 	uriDevice       = "/api/management/v1/devauth/devices/:id"
 	uriToken        = "/api/management/v1/devauth/tokens/:id"
 	uriDeviceStatus = "/api/management/v1/devauth/devices/:id/auth/:aid/status"
+	uriLimit        = "/api/management/v1/devauth/limits/:name"
 
 	// internal API
 	uriTokenVerify = "/api/internal/v1/devauth/tokens/verify"
@@ -81,6 +82,8 @@ func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
 		rest.Put(uriDeviceStatus, d.UpdateDeviceStatusHandler),
 
 		rest.Put(uriTenantLimit, d.PutTenantLimitHandler),
+
+		rest.Get(uriLimit, d.GetLimit),
 	}
 
 	app, err := rest.MakeRouter(
@@ -338,6 +341,13 @@ func (d *DevAuthApiHandlers) PutTenantLimitHandler(w rest.ResponseWriter, r *res
 	tenantId := r.PathParam("id")
 	reqLimitName := r.PathParam("name")
 
+	if !model.IsValidLimit(reqLimitName) {
+		rest_utils.RestErrWithLog(w, r, l,
+			errors.Errorf("unsupported limit %v", reqLimitName),
+			http.StatusBadRequest)
+		return
+	}
+
 	var value LimitValue
 	err := r.DecodeJsonPayload(&value)
 	if err != nil {
@@ -348,17 +358,7 @@ func (d *DevAuthApiHandlers) PutTenantLimitHandler(w rest.ResponseWriter, r *res
 
 	limit := model.Limit{
 		Value: value.Limit,
-	}
-
-	if reqLimitName == "max-device-count" {
-		limit.Name = model.LimitMaxDeviceCount
-	}
-
-	if limit.Name == "" {
-		rest_utils.RestErrWithLog(w, r, l,
-			errors.Errorf("unsupported limit %v", reqLimitName),
-			http.StatusBadRequest)
-		return
+		Name:  reqLimitName,
 	}
 
 	if err := d.devAuth.SetTenantLimit(ctx, tenantId, limit); err != nil {
@@ -367,6 +367,29 @@ func (d *DevAuthApiHandlers) PutTenantLimitHandler(w rest.ResponseWriter, r *res
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (d *DevAuthApiHandlers) GetLimit(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+
+	l := log.FromContext(ctx)
+
+	name := r.PathParam("name")
+
+	if !model.IsValidLimit(name) {
+		rest_utils.RestErrWithLog(w, r, l,
+			errors.Errorf("unsupported limit %v", name),
+			http.StatusBadRequest)
+		return
+	}
+
+	lim, err := d.devAuth.GetLimit(ctx, name)
+	if err != nil {
+		rest_utils.RestErrWithLogInternal(w, r, l, err)
+		return
+	}
+
+	w.WriteJson(lim)
 }
 
 // Validate status.

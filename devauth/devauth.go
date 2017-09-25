@@ -72,6 +72,8 @@ type App interface {
 	VerifyToken(ctx context.Context, token string) error
 
 	SetTenantLimit(ctx context.Context, tenant_id string, limit model.Limit) error
+
+	GetLimit(ctx context.Context, name string) (*model.Limit, error)
 }
 
 type DevAuth struct {
@@ -571,6 +573,19 @@ func (d *DevAuth) VerifyToken(ctx context.Context, raw string) error {
 	}
 
 	return nil
+}
+
+func (d *DevAuth) GetLimit(ctx context.Context, name string) (*model.Limit, error) {
+	lim, err := d.db.GetLimit(ctx, name)
+
+	switch err {
+	case nil:
+		return lim, nil
+	case store.ErrLimitNotFound:
+		return &model.Limit{Name: name, Value: 0}, nil
+	default:
+		return nil, err
+	}
 }
 
 // WithTenantVerification will force verification of tenant token with tenant
