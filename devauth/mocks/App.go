@@ -143,6 +143,29 @@ func (_m *App) GetLimit(ctx context.Context, name string) (*model.Limit, error) 
 	return r0, r1
 }
 
+// GetTenantLimit provides a mock function with given fields: ctx, name, tenant_id
+func (_m *App) GetTenantLimit(ctx context.Context, name string, tenant_id string) (*model.Limit, error) {
+	ret := _m.Called(ctx, name, tenant_id)
+
+	var r0 *model.Limit
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) *model.Limit); ok {
+		r0 = rf(ctx, name, tenant_id)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*model.Limit)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = rf(ctx, name, tenant_id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // RejectDeviceAuth provides a mock function with given fields: ctx, dev_id, auth_id
 func (_m *App) RejectDeviceAuth(ctx context.Context, dev_id string, auth_id string) error {
 	ret := _m.Called(ctx, dev_id, auth_id)
