@@ -150,6 +150,37 @@ paths:
           description: Internal server error.
           schema:
             $ref: "#/definitions/Error"
+  /devices/count:
+    get:
+      summary: Get a count of devices, optionally filtered by status.
+      description: |
+        Provides a list of devices, optionally filtered by status.
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          type: string
+          format: Bearer [token]
+          description: Contains the JWT token issued by the User Administration and Authentication Service.
+        - name: status
+          in: query
+          description: |
+            Device status filter, one of 'pending', 'accepted', 'rejected'. Default is 'all devices'.
+          required: false
+          type: string
+      responses:
+        200:
+          description: Device count.
+          schema:
+            $ref: '#/definitions/Count'
+        400:
+          description: Missing/malformed request params.
+          schema:
+            $ref: '#/definitions/Error'
+        500:
+          description: Unexpected error
+          schema:
+            $ref: '#/definitions/Error'
   /tokens/{id}:
     delete:
       summary: Delete device token
@@ -276,6 +307,15 @@ definitions:
           type: string
           format: datetime
           description: Created timestamp
+  Count:
+    description: Counter type
+    type: object
+    properties:
+      count:
+        description: The count of requested items.
+        type: integer
+    example:
+      count: "42"
   Error:
     description: Error descriptor
     type: object
