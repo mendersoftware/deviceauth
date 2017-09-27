@@ -90,8 +90,9 @@ func RunServer(c config.Reader) error {
 		orchestrator.NewClient(orchClientConf),
 		jwtHandler,
 		devauth.Config{
-			Issuer:         c.GetString(SettingJWTIssuer),
-			ExpirationTime: int64(c.GetInt(SettingJWTExpirationTimeout)),
+			Issuer:                 c.GetString(SettingJWTIssuer),
+			ExpirationTime:         int64(c.GetInt(SettingJWTExpirationTimeout)),
+			MaxDevicesLimitDefault: uint64(c.GetInt(SettingMaxDevicesLimitDefault)),
 		})
 
 	if tadmAddr := c.GetString(SettingTenantAdmAddr); tadmAddr != "" {
