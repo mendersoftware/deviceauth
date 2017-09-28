@@ -120,7 +120,9 @@ var (
 				preserveHeaders,
 			},
 		},
-		&identity.IdentityMiddleware{},
+		&identity.IdentityMiddleware{
+			UpdateLogger: true,
+		},
 	}
 
 	middlewareMap = map[string][]rest.Middleware{
