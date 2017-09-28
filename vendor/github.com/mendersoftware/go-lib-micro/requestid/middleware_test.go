@@ -27,19 +27,21 @@ func TestRequestIdMiddlewareWithReqID(t *testing.T) {
 
 	api.Use(&RequestIdMiddleware{})
 
+	reqid := "4420a5b9-dbf2-4e5d-8b4f-3cf2013d04af"
 	api.SetApp(rest.AppSimple(func(w rest.ResponseWriter, r *rest.Request) {
+		assert.Equal(t, reqid, FromContext(r.Context()))
 		w.WriteJson(map[string]string{"foo": "bar"})
 	}))
 
 	handler := api.MakeHandler()
 
 	req := test.MakeSimpleRequest("GET", "http://localhost/", nil)
-	req.Header.Set(RequestIdHeader, "4420a5b9-dbf2-4e5d-8b4f-3cf2013d04af")
+	req.Header.Set(RequestIdHeader, reqid)
 
 	recorded := test.RunRequest(t, handler, req)
 	recorded.CodeIs(200)
 	recorded.ContentTypeIsJson()
-	recorded.HeaderIs(RequestIdHeader, "4420a5b9-dbf2-4e5d-8b4f-3cf2013d04af")
+	recorded.HeaderIs(RequestIdHeader, reqid)
 
 }
 
@@ -49,6 +51,9 @@ func TestRequestIdMiddlewareNoReqID(t *testing.T) {
 	api.Use(&RequestIdMiddleware{})
 
 	api.SetApp(rest.AppSimple(func(w rest.ResponseWriter, r *rest.Request) {
+		reqid := FromContext(r.Context())
+		_, err := uuid.FromString(reqid)
+		assert.NoError(t, err)
 		w.WriteJson(map[string]string{"foo": "bar"})
 	}))
 

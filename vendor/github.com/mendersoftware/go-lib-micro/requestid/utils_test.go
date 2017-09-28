@@ -26,9 +26,7 @@ func TestContext(t *testing.T) {
 	assert.Equal(t, "", FromContext(context.Background()))
 	assert.Equal(t, "foo",
 		FromContext(WithContext(context.Background(), "foo")))
-	// fallback to default string if someone packs the value into context
-	// themselves
-	assert.Equal(t, "",
-		FromContext(context.WithValue(context.Background(),
-			RequestIdHeader, 123)))
+
+	// make sure that the helpers are using private types
+	assert.Nil(t, WithContext(context.Background(), "foo").Value(0))
 }

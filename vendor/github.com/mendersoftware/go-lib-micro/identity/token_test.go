@@ -22,18 +22,35 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func makeClaimsPart(sub, tenant string) string {
+func boolPtr(val bool) *bool {
+	return &val
+}
+
+func makeClaimsFull(sub, tenant string, device, user bool) string {
 	claim := struct {
 		Subject string `json:"sub,omitempty"`
 		Tenant  string `json:"mender.tenant,omitempty"`
+		Device  *bool  `json:"mender.device,omitempty"`
+		User    *bool  `json:"mender.user,omitempty"`
 	}{
 		Subject: sub,
 		Tenant:  tenant,
+	}
+
+	if device {
+		claim.Device = boolPtr(true)
+	}
+	if user {
+		claim.User = boolPtr(true)
 	}
 	data, _ := json.Marshal(&claim)
 	rawclaim := base64.StdEncoding.EncodeToString(data)
 
 	return rawclaim
+}
+
+func makeClaimsPart(sub, tenant string) string {
+	return makeClaimsFull(sub, tenant, false, false)
 }
 
 func TestExtractIdentity(t *testing.T) {
@@ -51,7 +68,7 @@ func TestExtractIdentity(t *testing.T) {
 	_, err = ExtractIdentity(rawclaims)
 	assert.Error(t, err)
 
-	// correct cate
+	// correct case
 	idata, err := ExtractIdentity("foo." + rawclaims + ".bar")
 	assert.NoError(t, err)
 	assert.Equal(t, Identity{Subject: "foobar"}, idata)
@@ -65,6 +82,22 @@ func TestExtractIdentity(t *testing.T) {
 	enc = base64.StdEncoding.EncodeToString([]byte(`{"sub": 1}`))
 	_, err = ExtractIdentity("foo." + enc + ".bar")
 	assert.Error(t, err)
+
+	enc = base64.StdEncoding.EncodeToString([]byte(`{"sub": "123", "mender.device": true}`))
+	idata, err = ExtractIdentity("foo." + enc + ".bar")
+	assert.NoError(t, err)
+	assert.Equal(t, Identity{Subject: "123", IsDevice: true}, idata)
+
+	enc = base64.StdEncoding.EncodeToString([]byte(`{"sub": "123", "mender.user": true}`))
+	idata, err = ExtractIdentity("foo." + enc + ".bar")
+	assert.NoError(t, err)
+	assert.Equal(t, Identity{Subject: "123", IsUser: true}, idata)
+
+	enc = base64.StdEncoding.EncodeToString([]byte(`{"sub": "123", "mender.user": {"garbage": 2}}`))
+	idata, err = ExtractIdentity("foo." + enc + ".bar")
+	assert.NoError(t, err)
+	assert.Equal(t, Identity{Subject: "123"}, idata)
+
 }
 
 func TestExtractIdentityFromHeaders(t *testing.T) {

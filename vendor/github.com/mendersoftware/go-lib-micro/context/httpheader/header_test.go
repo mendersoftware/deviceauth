@@ -42,4 +42,6 @@ func TestHttpHeader(t *testing.T) {
 	assert.Equal(t, "foo", FromContext(ctx, "Authorization"))
 	assert.Equal(t, "", FromContext(ctx, "Foobar"))
 	assert.Equal(t, "barbar", FromContext(ctx, "X-Mender-Identity"))
+
+	assert.Nil(t, ctx.Value("X-Mender-Identity"))
 }
