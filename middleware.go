@@ -115,8 +115,6 @@ var (
 		&requestid.RequestIdMiddleware{},
 		&mctx.UpdateContextMiddleware{
 			Updates: []mctx.UpdateContextFunc{
-				mctx.RepackLoggerToContext,
-				mctx.RepackRequestIdToContext,
 				preserveHeaders,
 			},
 		},
