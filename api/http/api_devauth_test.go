@@ -244,7 +244,7 @@ func TestApiDevAuthSubmitAuthReq(t *testing.T) {
 		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
 			da := &mocks.App{}
 			da.On("SubmitAuthRequest",
-				context.Background(),
+				mtest.ContextMatcher(),
 				mock.AnythingOfType("*model.AuthReq")).
 				Return(
 					func(_ context.Context, r *model.AuthReq) string {
@@ -304,15 +304,15 @@ func TestApiDevAuthUpdateStatusDevice(t *testing.T) {
 	}
 	da := &mocks.App{}
 	da.On("AcceptDeviceAuth",
-		context.Background(),
+		mtest.ContextMatcher(),
 		mock.AnythingOfType("string"),
 		mock.AnythingOfType("string")).Return(mockaction)
 	da.On("RejectDeviceAuth",
-		context.Background(),
+		mtest.ContextMatcher(),
 		mock.AnythingOfType("string"),
 		mock.AnythingOfType("string")).Return(mockaction)
 	da.On("ResetDeviceAuth",
-		context.Background(),
+		mtest.ContextMatcher(),
 		mock.AnythingOfType("string"),
 		mock.AnythingOfType("string")).Return(mockaction)
 
@@ -460,7 +460,7 @@ func TestApiDevAuthVerifyToken(t *testing.T) {
 
 			da := &mocks.App{}
 			da.On("VerifyToken",
-				context.Background(),
+				mtest.ContextMatcher(),
 				mock.AnythingOfType("string")).
 				Return(tc.err)
 
@@ -514,7 +514,7 @@ func TestApiDevAuthDeleteToken(t *testing.T) {
 
 			da := &mocks.App{}
 			da.On("RevokeToken",
-				context.Background(),
+				mtest.ContextMatcher(),
 				mock.AnythingOfType("string")).
 				Return(tc.err)
 
@@ -568,7 +568,7 @@ func TestApiGetDevice(t *testing.T) {
 
 			da := &mocks.App{}
 			da.On("GetDevice",
-				context.Background(),
+				mtest.ContextMatcher(),
 				mock.AnythingOfType("string")).
 				Return(tc.device, tc.err)
 
@@ -659,7 +659,7 @@ func TestApiGetDevices(t *testing.T) {
 
 			da := &mocks.App{}
 			da.On("GetDevices",
-				context.Background(),
+				mtest.ContextMatcher(),
 				tc.skip, tc.limit).Return(
 				tc.devices, tc.err)
 
@@ -714,7 +714,7 @@ func TestApiDevAuthDecommissionDevice(t *testing.T) {
 
 			da := &mocks.App{}
 			da.On("DecommissionDevice",
-				context.Background(),
+				mtest.ContextMatcher(),
 				mock.AnythingOfType("string")).
 				Return(tc.err)
 
@@ -788,7 +788,7 @@ func TestApiDevAuthPutTenantLimit(t *testing.T) {
 
 			da := &mocks.App{}
 			da.On("SetTenantLimit",
-				context.Background(),
+				mtest.ContextMatcher(),
 				tc.tenant,
 				tc.limit).
 				Return(tc.err)
@@ -859,7 +859,7 @@ func TestApiDevAuthGetLimit(t *testing.T) {
 
 			da := &mocks.App{}
 			da.On("GetLimit",
-				context.Background(),
+				mtest.ContextMatcher(),
 				tc.limit).
 				Return(tc.daLimit, tc.daErr)
 
