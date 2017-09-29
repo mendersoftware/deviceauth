@@ -25,6 +25,7 @@ func (m *MockConfigReader) Get(key string) interface{}                      { re
 func (m *MockConfigReader) GetBool(key string) bool                         { return true }
 func (m *MockConfigReader) GetFloat64(key string) float64                   { return 1.1 }
 func (m *MockConfigReader) GetInt(key string) int                           { return 1 }
+func (m *MockConfigReader) GetInt64(key string) int64                       { return 1 }
 func (m *MockConfigReader) GetString(key string) string                     { return "some string" }
 func (m *MockConfigReader) GetStringMap(key string) map[string]interface{}  { return nil }
 func (m *MockConfigReader) GetStringMapString(key string) map[string]string { return nil }

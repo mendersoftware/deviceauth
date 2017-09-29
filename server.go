@@ -92,7 +92,7 @@ func RunServer(c config.Reader) error {
 		devauth.Config{
 			Issuer:                 c.GetString(SettingJWTIssuer),
 			ExpirationTime:         int64(c.GetInt(SettingJWTExpirationTimeout)),
-			MaxDevicesLimitDefault: uint64(c.GetInt(SettingMaxDevicesLimitDefault)),
+			MaxDevicesLimitDefault: uint64(c.GetInt64(SettingMaxDevicesLimitDefault)),
 		})
 
 	if tadmAddr := c.GetString(SettingTenantAdmAddr); tadmAddr != "" {
