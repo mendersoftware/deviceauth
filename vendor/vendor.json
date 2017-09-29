@@ -33,6 +33,12 @@
 			"revisionTime": "2016-10-29T20:57:26Z"
 		},
 		{
+			"checksumSHA1": "LE7q4aPITU5N090e8Y8RdW0MNJ0=",
+			"path": "github.com/fsnotify/fsnotify",
+			"revision": "4da3e2cfbabc9f751898f250b49f2439785783a1",
+			"revisionTime": "2017-03-29T04:21:07Z"
+		},
+		{
 			"checksumSHA1": "g0dTi8EAx4xbJAQDjcwMQ2eFUhw=",
 			"path": "github.com/mendersoftware/go-lib-micro",
 			"revision": "2db4d4057f33f95097fa8c879dda9c0180296c98",
@@ -141,6 +147,30 @@
 			"revisionTime": "2017-07-12T12:07:28Z"
 		},
 		{
+			"checksumSHA1": "shHLR6e600pl+Qe/VVeoJmHruWI=",
+			"path": "github.com/pelletier/go-toml",
+			"revision": "16398bac157da96aa88f98a2df640c7f32af1da2",
+			"revisionTime": "2017-09-24T18:42:18Z"
+		},
+		{
+			"checksumSHA1": "WEIU3vzSKbJBCuUTvsBKRFWD5Cw=",
+			"path": "github.com/spf13/afero",
+			"revision": "ee1bd8ee15a1306d1f9201acc41ef39cd9f99a1b",
+			"revisionTime": "2016-09-19T01:42:32Z"
+		},
+		{
+			"checksumSHA1": "5KRbEQ28dDaQmKwAYTD0if/aEvg=",
+			"path": "github.com/spf13/afero/mem",
+			"revision": "ee1bd8ee15a1306d1f9201acc41ef39cd9f99a1b",
+			"revisionTime": "2016-09-19T01:42:32Z"
+		},
+		{
+			"checksumSHA1": "qWY1N4OXKdFpB0ynbmM6ojjpnhk=",
+			"path": "github.com/spf13/viper",
+			"revision": "25b30aa063fc18e48662b86996252eabdcf2f0c7",
+			"revisionTime": "2017-07-23T05:52:07Z"
+		},
+		{
 			"checksumSHA1": "EO+jcRet/AJ6IY3lBO8l8BLsZWg=",
 			"origin": "github.com/stretchr/testify/vendor/github.com/stretchr/objx",
 			"path": "github.com/stretchr/objx",
@@ -170,6 +200,36 @@
 			"path": "github.com/urfave/cli",
 			"revision": "4b90d79a682b4bf685762c7452db20f2a676ecb2",
 			"revisionTime": "2017-07-06T19:46:25Z"
+		},
+		{
+			"checksumSHA1": "ZQdHbB9VYCXwQ+9/CmZPhJv0+SM=",
+			"path": "golang.org/x/text/internal/gen",
+			"revision": "1cbadb444a806fd9430d14ad08967ed91da4fa0a",
+			"revisionTime": "2017-09-13T19:45:57Z"
+		},
+		{
+			"checksumSHA1": "ag7y2tiDc1Yx4fxBrA/CuwKZptg=",
+			"path": "golang.org/x/text/internal/testtext",
+			"revision": "1cbadb444a806fd9430d14ad08967ed91da4fa0a",
+			"revisionTime": "2017-09-13T19:45:57Z"
+		},
+		{
+			"checksumSHA1": "LXVplVWZWrHA8yelCVlNvlcwIMs=",
+			"path": "golang.org/x/text/transform",
+			"revision": "1cbadb444a806fd9430d14ad08967ed91da4fa0a",
+			"revisionTime": "2017-09-13T19:45:57Z"
+		},
+		{
+			"checksumSHA1": "fgvbx45gJSiSKFB7QKdVyF2Vn9U=",
+			"path": "golang.org/x/text/unicode/cldr",
+			"revision": "1cbadb444a806fd9430d14ad08967ed91da4fa0a",
+			"revisionTime": "2017-09-13T19:45:57Z"
+		},
+		{
+			"checksumSHA1": "RyNw9/C/d0xCGN16tbZFkyErRfI=",
+			"path": "golang.org/x/text/unicode/norm",
+			"revision": "1cbadb444a806fd9430d14ad08967ed91da4fa0a",
+			"revisionTime": "2017-09-13T19:45:57Z"
 		},
 		{
 			"path": "gopkg.in/urfave/cli",

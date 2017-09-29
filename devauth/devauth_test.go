@@ -1031,24 +1031,52 @@ func TestDevAuthGetLimit(t *testing.T) {
 
 		outLimit *model.Limit
 		outErr   error
+
+		maxDevicesLimitDefaultConfig uint64
 	}{
 		"ok": {
-			inName: "max_devices",
+			inName: "other_limit",
 
-			dbLimit: &model.Limit{Name: "max_devices", Value: 123},
+			dbLimit: &model.Limit{Name: "other_limit", Value: 123},
 			dbErr:   nil,
 
-			outLimit: &model.Limit{Name: "max_devices", Value: 123},
+			outLimit: &model.Limit{Name: "other_limit", Value: 123},
 			outErr:   nil,
+
+			maxDevicesLimitDefaultConfig: 456,
+		},
+		"ok max_devices": {
+			inName: model.LimitMaxDeviceCount,
+
+			dbLimit: &model.Limit{Name: model.LimitMaxDeviceCount, Value: 123},
+			dbErr:   nil,
+
+			outLimit: &model.Limit{Name: model.LimitMaxDeviceCount, Value: 123},
+			outErr:   nil,
+
+			maxDevicesLimitDefaultConfig: 456,
 		},
 		"limit not found": {
-			inName: "max_devices",
+			inName: "other_limit",
 
 			dbLimit: nil,
 			dbErr:   store.ErrLimitNotFound,
 
-			outLimit: &model.Limit{Name: "max_devices", Value: 0},
+			outLimit: &model.Limit{Name: "other_limit", Value: 0},
 			outErr:   nil,
+
+			maxDevicesLimitDefaultConfig: 456,
+		},
+		"limit not found max_devices": {
+			inName: model.LimitMaxDeviceCount,
+
+			dbLimit: nil,
+			dbErr:   store.ErrLimitNotFound,
+
+			outLimit: &model.Limit{Name: model.LimitMaxDeviceCount, Value: 456},
+			outErr:   nil,
+
+			maxDevicesLimitDefaultConfig: 456,
 		},
 		"generic error": {
 			inName: "max_devices",
@@ -1071,7 +1099,8 @@ func TestDevAuthGetLimit(t *testing.T) {
 			db := mstore.DataStore{}
 			db.On("GetLimit", ctx, tc.inName).Return(tc.dbLimit, tc.dbErr)
 
-			devauth := NewDevAuth(&db, nil, nil, nil, nil, Config{})
+			devauth := NewDevAuth(&db, nil, nil, nil, nil,
+				Config{MaxDevicesLimitDefault: tc.maxDevicesLimitDefaultConfig})
 			limit, err := devauth.GetLimit(ctx, tc.inName)
 
 			if tc.outErr != nil {

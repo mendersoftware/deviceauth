@@ -93,6 +93,8 @@ type Config struct {
 	Issuer string
 	// token expiration time
 	ExpirationTime int64
+	// max devices limit default
+	MaxDevicesLimitDefault uint64
 }
 
 func NewDevAuth(d store.DataStore, cda deviceadm.ClientRunner,
@@ -582,6 +584,9 @@ func (d *DevAuth) GetLimit(ctx context.Context, name string) (*model.Limit, erro
 	case nil:
 		return lim, nil
 	case store.ErrLimitNotFound:
+		if name == model.LimitMaxDeviceCount {
+			return &model.Limit{Name: name, Value: d.config.MaxDevicesLimitDefault}, nil
+		}
 		return &model.Limit{Name: name, Value: 0}, nil
 	default:
 		return nil, err

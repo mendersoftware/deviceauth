@@ -53,6 +53,7 @@ type Reader interface {
 	GetBool(key string) bool
 	GetFloat64(key string) float64
 	GetInt(key string) int
+	GetInt64(key string) int64
 	GetString(key string) string
 	GetStringMap(key string) map[string]interface{}
 	GetStringMapString(key string) map[string]string
