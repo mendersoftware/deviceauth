@@ -75,6 +75,8 @@ type App interface {
 
 	GetLimit(ctx context.Context, name string) (*model.Limit, error)
 	GetTenantLimit(ctx context.Context, name, tenant_id string) (*model.Limit, error)
+
+	GetDevCountByStatus(ctx context.Context, status string) (int, error)
 }
 
 type DevAuth struct {
@@ -627,4 +629,8 @@ func (d *DevAuth) SetTenantLimit(ctx context.Context, tenant_id string, limit mo
 			limit, tenant_id)
 	}
 	return nil
+}
+
+func (d *DevAuth) GetDevCountByStatus(ctx context.Context, status string) (int, error) {
+	return d.db.GetDevCountByStatus(ctx, status)
 }
