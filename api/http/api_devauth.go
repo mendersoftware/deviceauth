@@ -389,7 +389,7 @@ func (d *DevAuthApiHandlers) GetLimit(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	w.WriteJson(lim)
+	w.WriteJson(LimitValue{lim.Value})
 }
 
 // Validate status.
