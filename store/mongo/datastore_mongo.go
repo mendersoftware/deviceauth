@@ -364,34 +364,44 @@ func (db *DataStoreMongo) Migrate(ctx context.Context, version string) error {
 			Tenant: tenant,
 		})
 
-		if db.multitenant {
-			l.Infof("migrating %s for tenant %v", d, tenant)
-		} else {
-			l.Infof("migrating %s", d)
-		}
-
-		m := migrate.SimpleMigrator{
-			Session:     db.session,
-			Db:          d,
-			Automigrate: db.automigrate,
-		}
-
-		ver, err := migrate.NewVersion(version)
+		// TODO: we should aim to unify context usage across migrators and migrations
+		// migrators use 'string' db name, migrations use DbFromContext
+		// both should use one or the other; for now - just redundantly pass both ctx and db name
+		err := db.MigrateSingle(tenantCtx, d, version)
 		if err != nil {
-			return errors.Wrap(err, "failed to parse service version")
+			return err
 		}
+	}
 
-		migrations := []migrate.Migration{
-			&migration_1_1_0{
-				ms:  db,
-				ctx: tenantCtx,
-			},
-		}
+	return nil
+}
 
-		err = m.Apply(tenantCtx, *ver, migrations)
-		if err != nil {
-			return errors.Wrap(err, "failed to apply migrations")
-		}
+func (db *DataStoreMongo) MigrateSingle(ctx context.Context, database, version string) error {
+	l := log.FromContext(ctx)
+
+	l.Infof("migrating %s", database)
+
+	m := migrate.SimpleMigrator{
+		Session:     db.session,
+		Db:          database,
+		Automigrate: db.automigrate,
+	}
+
+	migrations := []migrate.Migration{
+		&migration_1_1_0{
+			ms:  db,
+			ctx: ctx,
+		},
+	}
+
+	ver, err := migrate.NewVersion(version)
+	if err != nil {
+		return errors.Wrap(err, "failed to parse service version")
+	}
+
+	err = m.Apply(ctx, *ver, migrations)
+	if err != nil {
+		return errors.Wrap(err, "failed to apply migrations")
 	}
 
 	return nil
