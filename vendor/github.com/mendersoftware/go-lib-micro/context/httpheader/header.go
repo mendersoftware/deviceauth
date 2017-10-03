@@ -18,12 +18,10 @@ import (
 	"net/http"
 )
 
-const (
-	hdrKeyPrefix = "github.com/mendersoftware/deviceadm/context/httpheader."
-)
+type headerKeyType string
 
-func makeKeyName(hdr string) string {
-	return hdrKeyPrefix + hdr
+func makeKeyName(hdr string) headerKeyType {
+	return headerKeyType(hdr)
 }
 
 // WithContext stores HTTP headers from `hdrs` which listed in `which` in a

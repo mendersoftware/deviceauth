@@ -106,5 +106,7 @@ func TestFromWithContext(t *testing.T) {
 	assert.Len(t, ln2.Data, 0)
 
 	ctx = WithContext(context.Background(), l)
-	assert.NotNil(t, ctx.Value(LoggerContextKey))
+	assert.NotNil(t, ctx.Value(loggerContextKey))
+
+	assert.Nil(t, ctx.Value(0))
 }

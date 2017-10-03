@@ -28,4 +28,8 @@ func TestContext(t *testing.T) {
 	}
 	assert.Empty(t, FromContext(context.Background()))
 	assert.Equal(t, &identity, FromContext(WithContext(context.Background(), &identity)))
+
+	ctx := WithContext(context.Background(), &identity)
+	// trying to fetch with same value but different type should fail
+	assert.Nil(t, ctx.Value(0))
 }

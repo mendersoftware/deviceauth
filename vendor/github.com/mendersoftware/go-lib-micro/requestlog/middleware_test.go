@@ -14,9 +14,11 @@
 package requestlog
 
 import (
+	"bytes"
 	"net/http"
 	"testing"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/ant0ine/go-json-rest/rest/test"
 	"github.com/stretchr/testify/assert"
@@ -24,14 +26,22 @@ import (
 	"github.com/mendersoftware/go-lib-micro/log"
 )
 
-func TestRequestLogMiddleware(t *testing.T) {
+func TestRequestLogMiddlewareBaseLogger(t *testing.T) {
 	api := rest.NewApi()
 
-	api.Use(&RequestLogMiddleware{})
+	buf := &bytes.Buffer{}
+	base := logrus.New()
+	base.Out = buf
+
+	api.Use(&RequestLogMiddleware{
+		BaseLogger: base,
+	})
 
 	api.SetApp(rest.AppSimple(func(w rest.ResponseWriter, r *rest.Request) {
-		log := r.Env[ReqLog]
-		assert.NotNil(t, log)
+		l := log.FromContext(r.Context())
+
+		assert.NotNil(t, l)
+		l.Printf("foobar")
 		w.WriteJson(map[string]string{"foo": "bar"})
 	}))
 
@@ -40,6 +50,9 @@ func TestRequestLogMiddleware(t *testing.T) {
 	req := test.MakeSimpleRequest("GET", "http://localhost/", nil)
 
 	_ = test.RunRequest(t, handler, req)
+
+	assert.NotEmpty(t, buf.String())
+	assert.Contains(t, buf.String(), "foobar")
 }
 
 func TestRequestLogMiddlewareWithCtx(t *testing.T) {
@@ -50,11 +63,10 @@ func TestRequestLogMiddlewareWithCtx(t *testing.T) {
 	})
 
 	api.SetApp(rest.AppSimple(func(w rest.ResponseWriter, r *rest.Request) {
-		le := r.Env[ReqLog]
+		l := log.FromContext(r.Context())
 
-		assert.NotNil(t, le)
+		assert.NotNil(t, l)
 
-		l := le.(*log.Logger)
 		assert.Contains(t, l.Data, "foo")
 
 		w.WriteHeader(http.StatusNoContent)
