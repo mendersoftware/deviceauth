@@ -896,9 +896,8 @@ func TestApiDevAuthGetTenantLimit(t *testing.T) {
 
 			code: http.StatusOK,
 			body: string(asJSON(
-				model.Limit{
-					Name:  model.LimitMaxDeviceCount,
-					Value: 123,
+				LimitValue{
+					Limit: 123,
 				},
 			)),
 		},
