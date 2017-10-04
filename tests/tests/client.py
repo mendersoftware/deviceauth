@@ -38,13 +38,12 @@ class BaseDevicesApiClient(BaseApiClient):
     api_url = "http://%s/api/devices/v1/authentication/" % \
               pytest.config.getoption("host")
 
-
 class SwaggerApiClient(BaseApiClient):
     config = {
         'also_return_response': True,
         'validate_responses': True,
         'validate_requests': False,
-        'validate_swagger_spec': False,
+        'validate_swagger_spec': True,
         'use_models': True,
     }
 
@@ -68,6 +67,18 @@ class InternalClient(SwaggerApiClient):
 
     log = logging.getLogger('client.InternalClient')
 
+    spec_option = 'spec'
+
+    def setup(self):
+        self.setup_swagger()
+
+    def get_max_devices_limit(self, tenant_id):
+        return self.client.tenant.get_tenant_tenant_id_limits_max_devices(tenant_id=tenant_id).result()[0]
+
+    def put_max_devices_limit(self, tenant_id, limit):
+        Limit = self.client.get_model('Limit')
+        l = Limit(limit=limit)
+        return self.client.tenant.put_tenant_tenant_id_limits_max_devices(tenant_id=tenant_id, limit=l)
 
 class SimpleInternalClient(InternalClient):
     """Internal API client. Cannot be used as pytest base class"""
