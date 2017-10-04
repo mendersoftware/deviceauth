@@ -119,7 +119,8 @@ script:
         mv integration/extra/travis-testing/* tests/ ;
         CGO_ENABLED=0 go test -c -o deviceauth-test -coverpkg $(go list ./... | grep -v vendor | grep -v mocks | grep -v test | tr  '\n' ,);
         sudo docker build -f Dockerfile.acceptance-testing -t mendersoftware/deviceauth:prtest .;
-        ./tests/build-acceptance ./tests ./docs/internal_api.yml ./docs/management_api.yml;
+        go build ;
+        ./tests/build-acceptance ./tests ./docs/internal_api.yml ./docs/management_api.yml deviceauth;
         TESTS_DIR=$PWD/tests ./tests/run-test-environment "acceptance" $PWD/integration ./tests/docker-compose.yml && TESTS_DIR=$PWD/tests ./tests/run-test-environment "acceptance" $PWD/integration ./tests/docker-compose-tenant.yml;
       fi
 
@@ -149,7 +150,7 @@ before_deploy:
         docker login --email=$DOCKER_HUB_EMAIL --username=$DOCKER_HUB_USERNAME --password=$DOCKER_HUB_PASSWORD;
         docker push $DOCKER_REPOSITORY:$IMAGE_TAG;
 
-        if [ "$TRAVIS_BRANCH" = master ]; then 
+        if [ "$TRAVIS_BRANCH" = master ]; then
             export COMMIT_TAG="$TRAVIS_BRANCH"_"$TRAVIS_COMMIT";
             docker tag $DOCKER_REPOSITORY:pr $DOCKER_REPOSITORY:$COMMIT_TAG;
             docker push $DOCKER_REPOSITORY:$COMMIT_TAG;
@@ -176,14 +177,14 @@ deploy:
     # Force before_deploy for branches
     -
         provider: script
-        script: /bin/true 
+        script: /bin/true
         on:
             all_branches: true
 
     # Force before_deploy for tags
     -
         provider: script
-        script: /bin/true 
+        script: /bin/true
         on:
             tags: true
             all_branches: true
