@@ -74,6 +74,7 @@ type App interface {
 	SetTenantLimit(ctx context.Context, tenant_id string, limit model.Limit) error
 
 	GetLimit(ctx context.Context, name string) (*model.Limit, error)
+	GetTenantLimit(ctx context.Context, name, tenant_id string) (*model.Limit, error)
 }
 
 type DevAuth struct {
@@ -591,6 +592,14 @@ func (d *DevAuth) GetLimit(ctx context.Context, name string) (*model.Limit, erro
 	default:
 		return nil, err
 	}
+}
+
+func (d *DevAuth) GetTenantLimit(ctx context.Context, name, tenant_id string) (*model.Limit, error) {
+	ctx = identity.WithContext(ctx, &identity.Identity{
+		Tenant: tenant_id,
+	})
+
+	return d.GetLimit(ctx, name)
 }
 
 // WithTenantVerification will force verification of tenant token with tenant

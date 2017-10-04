@@ -1112,3 +1112,85 @@ func TestDevAuthGetLimit(t *testing.T) {
 		})
 	}
 }
+
+func TestDevAuthGetTenantLimit(t *testing.T) {
+	t.Parallel()
+
+	testCases := map[string]struct {
+		inName   string
+		inTenant string
+
+		dbLimit *model.Limit
+		dbErr   error
+
+		outLimit *model.Limit
+		outErr   error
+	}{
+		"ok": {
+			inName:   "max_devices",
+			inTenant: "tenant-foo",
+
+			dbLimit: &model.Limit{Name: "max_devices", Value: 123},
+			dbErr:   nil,
+
+			outLimit: &model.Limit{Name: "max_devices", Value: 123},
+			outErr:   nil,
+		},
+		"limit not found": {
+			inName:   "max_devices",
+			inTenant: "tenant-bar",
+
+			dbLimit: nil,
+			dbErr:   store.ErrLimitNotFound,
+
+			outLimit: &model.Limit{Name: "max_devices", Value: 0},
+			outErr:   nil,
+		},
+		"generic error": {
+			inName:   "max_devices",
+			inTenant: "tenant-baz",
+
+			dbLimit: nil,
+			dbErr:   errors.New("db error"),
+
+			outLimit: nil,
+			outErr:   errors.New("db error"),
+		},
+	}
+
+	for i := range testCases {
+		tc := testCases[i]
+		t.Run(fmt.Sprintf("tc %s", i), func(t *testing.T) {
+			t.Parallel()
+
+			ctx := context.Background()
+
+			db := mstore.DataStore{}
+
+			// in get limit, verify the correct db was set
+			verifyCtx := func(args mock.Arguments) {
+				ctx := args.Get(0).(context.Context)
+				id := identity.FromContext(ctx)
+				assert.Equal(t, tc.inTenant, id.Tenant)
+			}
+
+			ctxMatcher := mock.MatchedBy(func(c context.Context) bool {
+				return assert.NotNil(t, identity.FromContext(c))
+			})
+
+			db.On("GetLimit", ctxMatcher, tc.inName).
+				Run(verifyCtx).
+				Return(tc.dbLimit, tc.dbErr)
+
+			devauth := NewDevAuth(&db, nil, nil, nil, nil, Config{})
+			limit, err := devauth.GetTenantLimit(ctx, tc.inName, tc.inTenant)
+
+			if tc.outErr != nil {
+				assert.EqualError(t, err, tc.outErr.Error())
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, *tc.outLimit, *limit)
+			}
+		})
+	}
+}
