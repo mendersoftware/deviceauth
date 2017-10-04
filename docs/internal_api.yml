@@ -51,12 +51,7 @@ paths:
         200:
           description: Successful response.
           schema:
-            title: MaxDeviceCountLimit
-            schema:
-              $ref: "#/definitions/Limit"
-            example:
-              application/json:
-                - limit: "10"
+            $ref: "#/definitions/Limit"
         400:
           description: |
             Invalid parameters. See error message for details.
