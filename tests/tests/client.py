@@ -122,6 +122,12 @@ class SimpleManagementClient(ManagementClient):
             kwargs['Authorization'] = 'Bearer foo'
         return self.client.devices.get_devices(**kwargs).result()[0]
 
+    def get_device_limit(self, **kwargs):
+        if 'Authorization' not in kwargs:
+            self.log.debug('appending default authorization header')
+            kwargs['Authorization'] = 'Bearer foo'
+        return self.client.limits.get_limits_max_devices(**kwargs).result()[0]
+
     def get_device(self, **kwargs):
         if 'Authorization' not in kwargs:
             self.log.debug('appending default authorization header')

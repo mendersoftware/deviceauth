@@ -114,6 +114,12 @@ class TestDevice(ManagementClient):
         self.log.debug('got %d devices', len(devs))
         assert len(devs) == plimit
 
+    def test_get_device_limit(self):
+        mc = SimpleManagementClient()
+        limit = mc.get_device_limit()
+        self.log.debug('limit; %s', limit)
+        assert limit.limit == 0
+
     def test_get_single_device(self):
         mc = SimpleManagementClient()
 
