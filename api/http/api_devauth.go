@@ -392,7 +392,7 @@ func (d *DevAuthApiHandlers) GetTenantLimitHandler(w rest.ResponseWriter, r *res
 		return
 	}
 
-	w.WriteJson(lim)
+	w.WriteJson(LimitValue{lim.Value})
 }
 
 func (d *DevAuthApiHandlers) GetLimit(w rest.ResponseWriter, r *rest.Request) {
