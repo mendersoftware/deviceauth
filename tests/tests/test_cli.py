@@ -44,6 +44,12 @@ class TestMigration:
         TestMigration.verify_migration(mongo[dbname], version)
 
 
+# runs 'last' since it drops/reinits the default db, which breaks deviceauth under test:
+# - the indexes are destroyed by 'clean_db/migrated_db'
+# - even though we ensure them on every write - mgo caches their names
+#   and thinks they're still there
+# - writes by deviceauth are then essentially incorrect (duplicate data) and other tests fail
+@pytest.mark.last
 class TestCliMigrate:
     def test_ok_no_db(self, cli, clean_db, mongo):
         cli.migrate()
@@ -65,6 +71,7 @@ class TestCliMigrate:
         TestMigration.verify(cli, mongo, DB_NAME, "2.0.0")
 
 
+@pytest.mark.last
 class TestCliMigrateMultiTenant:
     @pytest.mark.parametrize('tenant_id',
             list(MIGRATED_TENANT_DBS) + ['tenant-new-1','tenant-new-2']
