@@ -17,6 +17,7 @@ import logging
 import json
 import urllib.parse as up
 import requests
+import subprocess
 
 import pytest
 from bravado.swagger_model import load_file
@@ -174,3 +175,16 @@ class ConductorClient():
         endpoint = up.urljoin(self.base_url, 'workflow/search')
 
         return requests.get(endpoint, params=params)
+
+
+class CliClient:
+    cmd = '/testing/deviceauth'
+
+    def migrate(self, tenant=None):
+        args = [self.cmd,
+                'migrate']
+
+        if tenant is not None:
+            args.extend(['--tenant', tenant])
+
+        subprocess.run(args, check=True)

@@ -18,7 +18,9 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/log"
+	mstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/urfave/cli"
 
 	"github.com/mendersoftware/deviceauth/config"
@@ -66,6 +68,18 @@ func doMain(args []string) {
 			},
 
 			Action: cmdServer,
+		},
+		{
+			Name:  "migrate",
+			Usage: "Run migrations and exit",
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:  "tenant",
+					Usage: "Tenant ID (optional).",
+				},
+			},
+
+			Action: cmdMigrate,
 		},
 	}
 
@@ -138,6 +152,49 @@ func cmdServer(args *cli.Context) error {
 	err = RunServer(config.Config)
 	if err != nil {
 		return cli.NewExitError(err.Error(), 4)
+	}
+
+	return nil
+}
+
+func cmdMigrate(args *cli.Context) error {
+	db, err := mongo.NewDataStoreMongo(
+		mongo.DataStoreMongoConfig{
+			ConnectionString: config.Config.GetString(SettingDb),
+
+			SSL:           config.Config.GetBool(SettingDbSSL),
+			SSLSkipVerify: config.Config.GetBool(SettingDbSSLSkipVerify),
+
+			Username: config.Config.GetString(SettingDbUsername),
+			Password: config.Config.GetString(SettingDbPassword),
+		})
+
+	if err != nil {
+		return cli.NewExitError(
+			fmt.Sprintf("failed to connect to db: %v", err),
+			3)
+	}
+
+	db = db.WithAutomigrate()
+
+	tenant := args.String("tenant")
+
+	tenantCtx := identity.WithContext(context.Background(), &identity.Identity{
+		Tenant: tenant,
+	})
+
+	dbname := mstore.DbFromContext(tenantCtx, mongo.DbName)
+	if err != nil {
+		return cli.NewExitError(
+			fmt.Sprintf("failed to decode dbname: %v", err),
+			3)
+	}
+
+	err = db.MigrateSingle(tenantCtx, dbname, mongo.DbVersion)
+	if err != nil {
+		return cli.NewExitError(
+			fmt.Sprintf("failed to run migrations: %v", err),
+			3)
 	}
 
 	return nil
