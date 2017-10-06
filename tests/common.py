@@ -27,6 +27,8 @@ from Crypto.PublicKey import RSA
 from Crypto.Signature import PKCS1_v1_5
 from Crypto.Hash import SHA256
 
+from client import SimpleInternalClient, SimpleManagementClient, ConductorClient
+
 DB_NAME = "deviceauth"
 DB_MIGRATION_COLLECTION = "migration_info"
 DB_VERSION = "1.1.0"
@@ -178,5 +180,21 @@ def clean_db(mongo):
     yield
     mongo_cleanup(mongo)
 
+
 def make_tenant_db(tenant_id):
     return '{}-{}'.format(DB_NAME, tenant_id)
+
+
+@pytest.yield_fixture(scope='session')
+def conductor():
+    yield ConductorClient()
+
+
+@pytest.yield_fixture(scope='session')
+def management():
+    yield SimpleManagementClient()
+
+
+@pytest.yield_fixture(scope='session')
+def internal():
+    yield SimpleInternalClient()
