@@ -1,14 +1,9 @@
-import json
-import os
-
 import bravado
 import pytest
 import bravado_core
 
 from common import internal_api, clean_db, mongo
 
-from client import InternalClient, SimpleInternalClient
-import mockserver
 
 @pytest.mark.usefixtures("clean_db")
 class TestLimits:
