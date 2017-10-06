@@ -142,8 +142,10 @@ def mongo_cleanup(mongo):
 
 @pytest.yield_fixture(scope='function')
 def clean_db(mongo):
+    """Fixture setting up a clean (i.e. empty database). Yields
+    pymongo.MongoClient connected to the DB."""
     mongo_cleanup(mongo)
-    yield
+    yield mongo
     mongo_cleanup(mongo)
 
 
