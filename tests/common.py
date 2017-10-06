@@ -152,15 +152,15 @@ def clean_db(mongo):
 
 
 @pytest.yield_fixture(scope='session')
-def conductor():
+def conductor_api():
     yield ConductorClient()
 
 
 @pytest.yield_fixture(scope='session')
-def management():
+def management_api():
     yield SimpleManagementClient()
 
 
 @pytest.yield_fixture(scope='session')
-def internal():
+def internal_api():
     yield SimpleInternalClient()
