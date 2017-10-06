@@ -605,3 +605,125 @@ func (db *DataStoreMongo) GetLimit(ctx context.Context, name string) (*model.Lim
 
 	return &lim, nil
 }
+
+func (db *DataStoreMongo) GetDevCountByStatus(ctx context.Context, status string) (int, error) {
+	s := db.session.Copy()
+	defer s.Close()
+
+	// if status == "", fallback to a simple count of all devices
+	if status == "" {
+		c := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
+		return c.Count()
+	}
+
+	// compose aggregation pipeline
+	c := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbAuthSetColl)
+
+	// group by dev id and auth set status, count status occurences:
+	// {_id: {"devid": "dev1", "status": "accepted"}, count: 1}
+	// {_id: {"devid": "dev1", "status": "pending"}, count: 2}
+	// {_id: {"devid": "dev1", "status": "rejected"}, count: 0}
+	// etc. for all devs
+	grp := bson.M{
+		"$group": bson.M{
+			"_id": bson.M{
+				"devid":  "$device_id",
+				"status": "$status",
+			},
+			"count": bson.M{
+				"$sum": 1,
+			},
+		},
+	}
+
+	// project to:
+	// {device_id: "1", accepted: 1}
+	// {device_id: "1", pending: 2}
+	// {device_id: "1", rejected: 0}
+	// clunky - no easy way to transform values into fields
+	proj := bson.M{
+		"$project": bson.M{
+			"devid": "$_id.devid",
+			"res": bson.M{
+				"$cond": []bson.M{
+					{"$eq": []string{"$_id.status", "accepted"}},
+					{"accepted": "$count"},
+					{"$cond": []bson.M{
+						{"$eq": []string{"$_id.status", "pending"}},
+						{"pending": "$count"},
+						{"rejected": "$count"},
+					},
+					},
+				},
+			},
+		},
+	}
+
+	// group again to get aggregate per-status counts
+	// {device_id: "1", accepted: 1, pending: 2, rejected: 0}
+	sum := bson.M{
+		"$group": bson.M{
+			"_id":      "$devid",
+			"accepted": bson.M{"$sum": "$res.accepted"},
+			"pending":  bson.M{"$sum": "$res.pending"},
+			"rejected": bson.M{"$sum": "$res.rejected"},
+		}}
+
+	// actually filter devices according to status
+	var filt bson.M
+
+	// single accepted auth set = device accepted
+	if status == "accepted" {
+		filt = bson.M{
+			"$match": bson.M{
+				"accepted": bson.M{"$gt": 0},
+			},
+		}
+	}
+
+	// device is pending if it has no accepted sets and
+	// has pending sets
+	if status == "pending" {
+		filt = bson.M{
+			"$match": bson.M{
+				"$and": []bson.M{
+					{"accepted": bson.M{"$eq": 0}},
+					{"pending": bson.M{"$gt": 0}},
+				},
+			},
+		}
+	}
+
+	// device is rejected if all its sets are rejected
+	if status == "rejected" {
+		filt = bson.M{
+			"$match": bson.M{
+				"$and": []bson.M{
+					{"accepted": bson.M{"$eq": 0}},
+					{"pending": bson.M{"$eq": 0}},
+					{"rejected": bson.M{"$gt": 0}},
+				},
+			},
+		}
+	}
+
+	cnt := bson.M{
+		"$count": "count",
+	}
+
+	var resp bson.M
+
+	pipe := c.Pipe([]bson.M{grp, proj, sum, filt, cnt})
+	err := pipe.One(&resp)
+
+	switch err {
+	case nil:
+		break
+	case mgo.ErrNotFound:
+		return 0, nil
+	default:
+		return 0, err
+	}
+
+	return resp["count"].(int), err
+}

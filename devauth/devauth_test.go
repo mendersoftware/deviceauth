@@ -1166,7 +1166,6 @@ func TestDevAuthGetTenantLimit(t *testing.T) {
 			ctx := context.Background()
 
 			db := mstore.DataStore{}
-
 			// in get limit, verify the correct db was set
 			verifyCtx := func(args mock.Arguments) {
 				ctx := args.Get(0).(context.Context)
@@ -1190,6 +1189,69 @@ func TestDevAuthGetTenantLimit(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 				assert.Equal(t, *tc.outLimit, *limit)
+			}
+		})
+	}
+}
+
+func TestDevAuthGetDevCountByStatus(t *testing.T) {
+	t.Parallel()
+
+	testCases := map[string]struct {
+		status string
+
+		dbCnt int
+		dbErr error
+
+		cnt int
+		err error
+	}{
+		"ok": {
+			status: "pending",
+
+			dbCnt: 5,
+			dbErr: nil,
+
+			cnt: 5,
+			err: nil,
+		},
+		"ok 2": {
+			status: "accepted",
+
+			dbCnt: 0,
+			dbErr: nil,
+
+			cnt: 0,
+			err: nil,
+		},
+		"generic error": {
+			status: "accepted",
+
+			dbCnt: 5,
+			dbErr: errors.New("db error"),
+
+			err: errors.New("db error"),
+		},
+	}
+
+	for i := range testCases {
+		tc := testCases[i]
+		t.Run(fmt.Sprintf("tc %s", i), func(t *testing.T) {
+			t.Parallel()
+
+			ctx := context.Background()
+
+			db := mstore.DataStore{}
+			db.On("GetDevCountByStatus", ctx, tc.status).Return(tc.dbCnt, tc.dbErr)
+
+			devauth := NewDevAuth(&db, nil, nil, nil, nil, Config{})
+			cnt, err := devauth.GetDevCountByStatus(ctx, tc.status)
+
+			if tc.err != nil {
+				assert.EqualError(t, err, tc.err.Error())
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tc.cnt, cnt)
 			}
 		})
 	}

@@ -34,6 +34,7 @@ const (
 	uriAuthReqs = "/api/devices/v1/authentication/auth_requests"
 
 	uriDevices      = "/api/management/v1/devauth/devices"
+	uriDevicesCount = "/api/management/v1/devauth/devices/count"
 	uriDevice       = "/api/management/v1/devauth/devices/:id"
 	uriToken        = "/api/management/v1/devauth/tokens/:id"
 	uriDeviceStatus = "/api/management/v1/devauth/devices/:id/auth/:aid/status"
@@ -70,6 +71,8 @@ func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
 		rest.Post(uriAuthReqs, d.SubmitAuthRequestHandler),
 
 		rest.Get(uriDevices, d.GetDevicesHandler),
+
+		rest.Get(uriDevicesCount, d.GetDevicesCountHandler),
 
 		rest.Get(uriDevice, d.GetDeviceHandler),
 
@@ -194,6 +197,32 @@ func (d *DevAuthApiHandlers) GetDevicesHandler(w rest.ResponseWriter, r *rest.Re
 		w.Header().Add("Link", l)
 	}
 	w.WriteJson(devs[:len])
+}
+
+func (d *DevAuthApiHandlers) GetDevicesCountHandler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+	l := log.FromContext(ctx)
+
+	status := r.URL.Query().Get("status")
+
+	switch status {
+	case model.DevStatusAccepted,
+		model.DevStatusRejected,
+		model.DevStatusPending,
+		"":
+	default:
+		rest_utils.RestErrWithLog(w, r, l, errors.New("status must be one of: pending, accepted, rejected"), http.StatusBadRequest)
+		return
+	}
+
+	count, err := d.devAuth.GetDevCountByStatus(ctx, status)
+
+	if err != nil {
+		rest_utils.RestErrWithLogInternal(w, r, l, err)
+		return
+	}
+
+	w.WriteJson(model.Count{Count: count})
 }
 
 func (d *DevAuthApiHandlers) GetDeviceHandler(w rest.ResponseWriter, r *rest.Request) {

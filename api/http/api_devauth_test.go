@@ -945,3 +945,111 @@ func TestApiDevAuthGetTenantLimit(t *testing.T) {
 		})
 	}
 }
+
+func TestApiDevAuthGetDevicesCount(t *testing.T) {
+	t.Parallel()
+
+	// enforce specific field naming in errors returned by API
+	updateRestErrorFieldName()
+
+	tcases := []struct {
+		req    *http.Request
+		status string
+
+		daCnt int
+		daErr error
+
+		code int
+		body string
+	}{
+		{
+			status: "pending",
+
+			daCnt: 5,
+			daErr: nil,
+
+			code: http.StatusOK,
+			body: string(asJSON(
+				model.Count{
+					Count: 5,
+				},
+			)),
+		},
+		{
+			status: "accepted",
+
+			daCnt: 0,
+			daErr: nil,
+
+			code: http.StatusOK,
+			body: string(asJSON(
+				model.Count{
+					Count: 0,
+				},
+			)),
+		},
+		{
+			status: "rejected",
+
+			daCnt: 4,
+			daErr: nil,
+
+			code: http.StatusOK,
+			body: string(asJSON(
+				model.Count{
+					Count: 4,
+				},
+			)),
+		},
+		{
+			status: "",
+
+			daCnt: 10,
+			daErr: nil,
+
+			code: http.StatusOK,
+			body: string(asJSON(
+				model.Count{
+					Count: 10,
+				},
+			)),
+		},
+		{
+			status: "bogus",
+
+			code: http.StatusBadRequest,
+			body: RestError("status must be one of: pending, accepted, rejected"),
+		},
+		{
+			status: "accepted",
+
+			daErr: errors.New("generic error"),
+
+			code: http.StatusInternalServerError,
+			body: RestError("internal error"),
+		},
+	}
+
+	for i := range tcases {
+		tc := tcases[i]
+		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			t.Parallel()
+
+			url := "http://1.2.3.4/api/management/v1/devauth/devices/count"
+			if tc.status != "" {
+				url += "?status=" + tc.status
+			}
+
+			req := test.MakeSimpleRequest("GET", url, nil)
+
+			da := &mocks.App{}
+			da.On("GetDevCountByStatus",
+				mtest.ContextMatcher(),
+				tc.status).
+				Return(tc.daCnt, tc.daErr)
+
+			apih := makeMockApiHandler(t, da)
+			runTestRequest(t, apih, req, tc.code, tc.body)
+		})
+	}
+}

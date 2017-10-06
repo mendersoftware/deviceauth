@@ -51,6 +51,27 @@ func (_m *App) DecommissionDevice(ctx context.Context, dev_id string) error {
 	return r0
 }
 
+// GetDevCountByStatus provides a mock function with given fields: ctx, status
+func (_m *App) GetDevCountByStatus(ctx context.Context, status string) (int, error) {
+	ret := _m.Called(ctx, status)
+
+	var r0 int
+	if rf, ok := ret.Get(0).(func(context.Context, string) int); ok {
+		r0 = rf(ctx, status)
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, status)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetDevice provides a mock function with given fields: ctx, dev_id
 func (_m *App) GetDevice(ctx context.Context, dev_id string) (*model.Device, error) {
 	ret := _m.Called(ctx, dev_id)

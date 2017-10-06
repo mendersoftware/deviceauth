@@ -86,4 +86,8 @@ type DataStore interface {
 
 	// fetch limit information from data store
 	GetLimit(ctx context.Context, name string) (*model.Limit, error)
+
+	// get the number of devices with a given admission status
+	// computed based on aggregated auth set statuses
+	GetDevCountByStatus(ctx context.Context, status string) (int, error)
 }

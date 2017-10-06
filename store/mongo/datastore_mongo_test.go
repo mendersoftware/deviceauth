@@ -1236,3 +1236,165 @@ func TestGetLimit(t *testing.T) {
 	assert.NoError(t, err)
 	assert.EqualValues(t, lim3OtherTenant, *lim)
 }
+
+func TestStoreGetDevCountByStatus(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestGetDevCountByStatus in short mode.")
+	}
+
+	ctx := identity.WithContext(context.Background(), &identity.Identity{
+		Tenant: "foo",
+	})
+
+	testCases := []struct {
+		accepted int
+		pending  int
+		rejected int
+	}{
+		{
+			accepted: 0,
+			pending:  4,
+			rejected: 0,
+		},
+		{
+			accepted: 5,
+			pending:  0,
+			rejected: 0,
+		},
+		{
+			accepted: 0,
+			pending:  0,
+			rejected: 6,
+		},
+		{
+			accepted: 4,
+			pending:  2,
+			rejected: 1,
+		},
+		{
+			accepted: 1,
+			pending:  4,
+			rejected: 2,
+		},
+		{
+			accepted: 10,
+			pending:  30,
+			rejected: 12,
+		},
+		{
+			accepted: 10,
+			pending:  30,
+			rejected: 0,
+		},
+		{
+			accepted: 0,
+			pending:  30,
+			rejected: 12,
+		},
+		{
+			accepted: 10,
+			pending:  0,
+			rejected: 12,
+		},
+		{
+			accepted: 0,
+			pending:  0,
+			rejected: 0,
+		},
+	}
+
+	for i, tc := range testCases {
+		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			db := getDb(ctx)
+			defer db.session.Close()
+			s := db.session.Copy()
+			defer s.Close()
+
+			devs := getDevsWithStatuses(tc.accepted, tc.pending, tc.rejected)
+
+			// populate DB with a set of devices
+			for d, set := range devs {
+				err := db.AddDevice(ctx, *d)
+				assert.NoError(t, err)
+
+				for _, s := range set {
+					err := db.AddAuthSet(ctx, s)
+					assert.NoError(t, err)
+				}
+			}
+
+			cntAcc, err := db.GetDevCountByStatus(ctx, "accepted")
+			cntPen, err := db.GetDevCountByStatus(ctx, "pending")
+			cntRej, err := db.GetDevCountByStatus(ctx, "rejected")
+			cntAll, err := db.GetDevCountByStatus(ctx, "")
+
+			assert.NoError(t, err)
+			assert.Equal(t, tc.accepted, cntAcc)
+			assert.Equal(t, tc.pending, cntPen)
+			assert.Equal(t, tc.rejected, cntRej)
+			assert.Equal(t, tc.rejected+tc.accepted+tc.pending, cntAll)
+		})
+	}
+}
+
+// generate a list of devices having the desired number of total accepted/pending/rejected devices
+// auth sets for these devs will generated semi-randomly to aggregate to a given device's target status
+func getDevsWithStatuses(accepted, pending, rejected int) map[*model.Device][]model.AuthSet {
+	total := accepted + pending + rejected
+
+	res := make(map[*model.Device][]model.AuthSet)
+
+	for i := 0; i < total; i++ {
+		status := "pending"
+		if i < accepted {
+			status = "accepted"
+		} else if i < (accepted + rejected) {
+			status = "rejected"
+		}
+		dev, sets := getDevWithStatus(i, status)
+		res[dev] = sets
+	}
+
+	return res
+}
+
+func getDevWithStatus(id int, status string) (*model.Device, []model.AuthSet) {
+	iddata := fmt.Sprintf("foo-%04d", id)
+	pubkey := fmt.Sprintf("pubkey-%04d", id)
+
+	dev := model.Device{
+		Id:     fmt.Sprintf("%s", id),
+		IdData: iddata,
+		PubKey: pubkey,
+	}
+
+	asets := getAuthSetsForStatus(&dev, status)
+
+	return &dev, asets
+}
+
+// create a semi-random list of auth sets resultng in a desired device status
+func getAuthSetsForStatus(dev *model.Device, status string) []model.AuthSet {
+	n := rand.Intn(4) + 1
+
+	asets := make([]model.AuthSet, 0, n)
+
+	// create "rejected" auth sets, then populate
+	// with some accepted/pending, depending on the target status
+	for i := 0; i < n; i++ {
+		set := model.AuthSet{
+			IdData:    dev.IdData,
+			PubKey:    fmt.Sprintf("%s-%04d", dev.PubKey, i),
+			DeviceId:  dev.Id,
+			Timestamp: uto.TimePtr(time.Now()),
+			Status:    "rejected",
+		}
+		asets = append(asets, set)
+	}
+
+	if status != "rejected" {
+		asets[len(asets)-1].Status = status
+	}
+
+	return asets
+}
