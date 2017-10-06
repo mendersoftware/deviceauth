@@ -29,9 +29,6 @@ from Crypto.Hash import SHA256
 
 from client import SimpleInternalClient, SimpleManagementClient, ConductorClient
 
-DB_NAME = "deviceauth"
-DB_MIGRATION_COLLECTION = "migration_info"
-DB_VERSION = "1.1.0"
 
 def get_keypair():
     private = RSA.generate(1024)
@@ -135,43 +132,12 @@ def cli():
 def mongo():
     return MongoClient('mender-mongo-device-auth:27017')
 
-@pytest.fixture(scope='function')
-def migrated_db(clean_db, mongo, request):
-    ''' Init a default db to version passed in 'request'. '''
-    version = request.param
-    mongo_set_version(mongo, DB_NAME, version)
-
-
-MIGRATED_TENANT_DBS={
-    "tenant-stale-1": "0.0.1",
-    "tenant-stale-2": "0.2.0",
-    "tenant-stale-3": "1.0.0",
-    "tenant-current": "1.1.0",
-    "tenant-future": "2.0.0",
-}
-
-@pytest.fixture(scope='function')
-def migrated_tenant_dbs(clean_db, mongo):
-    ''' Init a set of tenant dbs to predefined versions. '''
-    for tid, ver in MIGRATED_TENANT_DBS.items():
-        mongo_set_version(mongo, make_tenant_db(tid), ver)
 
 def mongo_cleanup(mongo):
     dbs = mongo.database_names()
     dbs = [d for d in dbs if d not in ['local', 'admin']]
     for d in dbs:
         mongo.drop_database(d)
-
-def mongo_set_version(mongo, dbname, version):
-    major, minor, patch = [int(x) for x in version.split('.')]
-
-    version = {
-        "major": major,
-        "minor": minor,
-        "patch": patch,
-    }
-
-    mongo[dbname][DB_MIGRATION_COLLECTION].insert_one({"version": version})
 
 
 @pytest.yield_fixture(scope='function')
@@ -181,8 +147,6 @@ def clean_db(mongo):
     mongo_cleanup(mongo)
 
 
-def make_tenant_db(tenant_id):
-    return '{}-{}'.format(DB_NAME, tenant_id)
 
 
 @pytest.yield_fixture(scope='session')

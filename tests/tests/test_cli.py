@@ -12,8 +12,52 @@
 #    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
-from common import *
+from common import clean_db, mongo, cli
 import pytest
+
+
+DB_NAME = "deviceauth"
+DB_MIGRATION_COLLECTION = "migration_info"
+DB_VERSION = "1.1.0"
+
+
+MIGRATED_TENANT_DBS={
+    "tenant-stale-1": "0.0.1",
+    "tenant-stale-2": "0.2.0",
+    "tenant-stale-3": "1.0.0",
+    "tenant-current": "1.1.0",
+    "tenant-future": "2.0.0",
+}
+
+@pytest.fixture(scope='function')
+def migrated_tenant_dbs(clean_db, mongo):
+    ''' Init a set of tenant dbs to predefined versions. '''
+    for tid, ver in MIGRATED_TENANT_DBS.items():
+        mongo_set_version(mongo, make_tenant_db(tid), ver)
+
+
+@pytest.fixture(scope='function')
+def fake_migrated_db(clean_db, mongo, request):
+    '''Init a default db to version passed in 'request'. Does not run the actual
+    migrations, just records DB version in proper collection.'''
+    version = request.param
+    mongo_set_version(mongo, DB_NAME, version)
+
+
+def mongo_set_version(mongo, dbname, version):
+    major, minor, patch = [int(x) for x in version.split('.')]
+
+    version = {
+        "major": major,
+        "minor": minor,
+        "patch": patch,
+    }
+
+    mongo[dbname][DB_MIGRATION_COLLECTION].insert_one({"version": version})
+
+
+def make_tenant_db(tenant_id):
+    return '{}-{}'.format(DB_NAME, tenant_id)
 
 
 class TestMigration:
@@ -45,7 +89,7 @@ class TestMigration:
 
 
 # runs 'last' since it drops/reinits the default db, which breaks deviceauth under test:
-# - the indexes are destroyed by 'clean_db/migrated_db'
+# - the indexes are destroyed by 'clean_db/fake_migrated_db'
 # - even though we ensure them on every write - mgo caches their names
 #   and thinks they're still there
 # - writes by deviceauth are then essentially incorrect (duplicate data) and other tests fail
@@ -55,18 +99,18 @@ class TestCliMigrate:
         cli.migrate()
         TestMigration.verify(cli, mongo, DB_NAME, DB_VERSION)
 
-    @pytest.mark.parametrize('migrated_db', ["0.0.1"], indirect=True)
-    def test_ok_stale_db(self, cli, migrated_db, mongo):
+    @pytest.mark.parametrize('fake_migrated_db', ["0.0.1"], indirect=True)
+    def test_ok_stale_db(self, cli, fake_migrated_db, mongo):
         cli.migrate()
         TestMigration.verify(cli, mongo, DB_NAME, DB_VERSION)
 
-    @pytest.mark.parametrize('migrated_db', ["1.1.0"], indirect=True)
-    def test_ok_current_db(self, cli, migrated_db, mongo):
+    @pytest.mark.parametrize('fake_migrated_db', ["1.1.0"], indirect=True)
+    def test_ok_current_db(self, cli, fake_migrated_db, mongo):
         cli.migrate()
         TestMigration.verify(cli, mongo, DB_NAME, DB_VERSION)
 
-    @pytest.mark.parametrize('migrated_db', ["2.0.0"], indirect=True)
-    def test_ok_future_db(self, cli, migrated_db, mongo):
+    @pytest.mark.parametrize('fake_migrated_db', ["2.0.0"], indirect=True)
+    def test_ok_future_db(self, cli, fake_migrated_db, mongo):
         cli.migrate()
         TestMigration.verify(cli, mongo, DB_NAME, "2.0.0")
 
