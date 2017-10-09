@@ -39,6 +39,12 @@ class BaseDevicesApiClient(BaseApiClient):
     api_url = "http://%s/api/devices/v1/authentication/" % \
               pytest.config.getoption("host")
 
+    @property
+    def auth_requests_url(self):
+        """Provides device identity as a string"""
+        return self.make_api_url("/auth_requests")
+
+
 class SwaggerApiClient(BaseApiClient):
     config = {
         'also_return_response': True,
