@@ -39,8 +39,9 @@ import (
 )
 
 var (
-	ErrDevAuthUnauthorized = errors.New("dev auth: unauthorized")
-	ErrDevIdAuthIdMismatch = errors.New("dev auth: dev ID and auth ID mismatch")
+	ErrDevAuthUnauthorized   = errors.New("dev auth: unauthorized")
+	ErrDevIdAuthIdMismatch   = errors.New("dev auth: dev ID and auth ID mismatch")
+	ErrMaxDeviceCountReached = errors.New("maximum number of accepted devices reached")
 )
 
 // Expiration Timeout should be moved to database
@@ -403,6 +404,16 @@ func (d *DevAuth) DecommissionDevice(ctx context.Context, devId string) error {
 }
 
 func (d *DevAuth) AcceptDeviceAuth(ctx context.Context, device_id string, auth_id string) error {
+	// possible race, consider accept-count-unaccept pattern if that's problematic
+	allow, err := d.canAcceptDevice(ctx)
+	if err != nil {
+		return err
+	}
+
+	if !allow {
+		return ErrMaxDeviceCountReached
+	}
+
 	if err := d.setAuthSetStatus(ctx, device_id, auth_id, model.DevStatusAccepted); err != nil {
 		return err
 	}

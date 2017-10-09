@@ -443,11 +443,19 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
-		aset                      *model.AuthSet
+		aset *model.AuthSet
+
+		dbLimit    *model.Limit
+		dbLimitErr error
+
+		dbCount    int
+		dbCountErr error
+
 		dbUpdateErr               error
 		dbUpdateRevokeAuthSetsErr error
-		dbGetErr                  error
-		invErr                    error
+
+		dbGetErr error
+		invErr   error
 
 		outErr string
 	}{
@@ -456,12 +464,59 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 				Id:       "dummy_aid",
 				DeviceId: "dummy_devid",
 			},
+			dbLimit: &model.Limit{Value: 0},
 		},
 		{
+			aset: &model.AuthSet{
+				Id:       "dummy_aid",
+				DeviceId: "dummy_devid",
+			},
+			dbLimit: &model.Limit{Value: 5},
+			dbCount: 4,
+		},
+		{
+			aset: &model.AuthSet{
+				Id:       "dummy_aid",
+				DeviceId: "dummy_devid",
+			},
+			dbLimit: &model.Limit{Value: 5},
+			dbCount: 5,
+			outErr:  "maximum number of accepted devices reached",
+		},
+		{
+			aset: &model.AuthSet{
+				Id:       "dummy_aid",
+				DeviceId: "dummy_devid",
+			},
+			dbLimit: &model.Limit{Value: 5},
+			dbCount: 6,
+			outErr:  "maximum number of accepted devices reached",
+		},
+		{
+			aset: &model.AuthSet{
+				Id:       "dummy_aid",
+				DeviceId: "dummy_devid",
+			},
+			dbLimit:    &model.Limit{Value: 5},
+			dbLimitErr: errors.New("error"),
+			outErr:     "can't get current device limit: error",
+		},
+		{
+			aset: &model.AuthSet{
+				Id:       "dummy_aid",
+				DeviceId: "dummy_devid",
+			},
+			dbLimit:    &model.Limit{Value: 5},
+			dbCountErr: errors.New("error"),
+			outErr:     "can't get current device count: error",
+		},
+		{
+			dbLimit:  &model.Limit{Value: 0},
 			dbGetErr: store.ErrDevNotFound,
 			outErr:   store.ErrDevNotFound.Error(),
 		},
 		{
+			dbLimit: &model.Limit{Value: 0},
 			aset: &model.AuthSet{
 				Id:       "dummy_aid",
 				DeviceId: "dummy_devid",
@@ -470,6 +525,7 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 			outErr:      "db update device auth set error: failed to update device",
 		},
 		{
+			dbLimit: &model.Limit{Value: 0},
 			aset: &model.AuthSet{
 				Id:       "dummy_aid",
 				DeviceId: "dummy_devid",
@@ -478,6 +534,7 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 			outErr: "inventory device add error: failed to add device to inventory: inventory failed",
 		},
 		{
+			dbLimit: &model.Limit{Value: 0},
 			aset: &model.AuthSet{
 				Id:       "dummy_aid",
 				DeviceId: "dummy_devid",
@@ -485,6 +542,7 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 			dbUpdateRevokeAuthSetsErr: store.ErrAuthSetNotFound,
 		},
 		{
+			dbLimit: &model.Limit{Value: 0},
 			aset: &model.AuthSet{
 				Id:       "dummy_aid",
 				DeviceId: "dummy_devid",
@@ -502,6 +560,11 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 			db := mstore.DataStore{}
 			db.On("GetAuthSetById",
 				context.Background(), "dummy_aid").Return(tc.aset, tc.dbGetErr)
+			db.On("GetLimit",
+				context.Background(), model.LimitMaxDeviceCount).Return(tc.dbLimit, tc.dbLimitErr)
+			db.On("GetDevCountByStatus",
+				context.Background(), model.DevStatusAccepted).Return(tc.dbCount, tc.dbCountErr)
+
 			if tc.aset != nil {
 				// for rejecting all auth sets
 				db.On("UpdateAuthSet", context.Background(),
