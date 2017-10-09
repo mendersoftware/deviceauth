@@ -634,3 +634,26 @@ func (d *DevAuth) SetTenantLimit(ctx context.Context, tenant_id string, limit mo
 func (d *DevAuth) GetDevCountByStatus(ctx context.Context, status string) (int, error) {
 	return d.db.GetDevCountByStatus(ctx, status)
 }
+
+// canAcceptDevice checks if model.LimitMaxDeviceCount will be exceeded
+func (d *DevAuth) canAcceptDevice(ctx context.Context) (bool, error) {
+	limit, err := d.GetLimit(ctx, model.LimitMaxDeviceCount)
+	if err != nil {
+		return false, errors.Wrap(err, "can't get current device limit")
+	}
+
+	if limit.Value == 0 {
+		return true, nil
+	}
+
+	accepted, err := d.db.GetDevCountByStatus(ctx, model.DevStatusAccepted)
+	if err != nil {
+		return false, errors.Wrap(err, "can't get current device count")
+	}
+
+	if uint64(accepted+1) <= limit.Value {
+		return true, nil
+	}
+
+	return false, nil
+}
