@@ -149,8 +149,13 @@ def clean_db(mongo):
     yield mongo
     mongo_cleanup(mongo)
 
-
-
+@pytest.yield_fixture(scope='function')
+def clean_migrated_db(clean_db, cli, request):
+    """Clean database with migrations applied. Yields pymongo.MongoClient connected
+    to the DB"""
+    print("migrating DB")
+    cli.migrate()
+    yield clean_db
 
 @pytest.yield_fixture(scope='session')
 def conductor_api():
