@@ -290,6 +290,15 @@ func TestApiDevAuthUpdateStatusDevice(t *testing.T) {
 			dev: nil,
 			err: errors.New("processing failed"),
 		},
+		"567,890": {
+			dev: &model.Device{
+				Id:     "foo",
+				PubKey: "foobar",
+				Status: "pending",
+				IdData: "deadcafe",
+			},
+			err: devauth.ErrMaxDeviceCountReached,
+		},
 	}
 
 	mockaction := func(_ context.Context, dev_id string, auth_id string) error {
@@ -380,6 +389,13 @@ func TestApiDevAuthUpdateStatusDevice(t *testing.T) {
 				penstatus),
 			code: http.StatusBadRequest,
 			body: RestError("dev auth: dev ID and auth ID mismatch"),
+		},
+		{
+			req: test.MakeSimpleRequest("PUT",
+				"http://1.2.3.4/api/management/v1/devauth/devices/567/auth/890/status",
+				accstatus),
+			code: http.StatusUnprocessableEntity,
+			body: RestError("maximum number of accepted devices reached"),
 		},
 	}
 
