@@ -152,9 +152,13 @@ def clean_db(mongo):
 @pytest.yield_fixture(scope='function')
 def clean_migrated_db(clean_db, cli, request):
     """Clean database with migrations applied. Yields pymongo.MongoClient connected
-    to the DB"""
+    to the DB. The fixture can be parametrized with tenant ID"""
+    if hasattr(request, 'param'):
+        tenant_id = request.param
+    else:
+        tenant_id = ""
     print("migrating DB")
-    cli.migrate()
+    cli.migrate(tenant=tenant_id)
     yield clean_db
 
 @pytest.yield_fixture(scope='session')
