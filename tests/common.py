@@ -27,7 +27,8 @@ from Crypto.PublicKey import RSA
 from Crypto.Signature import PKCS1_v1_5
 from Crypto.Hash import SHA256
 
-from client import SimpleInternalClient, SimpleManagementClient, ConductorClient
+from client import SimpleInternalClient, SimpleManagementClient, ConductorClient, \
+    BaseDevicesApiClient
 
 
 def get_keypair():
@@ -164,3 +165,8 @@ def management_api():
 @pytest.yield_fixture(scope='session')
 def internal_api():
     yield SimpleInternalClient()
+
+
+@pytest.yield_fixture(scope='session')
+def device_api():
+    yield BaseDevicesApiClient()
