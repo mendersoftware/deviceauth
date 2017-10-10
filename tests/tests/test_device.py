@@ -198,6 +198,44 @@ class TestDevice:
         found = management_api.find_device_by_identity(dev.identity)
         assert not found
 
+    @pytest.mark.parametrize('devices', ['15'], indirect=True)
+    def test_device_count_simple(self, devices, management_api):
+        """We have 15 devices, each with a single auth set, verify that
+        accepting/rejecting affects the count"""
+        count = management_api.count_devices()
+
+        assert count == 15
+
+        pending_count = management_api.count_devices(status='pending')
+        assert pending_count == 15
+
+        # accept device[0] and reject device[1]
+        for idx, (d, da) in enumerate(devices[0:2]):
+            dev = management_api.find_device_by_identity(d.identity)
+
+            assert dev
+            devid = dev.id
+
+            print('found matching device with ID:', dev.id)
+            aid = dev.auth_sets[0].id
+
+            try:
+                with inventory.run_fake_for_device_id(devid) as server:
+                    if idx == 0:
+                        management_api.accept_device(devid, aid)
+                    elif idx == 1:
+                        management_api.reject_device(devid, aid)
+            except bravado.exception.HTTPError as e:
+                assert e.response.status_code == 204
+
+        pending_count = management_api.count_devices(status='pending')
+        assert pending_count == 13
+        accepted_count = management_api.count_devices(status='accepted')
+        assert accepted_count == 1
+        rejected_count = management_api.count_devices(status='rejected')
+        assert rejected_count == 1
+
+
 
 def get_fake_orchestrator_addr():
     return os.environ.get('FAKE_ORCHESTRATOR_ADDR', '0.0.0.0:9998')

@@ -127,6 +127,14 @@ class ManagementClient(SwaggerApiClient):
         rsp = requests.delete(self.make_api_url('/devices/{}'.format(devid)), headers = headers)
         return rsp
 
+    def count_devices(self, status=None, **kwargs):
+        if 'Authorization' not in kwargs:
+            self.log.debug('appending default authorization header')
+            kwargs['Authorization'] = 'Bearer foo'
+        count = self.client.devices.get_devices_count(status=status, **kwargs).result()[0]
+        return count.count
+
+
 class SimpleManagementClient(ManagementClient):
     """Management API client. Cannot be used as pytest base class"""
     log = logging.getLogger('client.SimpleManagementClient')
