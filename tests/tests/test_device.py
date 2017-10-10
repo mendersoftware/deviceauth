@@ -141,7 +141,6 @@ class TestDevice:
         print('limit:', limit)
         assert limit.limit == 0
 
-    @pytest.mark.xfail(reason='Not implemented yed, waiting for MEN-1486')
     @pytest.mark.parametrize('tenant_foobar_devices', ['5'], indirect=True)
     def test_device_limit_applied(self, management_api, internal_api,
                                   tenant_foobar_devices, tenant_foobar):
