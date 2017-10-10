@@ -40,6 +40,7 @@ def device_add(device_id=None, status=201):
 def get_fake_inventory_addr():
     return os.environ.get('FAKE_INVENTORY_ADDR', '0.0.0.0:9996')
 
+ANY_DEVICE = None
 
 @contextmanager
 def run_fake_for_device_id(devid):

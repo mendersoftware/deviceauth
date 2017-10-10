@@ -120,6 +120,26 @@ class TestDevice:
         print('limit:', limit)
         assert limit.limit == 0
 
+    @pytest.mark.xfail(reason='Not implemented yed, waiting for MEN-1486')
+    @pytest.mark.parametrize('devices', ['5'], indirect=True)
+    def test_device_limit_applied(self, management_api, internal_api, devices):
+        expected = 2
+        internal_api.put_max_devices_limit('foo', expected)
+
+        accepted = 0
+        try:
+            with inventory.run_fake_for_device_id(inventory.ANY_DEVICE):
+                for dev, dev_auth in devices:
+                    fdev = management_api.find_device_by_identity(dev.identity)
+                    aid = fdev.auth_sets[0].id
+                    management_api.accept_device(fdev.id, aid)
+                    accepted += 1
+        except bravado.exception.HTTPError as e:
+            assert e.response.status_code == 422
+        finally:
+            if accepted > expected:
+                pytest.fail("expected only {} devices to be accepted".format(expected))
+
     def test_get_single_device_none(self, management_api):
         try:
             management_api.get_device(id='some-devid-foo')
