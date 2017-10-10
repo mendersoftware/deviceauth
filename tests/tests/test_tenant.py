@@ -14,14 +14,12 @@
 import os
 import json
 
-from base64 import urlsafe_b64encode
-
 import pytest
 
 from common import Device, DevAuthorizer, \
     device_auth_req, \
     clean_migrated_db, clean_db, mongo, cli, \
-    management_api, device_api
+    management_api, device_api, tenant_foobar
 
 import mockserver
 import deviceadm
@@ -120,31 +118,3 @@ class TestMultiTenant:
             assert dev
         else:
             assert not dev
-
-
-def make_fake_tenant_token(tenant):
-    """make_fake_tenant_token will generate a JWT-like tenant token which looks
-    like this: 'fake.<base64 JSON encoded claims>.fake-sig'. The claims are:
-    issuer (Mender), subject (fake-tenant), mender.tenant (foobar)
-    """
-    claims = {
-        'iss': 'Mender',
-        'sub': 'fake-tenant',
-        'mender.tenant': tenant,
-    }
-
-    # serialize claims to JSON, encode as base64 and strip padding to be
-    # compatible with JWT
-    enc = urlsafe_b64encode(json.dumps(claims).encode()). \
-          decode().strip('==')
-
-    return 'fake.' + enc + '.fake-sig'
-
-
-@pytest.fixture
-@pytest.mark.parametrize('clean_migrated_db', ['foobar'], indirect=True)
-def tenant_foobar(request, clean_migrated_db):
-    """Fixture that sets up a tenant with ID 'foobar', on top of a clean migrated
-    (with tenant support) DB.
-    """
-    return make_fake_tenant_token('foobar')
