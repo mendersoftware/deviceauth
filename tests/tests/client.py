@@ -85,7 +85,8 @@ class InternalClient(SwaggerApiClient):
     def put_max_devices_limit(self, tenant_id, limit):
         Limit = self.client.get_model('Limit')
         l = Limit(limit=limit)
-        return self.client.tenant.put_tenant_tenant_id_limits_max_devices(tenant_id=tenant_id, limit=l)
+        return self.client.tenant.put_tenant_tenant_id_limits_max_devices(tenant_id=tenant_id,
+                                                                          limit=l).result()
 
 class SimpleInternalClient(InternalClient):
     """Internal API client. Cannot be used as pytest base class"""
