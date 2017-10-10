@@ -104,19 +104,24 @@ class ManagementClient(SwaggerApiClient):
     def setup(self):
         self.setup_swagger()
 
-    def accept_device(self, devid, aid):
-        return self.put_device_status(devid, aid, 'accepted')
+    def accept_device(self, devid, aid, **kwargs):
+        return self.put_device_status(devid, aid, 'accepted', **kwargs)
 
-    def reject_device(self, devid, aid):
-        return self.put_device_status(devid, aid, 'rejected')
+    def reject_device(self, devid, aid, **kwargs):
+        return self.put_device_status(devid, aid, 'rejected', **kwargs)
 
-    def put_device_status(self, devid, aid, status):
+    def put_device_status(self, devid, aid, status, **kwargs):
+        if 'Authorization' not in kwargs:
+            self.log.debug('appending default authorization header')
+            kwargs['Authorization'] = 'Bearer foo'
+
         self.log.info("definitions: %s", self.client.swagger_spec.definitions)
         Status = self.client.get_model('Status')
         st = Status(status=status)
         return self.client.devices.put_devices_id_auth_aid_status(id=devid,
                                                                   aid=aid,
-                                                                  status=st).result()
+                                                                  status=st,
+                                                                  **kwargs).result()
 
     def delete_device(self, devid, headers={}):
         if 'Authorization' not in headers:
