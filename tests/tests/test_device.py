@@ -7,37 +7,58 @@ import pytest
 from common import Device, DevAuthorizer, \
     device_auth_req, \
     clean_migrated_db, clean_db, mongo, cli, \
-    management_api, internal_api, device_api
+    management_api, internal_api, device_api, \
+    tenant_foobar
 
 import mockserver
 import deviceadm
 import inventory
 
 
+def make_devices(device_api, devcount=1, tenant_token=""):
+    print('device count to generate', devcount)
+
+    url = device_api.auth_requests_url
+
+    out_devices = []
+    with deviceadm.run_fake_for_device(deviceadm.ANY_DEVICE) as server:
+        for _ in range(devcount):
+            dev = Device()
+            da = DevAuthorizer(tenant_token=tenant_token)
+            # poke devauth so that device appears
+            rsp = device_auth_req(url, da, dev)
+            assert rsp.status_code == 401
+            out_devices.append((dev, da))
+
+    return out_devices
+
+
 @pytest.yield_fixture(scope='function')
 def devices(device_api, management_api, clean_migrated_db, request):
     """Make unauthorized devices. The fixture can be parametrized a number of
-    devices to make. Yields a list of tuples: (instance of Device, instance of DevAuthorizer)"""
-    url = device_api.auth_requests_url
+    devices to make. Yields a list of tuples:
+    (instance of Device, instance of DevAuthorizer)"""
+    if not hasattr(request, 'param'):
+        devcount = 1
+    else:
+        devcount = int(request.param)
+
+    yield make_devices(device_api, devcount)
+
+
+@pytest.yield_fixture(scope='function')
+def tenant_foobar_devices(device_api, management_api, tenant_foobar, request):
+    """Make unauthorized devices owned by tenant with ID 'foobar'. The fixture can
+    be parametrized a number of devices to make. Yields a list of tuples:
+    (instance of Device, instance of DevAuthorizer)
+    """
 
     if not hasattr(request, 'param'):
         devcount = 1
     else:
         devcount = int(request.param)
 
-    print('device count to generate', devcount)
-
-    out_devices = []
-    with deviceadm.run_fake_for_device(deviceadm.ANY_DEVICE) as server:
-        for _ in range(devcount):
-            dev = Device()
-            da = DevAuthorizer()
-            # poke devauth so that device appears
-            rsp = device_auth_req(url, da, dev)
-            assert rsp.status_code == 401
-            out_devices.append((dev, da))
-
-    yield out_devices
+    yield make_devices(device_api, devcount, tenant_token=tenant_foobar)
 
 
 class TestDevice:
@@ -121,18 +142,25 @@ class TestDevice:
         assert limit.limit == 0
 
     @pytest.mark.xfail(reason='Not implemented yed, waiting for MEN-1486')
-    @pytest.mark.parametrize('devices', ['5'], indirect=True)
-    def test_device_limit_applied(self, management_api, internal_api, devices):
+    @pytest.mark.parametrize('tenant_foobar_devices', ['5'], indirect=True)
+    def test_device_limit_applied(self, management_api, internal_api,
+                                  tenant_foobar_devices, tenant_foobar):
+        """Verify that max accepted devices limit is indeed applied. Since device
+        limits can only be set on per-tenant basis, use fixtures that setup
+        tenant 'foobar' with devices and a token
+        """
         expected = 2
-        internal_api.put_max_devices_limit('foo', expected)
+        internal_api.put_max_devices_limit('foobar', expected)
 
         accepted = 0
         try:
             with inventory.run_fake_for_device_id(inventory.ANY_DEVICE):
-                for dev, dev_auth in devices:
-                    fdev = management_api.find_device_by_identity(dev.identity)
+                for dev, dev_auth in tenant_foobar_devices:
+                    fdev = management_api.find_device_by_identity(dev.identity,
+                                                                  Authorization=tenant_foobar)
                     aid = fdev.auth_sets[0].id
-                    management_api.accept_device(fdev.id, aid)
+                    management_api.accept_device(fdev.id, aid,
+                                                 Authorization=tenant_foobar)
                     accepted += 1
         except bravado.exception.HTTPError as e:
             assert e.response.status_code == 422
