@@ -16,7 +16,8 @@ import json
 import requests
 import random
 import binascii
-from base64 import b64encode, urlsafe_b64decode
+from base64 import b64encode, urlsafe_b64decode, urlsafe_b64encode
+
 from itertools import count
 from client import CliClient
 from pymongo import MongoClient
@@ -179,3 +180,31 @@ def internal_api():
 @pytest.yield_fixture(scope='session')
 def device_api():
     yield BaseDevicesApiClient()
+
+
+def make_fake_tenant_token(tenant):
+    """make_fake_tenant_token will generate a JWT-like tenant token which looks
+    like this: 'fake.<base64 JSON encoded claims>.fake-sig'. The claims are:
+    issuer (Mender), subject (fake-tenant), mender.tenant (foobar)
+    """
+    claims = {
+        'iss': 'Mender',
+        'sub': 'fake-tenant',
+        'mender.tenant': tenant,
+    }
+
+    # serialize claims to JSON, encode as base64 and strip padding to be
+    # compatible with JWT
+    enc = urlsafe_b64encode(json.dumps(claims).encode()). \
+          decode().strip('==')
+
+    return 'fake.' + enc + '.fake-sig'
+
+
+@pytest.fixture
+@pytest.mark.parametrize('clean_migrated_db', ['foobar'], indirect=True)
+def tenant_foobar(request, clean_migrated_db):
+    """Fixture that sets up a tenant with ID 'foobar', on top of a clean migrated
+    (with tenant support) DB.
+    """
+    return make_fake_tenant_token('foobar')

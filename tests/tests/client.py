@@ -85,7 +85,8 @@ class InternalClient(SwaggerApiClient):
     def put_max_devices_limit(self, tenant_id, limit):
         Limit = self.client.get_model('Limit')
         l = Limit(limit=limit)
-        return self.client.tenant.put_tenant_tenant_id_limits_max_devices(tenant_id=tenant_id, limit=l)
+        return self.client.tenant.put_tenant_tenant_id_limits_max_devices(tenant_id=tenant_id,
+                                                                          limit=l).result()
 
 class SimpleInternalClient(InternalClient):
     """Internal API client. Cannot be used as pytest base class"""
@@ -103,19 +104,24 @@ class ManagementClient(SwaggerApiClient):
     def setup(self):
         self.setup_swagger()
 
-    def accept_device(self, devid, aid):
-        return self.put_device_status(devid, aid, 'accepted')
+    def accept_device(self, devid, aid, **kwargs):
+        return self.put_device_status(devid, aid, 'accepted', **kwargs)
 
-    def reject_device(self, devid, aid):
-        return self.put_device_status(devid, aid, 'rejected')
+    def reject_device(self, devid, aid, **kwargs):
+        return self.put_device_status(devid, aid, 'rejected', **kwargs)
 
-    def put_device_status(self, devid, aid, status):
+    def put_device_status(self, devid, aid, status, **kwargs):
+        if 'Authorization' not in kwargs:
+            self.log.debug('appending default authorization header')
+            kwargs['Authorization'] = 'Bearer foo'
+
         self.log.info("definitions: %s", self.client.swagger_spec.definitions)
         Status = self.client.get_model('Status')
         st = Status(status=status)
         return self.client.devices.put_devices_id_auth_aid_status(id=devid,
                                                                   aid=aid,
-                                                                  status=st).result()
+                                                                  status=st,
+                                                                  **kwargs).result()
 
     def delete_device(self, devid, headers={}):
         if 'Authorization' not in headers:
@@ -126,6 +132,14 @@ class ManagementClient(SwaggerApiClient):
         #   return self.client.devices.delete_devices_id(id=devid, **kwargs)
         rsp = requests.delete(self.make_api_url('/devices/{}'.format(devid)), headers = headers)
         return rsp
+
+    def count_devices(self, status=None, **kwargs):
+        if 'Authorization' not in kwargs:
+            self.log.debug('appending default authorization header')
+            kwargs['Authorization'] = 'Bearer foo'
+        count = self.client.devices.get_devices_count(status=status, **kwargs).result()[0]
+        return count.count
+
 
 class SimpleManagementClient(ManagementClient):
     """Management API client. Cannot be used as pytest base class"""
