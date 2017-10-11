@@ -256,13 +256,64 @@ class TestDevice:
             except bravado.exception.HTTPError as e:
                 assert e.response.status_code == 204
 
-        pending_count = management_api.count_devices(status='pending')
-        assert pending_count == 13
-        accepted_count = management_api.count_devices(status='accepted')
-        assert accepted_count == 1
-        rejected_count = management_api.count_devices(status='rejected')
-        assert rejected_count == 1
+        TestDevice.verify_device_count(management_api, 'pending', 13)
+        TestDevice.verify_device_count(management_api, 'accepted', 1)
+        TestDevice.verify_device_count(management_api, 'rejected', 1)
 
+    @staticmethod
+    def verify_device_count(management_api, status, expected_count):
+        count = management_api.count_devices(status=status)
+        assert count == expected_count
+
+    @pytest.mark.parametrize('devices', ['5'], indirect=True)
+    def test_device_count_multiple_auth_sets(self, devices, management_api, device_api):
+        """"Verify that auth sets are properly counted. Take a device, make sure it has
+        2 auth sets, switch each auth sets between accepted/rejected/pending
+        states
+        """
+
+        dev, dauth = devices[0]
+        # pretend device rotates its keys
+        dev.rotate_key()
+
+        with deviceadm.run_fake_for_device(deviceadm.ANY_DEVICE) as server:
+            device_auth_req(device_api.auth_requests_url, dauth, dev)
+
+        # should have 2 auth sets now
+        found_dev = management_api.find_device_by_identity(dev.identity)
+        assert len(found_dev.auth_sets) == 2
+
+        first_aid, second_aid = found_dev.auth_sets[0].id, found_dev.auth_sets[1].id
+
+        # device [0] has 2 auth sets, but still counts as 1 device
+        TestDevice.verify_device_count(management_api, 'pending', 5)
+
+        devid = found_dev.id
+        with inventory.run_fake_for_device_id(inventory.ANY_DEVICE) as server:
+            # accept first auth set
+            management_api.accept_device(devid, first_aid)
+
+            TestDevice.verify_device_count(management_api, 'pending', 4)
+            TestDevice.verify_device_count(management_api, 'accepted', 1)
+            TestDevice.verify_device_count(management_api, 'rejected', 0)
+
+            # reject the other
+            management_api.reject_device(devid, second_aid)
+            TestDevice.verify_device_count(management_api, 'pending', 4)
+            TestDevice.verify_device_count(management_api, 'accepted', 1)
+            TestDevice.verify_device_count(management_api, 'rejected', 0)
+
+            # reject both
+            management_api.reject_device(devid, first_aid)
+            TestDevice.verify_device_count(management_api, 'pending', 4)
+            TestDevice.verify_device_count(management_api, 'accepted', 0)
+            TestDevice.verify_device_count(management_api, 'rejected', 1)
+
+            # switch the first back to pending, 2nd remains rejected
+            management_api.put_device_status(devid, first_aid, 'pending')
+            TestDevice.verify_device_count(management_api, 'pending', 5)
+            TestDevice.verify_device_count(management_api, 'accepted', 0)
+            TestDevice.verify_device_count(management_api, 'rejected', 0)
 
 
 def get_fake_orchestrator_addr():
