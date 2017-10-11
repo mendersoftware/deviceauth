@@ -61,6 +61,9 @@ class Device(object):
         """Provides device identity as a string"""
         return json.dumps({"mac": self.mac})
 
+    def rotate_key(self):
+        self.private_key, self.public_key = get_keypair()
+
 
 class DevAuthorizer(object):
     def __init__(self, tenant_token=""):
