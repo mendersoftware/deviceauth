@@ -39,8 +39,9 @@ import (
 )
 
 var (
-	ErrDevAuthUnauthorized = errors.New("dev auth: unauthorized")
-	ErrDevIdAuthIdMismatch = errors.New("dev auth: dev ID and auth ID mismatch")
+	ErrDevAuthUnauthorized   = errors.New("dev auth: unauthorized")
+	ErrDevIdAuthIdMismatch   = errors.New("dev auth: dev ID and auth ID mismatch")
+	ErrMaxDeviceCountReached = errors.New("maximum number of accepted devices reached")
 )
 
 // Expiration Timeout should be moved to database
@@ -403,6 +404,16 @@ func (d *DevAuth) DecommissionDevice(ctx context.Context, devId string) error {
 }
 
 func (d *DevAuth) AcceptDeviceAuth(ctx context.Context, device_id string, auth_id string) error {
+	// possible race, consider accept-count-unaccept pattern if that's problematic
+	allow, err := d.canAcceptDevice(ctx)
+	if err != nil {
+		return err
+	}
+
+	if !allow {
+		return ErrMaxDeviceCountReached
+	}
+
 	if err := d.setAuthSetStatus(ctx, device_id, auth_id, model.DevStatusAccepted); err != nil {
 		return err
 	}
@@ -633,4 +644,27 @@ func (d *DevAuth) SetTenantLimit(ctx context.Context, tenant_id string, limit mo
 
 func (d *DevAuth) GetDevCountByStatus(ctx context.Context, status string) (int, error) {
 	return d.db.GetDevCountByStatus(ctx, status)
+}
+
+// canAcceptDevice checks if model.LimitMaxDeviceCount will be exceeded
+func (d *DevAuth) canAcceptDevice(ctx context.Context) (bool, error) {
+	limit, err := d.GetLimit(ctx, model.LimitMaxDeviceCount)
+	if err != nil {
+		return false, errors.Wrap(err, "can't get current device limit")
+	}
+
+	if limit.Value == 0 {
+		return true, nil
+	}
+
+	accepted, err := d.db.GetDevCountByStatus(ctx, model.DevStatusAccepted)
+	if err != nil {
+		return false, errors.Wrap(err, "can't get current device count")
+	}
+
+	if uint64(accepted+1) <= limit.Value {
+		return true, nil
+	}
+
+	return false, nil
 }

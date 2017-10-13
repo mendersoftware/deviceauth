@@ -141,33 +141,6 @@ class TestDevice:
         print('limit:', limit)
         assert limit.limit == 0
 
-    @pytest.mark.xfail(reason='Not implemented yed, waiting for MEN-1486')
-    @pytest.mark.parametrize('tenant_foobar_devices', ['5'], indirect=True)
-    def test_device_limit_applied(self, management_api, internal_api,
-                                  tenant_foobar_devices, tenant_foobar):
-        """Verify that max accepted devices limit is indeed applied. Since device
-        limits can only be set on per-tenant basis, use fixtures that setup
-        tenant 'foobar' with devices and a token
-        """
-        expected = 2
-        internal_api.put_max_devices_limit('foobar', expected)
-
-        accepted = 0
-        try:
-            with inventory.run_fake_for_device_id(inventory.ANY_DEVICE):
-                for dev, dev_auth in tenant_foobar_devices:
-                    fdev = management_api.find_device_by_identity(dev.identity,
-                                                                  Authorization=tenant_foobar)
-                    aid = fdev.auth_sets[0].id
-                    management_api.accept_device(fdev.id, aid,
-                                                 Authorization=tenant_foobar)
-                    accepted += 1
-        except bravado.exception.HTTPError as e:
-            assert e.response.status_code == 422
-        finally:
-            if accepted > expected:
-                pytest.fail("expected only {} devices to be accepted".format(expected))
-
     def test_get_single_device_none(self, management_api):
         try:
             management_api.get_device(id='some-devid-foo')
@@ -314,6 +287,33 @@ class TestDevice:
             TestDevice.verify_device_count(management_api, 'pending', 5)
             TestDevice.verify_device_count(management_api, 'accepted', 0)
             TestDevice.verify_device_count(management_api, 'rejected', 0)
+
+class TestDeviceMultiTenant:
+    @pytest.mark.parametrize('tenant_foobar_devices', ['5'], indirect=True)
+    def test_device_limit_applied(self, management_api, internal_api,
+                                  tenant_foobar_devices, tenant_foobar):
+        """Verify that max accepted devices limit is indeed applied. Since device
+        limits can only be set on per-tenant basis, use fixtures that setup
+        tenant 'foobar' with devices and a token
+        """
+        expected = 2
+        internal_api.put_max_devices_limit('foobar', expected)
+
+        accepted = 0
+        try:
+            with inventory.run_fake_for_device_id(inventory.ANY_DEVICE):
+                for dev, dev_auth in tenant_foobar_devices:
+                    fdev = management_api.find_device_by_identity(dev.identity,
+                                                                  Authorization=tenant_foobar)
+                    aid = fdev.auth_sets[0].id
+                    management_api.accept_device(fdev.id, aid,
+                                                 Authorization=tenant_foobar)
+                    accepted += 1
+        except bravado.exception.HTTPError as e:
+            assert e.response.status_code == 422
+        finally:
+            if accepted > expected:
+                pytest.fail("expected only {} devices to be accepted".format(expected))
 
 
 def get_fake_orchestrator_addr():

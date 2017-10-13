@@ -152,6 +152,10 @@ paths:
           description: The device was not found.
           schema:
             $ref: "#/definitions/Error"
+        422:
+          description: Request cannot be fulfilled e.g. due to exceeded limit on maximum accepted devices (see error message).
+          schema:
+            $ref: "#/definitions/Error"
         500:
           description: Internal server error.
           schema:

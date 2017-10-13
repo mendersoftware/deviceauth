@@ -351,6 +351,9 @@ func (d *DevAuthApiHandlers) UpdateDeviceStatusHandler(w rest.ResponseWriter, r 
 			rest_utils.RestErrWithLog(w, r, l, err, http.StatusNotFound)
 		case devauth.ErrDevIdAuthIdMismatch:
 			rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		case devauth.ErrMaxDeviceCountReached:
+			rest_utils.RestErrWithLog(w, r, l, err, http.StatusUnprocessableEntity)
+
 		default:
 			rest_utils.RestErrWithLogInternal(w, r, l, err)
 		}
