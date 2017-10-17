@@ -29,7 +29,7 @@ import (
 
 const (
 	// devices endpoint
-	DevAdmDevicesUri = "/api/0.1.0/devices/"
+	DevAdmDevicesUri = "/api/management/v1/admission/devices/"
 	// default request timeout, 10s?
 	defaultReqTimeout = time.Duration(10) * time.Second
 )

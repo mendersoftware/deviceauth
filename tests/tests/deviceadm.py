@@ -50,7 +50,7 @@ ANY_DEVICE = None
 @contextmanager
 def run_fake_for_device(device):
     handlers = [
-        ('PUT', '/api/0.1.0/devices/(.*)', auth_set_put_for_device(device)),
+        ('PUT', '/api/management/v1/admission/devices/(.*)', auth_set_put_for_device(device)),
     ]
     with mockserver.run_fake(get_fake_deviceadm_addr(),
                              handlers=handlers) as server:
