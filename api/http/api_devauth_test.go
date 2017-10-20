@@ -1069,3 +1069,59 @@ func TestApiDevAuthGetDevicesCount(t *testing.T) {
 		})
 	}
 }
+
+func TestApiDevAuthPostTenants(t *testing.T) {
+	testCases := map[string]struct {
+		req        *http.Request
+		devAuthErr error
+		respCode   int
+		respBody   string
+	}{
+		"ok": {
+			req: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/internal/v1/devauth/tenants",
+				model.NewTenant{TenantId: "foo"}),
+			respCode: 201,
+			respBody: "",
+		},
+		"error: empty request": {
+			req: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/internal/v1/devauth/tenants",
+				nil),
+			respCode: 400,
+			respBody: RestError("EOF"),
+		},
+		"error: no tenant_id": {
+			req: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/internal/v1/devauth/tenants",
+				model.NewTenant{TenantId: ""},
+			),
+			respCode: 400,
+			respBody: RestError("tenant_id must be provided"),
+		},
+		"error: generic": {
+			req: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/internal/v1/devauth/tenants",
+				model.NewTenant{TenantId: "foo"},
+			),
+			devAuthErr: errors.New("can't provision tenant"),
+			respCode:   500,
+			respBody:   RestError("internal error"),
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Logf("test case: %s", name)
+		da := &mocks.App{}
+
+		da.On("ProvisionTenant",
+			mock.MatchedBy(func(c context.Context) bool { return true }),
+			mock.AnythingOfType("string")).Return(tc.devAuthErr)
+
+		apih := makeMockApiHandler(t, da)
+
+		rest.ErrorFieldName = "error"
+
+		runTestRequest(t, apih, tc.req, tc.respCode, tc.respBody)
+	}
+}
