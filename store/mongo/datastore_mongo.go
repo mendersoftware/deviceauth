@@ -534,9 +534,11 @@ func (db *DataStoreMongo) WithMultitenant() *DataStoreMongo {
 	return db
 }
 
-func (db *DataStoreMongo) WithAutomigrate() *DataStoreMongo {
-	db.automigrate = true
-	return db
+func (db *DataStoreMongo) WithAutomigrate() store.DataStore {
+	return &DataStoreMongo{
+		session:     db.session,
+		automigrate: true,
+	}
 }
 
 func (db *DataStoreMongo) EnsureIndexes(ctx context.Context, s *mgo.Session) error {

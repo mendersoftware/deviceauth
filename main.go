@@ -131,7 +131,7 @@ func cmdServer(args *cli.Context) error {
 	}
 
 	if args.Bool("automigrate") {
-		db = db.WithAutomigrate()
+		db = db.WithAutomigrate().(*mongo.DataStoreMongo)
 	}
 
 	if config.Config.Get(SettingTenantAdmAddr) != "" {
@@ -175,7 +175,7 @@ func cmdMigrate(args *cli.Context) error {
 			3)
 	}
 
-	db = db.WithAutomigrate()
+	db = db.WithAutomigrate().(*mongo.DataStoreMongo)
 
 	tenant := args.String("tenant")
 

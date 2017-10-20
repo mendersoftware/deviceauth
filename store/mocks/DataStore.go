@@ -326,6 +326,20 @@ func (_m *DataStore) GetToken(ctx context.Context, jti string) (*model.Token, er
 	return r0, r1
 }
 
+// MigrateTenant provides a mock function with given fields: ctx, version, tenant
+func (_m *DataStore) MigrateTenant(ctx context.Context, version string, tenant string) error {
+	ret := _m.Called(ctx, version, tenant)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+		r0 = rf(ctx, version, tenant)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // PutLimit provides a mock function with given fields: ctx, lim
 func (_m *DataStore) PutLimit(ctx context.Context, lim model.Limit) error {
 	ret := _m.Called(ctx, lim)
@@ -368,4 +382,18 @@ func (_m *DataStore) UpdateDevice(ctx context.Context, d model.Device, up model.
 	return r0
 }
 
-var _ store.DataStore = (*DataStore)(nil)
+// WithAutomigrate provides a mock function with given fields:
+func (_m *DataStore) WithAutomigrate() store.DataStore {
+	ret := _m.Called()
+
+	var r0 store.DataStore
+	if rf, ok := ret.Get(0).(func() store.DataStore); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(store.DataStore)
+		}
+	}
+
+	return r0
+}
