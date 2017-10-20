@@ -367,7 +367,7 @@ func (db *DataStoreMongo) Migrate(ctx context.Context, version string) error {
 		// TODO: we should aim to unify context usage across migrators and migrations
 		// migrators use 'string' db name, migrations use DbFromContext
 		// both should use one or the other; for now - just redundantly pass both ctx and db name
-		err := db.MigrateSingle(tenantCtx, d, version)
+		err := db.MigrateTenant(tenantCtx, d, version)
 		if err != nil {
 			return err
 		}
@@ -376,7 +376,7 @@ func (db *DataStoreMongo) Migrate(ctx context.Context, version string) error {
 	return nil
 }
 
-func (db *DataStoreMongo) MigrateSingle(ctx context.Context, database, version string) error {
+func (db *DataStoreMongo) MigrateTenant(ctx context.Context, database, version string) error {
 	l := log.FromContext(ctx)
 
 	l.Infof("migrating %s", database)

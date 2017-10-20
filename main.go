@@ -190,7 +190,7 @@ func cmdMigrate(args *cli.Context) error {
 			3)
 	}
 
-	err = db.MigrateSingle(tenantCtx, dbname, mongo.DbVersion)
+	err = db.MigrateTenant(tenantCtx, dbname, mongo.DbVersion)
 	if err != nil {
 		return cli.NewExitError(
 			fmt.Sprintf("failed to run migrations: %v", err),
