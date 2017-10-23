@@ -95,6 +95,7 @@ class TestToken:
         rsp = requests.post(token_verify_url, data='',
                             headers={'Authorization': auth_hdr})
         assert rsp.status_code == 200
+        assert rsp.headers['Content-Type'] == "application/jwt"
 
     def test_token_verify_none(self, token_verify_url):
         # no auth header should raise an error
