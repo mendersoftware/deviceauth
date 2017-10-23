@@ -155,8 +155,9 @@ func (d *DevAuthApiHandlers) SubmitAuthRequestHandler(w rest.ResponseWriter, r *
 			http.StatusUnauthorized, "unauthorized")
 		return
 	case nil:
-		w.(http.ResponseWriter).Header().Set("Content-Type", "application/jwt")
-		w.(http.ResponseWriter).Write([]byte(token))
+		ww := w.(http.ResponseWriter)
+		ww.Header().Set("Content-Type", "application/jwt")
+		ww.Write([]byte(token))
 		return
 	default:
 		rest_utils.RestErrWithLogInternal(w, r, l, err)
