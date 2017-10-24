@@ -1319,3 +1319,45 @@ func TestDevAuthGetDevCountByStatus(t *testing.T) {
 		})
 	}
 }
+
+func TestDevAuthProvisionTenant(t *testing.T) {
+	t.Parallel()
+
+	testCases := map[string]struct {
+		datastoreError error
+		outError       error
+	}{
+		"ok": {
+			datastoreError: nil,
+			outError:       nil,
+		},
+		"generic error": {
+			datastoreError: errors.New("failed to provision tenant"),
+			outError:       errors.New("failed to provision tenant"),
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(fmt.Sprintf("test case: %s", name), func(t *testing.T) {
+			ctx := context.Background()
+
+			db := mstore.DataStore{}
+			db.On("MigrateTenant", ctx,
+				mock.AnythingOfType("string"),
+				"1.1.0",
+			).Return(tc.datastoreError)
+			db.On("WithAutomigrate").Return(&db)
+			devauth := NewDevAuth(&db, nil, nil, nil, nil, Config{})
+
+			err := devauth.ProvisionTenant(ctx, "foo")
+
+			if tc.outError != nil {
+				if assert.Error(t, err) {
+					assert.EqualError(t, err, tc.outError.Error())
+				}
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}

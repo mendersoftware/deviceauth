@@ -25,6 +25,7 @@ import (
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/mendersoftware/go-lib-micro/requestid"
+	mstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/pkg/errors"
 	"github.com/satori/go.uuid"
 
@@ -35,6 +36,7 @@ import (
 	"github.com/mendersoftware/deviceauth/jwt"
 	"github.com/mendersoftware/deviceauth/model"
 	"github.com/mendersoftware/deviceauth/store"
+	"github.com/mendersoftware/deviceauth/store/mongo"
 	uto "github.com/mendersoftware/deviceauth/utils/to"
 )
 
@@ -78,6 +80,8 @@ type App interface {
 	GetTenantLimit(ctx context.Context, name, tenant_id string) (*model.Limit, error)
 
 	GetDevCountByStatus(ctx context.Context, status string) (int, error)
+
+	ProvisionTenant(ctx context.Context, tenant_id string) error
 }
 
 type DevAuth struct {
@@ -667,4 +671,14 @@ func (d *DevAuth) canAcceptDevice(ctx context.Context) (bool, error) {
 	}
 
 	return false, nil
+}
+
+func (d *DevAuth) ProvisionTenant(ctx context.Context, tenant_id string) error {
+	tenantCtx := identity.WithContext(context.Background(), &identity.Identity{
+		Tenant: tenant_id,
+	})
+
+	dbname := mstore.DbFromContext(tenantCtx, mongo.DbName)
+
+	return d.db.WithAutomigrate().MigrateTenant(ctx, dbname, mongo.DbVersion)
 }

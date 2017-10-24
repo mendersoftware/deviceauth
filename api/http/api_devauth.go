@@ -44,6 +44,8 @@ const (
 	uriTokenVerify = "/api/internal/v1/devauth/tokens/verify"
 	uriTenantLimit = "/api/internal/v1/devauth/tenant/:id/limits/:name"
 
+	uriTenants = "/api/internal/v1/devauth/tenants"
+
 	HdrAuthReqSign = "X-MEN-Signature"
 )
 
@@ -89,6 +91,8 @@ func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
 		rest.Get(uriTenantLimit, d.GetTenantLimitHandler),
 
 		rest.Get(uriLimit, d.GetLimit),
+
+		rest.Post(uriTenants, d.ProvisionTenantHandler),
 	}
 
 	app, err := rest.MakeRouter(
@@ -448,6 +452,27 @@ func (d *DevAuthApiHandlers) GetLimit(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	w.WriteJson(LimitValue{lim.Value})
+}
+
+func (d *DevAuthApiHandlers) ProvisionTenantHandler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+	l := log.FromContext(ctx)
+
+	defer r.Body.Close()
+
+	tenant, err := model.ParseNewTenant(r.Body)
+	if err != nil {
+		rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		return
+	}
+
+	err = d.devAuth.ProvisionTenant(ctx, tenant.TenantId)
+	if err != nil {
+		rest_utils.RestErrWithLogInternal(w, r, l, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
 }
 
 // Validate status.

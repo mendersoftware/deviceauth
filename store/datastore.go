@@ -90,4 +90,7 @@ type DataStore interface {
 	// get the number of devices with a given admission status
 	// computed based on aggregated auth set statuses
 	GetDevCountByStatus(ctx context.Context, status string) (int, error)
+
+	MigrateTenant(ctx context.Context, version string, tenant string) error
+	WithAutomigrate() DataStore
 }

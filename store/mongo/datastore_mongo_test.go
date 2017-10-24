@@ -72,7 +72,7 @@ func getDb(ctx context.Context) *DataStoreMongo {
 	db.Wipe()
 
 	ds := NewDataStoreMongoWithSession(db.Session())
-	ds = ds.WithAutomigrate()
+	ds = ds.WithAutomigrate().(*DataStoreMongo)
 	ds.Migrate(ctx, DbVersion)
 
 	return ds
@@ -630,7 +630,7 @@ func TestStoreMigrate(t *testing.T) {
 
 			// set up automigration
 			if tc.automigrate {
-				db = db.WithAutomigrate()
+				db = db.WithAutomigrate().(*DataStoreMongo)
 			}
 
 			// set up multitenancy/tenant dbs
