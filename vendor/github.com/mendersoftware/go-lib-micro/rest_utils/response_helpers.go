@@ -16,6 +16,7 @@ package rest_utils
 import (
 	"net/http"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/pkg/errors"
 
@@ -38,8 +39,52 @@ func RestErrWithLogInternal(w rest.ResponseWriter, r *rest.Request, l *log.Logge
 }
 
 // return an error code with an overriden message (to avoid exposing the details)
-// log full error
+// log full error as debug
+func RestErrWithDebugMsg(w rest.ResponseWriter, r *rest.Request, l *log.Logger, e error, code int, msg string) {
+	restErrWithLogMsg(w, r, l, e, code, msg, logrus.DebugLevel)
+}
+
+// return an error code with an overriden message (to avoid exposing the details)
+// log full error as info
+func RestErrWithInfoMsg(w rest.ResponseWriter, r *rest.Request, l *log.Logger, e error, code int, msg string) {
+	restErrWithLogMsg(w, r, l, e, code, msg, logrus.InfoLevel)
+}
+
+// return an error code with an overriden message (to avoid exposing the details)
+// log full error as warning
+func RestErrWithWarningMsg(w rest.ResponseWriter, r *rest.Request, l *log.Logger, e error, code int, msg string) {
+	restErrWithLogMsg(w, r, l, e, code, msg, logrus.WarnLevel)
+}
+
+// same as RestErrWithErrorMsg - for backward compatibility purpose
+// return an error code with an overriden message (to avoid exposing the details)
+// log full error as error
 func RestErrWithLogMsg(w rest.ResponseWriter, r *rest.Request, l *log.Logger, e error, code int, msg string) {
+	restErrWithLogMsg(w, r, l, e, code, msg, logrus.ErrorLevel)
+}
+
+// return an error code with an overriden message (to avoid exposing the details)
+// log full error as error
+func RestErrWithErrorMsg(w rest.ResponseWriter, r *rest.Request, l *log.Logger, e error, code int, msg string) {
+	restErrWithLogMsg(w, r, l, e, code, msg, logrus.ErrorLevel)
+}
+
+// return an error code with an overriden message (to avoid exposing the details)
+// log full error as fatal
+func RestErrWithFatalMsg(w rest.ResponseWriter, r *rest.Request, l *log.Logger, e error, code int, msg string) {
+	restErrWithLogMsg(w, r, l, e, code, msg, logrus.FatalLevel)
+}
+
+// return an error code with an overriden message (to avoid exposing the details)
+// log full error as panic
+func RestErrWithPanicMsg(w rest.ResponseWriter, r *rest.Request, l *log.Logger, e error, code int, msg string) {
+	restErrWithLogMsg(w, r, l, e, code, msg, logrus.PanicLevel)
+}
+
+// return an error code with an overriden message (to avoid exposing the details)
+// log full error with given log level
+func restErrWithLogMsg(w rest.ResponseWriter, r *rest.Request, l *log.Logger,
+	e error, code int, msg string, logLevel logrus.Level) {
 	w.WriteHeader(code)
 	err := w.WriteJson(map[string]string{
 		rest.ErrorFieldName: msg,
@@ -48,5 +93,18 @@ func RestErrWithLogMsg(w rest.ResponseWriter, r *rest.Request, l *log.Logger, e 
 	if err != nil {
 		panic(err)
 	}
-	l.F(log.Ctx{}).Error(errors.Wrap(e, msg).Error())
+	switch logLevel {
+	case logrus.DebugLevel:
+		l.F(log.Ctx{}).Debug(errors.Wrap(e, msg).Error())
+	case logrus.InfoLevel:
+		l.F(log.Ctx{}).Info(errors.Wrap(e, msg).Error())
+	case logrus.WarnLevel:
+		l.F(log.Ctx{}).Warn(errors.Wrap(e, msg).Error())
+	case logrus.ErrorLevel:
+		l.F(log.Ctx{}).Error(errors.Wrap(e, msg).Error())
+	case logrus.FatalLevel:
+		l.F(log.Ctx{}).Fatal(errors.Wrap(e, msg).Error())
+	case logrus.PanicLevel:
+		l.F(log.Ctx{}).Panic(errors.Wrap(e, msg).Error())
+	}
 }

@@ -155,7 +155,7 @@ func (d *DevAuthApiHandlers) SubmitAuthRequestHandler(w rest.ResponseWriter, r *
 	case devauth.ErrDevAuthUnauthorized, devauth.ErrDevIdAuthIdMismatch:
 		// error is always set to unauthorized, client does not need to
 		// know why
-		rest_utils.RestErrWithLogMsg(w, r, l, devauth.ErrDevAuthUnauthorized,
+		rest_utils.RestErrWithWarningMsg(w, r, l, devauth.ErrDevAuthUnauthorized,
 			http.StatusUnauthorized, "unauthorized")
 		return
 	case nil:
