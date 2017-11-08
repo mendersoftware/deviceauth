@@ -63,3 +63,8 @@ func TestTenantFromDbName(t *testing.T) {
 	assert.Equal(t, "198273913adsjhakdh",
 		TenantFromDbName("123__--afff-198273913adsjhakdh", "123__--afff"))
 }
+
+func TestDbNameForTenant(t *testing.T) {
+	assert.Equal(t, "basedb-tenant1", DbNameForTenant("tenant1", "basedb"))
+	assert.Equal(t, "basedb", DbNameForTenant("", "basedb"))
+}
