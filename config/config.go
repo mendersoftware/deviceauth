@@ -11,90 +11,72 @@
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
-
 package config
 
 import (
-	"time"
+	"github.com/mendersoftware/go-lib-micro/config"
+)
 
-	"github.com/pkg/errors"
-	"github.com/spf13/viper"
+const (
+	SettingListen        = "listen"
+	SettingListenDefault = ":8080"
+
+	SettingMiddleware        = "middleware"
+	SettingMiddlewareDefault = "prod"
+
+	SettingDb        = "mongo"
+	SettingDbDefault = "mongo-device-auth"
+
+	SettingDbSSL        = "mongo_ssl"
+	SettingDbSSLDefault = false
+
+	SettingDbSSLSkipVerify        = "mongo_ssl_skipverify"
+	SettingDbSSLSkipVerifyDefault = false
+
+	SettingDbUsername = "mongo_username"
+	SettingDbPassword = "mongo_password"
+
+	SettingDevAdmAddr        = "devadm_addr"
+	SettingDevAdmAddrDefault = "http://mender-device-adm:8080/"
+
+	SettingInventoryAddr        = "inventory_addr"
+	SettingInventoryAddrDefault = "http://mender-inventory:8080/"
+
+	SettingOrchestratorAddr        = "device_auth_orchestrator"
+	SettingOrchestratorAddrDefault = "http://mender-conductor:8080/"
+
+	SettingTenantAdmAddr        = "tenantadm_addr"
+	SettingTenantAdmAddrDefault = ""
+
+	SettingServerPrivKeyPath        = "server_priv_key_path"
+	SettingServerPrivKeyPathDefault = "/etc/deviceauth/rsa/private.pem"
+
+	SettingJWTIssuer        = "jwt_issuer"
+	SettingJWTIssuerDefault = "Mender"
+
+	SettingJWTExpirationTimeout        = "jwt_exp_timeout"
+	SettingJWTExpirationTimeoutDefault = "604800" //one week
+
+	SettingMaxDevicesLimitDefault        = "max_devices_limit_default"
+	SettingMaxDevicesLimitDefaultDefault = "0" // no limit
+
 )
 
 var (
-	Config = viper.New()
+	Validators = []config.Validator{}
+	Defaults   = []config.Default{
+		{Key: SettingListen, Value: SettingListenDefault},
+		{Key: SettingMiddleware, Value: SettingMiddlewareDefault},
+		{Key: SettingDb, Value: SettingDbDefault},
+		{Key: SettingDevAdmAddr, Value: SettingDevAdmAddrDefault},
+		{Key: SettingInventoryAddr, Value: SettingInventoryAddrDefault},
+		{Key: SettingOrchestratorAddr, Value: SettingOrchestratorAddrDefault},
+		{Key: SettingTenantAdmAddr, Value: SettingTenantAdmAddrDefault},
+		{Key: SettingServerPrivKeyPath, Value: SettingServerPrivKeyPathDefault},
+		{Key: SettingJWTIssuer, Value: SettingJWTIssuerDefault},
+		{Key: SettingJWTExpirationTimeout, Value: SettingJWTExpirationTimeoutDefault},
+		{Key: SettingDbSSL, Value: SettingDbSSLDefault},
+		{Key: SettingDbSSLSkipVerify, Value: SettingDbSSLSkipVerifyDefault},
+		{Key: SettingMaxDevicesLimitDefault, Value: SettingMaxDevicesLimitDefaultDefault},
+	}
 )
-
-func FromConfigFile(filePath string,
-	defaults []Default,
-	configValidators ...Validator) error {
-
-	// Set default values for config
-	SetDefaults(Config, defaults)
-
-	// Find and read the config file
-	if filePath != "" {
-		Config.SetConfigFile(filePath)
-		if err := Config.ReadInConfig(); err != nil {
-			return errors.Wrap(err, "failed to read configuration")
-		}
-	}
-
-	// Validate config
-	if err := ValidateConfig(Config, configValidators...); err != nil {
-		return errors.Wrap(err, "failed to validate configuration")
-	}
-
-	return nil
-}
-
-type Reader interface {
-	Get(key string) interface{}
-	GetBool(key string) bool
-	GetFloat64(key string) float64
-	GetInt(key string) int
-	GetInt64(key string) int64
-	GetString(key string) string
-	GetStringMap(key string) map[string]interface{}
-	GetStringMapString(key string) map[string]string
-	GetStringSlice(key string) []string
-	GetTime(key string) time.Time
-	GetDuration(key string) time.Duration
-	IsSet(key string) bool
-}
-
-type Writer interface {
-	SetDefault(key string, val interface{})
-	Set(key string, val interface{})
-}
-
-type Handler interface {
-	Reader
-	Writer
-}
-
-type Default struct {
-	Key   string
-	Value interface{}
-}
-
-type Validator func(c Reader) error
-
-// ValidateConfig validates conifg accroding to provided validators.
-func ValidateConfig(c Reader, validators ...Validator) error {
-
-	for _, validator := range validators {
-		err := validator(c)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func SetDefaults(c Writer, defaults []Default) {
-	for _, def := range defaults {
-		c.SetDefault(def.Key, def.Value)
-	}
-}

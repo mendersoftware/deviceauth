@@ -18,12 +18,13 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/mendersoftware/go-lib-micro/config"
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/log"
 	mstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/urfave/cli"
 
-	"github.com/mendersoftware/deviceauth/config"
+	dconfig "github.com/mendersoftware/deviceauth/config"
 	"github.com/mendersoftware/deviceauth/store/mongo"
 )
 
@@ -111,18 +112,18 @@ func cmdServer(args *cli.Context) error {
 
 	if devSetup {
 		l.Infof("setting up development configuration")
-		config.Config.Set(SettingMiddleware, EnvDev)
+		config.Config.Set(dconfig.SettingMiddleware, EnvDev)
 	}
 
 	db, err := mongo.NewDataStoreMongo(
 		mongo.DataStoreMongoConfig{
-			ConnectionString: config.Config.GetString(SettingDb),
+			ConnectionString: config.Config.GetString(dconfig.SettingDb),
 
-			SSL:           config.Config.GetBool(SettingDbSSL),
-			SSLSkipVerify: config.Config.GetBool(SettingDbSSLSkipVerify),
+			SSL:           config.Config.GetBool(dconfig.SettingDbSSL),
+			SSLSkipVerify: config.Config.GetBool(dconfig.SettingDbSSLSkipVerify),
 
-			Username: config.Config.GetString(SettingDbUsername),
-			Password: config.Config.GetString(SettingDbPassword),
+			Username: config.Config.GetString(dconfig.SettingDbUsername),
+			Password: config.Config.GetString(dconfig.SettingDbPassword),
 		})
 	if err != nil {
 		return cli.NewExitError(
@@ -134,7 +135,7 @@ func cmdServer(args *cli.Context) error {
 		db = db.WithAutomigrate().(*mongo.DataStoreMongo)
 	}
 
-	if config.Config.Get(SettingTenantAdmAddr) != "" {
+	if config.Config.Get(dconfig.SettingTenantAdmAddr) != "" {
 		db = db.WithMultitenant()
 	}
 
@@ -160,13 +161,13 @@ func cmdServer(args *cli.Context) error {
 func cmdMigrate(args *cli.Context) error {
 	db, err := mongo.NewDataStoreMongo(
 		mongo.DataStoreMongoConfig{
-			ConnectionString: config.Config.GetString(SettingDb),
+			ConnectionString: config.Config.GetString(dconfig.SettingDb),
 
-			SSL:           config.Config.GetBool(SettingDbSSL),
-			SSLSkipVerify: config.Config.GetBool(SettingDbSSLSkipVerify),
+			SSL:           config.Config.GetBool(dconfig.SettingDbSSL),
+			SSLSkipVerify: config.Config.GetBool(dconfig.SettingDbSSLSkipVerify),
 
-			Username: config.Config.GetString(SettingDbUsername),
-			Password: config.Config.GetString(SettingDbPassword),
+			Username: config.Config.GetString(dconfig.SettingDbUsername),
+			Password: config.Config.GetString(dconfig.SettingDbPassword),
 		})
 
 	if err != nil {
