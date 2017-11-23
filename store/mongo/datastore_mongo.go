@@ -729,3 +729,7 @@ func (db *DataStoreMongo) GetDevCountByStatus(ctx context.Context, status string
 
 	return resp["count"].(int), err
 }
+
+func (db *DataStoreMongo) GetTenantDbs() ([]string, error) {
+	return migrate.GetTenantDbs(db.session, ctxstore.IsTenantDb(DbName))
+}
