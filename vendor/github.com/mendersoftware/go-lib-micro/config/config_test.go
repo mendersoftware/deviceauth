@@ -25,7 +25,6 @@ func (m *MockConfigReader) Get(key string) interface{}                      { re
 func (m *MockConfigReader) GetBool(key string) bool                         { return true }
 func (m *MockConfigReader) GetFloat64(key string) float64                   { return 1.1 }
 func (m *MockConfigReader) GetInt(key string) int                           { return 1 }
-func (m *MockConfigReader) GetInt64(key string) int64                       { return 1 }
 func (m *MockConfigReader) GetString(key string) string                     { return "some string" }
 func (m *MockConfigReader) GetStringMap(key string) map[string]interface{}  { return nil }
 func (m *MockConfigReader) GetStringMapString(key string) map[string]string { return nil }
@@ -53,7 +52,6 @@ func NewMockWriter() *MockConfigWriter {
 }
 
 func TestValidateConfig(t *testing.T) {
-	t.Parallel()
 
 	err := errors.New("test error")
 
@@ -74,8 +72,6 @@ func TestValidateConfig(t *testing.T) {
 }
 
 func TestSetDefaultConfigs(t *testing.T) {
-	t.Parallel()
-
 	defaults := []Default{
 		{"foo", "bar"},
 		{"baz", 1},
@@ -97,12 +93,15 @@ func TestSetDefaultConfigs(t *testing.T) {
 }
 
 func TestFromConfigFile(t *testing.T) {
-	t.Parallel()
+	if err := FromConfigFile("testdata/config-empty.yaml", []Default{}); err != nil {
+		t.Fatal(err)
+	}
 
 	err := FromConfigFile("", nil)
 	if err != nil {
-		t.FailNow()
+		t.Fatal(err)
 	}
+
 	err = FromConfigFile("non-existing-file.yaml", nil)
 	if err == nil {
 		t.FailNow()

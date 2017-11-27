@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/mendersoftware/go-lib-micro/config"
 	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/pkg/errors"
 
@@ -26,7 +27,7 @@ import (
 	"github.com/mendersoftware/deviceauth/client/inventory"
 	"github.com/mendersoftware/deviceauth/client/orchestrator"
 	"github.com/mendersoftware/deviceauth/client/tenant"
-	"github.com/mendersoftware/deviceauth/config"
+	dconfig "github.com/mendersoftware/deviceauth/config"
 	"github.com/mendersoftware/deviceauth/devauth"
 	"github.com/mendersoftware/deviceauth/jwt"
 	"github.com/mendersoftware/deviceauth/keys"
@@ -52,20 +53,20 @@ func RunServer(c config.Reader) error {
 
 	l := log.New(log.Ctx{})
 
-	privKey, err := keys.LoadRSAPrivate(c.GetString(SettingServerPrivKeyPath))
+	privKey, err := keys.LoadRSAPrivate(c.GetString(dconfig.SettingServerPrivKeyPath))
 	if err != nil {
 		return errors.Wrap(err, "failed to read rsa private key")
 	}
 
 	db, err := mongo.NewDataStoreMongo(
 		mongo.DataStoreMongoConfig{
-			ConnectionString: c.GetString(SettingDb),
+			ConnectionString: c.GetString(dconfig.SettingDb),
 
-			SSL:           c.GetBool(SettingDbSSL),
-			SSLSkipVerify: c.GetBool(SettingDbSSLSkipVerify),
+			SSL:           c.GetBool(dconfig.SettingDbSSL),
+			SSLSkipVerify: c.GetBool(dconfig.SettingDbSSLSkipVerify),
 
-			Username: c.GetString(SettingDbUsername),
-			Password: c.GetString(SettingDbPassword),
+			Username: c.GetString(dconfig.SettingDbUsername),
+			Password: c.GetString(dconfig.SettingDbPassword),
 		})
 	if err != nil {
 		return errors.Wrap(err, "database connection failed")
@@ -74,13 +75,13 @@ func RunServer(c config.Reader) error {
 	jwtHandler := jwt.NewJWTHandlerRS256(privKey)
 
 	devAdmClientConf := deviceadm.Config{
-		DevAdmAddr: c.GetString(SettingDevAdmAddr),
+		DevAdmAddr: c.GetString(dconfig.SettingDevAdmAddr),
 	}
 	invClientConf := inventory.Config{
-		InventoryAddr: c.GetString(SettingInventoryAddr),
+		InventoryAddr: c.GetString(dconfig.SettingInventoryAddr),
 	}
 	orchClientConf := orchestrator.Config{
-		OrchestratorAddr: c.GetString(SettingOrchestratorAddr),
+		OrchestratorAddr: c.GetString(dconfig.SettingOrchestratorAddr),
 		Timeout:          time.Duration(30) * time.Second,
 	}
 
@@ -90,12 +91,12 @@ func RunServer(c config.Reader) error {
 		orchestrator.NewClient(orchClientConf),
 		jwtHandler,
 		devauth.Config{
-			Issuer:                 c.GetString(SettingJWTIssuer),
-			ExpirationTime:         int64(c.GetInt(SettingJWTExpirationTimeout)),
-			MaxDevicesLimitDefault: uint64(c.GetInt64(SettingMaxDevicesLimitDefault)),
+			Issuer:                 c.GetString(dconfig.SettingJWTIssuer),
+			ExpirationTime:         int64(c.GetInt(dconfig.SettingJWTExpirationTimeout)),
+			MaxDevicesLimitDefault: uint64(c.GetInt(dconfig.SettingMaxDevicesLimitDefault)),
 		})
 
-	if tadmAddr := c.GetString(SettingTenantAdmAddr); tadmAddr != "" {
+	if tadmAddr := c.GetString(dconfig.SettingTenantAdmAddr); tadmAddr != "" {
 		l.Infof("settting up tenant verification")
 
 		tc := tenant.NewClient(tenant.Config{
@@ -105,7 +106,7 @@ func RunServer(c config.Reader) error {
 		devauth = devauth.WithTenantVerification(tc)
 	}
 
-	api, err := SetupAPI(c.GetString(SettingMiddleware))
+	api, err := SetupAPI(c.GetString(dconfig.SettingMiddleware))
 	if err != nil {
 		return errors.Wrap(err, "API setup failed")
 	}
@@ -118,7 +119,7 @@ func RunServer(c config.Reader) error {
 	}
 	api.SetApp(apph)
 
-	addr := c.GetString(SettingListen)
+	addr := c.GetString(dconfig.SettingListen)
 	l.Printf("listening on %s", addr)
 
 	return http.ListenAndServe(addr, api.MakeHandler())

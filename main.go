@@ -18,12 +18,12 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/mendersoftware/go-lib-micro/identity"
+	"github.com/mendersoftware/go-lib-micro/config"
 	"github.com/mendersoftware/go-lib-micro/log"
-	mstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/urfave/cli"
 
-	"github.com/mendersoftware/deviceauth/config"
+	"github.com/mendersoftware/deviceauth/cmd"
+	dconfig "github.com/mendersoftware/deviceauth/config"
 	"github.com/mendersoftware/deviceauth/store/mongo"
 )
 
@@ -77,6 +77,10 @@ func doMain(args []string) {
 					Name:  "tenant",
 					Usage: "Tenant ID (optional).",
 				},
+				cli.BoolFlag{
+					Name:  "list-tenants",
+					Usage: "List Tenant IDs. Not performing migrations.",
+				},
 			},
 
 			Action: cmdMigrate,
@@ -87,7 +91,7 @@ func doMain(args []string) {
 	app.Before = func(args *cli.Context) error {
 		log.Setup(debug)
 
-		err := config.FromConfigFile(configPath, configDefaults)
+		err := config.FromConfigFile(configPath, dconfig.Defaults)
 		if err != nil {
 			return cli.NewExitError(
 				fmt.Sprintf("error loading configuration: %s", err),
@@ -111,30 +115,30 @@ func cmdServer(args *cli.Context) error {
 
 	if devSetup {
 		l.Infof("setting up development configuration")
-		config.Config.Set(SettingMiddleware, EnvDev)
+		config.Config.Set(dconfig.SettingMiddleware, EnvDev)
 	}
 
 	db, err := mongo.NewDataStoreMongo(
 		mongo.DataStoreMongoConfig{
-			ConnectionString: config.Config.GetString(SettingDb),
+			ConnectionString: config.Config.GetString(dconfig.SettingDb),
 
-			SSL:           config.Config.GetBool(SettingDbSSL),
-			SSLSkipVerify: config.Config.GetBool(SettingDbSSLSkipVerify),
+			SSL:           config.Config.GetBool(dconfig.SettingDbSSL),
+			SSLSkipVerify: config.Config.GetBool(dconfig.SettingDbSSLSkipVerify),
 
-			Username: config.Config.GetString(SettingDbUsername),
-			Password: config.Config.GetString(SettingDbPassword),
+			Username: config.Config.GetString(dconfig.SettingDbUsername),
+			Password: config.Config.GetString(dconfig.SettingDbPassword),
 		})
 	if err != nil {
 		return cli.NewExitError(
 			fmt.Sprintf("failed to connect to db: %v", err),
-			3)
+			2)
 	}
 
 	if args.Bool("automigrate") {
 		db = db.WithAutomigrate().(*mongo.DataStoreMongo)
 	}
 
-	if config.Config.Get(SettingTenantAdmAddr) != "" {
+	if config.Config.Get(dconfig.SettingTenantAdmAddr) != "" {
 		db = db.WithMultitenant()
 	}
 
@@ -158,44 +162,9 @@ func cmdServer(args *cli.Context) error {
 }
 
 func cmdMigrate(args *cli.Context) error {
-	db, err := mongo.NewDataStoreMongo(
-		mongo.DataStoreMongoConfig{
-			ConnectionString: config.Config.GetString(SettingDb),
-
-			SSL:           config.Config.GetBool(SettingDbSSL),
-			SSLSkipVerify: config.Config.GetBool(SettingDbSSLSkipVerify),
-
-			Username: config.Config.GetString(SettingDbUsername),
-			Password: config.Config.GetString(SettingDbPassword),
-		})
-
+	err := cmd.Migrate(config.Config, args.String("tenant"), args.Bool("list-tenants"))
 	if err != nil {
-		return cli.NewExitError(
-			fmt.Sprintf("failed to connect to db: %v", err),
-			3)
+		return cli.NewExitError(err, 5)
 	}
-
-	db = db.WithAutomigrate().(*mongo.DataStoreMongo)
-
-	tenant := args.String("tenant")
-
-	tenantCtx := identity.WithContext(context.Background(), &identity.Identity{
-		Tenant: tenant,
-	})
-
-	dbname := mstore.DbFromContext(tenantCtx, mongo.DbName)
-	if err != nil {
-		return cli.NewExitError(
-			fmt.Sprintf("failed to decode dbname: %v", err),
-			3)
-	}
-
-	err = db.MigrateTenant(tenantCtx, dbname, mongo.DbVersion)
-	if err != nil {
-		return cli.NewExitError(
-			fmt.Sprintf("failed to run migrations: %v", err),
-			3)
-	}
-
 	return nil
 }
