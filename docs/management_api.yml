@@ -110,6 +110,33 @@ paths:
           description: Internal server error.
           schema:
             $ref: "#/definitions/Error"
+  /devices/{id}/auth/{aid}:
+    delete:
+      summary: Remove the device authentication set
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          type: string
+          format: Bearer [token]
+          description: Contains the JWT token issued by the User Administration and Authentication Service.
+        - name: id
+          in: path
+          description: Device identifier.
+          required: true
+          type: string
+        - name: aid
+          in: path
+          description: Authentication data set identifier.
+          required: true
+          type: string
+      responses:
+        204:
+          description: Device authentication set deleted.
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/Error"
   /devices/{id}/auth/{aid}/status:
     put:
       summary: Update the device authentication set status
