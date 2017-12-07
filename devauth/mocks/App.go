@@ -187,6 +187,20 @@ func (_m *App) GetTenantLimit(ctx context.Context, name string, tenant_id string
 	return r0, r1
 }
 
+// PreauthorizeDevice provides a mock function with given fields: ctx, req
+func (_m *App) PreauthorizeDevice(ctx context.Context, req *model.PreAuthReq) error {
+	ret := _m.Called(ctx, req)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *model.PreAuthReq) error); ok {
+		r0 = rf(ctx, req)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // ProvisionTenant provides a mock function with given fields: ctx, tenant_id
 func (_m *App) ProvisionTenant(ctx context.Context, tenant_id string) error {
 	ret := _m.Called(ctx, tenant_id)

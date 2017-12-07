@@ -21,6 +21,7 @@ const (
 	DevStatusAccepted = "accepted"
 	DevStatusRejected = "rejected"
 	DevStatusPending  = "pending"
+	DevStatusPreauth  = "preauthorized"
 
 	DevKeyIdData = "id_data"
 )

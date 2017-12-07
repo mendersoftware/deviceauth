@@ -439,6 +439,111 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 	}
 }
 
+func TestDevAuthPreauthorizeDevice(t *testing.T) {
+	t.Parallel()
+
+	authsetId := "aid"
+	deviceId := "did"
+	idData := "iddata"
+	pubKey := "pubkey"
+
+	req := &model.PreAuthReq{
+		AuthSetId: authsetId,
+		DeviceId:  deviceId,
+		IdData:    idData,
+		PubKey:    pubKey,
+	}
+
+	testCases := []struct {
+		desc string
+		req  *model.PreAuthReq
+
+		addDeviceErr  error
+		addAuthSetErr error
+
+		err error
+	}{
+		{
+			desc: "ok",
+			req:  req,
+		},
+		{
+			desc: "error: add device, exists",
+			req:  req,
+
+			addDeviceErr: store.ErrObjectExists,
+
+			err: ErrDeviceExists,
+		},
+		{
+			desc: "error: add device, generic",
+			req:  req,
+
+			addDeviceErr: errors.New("generic error"),
+
+			err: errors.New("failed to add device: generic error"),
+		},
+		{
+			desc: "error: add auth set, exists",
+			req:  req,
+
+			addAuthSetErr: store.ErrObjectExists,
+
+			err: ErrDeviceExists,
+		},
+		{
+			desc: "error: add auth set, exists",
+			req:  req,
+
+			addAuthSetErr: errors.New("generic error"),
+
+			err: errors.New("failed to add auth set: generic error"),
+		},
+	}
+
+	for tcidx := range testCases {
+		tc := testCases[tcidx]
+		t.Run(fmt.Sprintf("tc: %s", tc.desc), func(t *testing.T) {
+			t.Parallel()
+
+			ctxMatcher := mtesting.ContextMatcher()
+
+			ctxMatcher = mock.MatchedBy(func(c context.Context) bool {
+				return true
+			})
+
+			db := mstore.DataStore{}
+			db.On("AddDevice",
+				ctxMatcher,
+				mock.MatchedBy(
+					func(d model.Device) bool {
+						return (d.IdData == tc.req.IdData) &&
+							(d.Id == tc.req.DeviceId) &&
+							(d.PubKey == tc.req.PubKey)
+					})).Return(tc.addDeviceErr)
+
+			db.On("AddAuthSet",
+				ctxMatcher,
+				mock.MatchedBy(
+					func(m model.AuthSet) bool {
+						return (m.Id == tc.req.AuthSetId) &&
+							(m.DeviceId == tc.req.DeviceId) &&
+							(m.IdData == tc.req.IdData) &&
+							(m.PubKey == tc.req.PubKey)
+					})).Return(tc.addAuthSetErr)
+
+			devauth := NewDevAuth(&db, nil, nil, nil, nil, Config{})
+			err := devauth.PreauthorizeDevice(context.Background(), tc.req)
+
+			if tc.err != nil {
+				assert.EqualError(t, err, tc.err.Error())
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestDevAuthAcceptDevice(t *testing.T) {
 	t.Parallel()
 
