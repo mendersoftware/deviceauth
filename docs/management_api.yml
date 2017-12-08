@@ -78,10 +78,6 @@ paths:
       responses:
         201:
           description: Device submitted.
-          headers:
-            Location:
-              type: string
-              description: Link to the created auth set.
         400:
           description: Missing/malformed request params.
           schema:

@@ -37,6 +37,7 @@ import (
 	"github.com/mendersoftware/deviceauth/model"
 	"github.com/mendersoftware/deviceauth/store"
 	mtest "github.com/mendersoftware/deviceauth/utils/testing"
+	mt "github.com/mendersoftware/go-lib-micro/testing"
 )
 
 var restErrUpdateDone sync.Once
@@ -262,6 +263,131 @@ func TestApiDevAuthSubmitAuthReq(t *testing.T) {
 				assert.Equal(t, "application/jwt",
 					recorded.Recorder.HeaderMap.Get("Content-Type"))
 			}
+		})
+	}
+}
+
+func TestApiDevAuthPreauthDevice(t *testing.T) {
+	t.Parallel()
+
+	// enforce specific field naming in errors returned by API
+	updateRestErrorFieldName()
+
+	testCases := map[string]struct {
+		body interface{}
+
+		devAuthErr error
+
+		checker mt.ResponseChecker
+	}{
+		"ok": {
+			body: &model.PreAuthReq{
+				AuthSetId: "auth-set-id",
+				DeviceId:  "device-id",
+				IdData:    "id-data",
+				PubKey:    "pubkey",
+			},
+			checker: mt.NewJSONResponse(
+				http.StatusCreated,
+				nil,
+				nil),
+		},
+		"invalid: no auth set id": {
+			body: &model.PreAuthReq{
+				DeviceId: "device-id",
+				IdData:   "id-data",
+				PubKey:   "pubkey",
+			},
+			checker: mt.NewJSONResponse(
+				http.StatusBadRequest,
+				nil,
+				restError("failed to decode preauth request: auth_set_id: non zero value required")),
+		},
+		"invalid: no device_id": {
+			body: &model.PreAuthReq{
+				AuthSetId: "auth-set-id",
+				IdData:    "id-data",
+				PubKey:    "pubkey",
+			},
+			checker: mt.NewJSONResponse(
+				http.StatusBadRequest,
+				nil,
+				restError("failed to decode preauth request: device_id: non zero value required")),
+		},
+		"invalid: no id data": {
+			body: &model.PreAuthReq{
+				AuthSetId: "auth-set-id",
+				DeviceId:  "device-id",
+				PubKey:    "pubkey",
+			},
+			checker: mt.NewJSONResponse(
+				http.StatusBadRequest,
+				nil,
+				restError("failed to decode preauth request: id_data: non zero value required")),
+		},
+		"invalid: no pubkey": {
+			body: &model.PreAuthReq{
+				AuthSetId: "auth-set-id",
+				DeviceId:  "device-id",
+				IdData:    "id-data",
+			},
+			checker: mt.NewJSONResponse(
+				http.StatusBadRequest,
+				nil,
+				restError("failed to decode preauth request: pubkey: non zero value required")),
+		},
+		"invalid: no body": {
+			checker: mt.NewJSONResponse(
+				http.StatusBadRequest,
+				nil,
+				restError("failed to decode preauth request: EOF")),
+		},
+		"devauth: device exists": {
+			body: &model.PreAuthReq{
+				AuthSetId: "auth-set-id",
+				DeviceId:  "device-id",
+				IdData:    "id-data",
+				PubKey:    "pubkey",
+			},
+			devAuthErr: devauth.ErrDeviceExists,
+			checker: mt.NewJSONResponse(
+				http.StatusConflict,
+				nil,
+				restError("device already exists")),
+		},
+		"devauth: generic error": {
+			body: &model.PreAuthReq{
+				AuthSetId: "auth-set-id",
+				DeviceId:  "device-id",
+				IdData:    "id-data",
+				PubKey:    "pubkey",
+			},
+			devAuthErr: errors.New("generic"),
+			checker: mt.NewJSONResponse(
+				http.StatusInternalServerError,
+				nil,
+				restError("internal error")),
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(fmt.Sprintf("tc %s", name), func(t *testing.T) {
+			da := &mocks.App{}
+			da.On("PreauthorizeDevice",
+				mtest.ContextMatcher(),
+				tc.body).
+				Return(tc.devAuthErr)
+
+			apih := makeMockApiHandler(t, da)
+
+			//make request
+			req := makeReq("POST",
+				"http://1.2.3.4/api/management/v1/devauth/devices",
+				"",
+				tc.body)
+
+			recorded := test.RunRequest(t, apih, req)
+			mt.CheckResponse(t, tc.checker, recorded)
 		})
 	}
 }
@@ -1124,4 +1250,19 @@ func TestApiDevAuthPostTenants(t *testing.T) {
 
 		runTestRequest(t, apih, tc.req, tc.respCode, tc.respBody)
 	}
+}
+
+func makeReq(method, url, auth string, body interface{}) *http.Request {
+	req := test.MakeSimpleRequest(method, url, body)
+
+	if auth != "" {
+		req.Header.Set("Authorization", auth)
+	}
+	req.Header.Add(requestid.RequestIdHeader, "test")
+
+	return req
+}
+
+func restError(status string) map[string]interface{} {
+	return map[string]interface{}{"error": status, "request_id": "test"}
 }
