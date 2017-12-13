@@ -8,29 +8,12 @@ from common import Device, DevAuthorizer, \
     device_auth_req, make_devices, devices, \
     clean_migrated_db, clean_db, mongo, cli, \
     management_api, internal_api, device_api, \
-    tenant_foobar
+    tenant_foobar, tenant_foobar_devices
 
 
 import mockserver
 import deviceadm
 import inventory
-
-
-
-
-@pytest.yield_fixture(scope='function')
-def tenant_foobar_devices(device_api, management_api, tenant_foobar, request):
-    """Make unauthorized devices owned by tenant with ID 'foobar'. The fixture can
-    be parametrized a number of devices to make. Yields a list of tuples:
-    (instance of Device, instance of DevAuthorizer)
-    """
-
-    if not hasattr(request, 'param'):
-        devcount = 1
-    else:
-        devcount = int(request.param)
-
-    yield make_devices(device_api, devcount, tenant_token=tenant_foobar)
 
 
 class TestDevice:

@@ -241,3 +241,17 @@ def devices(device_api, management_api, clean_migrated_db, request):
         devcount = int(request.param)
 
     yield make_devices(device_api, devcount)
+
+@pytest.yield_fixture(scope='function')
+def tenant_foobar_devices(device_api, management_api, tenant_foobar, request):
+    """Make unauthorized devices owned by tenant with ID 'foobar'. The fixture can
+    be parametrized a number of devices to make. Yields a list of tuples:
+    (instance of Device, instance of DevAuthorizer)
+    """
+
+    if not hasattr(request, 'param'):
+        devcount = 1
+    else:
+        devcount = int(request.param)
+
+    yield make_devices(device_api, devcount, tenant_token=tenant_foobar)
