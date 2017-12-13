@@ -19,9 +19,8 @@ import json
 import bravado
 
 
-class TestManagementPreauthorize:
-    @pytest.mark.parametrize('devices', ['5'], indirect=True)
-    def test_ok(self, management_api, devices):
+class TestManagementPreauthorizeBase:
+    def _test_ok(self, management_api, devices, **kwargs):
         aid = '1'
         device_id = '2'
         key = 'key'
@@ -48,8 +47,7 @@ class TestManagementPreauthorize:
         assert auth_set.pubkey == key
         assert auth_set.status == 'preauthorized'
 
-    @pytest.mark.parametrize('devices', ['5'], indirect=True)
-    def test_conflict(self, management_api, devices):
+    def _test_conflict(self, management_api, devices, **kwargs):
         existing = devices[0][0]
         req = management_api.make_preauth_req('1', '2', existing.identity, 'key')
         try:
@@ -59,3 +57,23 @@ class TestManagementPreauthorize:
 
         devs = management_api.list_devices()
         assert len(devs) == 5
+
+class TestManagementPreauthorize(TestManagementPreauthorizeBase):
+    @pytest.mark.parametrize('devices', ['5'], indirect=True)
+    def test_ok(self, management_api, devices):
+        self._test_ok(management_api, devices)
+
+    @pytest.mark.parametrize('devices', ['5'], indirect=True)
+    def test_conflict(self, management_api, devices):
+        self._test_conflict(management_api, devices)
+
+class TestManagementPreauthorizeMultiTenant(TestManagementPreauthorizeBase):
+    @pytest.mark.parametrize('tenant_foobar_devices', ['5'], indirect=True)
+    def test_ok(self, management_api, tenant_foobar_devices, tenant_foobar):
+        auth = 'Authorization: Bearer ' + tenant_foobar
+        self._test_ok(management_api, tenant_foobar_devices, Authorization=auth)
+
+    @pytest.mark.parametrize('tenant_foobar_devices', ['5'], indirect=True)
+    def test_conflict(self, management_api, tenant_foobar_devices, tenant_foobar):
+        auth = 'Authorization: Bearer ' + tenant_foobar
+        self._test_conflict(management_api, devices, Authorization=auth)
