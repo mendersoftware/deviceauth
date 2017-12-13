@@ -205,7 +205,9 @@ func (db *DataStoreMongo) AddDevice(ctx context.Context, d model.Device) error {
 
 	c := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
 
-	d.Id = bson.NewObjectId().Hex()
+	if d.Id == "" {
+		d.Id = bson.NewObjectId().Hex()
+	}
 
 	if err := c.Insert(d); err != nil {
 		if mgo.IsDup(err) {
@@ -417,7 +419,9 @@ func (db *DataStoreMongo) AddAuthSet(ctx context.Context, set model.AuthSet) err
 
 	c := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbAuthSetColl)
 
-	set.Id = bson.NewObjectId().Hex()
+	if set.Id == "" {
+		set.Id = bson.NewObjectId().Hex()
+	}
 
 	if err := c.Insert(set); err != nil {
 		if mgo.IsDup(err) {
