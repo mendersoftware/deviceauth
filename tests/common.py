@@ -21,6 +21,7 @@ from base64 import b64encode, urlsafe_b64decode, urlsafe_b64encode
 from itertools import count
 from client import CliClient
 from pymongo import MongoClient
+import deviceadm
 
 import pytest
 
@@ -203,7 +204,6 @@ def make_fake_tenant_token(tenant):
 
     return 'fake.' + enc + '.fake-sig'
 
-
 @pytest.fixture
 @pytest.mark.parametrize('clean_migrated_db', ['foobar'], indirect=True)
 def tenant_foobar(request, clean_migrated_db):
@@ -211,3 +211,33 @@ def tenant_foobar(request, clean_migrated_db):
     (with tenant support) DB.
     """
     return make_fake_tenant_token('foobar')
+
+def make_devices(device_api, devcount=1, tenant_token=""):
+    print('device count to generate', devcount)
+
+    url = device_api.auth_requests_url
+
+    out_devices = []
+    with deviceadm.run_fake_for_device(deviceadm.ANY_DEVICE) as server:
+        for _ in range(devcount):
+            dev = Device()
+            da = DevAuthorizer(tenant_token=tenant_token)
+            # poke devauth so that device appears
+            rsp = device_auth_req(url, da, dev)
+            assert rsp.status_code == 401
+            out_devices.append((dev, da))
+
+    return out_devices
+
+
+@pytest.yield_fixture(scope='function')
+def devices(device_api, management_api, clean_migrated_db, request):
+    """Make unauthorized devices. The fixture can be parametrized a number of
+    devices to make. Yields a list of tuples:
+    (instance of Device, instance of DevAuthorizer)"""
+    if not hasattr(request, 'param'):
+        devcount = 1
+    else:
+        devcount = int(request.param)
+
+    yield make_devices(device_api, devcount)
