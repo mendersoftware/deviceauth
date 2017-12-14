@@ -44,6 +44,7 @@ var (
 	ErrDevAuthUnauthorized   = errors.New("dev auth: unauthorized")
 	ErrDevIdAuthIdMismatch   = errors.New("dev auth: dev ID and auth ID mismatch")
 	ErrMaxDeviceCountReached = errors.New("maximum number of accepted devices reached")
+	ErrDeviceExists          = errors.New("device already exists")
 )
 
 // Expiration Timeout should be moved to database
@@ -69,6 +70,7 @@ type App interface {
 	AcceptDeviceAuth(ctx context.Context, dev_id string, auth_id string) error
 	RejectDeviceAuth(ctx context.Context, dev_id string, auth_id string) error
 	ResetDeviceAuth(ctx context.Context, dev_id string, auth_id string) error
+	PreauthorizeDevice(ctx context.Context, req *model.PreAuthReq) error
 	GetDeviceToken(ctx context.Context, dev_id string) (*model.Token, error)
 
 	RevokeToken(ctx context.Context, token_id string) error
@@ -491,6 +493,47 @@ func (d *DevAuth) RejectDeviceAuth(ctx context.Context, device_id string, auth_i
 
 func (d *DevAuth) ResetDeviceAuth(ctx context.Context, device_id string, auth_id string) error {
 	return d.setAuthSetStatus(ctx, device_id, auth_id, model.DevStatusPending)
+}
+
+func (d *DevAuth) PreauthorizeDevice(ctx context.Context, req *model.PreAuthReq) error {
+	// try add device, if a device with the given id_data exists -
+	// the unique index on id_data will prevent it (conflict)
+	// this is the only safeguard against id data conflict - we won't try to handle it
+	// additionally on inserting the auth set (can't add an id data index on auth set - would prevent key rotation)
+
+	// FIXME: tenant_token is "" on purpose, will be removed
+	dev := model.NewDevice(req.DeviceId, req.IdData, req.PubKey, "")
+	dev.Status = model.DevStatusPreauth
+
+	err := d.db.AddDevice(ctx, *dev)
+	switch err {
+	case nil:
+		break
+	case store.ErrObjectExists:
+		return ErrDeviceExists
+	default:
+		return errors.Wrap(err, "failed to add device")
+	}
+
+	// record authentication request
+	authset := model.AuthSet{
+		Id:        req.AuthSetId,
+		IdData:    req.IdData,
+		PubKey:    req.PubKey,
+		DeviceId:  req.DeviceId,
+		Status:    model.DevStatusPreauth,
+		Timestamp: uto.TimePtr(time.Now()),
+	}
+
+	err = d.db.AddAuthSet(ctx, authset)
+	switch err {
+	case nil:
+		return nil
+	case store.ErrObjectExists:
+		return ErrDeviceExists
+	default:
+		return errors.Wrap(err, "failed to add auth set")
+	}
 }
 
 func (*DevAuth) GetDeviceToken(ctx context.Context, dev_id string) (*model.Token, error) {

@@ -74,6 +74,8 @@ func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
 
 		rest.Get(uriDevices, d.GetDevicesHandler),
 
+		rest.Post(uriDevices, d.PreauthDeviceHandler),
+
 		rest.Get(uriDevicesCount, d.GetDevicesCountHandler),
 
 		rest.Get(uriDevice, d.GetDeviceHandler),
@@ -165,6 +167,29 @@ func (d *DevAuthApiHandlers) SubmitAuthRequestHandler(w rest.ResponseWriter, r *
 	default:
 		rest_utils.RestErrWithLogInternal(w, r, l, err)
 		return
+	}
+}
+
+func (d *DevAuthApiHandlers) PreauthDeviceHandler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+
+	l := log.FromContext(ctx)
+
+	req, err := model.ParsePreAuthReq(r.Body)
+	if err != nil {
+		err = errors.Wrap(err, "failed to decode preauth request")
+		rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		return
+	}
+
+	err = d.devAuth.PreauthorizeDevice(ctx, req)
+	switch err {
+	case nil:
+		w.WriteHeader(http.StatusCreated)
+	case devauth.ErrDeviceExists:
+		rest_utils.RestErrWithLog(w, r, l, err, http.StatusConflict)
+	default:
+		rest_utils.RestErrWithLogInternal(w, r, l, err)
 	}
 }
 

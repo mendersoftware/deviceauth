@@ -63,6 +63,12 @@ paths:
           Adds a given device/authentication data set in the 'preauthorized' state.
           Designed to be called from admission, with precomputed device_id and auth_set_id.
       parameters:
+        - name: Authorization
+          in: header
+          required: true
+          type: string
+          format: Bearer [token]
+          description: Contains the JWT token issued by the User Administration and Authentication Service.
         - name: pre_auth_request
           in: body
           description: Preauthentication request.
@@ -72,10 +78,6 @@ paths:
       responses:
         201:
           description: Device submitted.
-          headers:
-            Location:
-              type: string
-              description: Link to the created auth set.
         400:
           description: Missing/malformed request params.
           schema:
