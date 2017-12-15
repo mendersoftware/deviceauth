@@ -149,8 +149,10 @@ paths:
       summary: Remove the device authentication set
       description: |
         Removes the device authentication set.
+        Removing 'accepted' authentication set is equivalent
+        to rejecting device and removing authentication set.
         If there is only one authentication set for the device,
-        the device will be also deleted.
+        the device will also be deleted.
       parameters:
         - name: Authorization
           in: header
@@ -171,6 +173,10 @@ paths:
       responses:
         204:
           description: Device authentication set deleted.
+        404:
+          description: Device authentication set not found
+          schema:
+            $ref: "#/definitions/Error"
         500:
           description: Internal server error.
           schema:
