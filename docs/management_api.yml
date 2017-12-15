@@ -147,6 +147,10 @@ paths:
   /devices/{id}/auth/{aid}:
     delete:
       summary: Remove the device authentication set
+      description: |
+        Removes the device authentication set.
+        If there is only one authentication set for the device,
+        the device will be also deleted.
       parameters:
         - name: Authorization
           in: header
