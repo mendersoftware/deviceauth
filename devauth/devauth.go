@@ -209,9 +209,18 @@ func (d *DevAuth) SubmitAuthRequest(ctx context.Context, r *model.AuthReq) (stri
 		ctx = tCtx
 	}
 
-	authSet, err := d.processAuthRequest(ctx, r)
+	// first, try to handle preauthorization
+	authSet, err := d.processPreAuthRequest(ctx, r)
 	if err != nil {
 		return "", err
+	}
+
+	// if not a preauth request, process with regular auth request handling
+	if authSet == nil {
+		authSet, err = d.processAuthRequest(ctx, r)
+		if err != nil {
+			return "", err
+		}
 	}
 
 	// request was already present in DB, check its status
@@ -255,6 +264,70 @@ func (d *DevAuth) SubmitAuthRequest(ctx context.Context, r *model.AuthReq) (stri
 	// no token, return device unauthorized
 	return "", ErrDevAuthUnauthorized
 
+}
+
+func (d *DevAuth) processPreAuthRequest(ctx context.Context, r *model.AuthReq) (*model.AuthSet, error) {
+	// authset exists?
+	aset, err := d.db.GetAuthSetByDataKey(ctx, r.IdData, r.PubKey)
+	switch err {
+	case nil:
+		break
+	case store.ErrDevNotFound:
+		return nil, nil
+	default:
+		return nil, errors.Wrap(err, "failed to fetch auth set")
+	}
+
+	// if authset status is not 'preauthorized', nothing to do
+	if aset.Status != model.DevStatusPreauth {
+		return nil, nil
+	}
+
+	// auth set is ok for auto-accepting, check device limit
+	allow, err := d.canAcceptDevice(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if !allow {
+		return nil, ErrMaxDeviceCountReached
+	}
+
+	// propagate 'accepted' status to deviceadm
+	sreq := deviceadm.UpdateStatusReq{
+		Status: model.DevStatusAccepted,
+	}
+
+	if err := d.cDevAdm.UpdateStatusInternal(ctx, aset.Id, sreq, d.clientGetter()); err != nil {
+		return nil, errors.Wrap(err, "devadm update status error")
+	}
+
+	// propagate device to inventory
+	if err := d.SubmitInventoryDevice(ctx, model.Device{
+		Id: aset.DeviceId,
+	}); err != nil {
+		return nil, errors.Wrap(err, "inventory device add error")
+	}
+
+	// persist the 'accepted' status in both auth set, and device
+	aset.Status = model.DevStatusAccepted
+	if err := d.db.UpdateAuthSet(ctx, aset, model.AuthSetUpdate{
+		Status: model.DevStatusAccepted,
+	}); err != nil {
+		return nil, errors.Wrap(err, "failed to update auth set status")
+	}
+
+	if err := d.db.UpdateDevice(ctx,
+		model.Device{
+			Id: aset.DeviceId,
+		},
+		model.DeviceUpdate{
+			Status: model.DevStatusAccepted,
+		}); err != nil {
+		return nil, errors.Wrap(err, "failed to update auth set status")
+	}
+
+	return aset, nil
 }
 
 // processAuthRequest will process incoming auth request, record authentication

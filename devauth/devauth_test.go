@@ -439,6 +439,231 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 	}
 }
 
+// still a Submit... test, but focuses on preauth
+func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
+	t.Parallel()
+
+	inReq := model.AuthReq{
+		IdData:      "foo-iddata",
+		PubKey:      "foo-pubkey",
+		TenantToken: "foo-tenant",
+	}
+
+	dummyDevId := "dummydevid"
+	dummyToken := "dummytoken"
+
+	testCases := []struct {
+		desc string
+
+		dbGetAuthSetByDataKeyRes *model.AuthSet
+		dbGetAuthSetByDataKeyErr error
+
+		dbGetLimitRes *model.Limit
+		dbGetLimitErr error
+
+		dbGetDevCountByStatusRes int
+		dbGetDevCountByStatusErr error
+
+		devadmUpdateStatusErr error
+
+		inventoryAddDeviceErr error
+
+		res string
+		err error
+	}{
+		{
+			desc: "ok: preauthorized set is auto-accepted",
+			dbGetAuthSetByDataKeyRes: &model.AuthSet{
+				IdData:   inReq.IdData,
+				DeviceId: dummyDevId,
+				PubKey:   inReq.PubKey,
+				Status:   model.DevStatusPreauth,
+			},
+			dbGetLimitRes: &model.Limit{
+				Value: 5,
+			},
+			dbGetDevCountByStatusRes: 0,
+			res: dummyToken,
+		},
+		{
+			desc: "error: can't get an existing authset",
+			dbGetAuthSetByDataKeyErr: errors.New("db error"),
+			err: errors.New("failed to fetch auth set: db error"),
+		},
+		{
+			desc: "error: preauthorized set would exceed limit",
+			dbGetAuthSetByDataKeyRes: &model.AuthSet{
+				IdData:   inReq.IdData,
+				DeviceId: dummyDevId,
+				PubKey:   inReq.PubKey,
+				Status:   model.DevStatusPreauth,
+			},
+			dbGetLimitRes: &model.Limit{
+				Value: 5,
+			},
+			dbGetDevCountByStatusRes: 5,
+			err: ErrMaxDeviceCountReached,
+		},
+		{
+			desc: "error: can't get device limit",
+			dbGetAuthSetByDataKeyRes: &model.AuthSet{
+				IdData:   inReq.IdData,
+				DeviceId: dummyDevId,
+				PubKey:   inReq.PubKey,
+				Status:   model.DevStatusPreauth,
+			},
+			dbGetLimitErr: errors.New("db error"),
+			err:           errors.New("can't get current device limit: db error"),
+		},
+		{
+			desc: "error: failed to propagate to deviceadm",
+			dbGetAuthSetByDataKeyRes: &model.AuthSet{
+				IdData:   inReq.IdData,
+				DeviceId: dummyDevId,
+				PubKey:   inReq.PubKey,
+				Status:   model.DevStatusPreauth,
+			},
+			dbGetLimitRes: &model.Limit{
+				Value: 5,
+			},
+			dbGetDevCountByStatusRes: 0,
+			devadmUpdateStatusErr:    errors.New("http error"),
+			err: errors.New("devadm update status error: http error"),
+		},
+		{
+			desc: "error: failed to propagate to inventory",
+			dbGetAuthSetByDataKeyRes: &model.AuthSet{
+				IdData:   inReq.IdData,
+				DeviceId: dummyDevId,
+				PubKey:   inReq.PubKey,
+				Status:   model.DevStatusPreauth,
+			},
+			dbGetLimitRes: &model.Limit{
+				Value: 5,
+			},
+			dbGetDevCountByStatusRes: 0,
+			inventoryAddDeviceErr:    errors.New("http error"),
+			err: errors.New("inventory device add error: failed to add device to inventory: http error"),
+		},
+	}
+
+	for tcidx := range testCases {
+		tc := testCases[tcidx]
+		t.Run(fmt.Sprintf("tc: %s", tc.desc), func(t *testing.T) {
+			t.Parallel()
+
+			ctx := context.Background()
+
+			// setup mocks
+			db := mstore.DataStore{}
+
+			// get the auth set to check if preauthorized
+			db.On("GetAuthSetByDataKey",
+				ctx,
+				inReq.IdData,
+				inReq.PubKey,
+			).Return(
+				tc.dbGetAuthSetByDataKeyRes,
+				tc.dbGetAuthSetByDataKeyErr,
+			)
+
+			// for a preauthorized set - check if we're not over the limit
+			db.On("GetLimit",
+				ctx,
+				model.LimitMaxDeviceCount,
+			).Return(
+				tc.dbGetLimitRes,
+				tc.dbGetLimitErr,
+			)
+
+			// takes part in limit checking
+			db.On("GetDevCountByStatus",
+				ctx,
+				model.DevStatusAccepted,
+			).Return(
+				tc.dbGetDevCountByStatusRes,
+				tc.dbGetDevCountByStatusErr,
+			)
+
+			// at the end of processing, updates the preauthorized set to 'accepted'
+			// just happy path, errors tested elsewhere
+			db.On("UpdateAuthSet",
+				ctx,
+				mock.MatchedBy(
+					func(m *model.AuthSet) bool {
+						return m.DeviceId == dummyDevId
+
+					}),
+				mock.MatchedBy(
+					func(u model.AuthSetUpdate) bool {
+						return u.Status == model.DevStatusAccepted
+					}),
+			).Return(nil)
+
+			// at the end of processing, updates the device status to 'accepted'
+			db.On("UpdateDevice",
+				ctx,
+				mock.MatchedBy(
+					func(m model.Device) bool {
+						return m.Id == dummyDevId
+
+					}),
+				mock.MatchedBy(
+					func(u model.DeviceUpdate) bool {
+						return u.Status == model.DevStatusAccepted
+					}),
+			).Return(nil)
+
+			// at the end of processing, saves the issued token
+			// only happy path, errors tested elsewhere
+			db.On("AddToken",
+				ctx,
+				mock.AnythingOfType("model.Token"),
+			).Return(nil)
+
+			cda := mdevadm.ClientRunner{}
+
+			// an auto-accepted device must be propagated to deviceadm
+			cda.On("UpdateStatusInternal",
+				ctx,
+				mock.AnythingOfType("string"),
+				mock.MatchedBy(func(r deviceadm.UpdateStatusReq) bool {
+					return (r.Status == model.DevStatusAccepted)
+				}),
+				mock.AnythingOfType("*apiclient.HttpApi"),
+			).Return(tc.devadmUpdateStatusErr)
+
+			// an auto-accepted device must be propagated to inventory
+			cdi := minventory.ClientRunner{}
+			cdi.On("AddDevice",
+				ctx,
+				inventory.AddReq{Id: dummyDevId},
+				mock.AnythingOfType("*apiclient.HttpApi"),
+			).Return(tc.inventoryAddDeviceErr)
+
+			// token serialization - happy path only, errors tested elsewhere
+			jwth := mjwt.Handler{}
+			jwth.On("ToJWT",
+				mock.AnythingOfType("*jwt.Token"),
+			).Return(dummyToken, nil)
+
+			// setup devauth
+			devauth := NewDevAuth(&db, &cda, &cdi, nil, &jwth, Config{})
+
+			// test
+			res, err := devauth.SubmitAuthRequest(ctx, &inReq)
+
+			// verify
+			assert.Equal(t, tc.res, res)
+			if tc.err != nil {
+				assert.EqualError(t, err, tc.err.Error())
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestDevAuthPreauthorizeDevice(t *testing.T) {
 	t.Parallel()
 
