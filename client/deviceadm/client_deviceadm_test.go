@@ -17,6 +17,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -34,7 +35,7 @@ func TestGetClient(t *testing.T) {
 	assert.NotNil(t, c)
 }
 
-func TestClientReqSuccess(t *testing.T) {
+func TestClientAddDeviceSuccess(t *testing.T) {
 	t.Parallel()
 
 	s, rd := ct.NewMockServer(http.StatusNoContent)
@@ -51,7 +52,7 @@ func TestClientReqSuccess(t *testing.T) {
 	assert.Equal(t, DevAdmDevicesUri, rd.Url.Path)
 }
 
-func TestClientReqFail(t *testing.T) {
+func TestClientAddDeviceFail(t *testing.T) {
 	t.Parallel()
 
 	s, rd := ct.NewMockServer(http.StatusBadRequest)
@@ -68,7 +69,7 @@ func TestClientReqFail(t *testing.T) {
 	assert.Equal(t, DevAdmDevicesUri, rd.Url.Path)
 }
 
-func TestClientReqNoHost(t *testing.T) {
+func TestClientAddDeviceNoHost(t *testing.T) {
 	t.Parallel()
 
 	c := NewClient(Config{
@@ -82,7 +83,7 @@ func TestClientReqNoHost(t *testing.T) {
 	assert.Error(t, err, "expected an error")
 }
 
-func TestClientTimeout(t *testing.T) {
+func TestClientAddDeviceTimeout(t *testing.T) {
 	t.Parallel()
 
 	if testing.Short() {
@@ -113,6 +114,100 @@ func TestClientTimeout(t *testing.T) {
 	ctx := context.Background()
 	err := c.AddDevice(ctx, AdmReq{},
 		&http.Client{Timeout: defaultReqTimeout})
+	t2 := time.Now()
+
+	// let the responder know we're done
+	testdone <- true
+
+	s.Close()
+
+	assert.Error(t, err, "expected timeout error")
+	// allow some slack in timeout, add 20% of the default timeout
+	maxdur := defaultReqTimeout +
+		time.Duration(0.2*float64(defaultReqTimeout))
+
+	assert.WithinDuration(t, t2, t1, maxdur, "timeout took too long")
+}
+
+func TestClientUpdateStatusInternalSuccess(t *testing.T) {
+	t.Parallel()
+
+	s, rd := ct.NewMockServer(http.StatusOK)
+	defer s.Close()
+
+	c := NewClient(Config{
+		DevAdmAddr: s.URL,
+	})
+
+	ctx := context.Background()
+
+	err := c.UpdateStatusInternal(ctx, "foo", UpdateStatusReq{}, &http.Client{})
+	assert.NoError(t, err, "expected no errors")
+	expUri := strings.Replace(DevAdmStatusInternalUri, ":id", "foo", 1)
+	assert.Equal(t, expUri, rd.Url.Path)
+}
+
+func TestClientUpdateStatusInternalFail(t *testing.T) {
+	t.Parallel()
+
+	s, rd := ct.NewMockServer(http.StatusBadRequest)
+	defer s.Close()
+
+	c := NewClient(Config{
+		DevAdmAddr: s.URL,
+	})
+
+	ctx := context.Background()
+
+	err := c.UpdateStatusInternal(ctx, "foo", UpdateStatusReq{}, &http.Client{})
+	assert.Error(t, err, "expected an error")
+	expUri := strings.Replace(DevAdmStatusInternalUri, ":id", "foo", 1)
+	assert.Equal(t, expUri, rd.Url.Path)
+}
+
+func TestClientUpdateStatusInternalNoHost(t *testing.T) {
+	t.Parallel()
+
+	c := NewClient(Config{
+		DevAdmAddr: "http://somehost:1234",
+	})
+
+	ctx := context.Background()
+
+	err := c.UpdateStatusInternal(ctx, "foo", UpdateStatusReq{}, &http.Client{})
+
+	assert.Error(t, err, "expected an error")
+}
+
+func TestClientUpdateStatusInternalTimeout(t *testing.T) {
+	t.Parallel()
+
+	if testing.Short() {
+		t.Skip("skipping test in short mode")
+	}
+
+	// channel for nofitying the responder that the test is
+	// complete
+	testdone := make(chan bool)
+
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// wait for the test to notify us about timeout
+		select {
+		case <-testdone:
+			// test finished, can leave now
+		case <-time.After(defaultReqTimeout * 2):
+			// don't block longer than default timeout * 2
+		}
+		w.WriteHeader(400)
+	}))
+
+	c := NewClient(Config{
+		DevAdmAddr: s.URL,
+	})
+
+	t1 := time.Now()
+	ctx := context.Background()
+	err := c.UpdateStatusInternal(ctx, "foo", UpdateStatusReq{}, &http.Client{Timeout: defaultReqTimeout})
 	t2 := time.Now()
 
 	// let the responder know we're done
