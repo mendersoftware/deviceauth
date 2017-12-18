@@ -1398,3 +1398,83 @@ func getAuthSetsForStatus(dev *model.Device, status string) []model.AuthSet {
 
 	return asets
 }
+
+func TestStoreDeleteAuthSetForDevice(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestStoreDeleteAuthSetForDevice in short mode.")
+	}
+
+	authSets := []interface{}{
+		model.AuthSet{
+			Id:       "001",
+			DeviceId: "001",
+			IdData:   "001",
+			PubKey:   "001",
+		},
+		model.AuthSet{
+			Id:       "002",
+			DeviceId: "001",
+			IdData:   "001",
+			PubKey:   "002",
+		},
+	}
+
+	dbCtx := identity.WithContext(context.Background(), &identity.Identity{
+		Tenant: tenant,
+	})
+	db := getDb(dbCtx)
+	defer db.session.Close()
+	s := db.session.Copy()
+	defer s.Close()
+
+	coll := s.DB(ctxstore.DbFromContext(dbCtx, DbName)).C(DbAuthSetColl)
+	assert.NoError(t, coll.Insert(authSets...))
+
+	testCases := []struct {
+		devId  string
+		authId string
+		tenant string
+		err    string
+	}{
+		{
+			devId:  "001",
+			authId: "001",
+			tenant: tenant,
+			err:    "",
+		},
+		{
+			devId:  "001",
+			authId: "003",
+			err:    store.ErrAuthSetNotFound.Error(),
+		},
+		{
+			devId:  "100",
+			authId: "001",
+			tenant: tenant,
+			err:    store.ErrAuthSetNotFound.Error(),
+		},
+	}
+
+	for i, tc := range testCases {
+		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+
+			ctx := context.Background()
+			if tc.tenant != "" {
+				ctx = identity.WithContext(ctx, &identity.Identity{
+					Tenant: tc.tenant,
+				})
+			}
+
+			err := db.DeleteAuthSetForDevice(ctx, tc.devId, tc.authId)
+			if tc.err != "" {
+				assert.Equal(t, tc.err, err.Error())
+			} else {
+				assert.NoError(t, err)
+				_, err := db.GetAuthSetById(ctx, tc.authId)
+				if assert.Error(t, err) {
+					assert.Equal(t, err.Error(), store.ErrDevNotFound.Error())
+				}
+			}
+		})
+	}
+}

@@ -68,6 +68,9 @@ type DataStore interface {
 	// deletes all auth sets for device
 	DeleteAuthSetsForDevice(ctx context.Context, devid string) error
 
+	// deletes authentication set for device
+	DeleteAuthSetForDevice(ctx context.Context, devId string, authId string) error
+
 	// adds JWT to database
 	AddToken(ctx context.Context, t model.Token) error
 
