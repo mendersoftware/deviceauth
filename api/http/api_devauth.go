@@ -33,12 +33,13 @@ import (
 const (
 	uriAuthReqs = "/api/devices/v1/authentication/auth_requests"
 
-	uriDevices      = "/api/management/v1/devauth/devices"
-	uriDevicesCount = "/api/management/v1/devauth/devices/count"
-	uriDevice       = "/api/management/v1/devauth/devices/:id"
-	uriToken        = "/api/management/v1/devauth/tokens/:id"
-	uriDeviceStatus = "/api/management/v1/devauth/devices/:id/auth/:aid/status"
-	uriLimit        = "/api/management/v1/devauth/limits/:name"
+	uriDevices       = "/api/management/v1/devauth/devices"
+	uriDevicesCount  = "/api/management/v1/devauth/devices/count"
+	uriDevice        = "/api/management/v1/devauth/devices/:id"
+	uriToken         = "/api/management/v1/devauth/tokens/:id"
+	uriDeviceAuthSet = "/api/management/v1/devauth/devices/:id/auth/:aid"
+	uriDeviceStatus  = "/api/management/v1/devauth/devices/:id/auth/:aid/status"
+	uriLimit         = "/api/management/v1/devauth/limits/:name"
 
 	// internal API
 	uriTokenVerify = "/api/internal/v1/devauth/tokens/verify"
@@ -81,6 +82,8 @@ func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
 		rest.Get(uriDevice, d.GetDeviceHandler),
 
 		rest.Delete(uriDevice, d.DeleteDeviceHandler),
+
+		rest.Delete(uriDeviceAuthSet, d.DeleteDeviceAuthSetHandler),
 
 		rest.Delete(uriToken, d.DeleteTokenHandler),
 
@@ -283,6 +286,27 @@ func (d *DevAuthApiHandlers) DeleteDeviceHandler(w rest.ResponseWriter, r *rest.
 
 	if err := d.devAuth.DecommissionDevice(ctx, devId); err != nil {
 		if err == store.ErrDevNotFound {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		rest_utils.RestErrWithLogInternal(w, r, l, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (d *DevAuthApiHandlers) DeleteDeviceAuthSetHandler(w rest.ResponseWriter, r *rest.Request) {
+
+	ctx := r.Context()
+
+	l := log.FromContext(ctx)
+
+	devId := r.PathParam("id")
+	authId := r.PathParam("aid")
+
+	if err := d.devAuth.DeleteAuthSet(ctx, devId, authId); err != nil {
+		if err == store.ErrAuthSetNotFound {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
