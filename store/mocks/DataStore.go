@@ -354,13 +354,13 @@ func (_m *DataStore) PutLimit(ctx context.Context, lim model.Limit) error {
 	return r0
 }
 
-// UpdateAuthSet provides a mock function with given fields: ctx, orig, mod
-func (_m *DataStore) UpdateAuthSet(ctx context.Context, orig model.AuthSet, mod model.AuthSetUpdate) error {
-	ret := _m.Called(ctx, orig, mod)
+// UpdateAuthSet provides a mock function with given fields: ctx, filter, mod
+func (_m *DataStore) UpdateAuthSet(ctx context.Context, filter interface{}, mod model.AuthSetUpdate) error {
+	ret := _m.Called(ctx, filter, mod)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, model.AuthSet, model.AuthSetUpdate) error); ok {
-		r0 = rf(ctx, orig, mod)
+	if rf, ok := ret.Get(0).(func(context.Context, interface{}, model.AuthSetUpdate) error); ok {
+		r0 = rf(ctx, filter, mod)
 	} else {
 		r0 = ret.Error(0)
 	}

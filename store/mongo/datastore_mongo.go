@@ -494,13 +494,13 @@ func (db *DataStoreMongo) GetAuthSetsForDevice(ctx context.Context, devid string
 	return res, nil
 }
 
-func (db *DataStoreMongo) UpdateAuthSet(ctx context.Context, orig model.AuthSet, mod model.AuthSetUpdate) error {
+func (db *DataStoreMongo) UpdateAuthSet(ctx context.Context, filter interface{}, mod model.AuthSetUpdate) error {
 	s := db.session.Copy()
 	defer s.Close()
 
 	c := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbAuthSetColl)
 
-	ci, err := c.UpdateAll(orig, bson.M{"$set": mod})
+	ci, err := c.UpdateAll(filter, bson.M{"$set": mod})
 	if err != nil {
 		return errors.Wrap(err, "failed to update auth set")
 	} else if ci.Updated == 0 {
