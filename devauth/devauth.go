@@ -28,6 +28,7 @@ import (
 	mstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/pkg/errors"
 	"github.com/satori/go.uuid"
+	"gopkg.in/mgo.v2/bson"
 
 	"github.com/mendersoftware/deviceauth/client/deviceadm"
 	"github.com/mendersoftware/deviceauth/client/inventory"
@@ -540,9 +541,12 @@ func (d *DevAuth) setAuthSetStatus(ctx context.Context, device_id string, auth_i
 	if status == model.DevStatusAccepted {
 		// reject all accepted auth sets for this device first
 		if err := d.db.UpdateAuthSet(ctx,
-			model.AuthSet{
-				DeviceId: device_id,
-				Status:   model.DevStatusAccepted,
+			bson.M{
+				model.AuthSetKeyDeviceId: device_id,
+				"$or": []bson.M{
+					bson.M{model.AuthSetKeyStatus: model.DevStatusAccepted},
+					bson.M{model.AuthSetKeyStatus: model.DevStatusPreauth},
+				},
 			},
 			model.AuthSetUpdate{
 				Status: model.DevStatusRejected,
