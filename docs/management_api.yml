@@ -384,6 +384,7 @@ definitions:
             - pending
             - accepted
             - rejected
+            - preauthorized
       ts:
           type: string
           format: datetime

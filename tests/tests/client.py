@@ -188,6 +188,22 @@ class SimpleManagementClient(ManagementClient):
 
         return None
 
+    def preauthorize(self, req, **kwargs):
+        if 'Authorization' not in kwargs:
+            self.log.debug('appending default authorization header')
+            kwargs['Authorization'] = 'Bearer foo'
+
+        return self.client.devices.post_devices(pre_auth_request=req, **kwargs).result()
+
+    @staticmethod
+    def make_preauth_req(auth_set_id, device_id, id_data, pubkey):
+        return {
+            'auth_set_id': auth_set_id,
+            'device_id': device_id,
+            'id_data': id_data,
+            'pubkey': pubkey
+        }
+
 class ConductorClient():
     """Trivial Conductor API client.
     The official one doesn't wrap what we need (get *executed*
