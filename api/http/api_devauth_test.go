@@ -1266,3 +1266,61 @@ func makeReq(method, url, auth string, body interface{}) *http.Request {
 func restError(status string) map[string]interface{} {
 	return map[string]interface{}{"error": status, "request_id": "test"}
 }
+
+func TestApiDevAuthDeleteDeviceAuthSet(t *testing.T) {
+	t.Parallel()
+
+	// enforce specific field naming in errors returned by API
+	updateRestErrorFieldName()
+
+	tcases := []struct {
+		req  *http.Request
+		code int
+		body string
+		err  error
+	}{
+		{
+			req: test.MakeSimpleRequest("DELETE",
+				"http://1.2.3.4/api/management/v1/devauth/devices/foo/auth/bar", nil),
+			code: http.StatusNoContent,
+			err:  nil,
+		},
+		{
+			req: test.MakeSimpleRequest("DELETE",
+				"http://1.2.3.4/api/management/v1/devauth/devices/foo/auth/bar", nil),
+			code: http.StatusNotFound,
+			err:  store.ErrAuthSetNotFound,
+		},
+		{
+			req: test.MakeSimpleRequest("DELETE",
+				"http://1.2.3.4/api/management/v1/devauth/devices/foo/auth/bar", nil),
+			code: http.StatusInternalServerError,
+			body: RestError("internal error"),
+			err:  store.ErrDevNotFound,
+		},
+		{
+			req: test.MakeSimpleRequest("DELETE",
+				"http://1.2.3.4/api/management/v1/devauth/devices/foo/auth/bar", nil),
+			code: http.StatusInternalServerError,
+			body: RestError("internal error"),
+			err:  errors.New("some error that will only be logged"),
+		},
+	}
+
+	for i := range tcases {
+		tc := tcases[i]
+		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			t.Parallel()
+
+			da := &mocks.App{}
+			da.On("DeleteAuthSet",
+				mtest.ContextMatcher(),
+				mock.AnythingOfType("string"),
+				mock.AnythingOfType("string")).
+				Return(tc.err)
+
+			apih := makeMockApiHandler(t, da)
+			runTestRequest(t, apih, tc.req, tc.code, tc.body)
+		})
+	}
+}

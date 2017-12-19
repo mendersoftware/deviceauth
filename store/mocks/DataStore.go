@@ -65,6 +65,20 @@ func (_m *DataStore) AddToken(ctx context.Context, t model.Token) error {
 	return r0
 }
 
+// DeleteAuthSetForDevice provides a mock function with given fields: ctx, devId, authId
+func (_m *DataStore) DeleteAuthSetForDevice(ctx context.Context, devId string, authId string) error {
+	ret := _m.Called(ctx, devId, authId)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+		r0 = rf(ctx, devId, authId)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // DeleteAuthSetsForDevice provides a mock function with given fields: ctx, devid
 func (_m *DataStore) DeleteAuthSetsForDevice(ctx context.Context, devid string) error {
 	ret := _m.Called(ctx, devid)

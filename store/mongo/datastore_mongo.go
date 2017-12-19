@@ -529,6 +529,25 @@ func (db *DataStoreMongo) DeleteAuthSetsForDevice(ctx context.Context, devid str
 	return nil
 }
 
+func (db *DataStoreMongo) DeleteAuthSetForDevice(ctx context.Context, devId string, authId string) error {
+	s := db.session.Copy()
+	defer s.Close()
+
+	c := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbAuthSetColl)
+
+	err := c.Remove(model.AuthSet{Id: authId, DeviceId: devId})
+
+	if err != nil {
+		if err == mgo.ErrNotFound {
+			return store.ErrAuthSetNotFound
+		} else {
+			return errors.Wrap(err, "failed to remove auth sets for device")
+		}
+	}
+
+	return nil
+}
+
 func (db *DataStoreMongo) WithMultitenant() *DataStoreMongo {
 	db.multitenant = true
 	return db

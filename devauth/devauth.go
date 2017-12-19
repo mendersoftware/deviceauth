@@ -67,6 +67,7 @@ type App interface {
 	GetDevices(ctx context.Context, skip, limit uint) ([]model.Device, error)
 	GetDevice(ctx context.Context, dev_id string) (*model.Device, error)
 	DecommissionDevice(ctx context.Context, dev_id string) error
+	DeleteAuthSet(ctx context.Context, dev_id string, auth_id string) error
 	AcceptDeviceAuth(ctx context.Context, dev_id string, auth_id string) error
 	RejectDeviceAuth(ctx context.Context, dev_id string, auth_id string) error
 	ResetDeviceAuth(ctx context.Context, dev_id string, auth_id string) error
@@ -336,7 +337,7 @@ func (d *DevAuth) SubmitInventoryDeviceWithClient(ctx context.Context, dev model
 func (d *DevAuth) GetDevices(ctx context.Context, skip, limit uint) ([]model.Device, error) {
 	devs, err := d.db.GetDevices(ctx, skip, limit)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to list devices")
+		return nil, errors.Wrap(err, "failed to list devices")
 	}
 
 	for i := range devs {
@@ -395,7 +396,7 @@ func (d *DevAuth) DecommissionDevice(ctx context.Context, devId string) error {
 		return errors.Wrap(err, "submit device decommissioning job error")
 	}
 
-	// delete device athorization sets
+	// delete device authorization sets
 	if err := d.db.DeleteAuthSetsForDevice(ctx, devId); err != nil && err != store.ErrAuthSetNotFound {
 		return errors.Wrap(err, "db delete device authorization sets error")
 	}
@@ -407,6 +408,49 @@ func (d *DevAuth) DecommissionDevice(ctx context.Context, devId string) error {
 
 	// delete device
 	return d.db.DeleteDevice(ctx, devId)
+}
+
+// Deletes device authentication set.
+// If there is only one authentication set for the device, the device will also be deleted.
+func (d *DevAuth) DeleteAuthSet(ctx context.Context, devId string, authId string) error {
+
+	l := log.FromContext(ctx)
+
+	l.Warnf("Delete authentication set with id: %s for the device with id: %s", authId, devId)
+
+	// retrieve device authentication set to check its status
+	authSet, err := d.db.GetAuthSetById(ctx, authId)
+	if err != nil {
+		if err == store.ErrAuthSetNotFound {
+			return err
+		}
+		return errors.Wrap(err, "db get auth set error")
+	}
+
+	// if the device authentication set is accepted delete device tokens
+	if authSet.Status == model.DevStatusAccepted {
+		if err := d.db.DeleteTokenByDevId(ctx, devId); err != nil && err != store.ErrTokenNotFound {
+			return errors.Wrap(err, "db delete device tokens error")
+		}
+	}
+
+	// delete device authorization set
+	if err := d.db.DeleteAuthSetForDevice(ctx, devId, authId); err != nil {
+		return err
+	}
+
+	// check if there is at least one authentication set for the device
+	// if not - delete the device
+	authSets, err := d.db.GetAuthSetsForDevice(ctx, devId)
+	if err != nil {
+		return err
+	}
+	if len(authSets) == 0 {
+		// no more authentication sets - delete device
+		return d.db.DeleteDevice(ctx, devId)
+	}
+
+	return nil
 }
 
 func (d *DevAuth) AcceptDeviceAuth(ctx context.Context, device_id string, auth_id string) error {
@@ -429,7 +473,7 @@ func (d *DevAuth) AcceptDeviceAuth(ctx context.Context, device_id string, auth_i
 		if err == store.ErrDevNotFound {
 			return err
 		}
-		return errors.Wrapf(err, "db get auth set error")
+		return errors.Wrap(err, "db get auth set error")
 	}
 
 	// TODO make this a job for an orchestrator

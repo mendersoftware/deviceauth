@@ -1466,3 +1466,127 @@ func TestDevAuthProvisionTenant(t *testing.T) {
 		})
 	}
 }
+
+func TestDevAuthDeleteAuthSet(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		devId  string
+		authId string
+
+		dbGetAuthSetByIdErr         error
+		dbDeleteTokenByDevIdErr     error
+		dbDeleteAuthSetForDeviceErr error
+		dbGetAuthSetsForDeviceErr   error
+		dbDeleteDeviceErr           error
+
+		authSet          *model.AuthSet
+		numberOfAuthSets int
+
+		outErr string
+	}{
+		{
+			devId:               "devId1",
+			authId:              "authId1",
+			dbGetAuthSetByIdErr: errors.New("GetAuthSetById Error"),
+			outErr:              "db get auth set error: GetAuthSetById Error",
+		},
+		{
+			devId:               "devId2",
+			authId:              "authId2",
+			dbGetAuthSetByIdErr: store.ErrAuthSetNotFound,
+			outErr:              store.ErrAuthSetNotFound.Error(),
+		},
+		{
+			devId:                   "devId3",
+			authId:                  "authId3",
+			authSet:                 &model.AuthSet{Status: model.DevStatusAccepted},
+			dbDeleteTokenByDevIdErr: errors.New("DeleteTokenByDevId Error"),
+			outErr:                  "db delete device tokens error: DeleteTokenByDevId Error",
+		},
+		{
+			devId:                   "devId4",
+			authId:                  "authId4",
+			authSet:                 &model.AuthSet{Status: model.DevStatusPending},
+			dbDeleteTokenByDevIdErr: errors.New("DeleteTokenByDevId Error"),
+		},
+		{
+			devId:                   "devId5",
+			authId:                  "authId5",
+			dbDeleteTokenByDevIdErr: store.ErrTokenNotFound,
+		},
+		{
+			devId:  "devId6",
+			authId: "authId6",
+			dbDeleteAuthSetForDeviceErr: errors.New("DeleteAuthSetsForDevice Error"),
+			outErr: "DeleteAuthSetsForDevice Error",
+		},
+		{
+			devId:  "devId7",
+			authId: "authId7",
+			dbGetAuthSetsForDeviceErr: errors.New("GetAuthSetsForDevice Error"),
+			outErr: "GetAuthSetsForDevice Error",
+		},
+		{
+			devId:             "devId8",
+			authId:            "authId8",
+			dbDeleteDeviceErr: errors.New("DeleteDevice Error"),
+			numberOfAuthSets:  0,
+			outErr:            "DeleteDevice Error",
+		},
+		{
+			devId:             "devId9",
+			authId:            "authId9",
+			dbDeleteDeviceErr: errors.New("DeleteDevice Error"),
+			numberOfAuthSets:  1,
+		},
+		{
+			devId:            "devId10",
+			authId:           "authId10",
+			numberOfAuthSets: 1,
+		},
+	}
+
+	for i := range testCases {
+		tc := testCases[i]
+		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			t.Parallel()
+
+			ctx := context.Background()
+
+			authSets := make([]model.AuthSet, tc.numberOfAuthSets)
+			authSet := &model.AuthSet{Status: model.DevStatusPending}
+			if tc.authSet != nil {
+				authSet = tc.authSet
+			}
+
+			db := mstore.DataStore{}
+			db.On("GetAuthSetById", ctx,
+				tc.authId).Return(
+				authSet,
+				tc.dbGetAuthSetByIdErr)
+			db.On("DeleteAuthSetForDevice", ctx,
+				tc.devId, tc.authId).Return(
+				tc.dbDeleteAuthSetForDeviceErr)
+			db.On("GetAuthSetsForDevice", ctx,
+				tc.devId).Return(
+				authSets,
+				tc.dbGetAuthSetsForDeviceErr)
+			db.On("DeleteTokenByDevId", ctx,
+				tc.devId).Return(
+				tc.dbDeleteTokenByDevIdErr)
+			db.On("DeleteDevice", ctx,
+				tc.devId).Return(
+				tc.dbDeleteDeviceErr)
+
+			devauth := NewDevAuth(&db, nil, nil, nil, nil, Config{})
+			err := devauth.DeleteAuthSet(ctx, tc.devId, tc.authId)
+
+			if tc.outErr != "" {
+				assert.EqualError(t, err, tc.outErr)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
