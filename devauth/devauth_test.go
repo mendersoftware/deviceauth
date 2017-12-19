@@ -25,6 +25,7 @@ import (
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"gopkg.in/mgo.v2/bson"
 
 	"github.com/mendersoftware/deviceauth/client/deviceadm"
 	mdevadm "github.com/mendersoftware/deviceauth/client/deviceadm/mocks"
@@ -362,7 +363,6 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 					func(m model.AuthSetUpdate) bool {
 						return to.Bool(m.AdmissionNotified) == true
 					})).Return(nil)
-
 			db.On("GetAuthSetByDataKey",
 				ctxMatcher,
 				idData, pubKey).Return(
@@ -897,11 +897,12 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 
 			if tc.aset != nil {
 				// for rejecting all auth sets
-				db.On("UpdateAuthSet", context.Background(),
-					model.AuthSet{
-						DeviceId: tc.aset.DeviceId,
-						Status:   model.DevStatusAccepted,
-					},
+				db.On("UpdateAuthSet",
+					context.Background(),
+					mock.MatchedBy(
+						func(m bson.M) bool {
+							return m[model.AuthSetKeyDeviceId] == tc.aset.DeviceId
+						}),
 					model.AuthSetUpdate{
 						Status: model.DevStatusRejected,
 					}).Return(tc.dbUpdateRevokeAuthSetsErr)
