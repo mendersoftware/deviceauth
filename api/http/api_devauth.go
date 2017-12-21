@@ -157,7 +157,7 @@ func (d *DevAuthApiHandlers) SubmitAuthRequestHandler(w rest.ResponseWriter, r *
 
 	token, err := d.devAuth.SubmitAuthRequest(ctx, &authreq)
 	switch err {
-	case devauth.ErrDevAuthUnauthorized, devauth.ErrDevIdAuthIdMismatch:
+	case devauth.ErrDevAuthUnauthorized, devauth.ErrDevIdAuthIdMismatch, devauth.ErrMaxDeviceCountReached:
 		// error is always set to unauthorized, client does not need to
 		// know why
 		rest_utils.RestErrWithWarningMsg(w, r, l, devauth.ErrDevAuthUnauthorized,

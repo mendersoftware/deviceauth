@@ -962,6 +962,78 @@ func TestUpdateAuthSetMultiple(t *testing.T) {
 
 }
 
+func TestUpdateAuthSetBson(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestUpdateAuthSetBson in short mode.")
+	}
+
+	ctx := identity.WithContext(context.Background(), &identity.Identity{
+		Tenant: "foo",
+	})
+	db := getDb(ctx)
+	defer db.session.Close()
+
+	asin := model.AuthSet{
+		IdData:   "foobar",
+		DeviceId: "1",
+		Status:   model.DevStatusPending,
+	}
+	// add 5 auth sets, all with status 'pending'
+	for i := 0; i < 5; i++ {
+		asin.PubKey = fmt.Sprintf("pubkey-%d", i)
+		asin.Timestamp = uto.TimePtr(time.Now())
+		err := db.AddAuthSet(ctx, asin)
+		assert.NoError(t, err)
+	}
+
+	// add another one that is accepted
+	err := db.AddAuthSet(ctx, model.AuthSet{
+		IdData:    "foobar",
+		PubKey:    "pubkey-5",
+		DeviceId:  "1",
+		Status:    model.DevStatusAccepted,
+		Timestamp: uto.TimePtr(time.Now()),
+	})
+	assert.NoError(t, err)
+
+	// and another one that is preauthorized
+	err = db.AddAuthSet(ctx, model.AuthSet{
+		IdData:    "foobar",
+		PubKey:    "pubkey-6",
+		DeviceId:  "1",
+		Status:    model.DevStatusPreauth,
+		Timestamp: uto.TimePtr(time.Now()),
+	})
+	assert.NoError(t, err)
+
+	// update all accepted/preauthorized to rejected in a single call
+	err = db.UpdateAuthSet(ctx,
+		bson.M{
+			model.AuthSetKeyDeviceId: "1",
+			"$or": []bson.M{
+				bson.M{model.AuthSetKeyStatus: model.DevStatusAccepted},
+				bson.M{model.AuthSetKeyStatus: model.DevStatusPreauth},
+			},
+		},
+
+		model.AuthSetUpdate{
+			Status: model.DevStatusRejected,
+		})
+	assert.NoError(t, err)
+
+	asets, err := db.GetAuthSetsForDevice(ctx, "1")
+	assert.NoError(t, err)
+	assert.Len(t, asets, 7)
+	for idx, aset := range asets {
+		if idx < 5 {
+			assert.Equal(t, model.DevStatusPending, aset.Status)
+		} else {
+			// last 2 are rejected
+			assert.Equal(t, model.DevStatusRejected, aset.Status)
+		}
+	}
+}
+
 func TestStoreDeleteDevice(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping TestStoreDeleteDevice in short mode.")

@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/mendersoftware/go-lib-micro/apiclient"
@@ -30,6 +31,8 @@ import (
 const (
 	// devices endpoint
 	DevAdmDevicesUri = "/api/management/v1/admission/devices/"
+	// internal auth set status update endpoint
+	DevAdmStatusInternalUri = "/api/internal/v1/admission/devices/:id/status"
 	// default request timeout, 10s?
 	defaultReqTimeout = time.Duration(10) * time.Second
 )
@@ -45,6 +48,10 @@ type Config struct {
 // ClientRunner is an interface of device admission client
 type ClientRunner interface {
 	AddDevice(ctx context.Context, req AdmReq, client apiclient.HttpRunner) error
+	UpdateStatusInternal(ctx context.Context,
+		id string,
+		statusreq UpdateStatusReq,
+		client apiclient.HttpRunner) error
 }
 
 // Client is an opaque implementation of device admission client. Implements
@@ -90,6 +97,47 @@ func (d *Client) AddDevice(ctx context.Context, admreq AdmReq,
 	if rsp.StatusCode != http.StatusNoContent {
 		return errors.Errorf(
 			"device add request failed with status %v", rsp.Status)
+	}
+	return nil
+}
+
+func (d *Client) UpdateStatusInternal(ctx context.Context, id string, statusreq UpdateStatusReq,
+	client apiclient.HttpRunner) error {
+
+	l := log.FromContext(ctx)
+
+	l.Debugf("update status for auth set %s", id)
+
+	statusReqJson, err := json.Marshal(statusreq)
+	if err != nil {
+		return errors.Wrapf(err, "failed to prepare status update request")
+	}
+
+	contentReader := bytes.NewReader(statusReqJson)
+
+	uri := strings.Replace(DevAdmStatusInternalUri, ":id", id, 1)
+	req, err := http.NewRequest(
+		http.MethodPut,
+		utils.JoinURL(d.conf.DevAdmAddr, uri),
+		contentReader)
+	if err != nil {
+		return errors.Wrapf(err, "failed to create request")
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	ctx, cancel := context.WithTimeout(ctx, d.conf.Timeout)
+	defer cancel()
+
+	rsp, err := client.Do(req.WithContext(ctx))
+	if err != nil {
+		return errors.Wrapf(err, "failed to update status")
+	}
+	defer rsp.Body.Close()
+
+	if rsp.StatusCode != http.StatusOK {
+		return errors.Errorf(
+			"update status request failed with status %v", rsp.Status)
 	}
 	return nil
 }

@@ -21,6 +21,7 @@ const (
 	AuthSetKeyIdData   = "id_data"
 	AuthSetKeyPubKey   = "pubkey"
 	AuthSetKeyDeviceId = "device_id"
+	AuthSetKeyStatus   = "status"
 )
 
 type AuthSet struct {

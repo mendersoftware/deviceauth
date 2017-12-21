@@ -37,4 +37,16 @@ func (_m *ClientRunner) AddDevice(ctx context.Context, req deviceadm.AdmReq, cli
 	return r0
 }
 
-var _ deviceadm.ClientRunner = (*ClientRunner)(nil)
+// UpdateStatusInternal provides a mock function with given fields: ctx, id, statusreq, client
+func (_m *ClientRunner) UpdateStatusInternal(ctx context.Context, id string, statusreq deviceadm.UpdateStatusReq, client apiclient.HttpRunner) error {
+	ret := _m.Called(ctx, id, statusreq, client)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, deviceadm.UpdateStatusReq, apiclient.HttpRunner) error); ok {
+		r0 = rf(ctx, id, statusreq, client)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
