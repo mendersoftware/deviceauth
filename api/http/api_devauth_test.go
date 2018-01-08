@@ -1315,8 +1315,8 @@ func TestApiDevAuthDeleteDeviceAuthSet(t *testing.T) {
 			da := &mocks.App{}
 			da.On("DeleteAuthSet",
 				mtest.ContextMatcher(),
-				mock.AnythingOfType("string"),
-				mock.AnythingOfType("string")).
+				"foo",
+				"bar").
 				Return(tc.err)
 
 			apih := makeMockApiHandler(t, da)
