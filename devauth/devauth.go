@@ -495,7 +495,7 @@ func (d *DevAuth) DeleteAuthSet(ctx context.Context, devId string, authId string
 	// retrieve device authentication set to check its status
 	authSet, err := d.db.GetAuthSetById(ctx, authId)
 	if err != nil {
-		if err == store.ErrAuthSetNotFound {
+		if err == store.ErrDevNotFound {
 			return err
 		}
 		return errors.Wrap(err, "db get auth set error")
