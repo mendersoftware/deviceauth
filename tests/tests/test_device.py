@@ -276,3 +276,46 @@ def get_fake_orchestrator_addr():
 
 def get_fake_deviceadm_addr():
     return os.environ.get('FAKE_ADMISSION_ADDR', '0.0.0.0:9997')
+
+
+def test_delete_authset_500( management_api, devices):
+    rsp = management_api.delete_authset("foo", "bar")
+    assert rsp.status_code == 500
+
+
+def test_delete_authset_OK( management_api, devices):
+
+    d, da = devices[0]
+    url = device_api.auth_requests_url
+
+    dev = management_api.find_device_by_identity(d.identity)
+
+    assert dev
+    devid = dev.id
+
+    print('found matching device with ID:', dev.id)
+    aid = dev.auth_sets[0].id
+
+
+    rsp = management_api.delete_authset(devid, aid)
+    assert rsp.status_code == 204
+
+def test_delete_authset_404( management_api, devices):
+
+    d, da = devices[0]
+    url = device_api.auth_requests_url
+
+    dev = management_api.find_device_by_identity(d.identity)
+
+    assert dev
+    devid = dev.id
+
+    print('found matching device with ID:', dev.id)
+
+    rsp = management_api.delete_authset(devid, "foobar")
+    assert rsp.status_code == 404
+
+
+
+
+
