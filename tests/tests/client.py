@@ -136,6 +136,16 @@ class ManagementClient(SwaggerApiClient):
         rsp = requests.delete(self.make_api_url('/devices/{}'.format(devid)), headers = headers)
         return rsp
 
+    def delete_authset(self, devid, aid, headers={}):
+        if 'Authorization' not in headers:
+            self.log.debug('appending default authorization header')
+            headers['Authorization'] = 'Bearer foo'
+        # bravado for some reason doesn't issue DELETEs properly (silent failure)
+        # fall back to 'requests'
+        #   return self.client.devices.delete_devices_id(id=devid, **kwargs)
+        rsp = requests.delete(self.make_api_url('/devices/{}/auth/{}'.format(devid, aid)), headers = headers)
+        return rsp
+
     def count_devices(self, status=None, **kwargs):
         if 'Authorization' not in kwargs:
             self.log.debug('appending default authorization header')
