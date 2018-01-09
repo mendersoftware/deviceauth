@@ -306,7 +306,7 @@ func (d *DevAuthApiHandlers) DeleteDeviceAuthSetHandler(w rest.ResponseWriter, r
 	authId := r.PathParam("aid")
 
 	if err := d.devAuth.DeleteAuthSet(ctx, devId, authId); err != nil {
-		if err == store.ErrAuthSetNotFound {
+		if err == store.ErrDevNotFound {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
