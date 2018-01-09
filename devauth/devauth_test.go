@@ -1721,7 +1721,7 @@ func TestDevAuthDeleteAuthSet(t *testing.T) {
 			devId:               "devId2",
 			authId:              "authId2",
 			dbGetAuthSetByIdErr: store.ErrAuthSetNotFound,
-			outErr:              store.ErrAuthSetNotFound.Error(),
+			outErr:              "db get auth set error: authorization set not found",
 		},
 		{
 			devId:                   "devId3",
