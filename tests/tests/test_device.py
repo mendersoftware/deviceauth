@@ -297,14 +297,14 @@ class TestDeleteAuthsetBase:
         found = management_api.find_device_by_identity(d.identity, **kwargs)
         assert not found
 
-    def _test_delete_authset_error_device_not_found(self, management_api, devices):
+    def _test_delete_authset_error_device_not_found(self, management_api, devices, **kwargs):
         rsp = management_api.delete_authset("foo", "bar")
         assert rsp.status_code == 404
 
-    def _test_delete_authset_error_authset_not_found(self, management_api, devices):
+    def _test_delete_authset_error_authset_not_found(self, management_api, devices, **kwargs):
         d, da = devices[0]
 
-        dev = management_api.find_device_by_identity(d.identity)
+        dev = management_api.find_device_by_identity(d.identity, **kwargs)
 
         assert dev
         devid = dev.id

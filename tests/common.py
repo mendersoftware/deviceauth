@@ -32,6 +32,8 @@ from Crypto.Hash import SHA256
 from client import SimpleInternalClient, SimpleManagementClient, ConductorClient, \
     BaseDevicesApiClient
 
+import mockserver
+import os
 
 def get_keypair():
     private = RSA.generate(1024)
@@ -249,9 +251,20 @@ def tenant_foobar_devices(device_api, management_api, tenant_foobar, request):
     (instance of Device, instance of DevAuthorizer)
     """
 
-    if not hasattr(request, 'param'):
-        devcount = 1
-    else:
-        devcount = int(request.param)
 
-    yield make_devices(device_api, devcount, tenant_token=tenant_foobar)
+    handlers = [
+        ('POST', '/api/internal/v1/tenantadm/tenants/verify',
+         lambda _: (401, {}, '')),
+    ]
+    with mockserver.run_fake(get_fake_tenantadm_addr(),
+                             handlers=handlers) as fake:
+
+        if not hasattr(request, 'param'):
+            devcount = 1
+        else:
+            devcount = int(request.param)
+
+        yield make_devices(device_api, devcount, tenant_token=tenant_foobar)
+
+def get_fake_tenantadm_addr():
+    return os.environ.get('FAKE_TENANTADM_ADDR', '0.0.0.0:9999')
