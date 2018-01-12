@@ -1288,14 +1288,14 @@ func TestApiDevAuthDeleteDeviceAuthSet(t *testing.T) {
 		{
 			req: test.MakeSimpleRequest("DELETE",
 				"http://1.2.3.4/api/management/v1/devauth/devices/foo/auth/bar", nil),
-			code: http.StatusNotFound,
+			code: http.StatusInternalServerError,
+			body: RestError("internal error"),
 			err:  store.ErrAuthSetNotFound,
 		},
 		{
 			req: test.MakeSimpleRequest("DELETE",
 				"http://1.2.3.4/api/management/v1/devauth/devices/foo/auth/bar", nil),
-			code: http.StatusInternalServerError,
-			body: RestError("internal error"),
+			code: http.StatusNotFound,
 			err:  store.ErrDevNotFound,
 		},
 		{
@@ -1315,8 +1315,8 @@ func TestApiDevAuthDeleteDeviceAuthSet(t *testing.T) {
 			da := &mocks.App{}
 			da.On("DeleteAuthSet",
 				mtest.ContextMatcher(),
-				mock.AnythingOfType("string"),
-				mock.AnythingOfType("string")).
+				"foo",
+				"bar").
 				Return(tc.err)
 
 			apih := makeMockApiHandler(t, da)

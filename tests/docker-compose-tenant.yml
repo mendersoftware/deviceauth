@@ -9,7 +9,7 @@ services:
         depends_on:
             - mender-device-auth
         # run multi tenant tests only
-        command: -k TestMultiTenant
+        command: -k 'MultiTenant'
         environment:
             # run mocked services
             FAKE_TENANTADM_ADDR: "0.0.0.0:9999"
