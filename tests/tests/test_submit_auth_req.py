@@ -13,6 +13,7 @@
 #    limitations under the License.
 from common import clean_db, mongo, \
                    management_api, device_api, internal_api, \
+                   make_fake_tenant_token, \
                    Device, DevAuthorizer, \
                    make_devices, get_keypair, \
                    device_auth_req, \
@@ -51,11 +52,26 @@ def clean_migrated_db(clean_db, cli, request):
 
 @pytest.fixture(scope='function')
 def devices(management_api, device_api, clean_migrated_db):
+    do_make_devices(management_api, device_api)
+
+TENANTS = ['tenant1', 'tenant2']
+@pytest.fixture(scope="function")
+@pytest.mark.parametrize('clean_migrated_db', [TENANTS], indirect=True)
+def devices_mt(clean_migrated_db):
+    for t in TENANTS:
+        token = make_fake_tenant_token(t)
+        do_make_devices(management_api, device_api, token)
+
+def do_make_devices(management_api, device_api, tenant_token=""):
     """
        Prepare a set of devices, including a 'preauthorized' one.
     """
+    auth = {}
+    if tenant_token != '':
+        auth = management_api.make_auth(tenant_token)
+
     cnt = 5
-    devs = make_devices(device_api, cnt)
+    devs = make_devices(device_api, cnt, **auth)
 
     aid = AID
     device_id = DEVID
@@ -63,11 +79,11 @@ def devices(management_api, device_api, clean_migrated_db):
     key = PUBKEY
 
     req = management_api.make_preauth_req(aid, device_id, iddata, key)
-    _, rsp = management_api.preauthorize(req)
+    _, rsp = management_api.preauthorize(req, **auth)
 
     assert rsp.status_code == 201
 
-    devs = management_api.list_devices()
+    devs = management_api.list_devices(**auth)
     assert len(devs) == cnt + 1
 
 @contextmanager
