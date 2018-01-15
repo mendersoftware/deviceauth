@@ -131,6 +131,10 @@ class TestDevicesSubmitAuthRequestBase:
             rsp = device_auth_req(device_api.auth_requests_url, da, d)
             assert rsp.status_code == 200
 
+        dev = management_api.get_device(id=dev.id, **auth)
+        assert dev.auth_sets[0].status == 'accepted'
+
+
     def _do_test_error_preauth_limit(self, management_api, device_api, tenant_token=""):
         auth = management_api.make_auth(tenant_token)
         devs = management_api.list_devices(**auth)
@@ -156,6 +160,8 @@ class TestDevicesSubmitAuthRequestBase:
         except bravado.exception.HTTPError as e:
             assert e.response.status_code == 401
 
+        dev = management_api.find_device_by_identity(d.identity, **auth)
+        assert dev.auth_sets[0].status == 'preauthorized'
 
 class TestDevicesSubmitAuthRequest(TestDevicesSubmitAuthRequestBase):
     def test_ok_preauth(self, management_api, device_api, devices):
