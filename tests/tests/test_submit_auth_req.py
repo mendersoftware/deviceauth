@@ -17,7 +17,8 @@ from common import clean_db, mongo, \
                    Device, DevAuthorizer, \
                    make_devices, get_keypair, \
                    device_auth_req, \
-                   cli
+                   cli, \
+                   get_fake_tenantadm_addr
 
 from contextlib import contextmanager
 
@@ -57,10 +58,11 @@ def devices(management_api, device_api, clean_migrated_db):
 TENANTS = ['tenant1', 'tenant2']
 @pytest.fixture(scope="function")
 @pytest.mark.parametrize('clean_migrated_db', [TENANTS], indirect=True)
-def devices_mt(clean_migrated_db):
-    for t in TENANTS:
-        token = make_fake_tenant_token(t)
-        do_make_devices(management_api, device_api, token)
+def devices_mt(management_api, device_api, clean_migrated_db):
+    with tenantadm_fake_tenant_verify():
+        for t in TENANTS:
+            token = make_fake_tenant_token(t)
+            do_make_devices(management_api, device_api, token)
 
 def do_make_devices(management_api, device_api, tenant_token=""):
     """
@@ -68,10 +70,10 @@ def do_make_devices(management_api, device_api, tenant_token=""):
     """
     auth = {}
     if tenant_token != '':
-        auth = management_api.make_auth(tenant_token)
+        auth = management_api.make_auth(tenant_token=tenant_token)
 
     cnt = 5
-    devs = make_devices(device_api, cnt, **auth)
+    devs = make_devices(device_api, cnt, tenant_token)
 
     aid = AID
     device_id = DEVID
@@ -100,18 +102,28 @@ def devadm_fake_status_update(authset_id):
                              handlers=handlers) as server:
         yield server
 
+@contextmanager
+def tenantadm_fake_tenant_verify():
+    handlers = [
+        ('POST', '/api/internal/v1/tenantadm/tenants/verify',
+         lambda _: (200, {}, '')),
+    ]
+    with mockserver.run_fake(get_fake_tenantadm_addr(),
+                            handlers=handlers) as fake:
+        yield fake
 
-class TestDevicesSubmitAuthRequest:
-    def test_ok_preauth(self, management_api, device_api, devices):
+class TestDevicesSubmitAuthRequestBase:
+    def _do_test_ok_preauth(self, management_api, device_api, tenant_token=""):
         d = Device()
         d.public_key = PUBKEY
         d.private_key = PRIVKEY
         d.mac = MAC
 
-        da = DevAuthorizer()
+        da = DevAuthorizer(tenant_token=tenant_token)
 
         # get the authset id - need it for the url
-        dev = management_api.find_device_by_identity(d.identity)
+        auth = management_api.make_auth(tenant_token)
+        dev = management_api.find_device_by_identity(d.identity, **auth)
         assert dev
 
         with devadm_fake_status_update(AID), \
@@ -119,8 +131,9 @@ class TestDevicesSubmitAuthRequest:
             rsp = device_auth_req(device_api.auth_requests_url, da, d)
             assert rsp.status_code == 200
 
-    def test_error_preauth_limit(self, management_api, device_api, devices):
-        devs = management_api.list_devices()
+    def _do_test_error_preauth_limit(self, management_api, device_api, tenant_token=""):
+        auth = management_api.make_auth(tenant_token)
+        devs = management_api.list_devices(**auth)
         assert len(devs) == 6
 
         limit = 3
@@ -129,7 +142,7 @@ class TestDevicesSubmitAuthRequest:
             dev = devs[i]
             aid = dev.auth_sets[0].id
             with inventory.run_fake_for_device_id(dev.id):
-                management_api.accept_device(dev.id, aid)
+                management_api.accept_device(dev.id, aid, **auth)
 
         try:
             d = Device()
@@ -137,9 +150,30 @@ class TestDevicesSubmitAuthRequest:
             d.private_key = PRIVKEY
             d.mac = MAC
 
-            da = DevAuthorizer()
+            da = DevAuthorizer(tenant_token)
 
             rsp = device_auth_req(device_api.auth_requests_url, da, d)
         except bravado.exception.HTTPError as e:
             assert e.response.status_code == 401
 
+
+class TestDevicesSubmitAuthRequest(TestDevicesSubmitAuthRequestBase):
+    def test_ok_preauth(self, management_api, device_api, devices):
+        self._do_test_ok_preauth(management_api, device_api)
+
+    def test_error_preauth_limit(self, management_api, device_api, devices):
+        self._do_test_error_preauth_limit(management_api, device_api)
+
+
+# TODO rename to SubmitAuthRequestMultiTenant when naming conventions are fixed
+class TestMultiTenantDevicesSubmitAuthRequest(TestDevicesSubmitAuthRequestBase):
+    @pytest.mark.parametrize("tenant_id", TENANTS)
+    def test_ok_preauth(self, management_api, device_api, devices_mt, tenant_id):
+        with tenantadm_fake_tenant_verify():
+            token = make_fake_tenant_token(tenant_id)
+            self._do_test_ok_preauth(management_api, device_api, token)
+
+    @pytest.mark.parametrize("tenant_id", TENANTS)
+    def test_error_preauth_limit(self, management_api, device_api, devices_mt, tenant_id):
+        token = make_fake_tenant_token(tenant_id)
+        self._do_test_error_preauth_limit(management_api, device_api, token)
