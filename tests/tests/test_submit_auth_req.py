@@ -11,7 +11,7 @@
 #    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
-from common import clean_db, clean_migrated_db, mongo, \
+from common import clean_db, mongo, \
                    management_api, device_api, internal_api, \
                    Device, DevAuthorizer, \
                    make_devices, get_keypair, \
@@ -32,6 +32,22 @@ DEVID = 'devid-preauth'
 AID = 'aid-preauth'
 MAC = 'mac-preauth'
 IDDATA = json.dumps({'mac': MAC})
+
+@pytest.yield_fixture(scope='function')
+def clean_migrated_db(clean_db, cli, request):
+    """Clean database with migrations applied to multiple tenant DBs at once.
+    TODO should replace the common.clean_migrated_db, which supports just 1 tenant at a time."""
+    tenants = []
+    if hasattr(request, 'param'):
+        tenant_ids = request.param
+
+    if len(tenants) > 0:
+        for t in tenants:
+            cli.migrate(tenant=t)
+    else:
+            cli.migrate()
+
+    yield clean_db
 
 @pytest.fixture(scope='function')
 def devices(management_api, device_api, clean_migrated_db):
