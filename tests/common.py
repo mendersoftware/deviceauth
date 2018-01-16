@@ -253,7 +253,7 @@ def tenant_foobar_devices(device_api, management_api, tenant_foobar, request):
     """
     handlers = [
         ('POST', '/api/internal/v1/tenantadm/tenants/verify',
-         lambda _: (401, {}, '')),
+         lambda _: (200, {}, '')),
     ]
     with mockserver.run_fake(get_fake_tenantadm_addr(),
                              handlers=handlers) as fake:
