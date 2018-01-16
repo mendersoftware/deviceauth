@@ -152,7 +152,7 @@ class ManagementClient(SwaggerApiClient):
         if 'Authorization' not in kwargs:
             self.log.debug('appending default authorization header')
             kwargs['Authorization'] = 'Bearer foo'
-        count = self.client.devices.get_devices_count(status=status, headers = headers).result()[0]
+        count = self.client.devices.get_devices_count(status=status, **kwargs).result()[0]
         return count.count
 
     def make_auth(self, tenant_token):
