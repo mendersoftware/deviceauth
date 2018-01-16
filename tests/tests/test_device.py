@@ -258,11 +258,12 @@ class TestDeviceMultiTenant:
         try:
             with inventory.run_fake_for_device_id(inventory.ANY_DEVICE):
                 for dev, dev_auth in tenant_foobar_devices:
+                    auth = 'Bearer ' + tenant_foobar
                     fdev = management_api.find_device_by_identity(dev.identity,
-                                                                  Authorization=tenant_foobar)
+                                                                  Authorization=auth)
                     aid = fdev.auth_sets[0].id
                     management_api.accept_device(fdev.id, aid,
-                                                 Authorization=tenant_foobar)
+                                                 Authorization=auth)
                     accepted += 1
         except bravado.exception.HTTPError as e:
             assert e.response.status_code == 422
