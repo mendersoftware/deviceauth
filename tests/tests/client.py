@@ -143,6 +143,9 @@ class ManagementClient(SwaggerApiClient):
         count = self.client.devices.get_devices_count(status=status, **kwargs).result()[0]
         return count.count
 
+    def make_auth(self, tenant_token):
+        return {'Authorization': 'Bearer ' + tenant_token}
+
 
 class SimpleManagementClient(ManagementClient):
     """Management API client. Cannot be used as pytest base class"""

@@ -12,6 +12,7 @@
 #    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
+import os
 import json
 import requests
 import random
@@ -255,3 +256,6 @@ def tenant_foobar_devices(device_api, management_api, tenant_foobar, request):
         devcount = int(request.param)
 
     yield make_devices(device_api, devcount, tenant_token=tenant_foobar)
+
+def get_fake_tenantadm_addr():
+    return os.environ.get('FAKE_TENANTADM_ADDR', '0.0.0.0:9999')
