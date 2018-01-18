@@ -33,6 +33,8 @@ from Crypto.Hash import SHA256
 from client import SimpleInternalClient, SimpleManagementClient, ConductorClient, \
     BaseDevicesApiClient
 
+import mockserver
+import os
 
 def get_keypair():
     private = RSA.generate(1024)
@@ -156,15 +158,15 @@ def clean_db(mongo):
     mongo_cleanup(mongo)
 
 @pytest.yield_fixture(scope='function')
-def clean_migrated_db(clean_db, cli, request):
-    """Clean database with migrations applied. Yields pymongo.MongoClient connected
-    to the DB. The fixture can be parametrized with tenant ID"""
-    if hasattr(request, 'param'):
-        tenant_id = request.param
-    else:
-        tenant_id = ""
-    print("migrating DB")
-    cli.migrate(tenant=tenant_id)
+def clean_migrated_db(clean_db, cli):
+    """Clean database with migrations applied. Yields pymongo.MongoClient connected to the DB."""
+    cli.migrate()
+    yield clean_db
+
+@pytest.yield_fixture(scope='function')
+def tenant_foobar_clean_migrated_db(clean_db, cli):
+    """Clean 'foobar' database with migrations applied. Yields pymongo.MongoClient connected to the DB."""
+    cli.migrate(tenant='foobar')
     yield clean_db
 
 @pytest.yield_fixture(scope='session')
@@ -206,8 +208,7 @@ def make_fake_tenant_token(tenant):
     return 'fake.' + enc + '.fake-sig'
 
 @pytest.fixture
-@pytest.mark.parametrize('clean_migrated_db', ['foobar'], indirect=True)
-def tenant_foobar(request, clean_migrated_db):
+def tenant_foobar(request, tenant_foobar_clean_migrated_db):
     """Fixture that sets up a tenant with ID 'foobar', on top of a clean migrated
     (with tenant support) DB.
     """
@@ -249,13 +250,19 @@ def tenant_foobar_devices(device_api, management_api, tenant_foobar, request):
     be parametrized a number of devices to make. Yields a list of tuples:
     (instance of Device, instance of DevAuthorizer)
     """
+    handlers = [
+        ('POST', '/api/internal/v1/tenantadm/tenants/verify',
+         lambda _: (200, {}, '')),
+    ]
+    with mockserver.run_fake(get_fake_tenantadm_addr(),
+                             handlers=handlers) as fake:
 
-    if not hasattr(request, 'param'):
-        devcount = 1
-    else:
-        devcount = int(request.param)
+        if not hasattr(request, 'param'):
+            devcount = 1
+        else:
+            devcount = int(request.param)
 
-    yield make_devices(device_api, devcount, tenant_token=tenant_foobar)
+        yield make_devices(device_api, devcount, tenant_token=tenant_foobar)
 
 def get_fake_tenantadm_addr():
     return os.environ.get('FAKE_TENANTADM_ADDR', '0.0.0.0:9999')

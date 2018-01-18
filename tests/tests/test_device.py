@@ -8,7 +8,7 @@ from common import Device, DevAuthorizer, \
     device_auth_req, make_devices, devices, \
     clean_migrated_db, clean_db, mongo, cli, \
     management_api, internal_api, device_api, \
-    tenant_foobar, tenant_foobar_devices
+    tenant_foobar, tenant_foobar_devices, tenant_foobar_clean_migrated_db
 
 
 import mockserver
@@ -258,11 +258,12 @@ class TestDeviceMultiTenant:
         try:
             with inventory.run_fake_for_device_id(inventory.ANY_DEVICE):
                 for dev, dev_auth in tenant_foobar_devices:
+                    auth = 'Bearer ' + tenant_foobar
                     fdev = management_api.find_device_by_identity(dev.identity,
-                                                                  Authorization=tenant_foobar)
+                                                                  Authorization=auth)
                     aid = fdev.auth_sets[0].id
                     management_api.accept_device(fdev.id, aid,
-                                                 Authorization=tenant_foobar)
+                                                 Authorization=auth)
                     accepted += 1
         except bravado.exception.HTTPError as e:
             assert e.response.status_code == 422
@@ -276,3 +277,67 @@ def get_fake_orchestrator_addr():
 
 def get_fake_deviceadm_addr():
     return os.environ.get('FAKE_ADMISSION_ADDR', '0.0.0.0:9997')
+
+
+class TestDeleteAuthsetBase:
+
+    def _test_delete_authset_OK(self, management_api, devices, **kwargs):
+        d, da = devices[0]
+
+        dev = management_api.find_device_by_identity(d.identity, **kwargs)
+
+        assert dev
+        devid = dev.id
+
+        print('found matching device with ID:', dev.id)
+        aid = dev.auth_sets[0].id
+
+        rsp = management_api.delete_authset(devid, aid, **kwargs)
+        assert rsp.status_code == 204
+
+        found = management_api.find_device_by_identity(d.identity, **kwargs)
+        assert not found
+
+    def _test_delete_authset_error_device_not_found(self, management_api, devices, **kwargs):
+        rsp = management_api.delete_authset("foo", "bar")
+        assert rsp.status_code == 404
+
+    def _test_delete_authset_error_authset_not_found(self, management_api, devices, **kwargs):
+        d, da = devices[0]
+
+        dev = management_api.find_device_by_identity(d.identity, **kwargs)
+
+        assert dev
+        devid = dev.id
+
+        print('found matching device with ID:', dev.id)
+
+        rsp = management_api.delete_authset(devid, "foobar")
+        assert rsp.status_code == 404
+
+
+class TestDeleteAuthset(TestDeleteAuthsetBase):
+
+    def test_delete_authset_OK(self, management_api, devices):
+        self._test_delete_authset_OK(management_api, devices)
+
+    def test_delete_authset_error_device_not_found(self, management_api, devices):
+        self._test_delete_authset_error_device_not_found(management_api, devices)
+
+    def test_delete_authset_error_authset_not_found(self, management_api, devices):
+        self._test_delete_authset_error_authset_not_found(management_api, devices)
+
+
+class TestDeleteAuthsetMultiTenant(TestDeleteAuthsetBase):
+
+    def test_delete_authset_OK(self, management_api, tenant_foobar_devices, tenant_foobar):
+        auth = 'Bearer ' + tenant_foobar
+        self._test_delete_authset_OK(management_api, tenant_foobar_devices, Authorization=auth)
+
+    def test_delete_authset_error_device_not_found(self, management_api, tenant_foobar_devices, tenant_foobar):
+        auth = 'Bearer ' + tenant_foobar
+        self._test_delete_authset_error_device_not_found(management_api, tenant_foobar_devices, Authorization=auth)
+
+    def test_delete_authset_error_authset_not_found(self, management_api, tenant_foobar_devices, tenant_foobar):
+        auth = 'Bearer ' + tenant_foobar
+        self._test_delete_authset_error_authset_not_found(management_api, tenant_foobar_devices, Authorization=auth)

@@ -136,6 +136,15 @@ class ManagementClient(SwaggerApiClient):
         rsp = requests.delete(self.make_api_url('/devices/{}'.format(devid)), headers = headers)
         return rsp
 
+    def delete_authset(self, devid, aid, **kwargs):
+        if 'Authorization' not in kwargs:
+            self.log.debug('appending default authorization header')
+            kwargs['Authorization'] = 'Bearer foo'
+
+        headers = {'Authorization' : kwargs['Authorization']}
+        rsp = requests.delete(self.make_api_url('/devices/{}/auth/{}'.format(devid, aid)), headers = headers)
+        return rsp
+
     def count_devices(self, status=None, **kwargs):
         if 'Authorization' not in kwargs:
             self.log.debug('appending default authorization header')

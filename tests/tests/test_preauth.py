@@ -13,7 +13,8 @@
 #    limitations under the License.
 import pytest
 
-from common import clean_db, mongo, management_api, clean_migrated_db, devices, device_api, cli
+from common import clean_db, mongo, management_api, clean_migrated_db, devices, device_api, cli, \
+tenant_foobar, tenant_foobar_devices, tenant_foobar_clean_migrated_db
 
 import json
 import bravado
@@ -27,10 +28,10 @@ class TestManagementPreauthorizeBase:
         iddata = json.dumps({'foo': 'bar'})
 
         req = management_api.make_preauth_req(aid, device_id, iddata, key)
-        _, rsp = management_api.preauthorize(req)
+        _, rsp = management_api.preauthorize(req, **kwargs)
         assert rsp.status_code == 201
 
-        devs = management_api.list_devices()
+        devs = management_api.list_devices(**kwargs)
         assert len(devs) == 6
 
         found = [d for d in devs if d.id == device_id]
@@ -51,11 +52,13 @@ class TestManagementPreauthorizeBase:
         existing = devices[0][0]
         req = management_api.make_preauth_req('1', '2', existing.identity, 'key')
         try:
-            _, rsp = management_api.preauthorize(req)
+            _, rsp = management_api.preauthorize(req, **kwargs)
         except bravado.exception.HTTPError as e:
             assert e.response.status_code == 409
+        else:
+            assert False, "unexpected code " + str(rsp.status_code)
 
-        devs = management_api.list_devices()
+        devs = management_api.list_devices(**kwargs)
         assert len(devs) == 5
 
 class TestManagementPreauthorize(TestManagementPreauthorizeBase):
@@ -70,10 +73,10 @@ class TestManagementPreauthorize(TestManagementPreauthorizeBase):
 class TestManagementPreauthorizeMultiTenant(TestManagementPreauthorizeBase):
     @pytest.mark.parametrize('tenant_foobar_devices', ['5'], indirect=True)
     def test_ok(self, management_api, tenant_foobar_devices, tenant_foobar):
-        auth = 'Authorization: Bearer ' + tenant_foobar
+        auth = 'Bearer ' + tenant_foobar
         self._test_ok(management_api, tenant_foobar_devices, Authorization=auth)
 
     @pytest.mark.parametrize('tenant_foobar_devices', ['5'], indirect=True)
     def test_conflict(self, management_api, tenant_foobar_devices, tenant_foobar):
-        auth = 'Authorization: Bearer ' + tenant_foobar
-        self._test_conflict(management_api, devices, Authorization=auth)
+        auth = 'Bearer ' + tenant_foobar
+        self._test_conflict(management_api, tenant_foobar_devices, Authorization=auth)
