@@ -331,13 +331,13 @@ class TestDeleteAuthset(TestDeleteAuthsetBase):
 class TestDeleteAuthsetMultiTenant(TestDeleteAuthsetBase):
 
     def test_delete_authset_OK(self, management_api, tenant_foobar_devices, tenant_foobar):
-        auth = 'Authorization: Bearer ' + tenant_foobar
+        auth = 'Bearer ' + tenant_foobar
         self._test_delete_authset_OK(management_api, tenant_foobar_devices, Authorization=auth)
 
     def test_delete_authset_error_device_not_found(self, management_api, tenant_foobar_devices, tenant_foobar):
-        auth = 'Authorization: Bearer ' + tenant_foobar
+        auth = 'Bearer ' + tenant_foobar
         self._test_delete_authset_error_device_not_found(management_api, tenant_foobar_devices, Authorization=auth)
 
     def test_delete_authset_error_authset_not_found(self, management_api, tenant_foobar_devices, tenant_foobar):
-        auth = 'Authorization: Bearer ' + tenant_foobar
+        auth = 'Bearer ' + tenant_foobar
         self._test_delete_authset_error_authset_not_found(management_api, tenant_foobar_devices, Authorization=auth)
