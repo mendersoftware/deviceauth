@@ -19,7 +19,8 @@ import pytest
 from common import Device, DevAuthorizer, \
     device_auth_req, \
     clean_migrated_db, clean_db, mongo, cli, \
-    management_api, device_api, tenant_foobar, \
+    management_api, device_api, \
+    tenant_foobar, tenant_foobar_clean_migrated_db, \
     get_fake_tenantadm_addr
 
 import mockserver

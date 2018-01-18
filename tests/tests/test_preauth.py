@@ -13,7 +13,8 @@
 #    limitations under the License.
 import pytest
 
-from common import clean_db, mongo, management_api, clean_migrated_db, devices, device_api, cli
+from common import clean_db, mongo, management_api, clean_migrated_db, devices, device_api, cli, \
+tenant_foobar, tenant_foobar_devices, tenant_foobar_clean_migrated_db
 
 import json
 import bravado

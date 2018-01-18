@@ -8,7 +8,7 @@ from common import Device, DevAuthorizer, \
     device_auth_req, make_devices, devices, \
     clean_migrated_db, clean_db, mongo, cli, \
     management_api, internal_api, device_api, \
-    tenant_foobar, tenant_foobar_devices
+    tenant_foobar, tenant_foobar_devices, tenant_foobar_clean_migrated_db
 
 
 import mockserver
