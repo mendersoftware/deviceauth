@@ -140,9 +140,6 @@ class ManagementClient(SwaggerApiClient):
         if 'Authorization' not in kwargs:
             self.log.debug('appending default authorization header')
             kwargs['Authorization'] = 'Bearer foo'
-        # bravado for some reason doesn't issue DELETEs properly (silent failure)
-        # fall back to 'requests'
-        #   return self.client.devices.delete_devices_id(id=devid, **kwargs)
 
         headers = {'Authorization' : kwargs['Authorization']}
         rsp = requests.delete(self.make_api_url('/devices/{}/auth/{}'.format(devid, aid)), headers = headers)
