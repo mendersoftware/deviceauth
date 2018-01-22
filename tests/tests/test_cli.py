@@ -87,6 +87,20 @@ class TestMigration:
         TestMigration.verify_db_and_collections(mongo, dbname)
         TestMigration.verify_migration(mongo[dbname], version)
 
+class TestListTenants:
+
+    def test_ok(self, cli, migrated_tenant_dbs):
+        dbs = list(MIGRATED_TENANT_DBS.keys())
+        dbs.sort()
+        listedTenants = cli.list_tenants()
+        listedTenantsList = listedTenants.split("\n")
+        listedTenantsList.remove('')
+        listedTenantsList.sort()
+        assert dbs == listedTenantsList
+
+    def test_no_tenants(self, cli):
+        assert cli.list_tenants() == ""
+
 
 # runs 'last' since it drops/reinits the default db, which breaks deviceauth under test:
 # - the indexes are destroyed by 'clean_db/fake_migrated_db'

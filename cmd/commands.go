@@ -73,7 +73,7 @@ func Migrate(c config.Reader, tenant string, listTenantsFlag bool) error {
 func listTenants(db *mongo.DataStoreMongo) error {
 	tdbs, err := db.GetTenantDbs()
 	if err != nil {
-		return errors.Wrap(err, "failed go retrieve tenant DBs")
+		return errors.Wrap(err, "failed to retrieve tenant DBs")
 	}
 
 	for _, tenant := range tdbs {
