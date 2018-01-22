@@ -250,3 +250,10 @@ class CliClient:
             args.extend(['--tenant', tenant])
 
         subprocess.run(args, check=True)
+
+    def list_tenants(self, tenant=None):
+        args = [self.cmd,
+                'migrate',
+                '--list-tenants']
+
+        return subprocess.run(args, check=True, stdout=subprocess.PIPE).stdout.decode("utf-8")
