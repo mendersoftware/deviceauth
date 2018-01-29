@@ -38,6 +38,35 @@ paths:
             description: Unexpected error.
             schema:
               $ref: '#/definitions/Error'
+  /tokens:
+    delete:
+      summary: Delete device tokens. for a tenant with given tenant id
+      description: |
+         This endpoint is designed to be used for device decommissionning
+         and tenant account suspension purpose.
+         For device decommissioning purpose both tenant_id and device_id parameters
+         must be set. When bot, tenant_id and device_id parameters are set,
+         all tokens will be deleted for device with given device_id.
+         For tenant account suspension purpose only tenant_id parameter
+         must be set. When device_id parameter is not set (only tenant_id parameter is set)
+         all tokens for all tenant devices will be deleted.
+      parameters:
+        - name: tenant_id
+          in: query
+          type: string
+          description: Tenant ID.
+          required: true
+        - name: device_id
+          in: query
+          type: string
+          description: Device ID.
+      responses:
+        204:
+          description: Tokens deleted.
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/Error"
   /tenant/{tenant_id}/limits/max_devices:
     get:
       summary: Max device count limit
