@@ -77,6 +77,36 @@
 			"revisionTime": "2017-03-29T04:21:07Z"
 		},
 		{
+			"checksumSHA1": "GlRa0AB0IrFx23ie0E8yR303884=",
+			"path": "github.com/globalsign/mgo",
+			"revision": "896bbb89d21253a28cd5a7f8b81fe091410cb94d",
+			"revisionTime": "2018-01-15T17:41:36Z"
+		},
+		{
+			"checksumSHA1": "t5L9j+tNXPMbJFuELB/g4dNNZJ4=",
+			"path": "github.com/globalsign/mgo/bson",
+			"revision": "896bbb89d21253a28cd5a7f8b81fe091410cb94d",
+			"revisionTime": "2018-01-15T17:41:36Z"
+		},
+		{
+			"checksumSHA1": "v+vkHey6KrivVjjvBSG3FTK98hk=",
+			"path": "github.com/globalsign/mgo/internal/json",
+			"revision": "896bbb89d21253a28cd5a7f8b81fe091410cb94d",
+			"revisionTime": "2018-01-15T17:41:36Z"
+		},
+		{
+			"checksumSHA1": "zSNjAU41khuKovmSSkhVqXf5q4A=",
+			"path": "github.com/globalsign/mgo/internal/sasl",
+			"revision": "896bbb89d21253a28cd5a7f8b81fe091410cb94d",
+			"revisionTime": "2018-01-15T17:41:36Z"
+		},
+		{
+			"checksumSHA1": "1LM1tD2hM3dbZ3p63M5Levyf2BY=",
+			"path": "github.com/globalsign/mgo/internal/scram",
+			"revision": "896bbb89d21253a28cd5a7f8b81fe091410cb94d",
+			"revisionTime": "2018-01-15T17:41:36Z"
+		},
+		{
 			"checksumSHA1": "s5gBB/x5WJFD8XnDxV1soUQfOtc=",
 			"path": "github.com/mendersoftware/go-lib-micro",
 			"revision": "1206e5ecc12675ed27ffc7ecfcfb00e638bc6160",
@@ -280,6 +310,12 @@
 			"path": "golang.org/x/text/unicode/norm",
 			"revision": "1cbadb444a806fd9430d14ad08967ed91da4fa0a",
 			"revisionTime": "2017-09-13T19:45:57Z"
+		},
+		{
+			"checksumSHA1": "538I8ghUdvZa25NxgMUDpq14Qic=",
+			"path": "gopkg.in/check.v1",
+			"revision": "20d25e2804050c1cd24a7eea1e7a6447dd0e74ec",
+			"revisionTime": "2016-12-08T18:13:25Z"
 		},
 		{
 			"path": "gopkg.in/urfave/cli",
