@@ -16,9 +16,9 @@ package migrate
 import (
 	"time"
 
+	"github.com/globalsign/mgo"
 	"github.com/mendersoftware/go-lib-micro/store"
 	"github.com/pkg/errors"
-	"gopkg.in/mgo.v2"
 )
 
 // this is a small internal data layer for the migration utils, may be shared by diff migrators

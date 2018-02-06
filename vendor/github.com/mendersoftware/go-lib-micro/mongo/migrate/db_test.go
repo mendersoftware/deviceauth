@@ -16,8 +16,8 @@ package migrate_test
 import (
 	"testing"
 
+	"github.com/globalsign/mgo/bson"
 	"github.com/stretchr/testify/assert"
-	"gopkg.in/mgo.v2/bson"
 
 	. "github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	"github.com/mendersoftware/go-lib-micro/store"

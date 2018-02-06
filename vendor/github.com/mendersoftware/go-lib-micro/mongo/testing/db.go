@@ -17,8 +17,8 @@ import (
 	"io/ioutil"
 	"os"
 
-	"gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/dbtest"
+	"github.com/globalsign/mgo"
+	"github.com/globalsign/mgo/dbtest"
 )
 
 // TestDBRunner exports selected calls of dbtest.DBServer API, just the ones
