@@ -8,11 +8,13 @@ f56f51f3aac08674202e9c399e4f32e733c12953c09e15464b0cc3227ac442c0  vendor/github.
 402f39eed8a1851385d0703999aa9f23d067c2ea3e15c63c074e389cbf8f8f8f  vendor/github.com/stretchr/testify/LICENSE
 2d36597f7117c38b006835ae7f537487207d8ec407aa9d9980794b2030cbc067  vendor/golang.org/x/sys/LICENSE
 ceb1b36ff073bd13d9806d4615b931707768ca9023805620acc32dd1cfc2f680  vendor/github.com/mendersoftware/mendertesting/LICENSE
+2d36597f7117c38b006835ae7f537487207d8ec407aa9d9980794b2030cbc067  vendor/golang.org/x/net/LICENSE
 
 # MIT license.
 feb6d17a0e7a64e5ab0f7e2b0e0ee3e69c1a6396626fd554dc0cddaa06851b44  vendor/github.com/spf13/viper/LICENSE
 
 # BSD 2 license.
-4367cb0287ad1fb0676409ba770bb50be231ab573c212bca7327c23191e1eac2  vendor/gopkg.in/mgo.v2/LICENSE
-150ff9d2cacd75cb54bd69c0c5cbcb17aff49b2a24ee7b3d83981228c55d7006  vendor/gopkg.in/mgo.v2/bson/LICENSE
-dd26a7abddd02e2d0aba97805b31f248ef7835d9e10da289b22e3b8ab78b324d  vendor/gopkg.in/mgo.v2/internal/json/LICENSE
+4367cb0287ad1fb0676409ba770bb50be231ab573c212bca7327c23191e1eac2  vendor/github.com/globalsign/mgo/LICENSE
+150ff9d2cacd75cb54bd69c0c5cbcb17aff49b2a24ee7b3d83981228c55d7006  vendor/github.com/globalsign/mgo/bson/LICENSE
+8407b13e462f755c06db3db3a034dc1fdc9157af19c6ea8986e7d5aecf4126b3  vendor/gopkg.in/tomb.v2/LICENSE
+dd26a7abddd02e2d0aba97805b31f248ef7835d9e10da289b22e3b8ab78b324d  vendor/github.com/globalsign/mgo/internal/json/LICENSE

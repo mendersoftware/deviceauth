@@ -12,6 +12,7 @@ f7a4d9fa675c9347d97d6cb7b3142f733a828e8884eef461f30601f797f8248a  vendor/github.
 fe60e0cc90e88f12c814adb7dc88df6791c6ec6798d8c856b7d5ad1b805b4f10  vendor/github.com/globalsign/mgo/LICENSE
 86258a47c5340187ef120b9c20e5427a84d3040ecab3243315692862e07dedae  vendor/github.com/globalsign/mgo/bson/LICENSE
 69ce77f2b1c9c608d27f2d749b0e7d0c13960ed3b0dc07b973ac940e362e5d9c  vendor/gopkg.in/check.v1/LICENSE
+dd26a7abddd02e2d0aba97805b31f248ef7835d9e10da289b22e3b8ab78b324d  vendor/github.com/globalsign/mgo/internal/json/LICENSE
 #
 # BSD-3-Clause
 b8514c577c1c4b46cee454d5a882b15fa411e72c5bd7f801f241591789fce61a  vendor/github.com/spf13/pflag/LICENSE

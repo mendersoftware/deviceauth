@@ -19,8 +19,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/globalsign/mgo"
 	"github.com/pkg/errors"
-	"gopkg.in/mgo.v2"
 
 	"github.com/mendersoftware/go-lib-micro/log"
 )
