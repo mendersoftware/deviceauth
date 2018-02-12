@@ -504,46 +504,77 @@ func TestStoreDeleteTokenByDevId(t *testing.T) {
 		t.Skip("skipping TestDeleteTokenByDevId in short mode.")
 	}
 
-	dbCtx := identity.WithContext(context.Background(), &identity.Identity{
-		Tenant: tenant,
-	})
-	d := getDb(dbCtx)
-	defer d.session.Close()
-	s := d.session.Copy()
-	defer s.Close()
-
-	err := setUpTokens(s, dbCtx)
-	assert.NoError(t, err, "failed to setup input data")
+	inTokens := []interface{}{
+		model.Token{
+			Id:        "id1",
+			DevId:     "devId1",
+			AuthSetId: "aId1-1",
+			Token:     "token1-1",
+		},
+		model.Token{
+			Id:        "id2",
+			DevId:     "devId1",
+			AuthSetId: "aId1-2",
+			Token:     "token1-2",
+		},
+		model.Token{
+			Id:        "id3",
+			DevId:     "devId2",
+			AuthSetId: "aId2-1",
+			Token:     "token2-1",
+		},
+	}
 
 	testCases := []struct {
 		devId  string
 		tenant string
-		err    bool
+
+		outTokens []model.Token
+		err       error
 	}{
 		{
-			devId:  token1.DevId,
-			tenant: tenant,
-			err:    false,
+			devId:  "devId1",
+			tenant: "tenant-foo",
+
+			outTokens: []model.Token{
+				model.Token{
+					Id:        "id3",
+					DevId:     "devId2",
+					AuthSetId: "aId2-1",
+					Token:     "token2-1",
+				},
+			},
+			err: nil,
 		},
 		{
-			devId: token1.DevId,
-			err:   true,
+			devId:  "devId2",
+			tenant: "tenant-foo",
+
+			outTokens: []model.Token{
+				model.Token{
+					Id:        "id1",
+					DevId:     "devId1",
+					AuthSetId: "aId1-1",
+					Token:     "token1-1",
+				},
+				model.Token{
+					Id:        "id2",
+					DevId:     "devId1",
+					AuthSetId: "aId1-2",
+					Token:     "token1-2",
+				},
+			},
+			err: nil,
 		},
 		{
-			devId:  token2.DevId,
-			tenant: tenant,
-			err:    false,
-		},
-		{
-			devId:  "devId3",
-			tenant: tenant,
-			err:    true,
+			devId: "devIdNotFound",
+
+			err: store.ErrTokenNotFound,
 		},
 	}
 
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
-
 			ctx := context.Background()
 			if tc.tenant != "" {
 				ctx = identity.WithContext(ctx, &identity.Identity{
@@ -551,11 +582,27 @@ func TestStoreDeleteTokenByDevId(t *testing.T) {
 				})
 			}
 
-			err := d.DeleteTokenByDevId(ctx, tc.devId)
-			if tc.err {
+			d := getDb(ctx)
+			defer d.session.Close()
+			s := d.session.Copy()
+			defer s.Close()
+
+			err := s.DB(ctxstore.DbFromContext(ctx, DbName)).
+				C(DbTokensColl).Insert(inTokens...)
+			assert.NoError(t, err)
+
+			err = d.DeleteTokenByDevId(ctx, tc.devId)
+			if tc.err != nil {
 				assert.Equal(t, store.ErrTokenNotFound, err)
 			} else {
-				assert.NoError(t, err, "failed to delete token")
+				assert.NoError(t, err)
+				var out []model.Token
+
+				err := s.DB(ctxstore.DbFromContext(ctx, DbName)).
+					C(DbTokensColl).Find(nil).All(&out)
+				assert.NoError(t, err)
+
+				assert.Equal(t, tc.outTokens, out)
 			}
 		})
 	}
