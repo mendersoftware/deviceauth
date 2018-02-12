@@ -520,14 +520,14 @@ func (db *DataStoreMongo) DeleteAuthSetsForDevice(ctx context.Context, devid str
 
 	c := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbAuthSetColl)
 
-	err := c.Remove(model.AuthSet{DeviceId: devid})
+	ci, err := c.RemoveAll(model.AuthSet{DeviceId: devid})
+
+	if ci.Removed == 0 {
+		return store.ErrAuthSetNotFound
+	}
 
 	if err != nil {
-		if err == mgo.ErrNotFound {
-			return store.ErrAuthSetNotFound
-		} else {
-			return errors.Wrap(err, "failed to remove auth sets for device")
-		}
+		return errors.Wrap(err, "failed to remove auth sets for device")
 	}
 
 	return nil
