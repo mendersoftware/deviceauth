@@ -316,14 +316,14 @@ func (db *DataStoreMongo) DeleteTokenByDevId(ctx context.Context, devId string) 
 	defer s.Close()
 
 	c := db.session.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbTokensColl)
-	err := c.Remove(bson.M{"dev_id": devId})
+	ci, err := c.RemoveAll(bson.M{"dev_id": devId})
+
+	if ci.Removed == 0 {
+		return store.ErrTokenNotFound
+	}
 
 	if err != nil {
-		if err == mgo.ErrNotFound {
-			return store.ErrTokenNotFound
-		} else {
-			return errors.Wrap(err, "failed to remove token")
-		}
+		return errors.Wrap(err, "failed to remove tokens")
 	}
 
 	return nil
