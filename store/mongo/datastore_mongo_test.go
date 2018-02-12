@@ -1117,52 +1117,129 @@ func TestStoreDeleteAuthSetsForDevice(t *testing.T) {
 
 	authSets := []interface{}{
 		model.AuthSet{
+			Id:       "1",
 			DeviceId: "001",
-			IdData:   "001",
-			PubKey:   "001",
+			IdData:   "id-001",
+			PubKey:   "key-001-1",
 		},
 		model.AuthSet{
+			Id:       "2",
+			DeviceId: "002",
+			IdData:   "id-002",
+			PubKey:   "key-002-1",
+		},
+		model.AuthSet{
+			Id:       "3",
 			DeviceId: "001",
-			IdData:   "001",
-			PubKey:   "002",
+			IdData:   "id-001",
+			PubKey:   "key-001-2",
+		},
+		model.AuthSet{
+			Id:       "4",
+			DeviceId: "002",
+			IdData:   "id-002",
+			PubKey:   "key-002-2",
+		},
+		model.AuthSet{
+			Id:       "5",
+			DeviceId: "002",
+			IdData:   "id-002",
+			PubKey:   "key-002-3",
 		},
 	}
-
-	dbCtx := identity.WithContext(context.Background(), &identity.Identity{
-		Tenant: tenant,
-	})
-	db := getDb(dbCtx)
-	defer db.session.Close()
-	s := db.session.Copy()
-	defer s.Close()
-
-	coll := s.DB(ctxstore.DbFromContext(dbCtx, DbName)).C(DbAuthSetColl)
-	assert.NoError(t, coll.Insert(authSets...))
 
 	testCases := []struct {
 		devId  string
 		tenant string
-		err    string
+
+		outAuthSets []model.AuthSet
+		err         string
 	}{
 		{
-			devId:  "001",
+			devId: "001",
+			outAuthSets: []model.AuthSet{
+				model.AuthSet{
+					Id:       "2",
+					DeviceId: "002",
+					IdData:   "id-002",
+					PubKey:   "key-002-1",
+				},
+				model.AuthSet{
+					Id:       "4",
+					DeviceId: "002",
+					IdData:   "id-002",
+					PubKey:   "key-002-2",
+				},
+				model.AuthSet{
+					Id:       "5",
+					DeviceId: "002",
+					IdData:   "id-002",
+					PubKey:   "key-002-3",
+				},
+			},
 			tenant: tenant,
 			err:    "",
 		},
 		{
-			devId: "001",
-			err:   store.ErrAuthSetNotFound.Error(),
+			devId: "002",
+			outAuthSets: []model.AuthSet{
+				model.AuthSet{
+					Id:       "1",
+					DeviceId: "001",
+					IdData:   "id-001",
+					PubKey:   "key-001-1",
+				},
+				model.AuthSet{
+					Id:       "3",
+					DeviceId: "001",
+					IdData:   "id-001",
+					PubKey:   "key-001-2",
+				},
+			},
+			tenant: "asdf",
+			err:    "",
 		},
 		{
 			devId:  "100",
 			tenant: tenant,
-			err:    store.ErrAuthSetNotFound.Error(),
+			outAuthSets: []model.AuthSet{
+				model.AuthSet{
+					Id:       "1",
+					DeviceId: "001",
+					IdData:   "id-001",
+					PubKey:   "key-001-1",
+				},
+				model.AuthSet{
+					Id:       "2",
+					DeviceId: "002",
+					IdData:   "id-002",
+					PubKey:   "key-002-1",
+				},
+				model.AuthSet{
+					Id:       "3",
+					DeviceId: "001",
+					IdData:   "id-001",
+					PubKey:   "key-001-1",
+				},
+				model.AuthSet{
+					Id:       "4",
+					DeviceId: "002",
+					IdData:   "id-002",
+					PubKey:   "key-002-2",
+				},
+				model.AuthSet{
+					Id:       "5",
+					DeviceId: "002",
+					IdData:   "id-002",
+					PubKey:   "key-002-3",
+				},
+			},
+			err: store.ErrAuthSetNotFound.Error(),
 		},
 	}
 
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
-
 			ctx := context.Background()
 			if tc.tenant != "" {
 				ctx = identity.WithContext(ctx, &identity.Identity{
@@ -1170,16 +1247,23 @@ func TestStoreDeleteAuthSetsForDevice(t *testing.T) {
 				})
 			}
 
+			db := getDb(ctx)
+			defer db.session.Close()
+			s := db.session.Copy()
+			defer s.Close()
+
+			coll := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbAuthSetColl)
+			assert.NoError(t, coll.Insert(authSets...))
+
 			err := db.DeleteAuthSetsForDevice(ctx, tc.devId)
 			if tc.err != "" {
 				assert.Equal(t, tc.err, err.Error())
 			} else {
 				assert.NoError(t, err)
-				var found model.Device
-				err = coll.FindId(model.AuthSet{DeviceId: tc.devId}).One(&found)
-				if assert.Error(t, err) {
-					assert.Equal(t, err.Error(), mgo.ErrNotFound.Error())
-				}
+				var out []model.AuthSet
+				err = coll.Find(nil).All(&out)
+				assert.NoError(t, err)
+				assert.Equal(t, tc.outAuthSets, out)
 			}
 		})
 	}
