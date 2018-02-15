@@ -296,7 +296,7 @@ class TestDeleteAuthsetBase:
         assert rsp.status_code == 204
 
         found = management_api.find_device_by_identity(d.identity, **kwargs)
-        assert not found
+        assert found
 
     def _test_delete_authset_error_device_not_found(self, management_api, devices, **kwargs):
         rsp = management_api.delete_authset("foo", "bar")
