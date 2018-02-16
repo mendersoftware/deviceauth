@@ -285,18 +285,18 @@ class TestDeleteAuthsetBase:
         d, da = devices[0]
 
         dev = management_api.find_device_by_identity(d.identity, **kwargs)
-
         assert dev
-        devid = dev.id
 
         print('found matching device with ID:', dev.id)
         aid = dev.auth_sets[0].id
 
-        rsp = management_api.delete_authset(devid, aid, **kwargs)
+        rsp = management_api.delete_authset(dev.id, aid, **kwargs)
         assert rsp.status_code == 204
 
-        found = management_api.find_device_by_identity(d.identity, **kwargs)
+        found = management_api.get_device(id=dev.id, **kwargs)
         assert found
+
+        assert len(found.auth_sets) == 0
 
     def _test_delete_authset_preauth_OK(self, management_api, devices, **kwargs):
         # preauthorize a device
