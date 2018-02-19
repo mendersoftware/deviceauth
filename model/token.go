@@ -20,6 +20,13 @@ type Token struct {
 	Token     string `json:"token" bson:"token,omitempty"`
 }
 
+type TokenFilter struct {
+	Id        string `json:"id" bson:"_id,omitempty"`
+	DevId     string `json:"dev_id" bson:"dev_id,omitempty"`
+	AuthSetId string `json:"auth_id" bson:"auth_id,omitempty"`
+	Token     string `json:"token" bson:"token,omitempty"`
+}
+
 func NewToken(id string, dev_id string, token string) *Token {
 	return &Token{
 		Id:    id,
