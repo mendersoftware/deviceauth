@@ -16,7 +16,7 @@ addons:
 
 # Golang version matrix
 go:
-    - 1.10
+    - 1.8
 
 env:
     matrix:
