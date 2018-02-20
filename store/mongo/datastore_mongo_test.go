@@ -1566,7 +1566,7 @@ func getDevWithStatus(id int, status string) (*model.Device, []model.AuthSet) {
 	pubkey := fmt.Sprintf("pubkey-%04d", id)
 
 	dev := model.Device{
-		Id:     fmt.Sprintf("%s", id),
+		Id:     fmt.Sprintf("%d", id),
 		IdData: iddata,
 		PubKey: pubkey,
 	}
