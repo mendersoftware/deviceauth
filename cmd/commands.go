@@ -139,9 +139,11 @@ func decommissioningCleanupDryRun(db *mongo.DataStoreMongo, dbName string) error
 	if err != nil {
 		return err
 	}
-	fmt.Println("devices with decommissioning flag set:")
-	for _, dev := range devices {
-		fmt.Println(dev.Id)
+	if len(devices) > 0 {
+		fmt.Println("devices with decommissioning flag set:")
+		for _, dev := range devices {
+			fmt.Println(dev.Id)
+		}
 	}
 
 	//auth sets
@@ -149,9 +151,11 @@ func decommissioningCleanupDryRun(db *mongo.DataStoreMongo, dbName string) error
 	if err != nil {
 		return err
 	}
-	fmt.Println("authentication sets to be removed:")
-	for _, authSetId := range authSetIds {
-		fmt.Println(authSetId)
+	if len(authSetIds) > 0 {
+		fmt.Println("authentication sets to be removed:")
+		for _, authSetId := range authSetIds {
+			fmt.Println(authSetId)
+		}
 	}
 
 	//tokens
@@ -160,9 +164,11 @@ func decommissioningCleanupDryRun(db *mongo.DataStoreMongo, dbName string) error
 		return err
 	}
 
-	fmt.Println("tokens to be removed:")
-	for _, tokenId := range tokenIds {
-		fmt.Println(tokenId)
+	if len(tokenIds) > 0 {
+		fmt.Println("tokens to be removed:")
+		for _, tokenId := range tokenIds {
+			fmt.Println(tokenId)
+		}
 	}
 
 	return nil
