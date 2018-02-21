@@ -190,7 +190,7 @@ func cmdMigrate(args *cli.Context) error {
 }
 
 func cmdMaintenance(args *cli.Context) error {
-	err := cmd.Maintenance(config.Config, args.Bool("decommissioning-cleanup"), args.String("tenant"), args.Bool("dry-run"))
+	err := cmd.Maintenance(args.Bool("decommissioning-cleanup"), args.String("tenant"), args.Bool("dry-run"))
 	if err != nil {
 		return cli.NewExitError(err, 6)
 	}

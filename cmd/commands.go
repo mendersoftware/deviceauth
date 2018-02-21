@@ -83,12 +83,16 @@ func listTenants(db *mongo.DataStoreMongo) error {
 	return nil
 }
 
-func Maintenance(c config.Reader, decommissioningCleanupFlag bool, tenant string, dryRunFlag bool) error {
+func Maintenance(decommissioningCleanupFlag bool, tenant string, dryRunFlag bool) error {
 	db, err := mongo.NewDataStoreMongo(makeDataStoreConfig())
 	if err != nil {
 		return errors.Wrap(err, "failed to connect to db")
 	}
 
+	return maintenanceWithDataStore(decommissioningCleanupFlag, tenant, dryRunFlag, db)
+}
+
+func maintenanceWithDataStore(decommissioningCleanupFlag bool, tenant string, dryRunFlag bool, db *mongo.DataStoreMongo) error {
 	// cleanup devauth database from leftovers after failed decommissioning
 	if decommissioningCleanupFlag {
 		return decommissioningCleanup(db, tenant, dryRunFlag)
