@@ -484,8 +484,7 @@ func (d *DevAuth) DecommissionDevice(ctx context.Context, devId string) error {
 	return d.db.DeleteDevice(ctx, devId)
 }
 
-// Deletes device authentication set.
-// If there is only one authentication set for the device, the device will also be deleted.
+// Deletes device authentication set, and optionally the device.
 func (d *DevAuth) DeleteAuthSet(ctx context.Context, devId string, authId string) error {
 
 	l := log.FromContext(ctx)
@@ -513,14 +512,9 @@ func (d *DevAuth) DeleteAuthSet(ctx context.Context, devId string, authId string
 		return err
 	}
 
-	// check if there is at least one authentication set for the device
-	// if not - delete the device
-	authSets, err := d.db.GetAuthSetsForDevice(ctx, devId)
-	if err != nil {
-		return err
-	}
-	if len(authSets) == 0 {
-		// no more authentication sets - delete device
+	// only delete the device if the set is 'preauthorized'
+	// otherwise device data may live in other services too, and is a case for decommissioning
+	if authSet.Status == model.DevStatusPreauth {
 		return d.db.DeleteDevice(ctx, devId)
 	}
 

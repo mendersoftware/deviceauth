@@ -1706,8 +1706,7 @@ func TestDevAuthDeleteAuthSet(t *testing.T) {
 		dbGetAuthSetsForDeviceErr   error
 		dbDeleteDeviceErr           error
 
-		authSet          *model.AuthSet
-		numberOfAuthSets int
+		authSet *model.AuthSet
 
 		outErr string
 	}{
@@ -1748,28 +1747,20 @@ func TestDevAuthDeleteAuthSet(t *testing.T) {
 			outErr: "DeleteAuthSetsForDevice Error",
 		},
 		{
-			devId:  "devId7",
-			authId: "authId7",
-			dbGetAuthSetsForDeviceErr: errors.New("GetAuthSetsForDevice Error"),
-			outErr: "GetAuthSetsForDevice Error",
-		},
-		{
 			devId:             "devId8",
 			authId:            "authId8",
+			authSet:           &model.AuthSet{Status: model.DevStatusPreauth},
 			dbDeleteDeviceErr: errors.New("DeleteDevice Error"),
-			numberOfAuthSets:  0,
 			outErr:            "DeleteDevice Error",
 		},
 		{
 			devId:             "devId9",
 			authId:            "authId9",
 			dbDeleteDeviceErr: errors.New("DeleteDevice Error"),
-			numberOfAuthSets:  1,
 		},
 		{
-			devId:            "devId10",
-			authId:           "authId10",
-			numberOfAuthSets: 1,
+			devId:  "devId10",
+			authId: "authId10",
 		},
 	}
 
@@ -1780,7 +1771,6 @@ func TestDevAuthDeleteAuthSet(t *testing.T) {
 
 			ctx := context.Background()
 
-			authSets := make([]model.AuthSet, tc.numberOfAuthSets)
 			authSet := &model.AuthSet{Status: model.DevStatusPending}
 			if tc.authSet != nil {
 				authSet = tc.authSet
@@ -1794,10 +1784,6 @@ func TestDevAuthDeleteAuthSet(t *testing.T) {
 			db.On("DeleteAuthSetForDevice", ctx,
 				tc.devId, tc.authId).Return(
 				tc.dbDeleteAuthSetForDeviceErr)
-			db.On("GetAuthSetsForDevice", ctx,
-				tc.devId).Return(
-				authSets,
-				tc.dbGetAuthSetsForDeviceErr)
 			db.On("DeleteTokenByDevId", ctx,
 				tc.devId).Return(
 				tc.dbDeleteTokenByDevIdErr)
@@ -1812,6 +1798,11 @@ func TestDevAuthDeleteAuthSet(t *testing.T) {
 				assert.EqualError(t, err, tc.outErr)
 			} else {
 				assert.NoError(t, err)
+				if authSet.Status == model.DevStatusPreauth {
+					db.AssertCalled(t, "DeleteDevice", tc.devId)
+				} else {
+					db.AssertNotCalled(t, "DeleteDevice", tc.devId)
+				}
 			}
 		})
 	}
