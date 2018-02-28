@@ -285,18 +285,53 @@ class TestDeleteAuthsetBase:
         d, da = devices[0]
 
         dev = management_api.find_device_by_identity(d.identity, **kwargs)
-
         assert dev
-        devid = dev.id
 
         print('found matching device with ID:', dev.id)
         aid = dev.auth_sets[0].id
 
-        rsp = management_api.delete_authset(devid, aid, **kwargs)
+        rsp = management_api.delete_authset(dev.id, aid, **kwargs)
         assert rsp.status_code == 204
 
-        found = management_api.find_device_by_identity(d.identity, **kwargs)
+        found = management_api.get_device(id=dev.id, **kwargs)
+        assert found
+
+        assert len(found.auth_sets) == 0
+
+    def _test_delete_authset_preauth_OK(self, management_api, devices, **kwargs):
+        # preauthorize a device
+        aid = 'aid-preauth'
+        device_id = 'id-preauth'
+        iddata = json.dumps({'mac': 'mac-preauth'})
+        key = 'key-preauth'
+
+        req = management_api.make_preauth_req(aid, device_id, iddata, key)
+        _, rsp = management_api.preauthorize(req, **kwargs)
+
+        assert rsp.status_code == 201
+
+        # check device created
+        dev = management_api.get_device(id=device_id, **kwargs)
+        assert dev
+        assert len(dev.auth_sets) == 1
+        assert dev.auth_sets[0].status == 'preauthorized'
+        assert dev.auth_sets[0].id == aid
+
+        # delete auth set, check device deleted
+        rsp = management_api.delete_authset(dev.id, aid, **kwargs)
+        assert rsp.status_code == 204
+
+        found = None
+        try:
+            found = management_api.get_device(id=device_id, **kwargs)
+        except bravado.exception.HTTPError as e:
+            assert e.response.status_code == 404
+
         assert not found
+
+        # check all other devices intact
+        after_devs = management_api.list_devices(**kwargs)
+        assert len(after_devs) == len(devices)
 
     def _test_delete_authset_error_device_not_found(self, management_api, devices, **kwargs):
         rsp = management_api.delete_authset("foo", "bar")
@@ -321,6 +356,9 @@ class TestDeleteAuthset(TestDeleteAuthsetBase):
     def test_delete_authset_OK(self, management_api, devices):
         self._test_delete_authset_OK(management_api, devices)
 
+    def test_delete_authset_preauth_OK(self, management_api, devices):
+        self._test_delete_authset_preauth_OK(management_api, devices)
+
     def test_delete_authset_error_device_not_found(self, management_api, devices):
         self._test_delete_authset_error_device_not_found(management_api, devices)
 
@@ -333,6 +371,10 @@ class TestDeleteAuthsetMultiTenant(TestDeleteAuthsetBase):
     def test_delete_authset_OK(self, management_api, tenant_foobar_devices, tenant_foobar):
         auth = 'Bearer ' + tenant_foobar
         self._test_delete_authset_OK(management_api, tenant_foobar_devices, Authorization=auth)
+
+    def test_delete_authset_preauth_OK(self, management_api, tenant_foobar_devices, tenant_foobar):
+        auth = 'Bearer ' + tenant_foobar
+        self._test_delete_authset_preauth_OK(management_api, tenant_foobar_devices, Authorization=auth)
 
     def test_delete_authset_error_device_not_found(self, management_api, tenant_foobar_devices, tenant_foobar):
         auth = 'Bearer ' + tenant_foobar
