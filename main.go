@@ -85,6 +85,26 @@ func doMain(args []string) {
 
 			Action: cmdMigrate,
 		},
+		{
+			Name:  "maintenance",
+			Usage: "Run maintenance operations and exit",
+			Flags: []cli.Flag{
+				cli.BoolFlag{
+					Name:  "decommissioning-cleanup",
+					Usage: "Cleanup devauth database from leftovers after failed decommissioning",
+				},
+				cli.StringFlag{
+					Name:  "tenant",
+					Usage: "Tenant ID (optional).",
+				},
+				cli.BoolFlag{
+					Name:  "dry-run",
+					Usage: "Do not perform any modifications and serves only as a way to inspect changes and detect if any are necessary",
+				},
+			},
+
+			Action: cmdMaintenance,
+		},
 	}
 
 	app.Action = cmdServer
@@ -165,6 +185,14 @@ func cmdMigrate(args *cli.Context) error {
 	err := cmd.Migrate(config.Config, args.String("tenant"), args.Bool("list-tenants"))
 	if err != nil {
 		return cli.NewExitError(err, 5)
+	}
+	return nil
+}
+
+func cmdMaintenance(args *cli.Context) error {
+	err := cmd.Maintenance(args.Bool("decommissioning-cleanup"), args.String("tenant"), args.Bool("dry-run"))
+	if err != nil {
+		return cli.NewExitError(err, 6)
 	}
 	return nil
 }

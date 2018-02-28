@@ -82,3 +82,114 @@ func listTenants(db *mongo.DataStoreMongo) error {
 
 	return nil
 }
+
+func Maintenance(decommissioningCleanupFlag bool, tenant string, dryRunFlag bool) error {
+	db, err := mongo.NewDataStoreMongo(makeDataStoreConfig())
+	if err != nil {
+		return errors.Wrap(err, "failed to connect to db")
+	}
+
+	return maintenanceWithDataStore(decommissioningCleanupFlag, tenant, dryRunFlag, db)
+}
+
+func maintenanceWithDataStore(decommissioningCleanupFlag bool, tenant string, dryRunFlag bool, db *mongo.DataStoreMongo) error {
+	// cleanup devauth database from leftovers after failed decommissioning
+	if decommissioningCleanupFlag {
+		return decommissioningCleanup(db, tenant, dryRunFlag)
+	}
+
+	return nil
+}
+
+func decommissioningCleanup(db *mongo.DataStoreMongo, tenant string, dryRunFlag bool) error {
+	if tenant == "" {
+		tdbs, err := db.GetTenantDbs()
+		if err != nil {
+			return errors.Wrap(err, "failed to retrieve tenant DBs")
+		}
+		decommissioningCleanupWithDbs(db, append(tdbs, mongo.DbName), dryRunFlag)
+	} else {
+		decommissioningCleanupWithDbs(db, []string{mstore.DbNameForTenant(tenant, mongo.DbName)}, dryRunFlag)
+	}
+
+	return nil
+}
+
+func decommissioningCleanupWithDbs(db *mongo.DataStoreMongo, tenantDbs []string, dryRunFlag bool) error {
+	for _, dbName := range tenantDbs {
+		println("database: ", dbName)
+		if err := decommissioningCleanupWithDb(db, dbName, dryRunFlag); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func decommissioningCleanupWithDb(db *mongo.DataStoreMongo, dbName string, dryRunFlag bool) error {
+	if dryRunFlag {
+		return decommissioningCleanupDryRun(db, dbName)
+	} else {
+		return decommissioningCleanupExecute(db, dbName)
+	}
+}
+
+func decommissioningCleanupDryRun(db *mongo.DataStoreMongo, dbName string) error {
+	//devices
+	devices, err := db.GetDevicesBeingDecommissioned(dbName)
+	if err != nil {
+		return err
+	}
+	if len(devices) > 0 {
+		fmt.Println("devices with decommissioning flag set:")
+		for _, dev := range devices {
+			fmt.Println(dev.Id)
+		}
+	}
+
+	//auth sets
+	authSetIds, err := db.GetBrokenAuthSets(dbName)
+	if err != nil {
+		return err
+	}
+	if len(authSetIds) > 0 {
+		fmt.Println("authentication sets to be removed:")
+		for _, authSetId := range authSetIds {
+			fmt.Println(authSetId)
+		}
+	}
+
+	//tokens
+	tokenIds, err := db.GetBrokenTokens(dbName)
+	if err != nil {
+		return err
+	}
+
+	if len(tokenIds) > 0 {
+		fmt.Println("tokens to be removed:")
+		for _, tokenId := range tokenIds {
+			fmt.Println(tokenId)
+		}
+	}
+
+	return nil
+}
+
+func decommissioningCleanupExecute(db *mongo.DataStoreMongo, dbName string) error {
+	if err := decommissioningCleanupDryRun(db, dbName); err != nil {
+		return err
+	}
+
+	if err := db.DeleteDevicesBeingDecommissioned(dbName); err != nil {
+		return err
+	}
+
+	if err := db.DeleteBrokenAuthSets(dbName); err != nil {
+		return err
+	}
+
+	if err := db.DeleteBrokenTokens(dbName); err != nil {
+		return err
+	}
+
+	return nil
+}
