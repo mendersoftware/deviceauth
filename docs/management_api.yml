@@ -323,8 +323,7 @@ definitions:
     required:
       - status
     example:
-      application/json:
-          status: "accepted"
+      status: "accepted"
   Limit:
     description: Limit definition
     type: object
@@ -334,8 +333,7 @@ definitions:
     required:
       - limit
     example:
-      application/json:
-        limit: 123
+      limit: 123
   Device:
     type: object
     properties:
@@ -426,8 +424,7 @@ definitions:
       - id_data
       - pubkey
     example:
-      application/json:
-        device_id: "f7881e82-0492-49fb-b459-795654e7188a"
-        auth_set_id: "a7881e82-0492-49fb-b459-795654e7188f"
-        id_data: "{\"mac\":\"00:01:02:03:04:05\"}"
-        pubkey: "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAzogVU7RGDilbsoUt/DdH\nVJvcepl0A5+xzGQ50cq1VE/Dyyy8Zp0jzRXCnnu9nu395mAFSZGotZVr+sWEpO3c\nyC3VmXdBZmXmQdZqbdD/GuixJOYfqta2ytbIUPRXFN7/I7sgzxnXWBYXYmObYvdP\nokP0mQanY+WKxp7Q16pt1RoqoAd0kmV39g13rFl35muSHbSBoAW3GBF3gO+mF5Ty\n1ddp/XcgLOsmvNNjY+2HOD5F/RX0fs07mWnbD7x+xz7KEKjF+H7ZpkqCwmwCXaf0\niyYyh1852rti3Afw4mDxuVSD7sd9ggvYMc0QHIpQNkD4YWOhNiE1AB0zH57VbUYG\nUwIDAQAB\n-----END PUBLIC KEY-----\n"
+      device_id: "f7881e82-0492-49fb-b459-795654e7188a"
+      auth_set_id: "a7881e82-0492-49fb-b459-795654e7188f"
+      id_data: "{\"mac\":\"00:01:02:03:04:05\"}"
+      pubkey: "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAzogVU7RGDilbsoUt/DdH\nVJvcepl0A5+xzGQ50cq1VE/Dyyy8Zp0jzRXCnnu9nu395mAFSZGotZVr+sWEpO3c\nyC3VmXdBZmXmQdZqbdD/GuixJOYfqta2ytbIUPRXFN7/I7sgzxnXWBYXYmObYvdP\nokP0mQanY+WKxp7Q16pt1RoqoAd0kmV39g13rFl35muSHbSBoAW3GBF3gO+mF5Ty\n1ddp/XcgLOsmvNNjY+2HOD5F/RX0fs07mWnbD7x+xz7KEKjF+H7ZpkqCwmwCXaf0\niyYyh1852rti3Afw4mDxuVSD7sd9ggvYMc0QHIpQNkD4YWOhNiE1AB0zH57VbUYG\nUwIDAQAB\n-----END PUBLIC KEY-----\n"
