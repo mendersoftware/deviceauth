@@ -147,8 +147,7 @@ definitions:
         description: New tenant's ID.
         type: string
     example:
-      application/json:
-          tenant_id: "58be8208dd77460001fe0d78"
+      tenant_id: "58be8208dd77460001fe0d78"
   Limit:
     description: Tenant account limit.
     type: object
@@ -158,8 +157,7 @@ definitions:
     required:
       - limit
     example:
-      application/json:
-        limit: 123
+      limit: 123
   Error:
     description: Error descriptor.
     type: object
@@ -171,6 +169,5 @@ definitions:
         description: Request ID (same as in X-MEN-RequestID header).
         type: string
     example:
-      application/json:
-          error: "failed to decode device group data: JSON payload is empty"
-          request_id: "f7881e82-0492-49fb-b459-795654e7188a"
+      error: "failed to decode device group data: JSON payload is empty"
+      request_id: "f7881e82-0492-49fb-b459-795654e7188a"
