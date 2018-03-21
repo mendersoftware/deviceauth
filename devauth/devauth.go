@@ -77,6 +77,7 @@ type App interface {
 
 	RevokeToken(ctx context.Context, token_id string) error
 	VerifyToken(ctx context.Context, token string) error
+	DeleteTokens(ctx context.Context, tenant_id, device_id string) error
 
 	SetTenantLimit(ctx context.Context, tenant_id string, limit model.Limit) error
 
@@ -829,6 +830,22 @@ func (d *DevAuth) canAcceptDevice(ctx context.Context) (bool, error) {
 	}
 
 	return false, nil
+}
+
+func (d *DevAuth) DeleteTokens(ctx context.Context, tenant_id, device_id string) error {
+	ctx = identity.WithContext(ctx, &identity.Identity{
+		Tenant: tenant_id,
+	})
+
+	var err error
+
+	if device_id != "" {
+		err = d.db.DeleteTokenByDevId(ctx, device_id)
+	} else {
+		err = d.db.DeleteTokens(ctx)
+	}
+
+	return err
 }
 
 func (d *DevAuth) ProvisionTenant(ctx context.Context, tenant_id string) error {
