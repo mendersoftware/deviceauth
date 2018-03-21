@@ -44,8 +44,8 @@ const (
 	// internal API
 	uriTokenVerify = "/api/internal/v1/devauth/tokens/verify"
 	uriTenantLimit = "/api/internal/v1/devauth/tenant/:id/limits/:name"
-
-	uriTenants = "/api/internal/v1/devauth/tenants"
+	uriTokens      = "/api/internal/v1/devauth/tokens"
+	uriTenants     = "/api/internal/v1/devauth/tenants"
 
 	HdrAuthReqSign = "X-MEN-Signature"
 )
@@ -88,6 +88,8 @@ func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
 		rest.Delete(uriToken, d.DeleteTokenHandler),
 
 		rest.Post(uriTokenVerify, d.VerifyTokenHandler),
+
+		rest.Delete(uriTokens, d.DeleteTokensHandler),
 
 		rest.Put(uriDeviceStatus, d.UpdateDeviceStatusHandler),
 
@@ -501,6 +503,28 @@ func (d *DevAuthApiHandlers) GetLimit(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	w.WriteJson(LimitValue{lim.Value})
+}
+
+func (d *DevAuthApiHandlers) DeleteTokensHandler(w rest.ResponseWriter, r *rest.Request) {
+
+	ctx := r.Context()
+
+	l := log.FromContext(ctx)
+
+	tenantId := r.URL.Query().Get("tenant_id")
+	if tenantId == "" {
+		rest_utils.RestErrWithLog(w, r, l, errors.New("tenant_id must be provided"), http.StatusBadRequest)
+		return
+	}
+	devId := r.URL.Query().Get("device_id")
+
+	err := d.devAuth.DeleteTokens(ctx, tenantId, devId)
+	switch err {
+	case nil:
+		w.WriteHeader(http.StatusNoContent)
+	default:
+		rest_utils.RestErrWithLogInternal(w, r, l, err)
+	}
 }
 
 func (d *DevAuthApiHandlers) ProvisionTenantHandler(w rest.ResponseWriter, r *rest.Request) {

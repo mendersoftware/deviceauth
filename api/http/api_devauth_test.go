@@ -1324,3 +1324,79 @@ func TestApiDevAuthDeleteDeviceAuthSet(t *testing.T) {
 		})
 	}
 }
+
+func TestApiDeleteTokens(t *testing.T) {
+	t.Parallel()
+
+	// enforce specific field naming in errors returned by API
+	updateRestErrorFieldName()
+
+	tcases := map[string]struct {
+		tenantId string
+		deviceId string
+
+		devAuthErr error
+
+		checker mt.ResponseChecker
+	}{
+		"ok, all tokens": {
+			tenantId: "foo",
+			checker: mt.NewJSONResponse(
+				http.StatusNoContent,
+				nil,
+				nil),
+		},
+		"ok, device's tokens": {
+			tenantId: "foo",
+			deviceId: "dev-foo",
+			checker: mt.NewJSONResponse(
+				http.StatusNoContent,
+				nil,
+				nil),
+		},
+		"error, no tenant id": {
+			deviceId: "dev-foo",
+			checker: mt.NewJSONResponse(
+				http.StatusBadRequest,
+				nil,
+				restError("tenant_id must be provided")),
+		},
+		"error, devauth": {
+			tenantId:   "foo",
+			devAuthErr: errors.New("generic error"),
+			checker: mt.NewJSONResponse(
+				http.StatusInternalServerError,
+				nil,
+				restError("internal error")),
+		},
+	}
+
+	for n := range tcases {
+		tc := tcases[n]
+		t.Run(fmt.Sprintf("tc %s", n), func(t *testing.T) {
+			t.Parallel()
+
+			da := &mocks.App{}
+			da.On("DeleteTokens",
+				mtest.ContextMatcher(),
+				tc.tenantId,
+				tc.deviceId).
+				Return(tc.devAuthErr)
+
+			//make request
+			url := fmt.Sprintf("http://1.2.3.4/api/internal/v1/devauth/tokens?tenant_id=%v&device_id=%v",
+				tc.tenantId,
+				tc.deviceId)
+
+			req := makeReq("DELETE",
+				url,
+				"",
+				nil)
+
+			apih := makeMockApiHandler(t, da)
+
+			recorded := test.RunRequest(t, apih, req)
+			mt.CheckResponse(t, tc.checker, recorded)
+		})
+	}
+}
