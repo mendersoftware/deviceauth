@@ -499,6 +499,79 @@ func TestStoreDeleteToken(t *testing.T) {
 	}
 }
 
+func TestStoreDeleteTokens(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestDeleteTokens in short mode.")
+	}
+
+	someTokens := []interface{}{
+		model.Token{
+			Id:        "id1",
+			DevId:     "devId1",
+			AuthSetId: "aId1-1",
+			Token:     "token1-1",
+		},
+		model.Token{
+			Id:        "id2",
+			DevId:     "devId1",
+			AuthSetId: "aId1-2",
+			Token:     "token1-2",
+		},
+		model.Token{
+			Id:        "id3",
+			DevId:     "devId2",
+			AuthSetId: "aId2-1",
+			Token:     "token2-1",
+		},
+	}
+
+	testCases := map[string]struct {
+		inTokens []interface{}
+		tenant   string
+	}{
+		"ok": {
+			inTokens: someTokens,
+		},
+		"ok, empty": {},
+		"ok, MT": {
+			inTokens: someTokens,
+			tenant:   "foo",
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(fmt.Sprintf("tc %s", name), func(t *testing.T) {
+			ctx := context.Background()
+			if tc.tenant != "" {
+				ctx = identity.WithContext(ctx, &identity.Identity{
+					Tenant: tc.tenant,
+				})
+			}
+
+			d := getDb(ctx)
+			defer d.session.Close()
+			s := d.session.Copy()
+			defer s.Close()
+
+			if tc.inTokens != nil {
+				err := s.DB(ctxstore.DbFromContext(ctx, DbName)).
+					C(DbTokensColl).Insert(tc.inTokens...)
+				assert.NoError(t, err)
+			}
+
+			err := d.DeleteTokens(ctx)
+			assert.NoError(t, err)
+			var out []model.Token
+
+			err = s.DB(ctxstore.DbFromContext(ctx, DbName)).
+				C(DbTokensColl).Find(nil).All(&out)
+			assert.NoError(t, err)
+
+			assert.Len(t, out, 0)
+		})
+	}
+}
+
 func TestStoreDeleteTokenByDevId(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping TestDeleteTokenByDevId in short mode.")

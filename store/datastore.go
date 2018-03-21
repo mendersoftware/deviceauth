@@ -81,6 +81,9 @@ type DataStore interface {
 	// deletes token
 	DeleteToken(ctx context.Context, jti string) error
 
+	// deletes all (tenant's) tokens (identity in context)
+	DeleteTokens(ctx context.Context) error
+
 	// deletes device token
 	DeleteTokenByDevId(ctx context.Context, dev_id string) error
 

@@ -65,6 +65,20 @@ func (_m *App) DeleteAuthSet(ctx context.Context, dev_id string, auth_id string)
 	return r0
 }
 
+// DeleteTokens provides a mock function with given fields: ctx, tenant_id, device_id
+func (_m *App) DeleteTokens(ctx context.Context, tenant_id string, device_id string) error {
+	ret := _m.Called(ctx, tenant_id, device_id)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+		r0 = rf(ctx, tenant_id, device_id)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // GetDevCountByStatus provides a mock function with given fields: ctx, status
 func (_m *App) GetDevCountByStatus(ctx context.Context, status string) (int, error) {
 	ret := _m.Called(ctx, status)

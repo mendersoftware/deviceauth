@@ -135,6 +135,20 @@ func (_m *DataStore) DeleteTokenByDevId(ctx context.Context, dev_id string) erro
 	return r0
 }
 
+// DeleteTokens provides a mock function with given fields: ctx
+func (_m *DataStore) DeleteTokens(ctx context.Context) error {
+	ret := _m.Called(ctx)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context) error); ok {
+		r0 = rf(ctx)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // GetAuthSetByDataKey provides a mock function with given fields: ctx, data, key
 func (_m *DataStore) GetAuthSetByDataKey(ctx context.Context, data string, key string) (*model.AuthSet, error) {
 	ret := _m.Called(ctx, data, key)
