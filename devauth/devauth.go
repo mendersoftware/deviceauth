@@ -845,7 +845,11 @@ func (d *DevAuth) DeleteTokens(ctx context.Context, tenant_id, device_id string)
 		err = d.db.DeleteTokens(ctx)
 	}
 
-	return err
+	if err != nil && err != store.ErrTokenNotFound {
+		return errors.Wrapf(err, "failed to delete tokens for tenant: %v, device id: %v", tenant_id, device_id)
+	}
+
+	return nil
 }
 
 func (d *DevAuth) ProvisionTenant(ctx context.Context, tenant_id string) error {

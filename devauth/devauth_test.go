@@ -1807,3 +1807,65 @@ func TestDevAuthDeleteAuthSet(t *testing.T) {
 		})
 	}
 }
+
+func TestDeleteTokens(t *testing.T) {
+	t.Parallel()
+
+	testCases := map[string]struct {
+		tenantId string
+		deviceId string
+
+		dbErrDeleteTokenById error
+		dbErrDeleteTokens    error
+
+		outErr error
+	}{
+		"ok, all tenant's devs": {
+			tenantId: "foo",
+			deviceId: "dev-foo",
+		},
+		"ok, single dev": {
+			tenantId: "foo",
+		},
+		"ok, single dev, token not found": {
+			tenantId:             "foo",
+			dbErrDeleteTokenById: store.ErrTokenNotFound,
+		},
+		"error, single dev": {
+			tenantId:             "foo",
+			deviceId:             "dev-foo",
+			dbErrDeleteTokenById: errors.New("db error"),
+			outErr:               errors.New("failed to delete tokens for tenant: foo, device id: dev-foo: db error"),
+		},
+		"error, all tenant's devs": {
+			tenantId:          "foo",
+			dbErrDeleteTokens: errors.New("db error"),
+			outErr:            errors.New("failed to delete tokens for tenant: foo, device id: : db error"),
+		},
+	}
+
+	for n := range testCases {
+		tc := testCases[n]
+		t.Run(fmt.Sprintf("tc %s", n), func(t *testing.T) {
+			t.Parallel()
+
+			ctx := context.Background()
+			ctxMatcher := mtesting.ContextMatcher()
+
+			db := mstore.DataStore{}
+			db.On("DeleteTokenByDevId", ctxMatcher, tc.deviceId).
+				Return(tc.dbErrDeleteTokenById)
+			db.On("DeleteTokens", ctxMatcher).
+				Return(tc.dbErrDeleteTokens)
+
+			devauth := NewDevAuth(&db, nil, nil, nil, nil, Config{})
+			err := devauth.DeleteTokens(ctx, tc.tenantId, tc.deviceId)
+
+			if tc.outErr != nil {
+				assert.EqualError(t, err, tc.outErr.Error())
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
