@@ -40,12 +40,12 @@ paths:
               $ref: '#/definitions/Error'
   /tokens:
     delete:
-      summary: Delete device tokens. for a tenant with given tenant id
+      summary: Delete device tokens
       description: |
          This endpoint is designed to be used for device decommissionning
          and tenant account suspension purpose.
          For device decommissioning purpose both tenant_id and device_id parameters
-         must be set. When bot, tenant_id and device_id parameters are set,
+         must be set. When both tenant_id and device_id parameters are set,
          all tokens will be deleted for device with given device_id.
          For tenant account suspension purpose only tenant_id parameter
          must be set. When device_id parameter is not set (only tenant_id parameter is set)
