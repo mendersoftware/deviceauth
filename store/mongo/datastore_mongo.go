@@ -311,6 +311,16 @@ func (db *DataStoreMongo) DeleteToken(ctx context.Context, jti string) error {
 	return nil
 }
 
+func (db *DataStoreMongo) DeleteTokens(ctx context.Context) error {
+	s := db.session.Copy()
+	defer s.Close()
+
+	c := db.session.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbTokensColl)
+	_, err := c.RemoveAll(nil)
+
+	return err
+}
+
 func (db *DataStoreMongo) DeleteTokenByDevId(ctx context.Context, devId string) error {
 	s := db.session.Copy()
 	defer s.Close()
