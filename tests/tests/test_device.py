@@ -13,7 +13,7 @@ from common import Device, DevAuthorizer, \
 
 import mockserver
 import deviceadm
-import inventory
+import orchestrator
 
 
 class TestDevice:
@@ -51,7 +51,7 @@ class TestDevice:
         aid = dev.auth_sets[0].id
 
         try:
-            with inventory.run_fake_for_device_id(devid) as server:
+            with orchestrator.run_fake_for_device_id(devid) as server:
                 management_api.accept_device(devid, aid)
         except bravado.exception.HTTPError as e:
             assert e.response.status_code == 204
@@ -125,31 +125,16 @@ class TestDevice:
         ourdev = management_api.find_device_by_identity(dev.identity)
         assert ourdev
 
-        # handler for orchestrator's job endpoint
-        def decommission_device_handler(request):
-            dreq = json.loads(request.body.decode())
-            print('decommision request', dreq)
-            # verify that devauth tries to decommision correct device
-            assert dreq.get('device_id', None) == ourdev.id
-            # test is enforcing particular request ID
-            assert dreq.get('request_id', None) == 'delete_device'
-            # test is enforcing particular request ID
-            assert dreq.get('authorization', None) == 'Bearer foobar'
-            return (200, {}, '')
-
-        handlers = [
-            ('POST', '/api/workflow/decommission_device', decommission_device_handler),
-        ]
-        with mockserver.run_fake(get_fake_orchestrator_addr(),
-                                 handlers=handlers) as server:
-
-            rsp = management_api.delete_device(ourdev.id, {
-                'X-MEN-RequestID':'delete_device',
-                'Authorization': 'Bearer foobar',
-            })
+        try:
+            with orchestrator.run_fake_for_device_id(ourdev.id) as server:
+                rsp = management_api.delete_device(ourdev.id, {
+                    'X-MEN-RequestID':'delete_device',
+                    'Authorization': 'Bearer foobar',
+                    })
             print('decommission request finished with status:',
                   rsp.status_code)
-            assert rsp.status_code == 204
+        except bravado.exception.HTTPError as e:
+            assert e.response.status_code == 204
 
         found = management_api.find_device_by_identity(dev.identity)
         assert not found
@@ -176,7 +161,7 @@ class TestDevice:
             aid = dev.auth_sets[0].id
 
             try:
-                with inventory.run_fake_for_device_id(devid) as server:
+                with orchestrator.run_fake_for_device_id(devid) as server:
                     if idx == 0:
                         management_api.accept_device(devid, aid)
                     elif idx == 1:
@@ -217,7 +202,7 @@ class TestDevice:
         TestDevice.verify_device_count(management_api, 'pending', 5)
 
         devid = found_dev.id
-        with inventory.run_fake_for_device_id(inventory.ANY_DEVICE) as server:
+        with orchestrator.run_fake_for_device_id(orchestrator.ANY_DEVICE) as server:
             # accept first auth set
             management_api.accept_device(devid, first_aid)
 
@@ -256,7 +241,7 @@ class TestDeviceMultiTenant:
 
         accepted = 0
         try:
-            with inventory.run_fake_for_device_id(inventory.ANY_DEVICE):
+            with orchestrator.run_fake_for_device_id(orchestrator.ANY_DEVICE):
                 for dev, dev_auth in tenant_foobar_devices:
                     auth = 'Bearer ' + tenant_foobar
                     fdev = management_api.find_device_by_identity(dev.identity,

@@ -30,7 +30,7 @@ from Crypto.PublicKey import RSA
 from Crypto.Signature import PKCS1_v1_5
 from Crypto.Hash import SHA256
 
-from client import SimpleInternalClient, SimpleManagementClient, ConductorClient, \
+from client import SimpleInternalClient, SimpleManagementClient, \
     BaseDevicesApiClient
 
 import mockserver
@@ -168,11 +168,6 @@ def tenant_foobar_clean_migrated_db(clean_db, cli):
     """Clean 'foobar' database with migrations applied. Yields pymongo.MongoClient connected to the DB."""
     cli.migrate(tenant='foobar')
     yield clean_db
-
-@pytest.yield_fixture(scope='session')
-def conductor_api():
-    yield ConductorClient()
-
 
 @pytest.yield_fixture(scope='session')
 def management_api():
