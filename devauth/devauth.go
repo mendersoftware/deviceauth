@@ -31,7 +31,6 @@ import (
 	"github.com/satori/go.uuid"
 
 	"github.com/mendersoftware/deviceauth/client/deviceadm"
-	"github.com/mendersoftware/deviceauth/client/inventory"
 	"github.com/mendersoftware/deviceauth/client/orchestrator"
 	"github.com/mendersoftware/deviceauth/client/tenant"
 	"github.com/mendersoftware/deviceauth/jwt"
@@ -92,7 +91,6 @@ type App interface {
 type DevAuth struct {
 	db           store.DataStore
 	cDevAdm      deviceadm.ClientRunner
-	cInv         inventory.ClientRunner
 	cOrch        orchestrator.ClientRunner
 	cTenant      tenant.ClientRunner
 	jwt          jwt.Handler
@@ -111,13 +109,11 @@ type Config struct {
 }
 
 func NewDevAuth(d store.DataStore, cda deviceadm.ClientRunner,
-	ci inventory.ClientRunner, co orchestrator.ClientRunner,
-	jwt jwt.Handler, config Config) *DevAuth {
+	co orchestrator.ClientRunner, jwt jwt.Handler, config Config) *DevAuth {
 
 	return &DevAuth{
 		db:           d,
 		cDevAdm:      cda,
-		cInv:         ci,
 		cOrch:        co,
 		jwt:          jwt,
 		clientGetter: simpleApiClientGetter,
@@ -403,18 +399,6 @@ func (d *DevAuth) processAuthRequest(ctx context.Context, r *model.AuthReq) (*mo
 	}
 
 	return areq, nil
-}
-
-func (d *DevAuth) SubmitInventoryDevice(ctx context.Context, dev model.Device) error {
-	return d.SubmitInventoryDeviceWithClient(ctx, dev, d.clientGetter())
-}
-
-func (d *DevAuth) SubmitInventoryDeviceWithClient(ctx context.Context, dev model.Device, client requestid.ApiRequester) error {
-	err := d.cInv.AddDevice(ctx, inventory.AddReq{Id: dev.Id}, client)
-	if err != nil {
-		return errors.Wrap(err, "failed to add device to inventory")
-	}
-	return nil
 }
 
 func (d *DevAuth) GetDevices(ctx context.Context, skip, limit uint) ([]model.Device, error) {
