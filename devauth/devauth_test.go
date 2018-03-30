@@ -466,7 +466,7 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 
 		devadmUpdateStatusErr error
 
-		inventoryAddDeviceErr error
+		coSubmitProvisionDeviceJobErr error
 
 		res string
 		err error
@@ -541,9 +541,9 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 			dbGetLimitRes: &model.Limit{
 				Value: 5,
 			},
-			dbGetDevCountByStatusRes: 0,
-			inventoryAddDeviceErr:    errors.New("http error"),
-			err: errors.New("inventory device add error: failed to add device to inventory: http error"),
+			dbGetDevCountByStatusRes:      0,
+			coSubmitProvisionDeviceJobErr: errors.New("conductor failed"),
+			err: errors.New("submit device provisioning job error: conductor failed"),
 		},
 	}
 
@@ -646,6 +646,11 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 			jwth.On("ToJWT",
 				mock.AnythingOfType("*jwt.Token"),
 			).Return(dummyToken, nil)
+
+			co := morchestrator.ClientRunner{}
+			co.On("SubmitProvisionDeviceJob", ctx,
+				mock.AnythingOfType("orchestrator.ProvisionDeviceReq")).
+				Return(tc.coSubmitProvisionDeviceJobErr)
 
 			// setup devauth
 			devauth := NewDevAuth(&db, &cda, &cdi, nil, &jwth, Config{})
@@ -785,7 +790,8 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 		dbUpdateRevokeAuthSetsErr error
 
 		dbGetErr error
-		invErr   error
+
+		coSubmitProvisionDeviceJobErr error
 
 		outErr string
 	}{
@@ -860,8 +866,8 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 				Id:       "dummy_aid",
 				DeviceId: "dummy_devid",
 			},
-			invErr: errors.New("inventory failed"),
-			outErr: "inventory device add error: failed to add device to inventory: inventory failed",
+			coSubmitProvisionDeviceJobErr: errors.New("conductor failed"),
+			outErr: "submit device provisioning job error: conductor failed",
 		},
 		{
 			dbLimit: &model.Limit{Value: 0},
@@ -914,13 +920,14 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 					}).Return(tc.dbUpdateErr)
 			}
 
-			inv := minventory.ClientRunner{}
-			inv.On("AddDevice", context.Background(),
-				inventory.AddReq{Id: "dummy_devid"},
-				mock.AnythingOfType("*apiclient.HttpApi")).
-				Return(tc.invErr)
+			ctx := context.Background()
 
-			devauth := NewDevAuth(&db, nil, &inv, nil, nil, Config{})
+			co := morchestrator.ClientRunner{}
+			co.On("SubmitProvisionDeviceJob", ctx,
+				mock.AnythingOfType("orchestrator.ProvisionDeviceReq")).
+				Return(tc.coSubmitProvisionDeviceJobErr)
+
+			devauth := NewDevAuth(&db, nil, nil, &co, nil, Config{})
 			err := devauth.AcceptDeviceAuth(context.Background(), "dummy_devid", "dummy_aid")
 
 			if tc.outErr != "" {

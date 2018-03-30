@@ -305,11 +305,19 @@ func (d *DevAuth) processPreAuthRequest(ctx context.Context, r *model.AuthReq) (
 		return nil, errors.Wrap(err, "devadm update status error")
 	}
 
-	// propagate device to inventory
-	if err := d.SubmitInventoryDevice(ctx, model.Device{
-		Id: aset.DeviceId,
-	}); err != nil {
-		return nil, errors.Wrap(err, "inventory device add error")
+	reqId := requestid.FromContext(ctx)
+
+	// submit device accepted job
+	if err := d.cOrch.SubmitProvisionDeviceJob(
+		ctx,
+		orchestrator.ProvisionDeviceReq{
+			RequestId:     reqId,
+			Authorization: ctxhttpheader.FromContext(ctx, "Authorization"),
+			Device: model.Device{
+				Id: aset.DeviceId,
+			},
+		}); err != nil {
+		return nil, errors.Wrap(err, "submit device provisioning job error")
 	}
 
 	// persist the 'accepted' status in both auth set, and device
@@ -545,11 +553,19 @@ func (d *DevAuth) AcceptDeviceAuth(ctx context.Context, device_id string, auth_i
 		return errors.Wrap(err, "db get auth set error")
 	}
 
-	// TODO make this a job for an orchestrator
-	if err := d.SubmitInventoryDevice(ctx, model.Device{
-		Id: aset.DeviceId,
-	}); err != nil {
-		return errors.Wrap(err, "inventory device add error")
+	reqId := requestid.FromContext(ctx)
+
+	// submit device accepted job
+	if err := d.cOrch.SubmitProvisionDeviceJob(
+		ctx,
+		orchestrator.ProvisionDeviceReq{
+			RequestId:     reqId,
+			Authorization: ctxhttpheader.FromContext(ctx, "Authorization"),
+			Device: model.Device{
+				Id: aset.DeviceId,
+			},
+		}); err != nil {
+		return errors.Wrap(err, "submit device provisioning job error")
 	}
 
 	return nil
