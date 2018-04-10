@@ -8,7 +8,7 @@ from common import Device, DevAuthorizer, device_auth_req, \
     management_api, internal_api, device_api
 
 import deviceadm
-import inventory
+import orchestrator
 
 
 def request_token(device, dev_auth, url):
@@ -43,7 +43,7 @@ def accepted_device(device_api, management_api, clean_migrated_db):
     aid = dev.auth_sets[0].id
 
     try:
-        with inventory.run_fake_for_device_id(devid) as server:
+        with orchestrator.run_fake_for_device_id(devid) as server:
             management_api.accept_device(devid, aid)
     except bravado.exception.HTTPError as e:
         assert e.response.status_code == 204

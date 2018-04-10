@@ -26,7 +26,7 @@ import deviceadm
 import mockserver
 import pytest
 import json
-import inventory
+import orchestrator
 import bravado
 
 PRIVKEY, PUBKEY = get_keypair()
@@ -127,7 +127,7 @@ class TestDevicesSubmitAuthRequestBase:
         assert dev
 
         with devadm_fake_status_update(AID), \
-             inventory.run_fake_for_device_id(DEVID):
+             orchestrator.run_fake_for_device_id(DEVID):
             rsp = device_auth_req(device_api.auth_requests_url, da, d)
             assert rsp.status_code == 200
 
@@ -145,7 +145,7 @@ class TestDevicesSubmitAuthRequestBase:
         for i in range(limit):
             dev = devs[i]
             aid = dev.auth_sets[0].id
-            with inventory.run_fake_for_device_id(dev.id):
+            with orchestrator.run_fake_for_device_id(dev.id):
                 management_api.accept_device(dev.id, aid, **auth)
 
         try:

@@ -31,7 +31,6 @@ import (
 	"github.com/satori/go.uuid"
 
 	"github.com/mendersoftware/deviceauth/client/deviceadm"
-	"github.com/mendersoftware/deviceauth/client/inventory"
 	"github.com/mendersoftware/deviceauth/client/orchestrator"
 	"github.com/mendersoftware/deviceauth/client/tenant"
 	"github.com/mendersoftware/deviceauth/jwt"
@@ -92,7 +91,6 @@ type App interface {
 type DevAuth struct {
 	db           store.DataStore
 	cDevAdm      deviceadm.ClientRunner
-	cInv         inventory.ClientRunner
 	cOrch        orchestrator.ClientRunner
 	cTenant      tenant.ClientRunner
 	jwt          jwt.Handler
@@ -111,13 +109,11 @@ type Config struct {
 }
 
 func NewDevAuth(d store.DataStore, cda deviceadm.ClientRunner,
-	ci inventory.ClientRunner, co orchestrator.ClientRunner,
-	jwt jwt.Handler, config Config) *DevAuth {
+	co orchestrator.ClientRunner, jwt jwt.Handler, config Config) *DevAuth {
 
 	return &DevAuth{
 		db:           d,
 		cDevAdm:      cda,
-		cInv:         ci,
 		cOrch:        co,
 		jwt:          jwt,
 		clientGetter: simpleApiClientGetter,
@@ -305,11 +301,19 @@ func (d *DevAuth) processPreAuthRequest(ctx context.Context, r *model.AuthReq) (
 		return nil, errors.Wrap(err, "devadm update status error")
 	}
 
-	// propagate device to inventory
-	if err := d.SubmitInventoryDevice(ctx, model.Device{
-		Id: aset.DeviceId,
-	}); err != nil {
-		return nil, errors.Wrap(err, "inventory device add error")
+	reqId := requestid.FromContext(ctx)
+
+	// submit device accepted job
+	if err := d.cOrch.SubmitProvisionDeviceJob(
+		ctx,
+		orchestrator.ProvisionDeviceReq{
+			RequestId:     reqId,
+			Authorization: ctxhttpheader.FromContext(ctx, "Authorization"),
+			Device: model.Device{
+				Id: aset.DeviceId,
+			},
+		}); err != nil {
+		return nil, errors.Wrap(err, "submit device provisioning job error")
 	}
 
 	// persist the 'accepted' status in both auth set, and device
@@ -395,18 +399,6 @@ func (d *DevAuth) processAuthRequest(ctx context.Context, r *model.AuthReq) (*mo
 	}
 
 	return areq, nil
-}
-
-func (d *DevAuth) SubmitInventoryDevice(ctx context.Context, dev model.Device) error {
-	return d.SubmitInventoryDeviceWithClient(ctx, dev, d.clientGetter())
-}
-
-func (d *DevAuth) SubmitInventoryDeviceWithClient(ctx context.Context, dev model.Device, client requestid.ApiRequester) error {
-	err := d.cInv.AddDevice(ctx, inventory.AddReq{Id: dev.Id}, client)
-	if err != nil {
-		return errors.Wrap(err, "failed to add device to inventory")
-	}
-	return nil
 }
 
 func (d *DevAuth) GetDevices(ctx context.Context, skip, limit uint) ([]model.Device, error) {
@@ -545,11 +537,19 @@ func (d *DevAuth) AcceptDeviceAuth(ctx context.Context, device_id string, auth_i
 		return errors.Wrap(err, "db get auth set error")
 	}
 
-	// TODO make this a job for an orchestrator
-	if err := d.SubmitInventoryDevice(ctx, model.Device{
-		Id: aset.DeviceId,
-	}); err != nil {
-		return errors.Wrap(err, "inventory device add error")
+	reqId := requestid.FromContext(ctx)
+
+	// submit device accepted job
+	if err := d.cOrch.SubmitProvisionDeviceJob(
+		ctx,
+		orchestrator.ProvisionDeviceReq{
+			RequestId:     reqId,
+			Authorization: ctxhttpheader.FromContext(ctx, "Authorization"),
+			Device: model.Device{
+				Id: aset.DeviceId,
+			},
+		}); err != nil {
+		return errors.Wrap(err, "submit device provisioning job error")
 	}
 
 	return nil

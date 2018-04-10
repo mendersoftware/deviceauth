@@ -29,8 +29,6 @@ import (
 
 	"github.com/mendersoftware/deviceauth/client/deviceadm"
 	mdevadm "github.com/mendersoftware/deviceauth/client/deviceadm/mocks"
-	"github.com/mendersoftware/deviceauth/client/inventory"
-	minventory "github.com/mendersoftware/deviceauth/client/inventory/mocks"
 	"github.com/mendersoftware/deviceauth/client/orchestrator"
 	morchestrator "github.com/mendersoftware/deviceauth/client/orchestrator/mocks"
 	"github.com/mendersoftware/deviceauth/client/tenant"
@@ -401,8 +399,6 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 					Return(tc.devAdmErr)
 			}
 
-			cdi := minventory.ClientRunner{}
-
 			jwth := mjwt.Handler{}
 			jwth.On("ToJWT",
 				mock.MatchedBy(func(jt *jwt.Token) bool {
@@ -414,7 +410,7 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 				})).
 				Return("dummytoken", nil)
 
-			devauth := NewDevAuth(&db, &cda, &cdi, nil, &jwth, Config{})
+			devauth := NewDevAuth(&db, &cda, nil, &jwth, Config{})
 
 			if tc.tenantVerify {
 				ct := mtenant.ClientRunner{}
@@ -466,7 +462,7 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 
 		devadmUpdateStatusErr error
 
-		inventoryAddDeviceErr error
+		coSubmitProvisionDeviceJobErr error
 
 		res string
 		err error
@@ -531,7 +527,7 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 			err: errors.New("devadm update status error: http error"),
 		},
 		{
-			desc: "error: failed to propagate to inventory",
+			desc: "error: failed to submit job to conductor",
 			dbGetAuthSetByDataKeyRes: &model.AuthSet{
 				IdData:   inReq.IdData,
 				DeviceId: dummyDevId,
@@ -541,9 +537,9 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 			dbGetLimitRes: &model.Limit{
 				Value: 5,
 			},
-			dbGetDevCountByStatusRes: 0,
-			inventoryAddDeviceErr:    errors.New("http error"),
-			err: errors.New("inventory device add error: failed to add device to inventory: http error"),
+			dbGetDevCountByStatusRes:      0,
+			coSubmitProvisionDeviceJobErr: errors.New("conductor failed"),
+			err: errors.New("submit device provisioning job error: conductor failed"),
 		},
 	}
 
@@ -633,22 +629,19 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 				mock.AnythingOfType("*apiclient.HttpApi"),
 			).Return(tc.devadmUpdateStatusErr)
 
-			// an auto-accepted device must be propagated to inventory
-			cdi := minventory.ClientRunner{}
-			cdi.On("AddDevice",
-				ctx,
-				inventory.AddReq{Id: dummyDevId},
-				mock.AnythingOfType("*apiclient.HttpApi"),
-			).Return(tc.inventoryAddDeviceErr)
-
 			// token serialization - happy path only, errors tested elsewhere
 			jwth := mjwt.Handler{}
 			jwth.On("ToJWT",
 				mock.AnythingOfType("*jwt.Token"),
 			).Return(dummyToken, nil)
 
+			co := morchestrator.ClientRunner{}
+			co.On("SubmitProvisionDeviceJob", ctx,
+				mock.AnythingOfType("orchestrator.ProvisionDeviceReq")).
+				Return(tc.coSubmitProvisionDeviceJobErr)
+
 			// setup devauth
-			devauth := NewDevAuth(&db, &cda, &cdi, nil, &jwth, Config{})
+			devauth := NewDevAuth(&db, &cda, &co, &jwth, Config{})
 
 			// test
 			res, err := devauth.SubmitAuthRequest(ctx, &inReq)
@@ -757,7 +750,7 @@ func TestDevAuthPreauthorizeDevice(t *testing.T) {
 							(m.PubKey == tc.req.PubKey)
 					})).Return(tc.addAuthSetErr)
 
-			devauth := NewDevAuth(&db, nil, nil, nil, nil, Config{})
+			devauth := NewDevAuth(&db, nil, nil, nil, Config{})
 			err := devauth.PreauthorizeDevice(context.Background(), tc.req)
 
 			if tc.err != nil {
@@ -785,7 +778,8 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 		dbUpdateRevokeAuthSetsErr error
 
 		dbGetErr error
-		invErr   error
+
+		coSubmitProvisionDeviceJobErr error
 
 		outErr string
 	}{
@@ -860,8 +854,8 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 				Id:       "dummy_aid",
 				DeviceId: "dummy_devid",
 			},
-			invErr: errors.New("inventory failed"),
-			outErr: "inventory device add error: failed to add device to inventory: inventory failed",
+			coSubmitProvisionDeviceJobErr: errors.New("conductor failed"),
+			outErr: "submit device provisioning job error: conductor failed",
 		},
 		{
 			dbLimit: &model.Limit{Value: 0},
@@ -914,13 +908,14 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 					}).Return(tc.dbUpdateErr)
 			}
 
-			inv := minventory.ClientRunner{}
-			inv.On("AddDevice", context.Background(),
-				inventory.AddReq{Id: "dummy_devid"},
-				mock.AnythingOfType("*apiclient.HttpApi")).
-				Return(tc.invErr)
+			ctx := context.Background()
 
-			devauth := NewDevAuth(&db, nil, &inv, nil, nil, Config{})
+			co := morchestrator.ClientRunner{}
+			co.On("SubmitProvisionDeviceJob", ctx,
+				mock.AnythingOfType("orchestrator.ProvisionDeviceReq")).
+				Return(tc.coSubmitProvisionDeviceJobErr)
+
+			devauth := NewDevAuth(&db, nil, &co, nil, Config{})
 			err := devauth.AcceptDeviceAuth(context.Background(), "dummy_devid", "dummy_aid")
 
 			if tc.outErr != "" {
@@ -986,7 +981,7 @@ func TestDevAuthRejectDevice(t *testing.T) {
 			db.On("DeleteTokenByDevId", context.Background(), "dummy_devid").Return(
 				tc.dbDelDevTokenErr)
 
-			devauth := NewDevAuth(&db, nil, nil, nil, nil, Config{})
+			devauth := NewDevAuth(&db, nil, nil, nil, Config{})
 			err := devauth.RejectDeviceAuth(context.Background(), "dummy_devid", "dummy_aid")
 
 			if tc.dbErr != nil || (tc.dbDelDevTokenErr != nil &&
@@ -1053,7 +1048,7 @@ func TestDevAuthResetDevice(t *testing.T) {
 			db.On("DeleteTokenByDevId", context.Background(), "dummy_devid").Return(
 				tc.dbDelDevTokenErr)
 
-			devauth := NewDevAuth(&db, nil, nil, nil, nil, Config{})
+			devauth := NewDevAuth(&db, nil, nil, nil, Config{})
 			err := devauth.ResetDeviceAuth(context.Background(), "dummy_devid", "dummy_aid")
 
 			if tc.dbErr != nil ||
@@ -1210,7 +1205,7 @@ func TestDevAuthVerifyToken(t *testing.T) {
 			db := &mstore.DataStore{}
 			ja := &mjwt.Handler{}
 
-			devauth := NewDevAuth(db, nil, nil, nil, ja, Config{})
+			devauth := NewDevAuth(db, nil, nil, ja, Config{})
 			if tc.tenantVerify {
 				// ok to pass nil tenantadm client here
 				devauth = devauth.WithTenantVerification(nil)
@@ -1344,7 +1339,7 @@ func TestDevAuthDecommissionDevice(t *testing.T) {
 				tc.devId).Return(
 				tc.dbDeleteDeviceErr)
 
-			devauth := NewDevAuth(&db, nil, nil, &co, nil, Config{})
+			devauth := NewDevAuth(&db, nil, &co, nil, Config{})
 			err := devauth.DecommissionDevice(ctx, tc.devId)
 
 			if tc.outErr != "" {
@@ -1402,7 +1397,7 @@ func TestDevAuthSetTenantLimit(t *testing.T) {
 				tc.limit).
 				Return(tc.dbPutLimitErr)
 
-			devauth := NewDevAuth(&db, nil, nil, nil, nil, Config{})
+			devauth := NewDevAuth(&db, nil, nil, nil, Config{})
 			err := devauth.SetTenantLimit(ctx, tc.tenantId, tc.limit)
 
 			if tc.outErr != "" {
@@ -1493,7 +1488,7 @@ func TestDevAuthGetLimit(t *testing.T) {
 			db := mstore.DataStore{}
 			db.On("GetLimit", ctx, tc.inName).Return(tc.dbLimit, tc.dbErr)
 
-			devauth := NewDevAuth(&db, nil, nil, nil, nil,
+			devauth := NewDevAuth(&db, nil, nil, nil,
 				Config{MaxDevicesLimitDefault: tc.maxDevicesLimitDefaultConfig})
 			limit, err := devauth.GetLimit(ctx, tc.inName)
 
@@ -1575,7 +1570,7 @@ func TestDevAuthGetTenantLimit(t *testing.T) {
 				Run(verifyCtx).
 				Return(tc.dbLimit, tc.dbErr)
 
-			devauth := NewDevAuth(&db, nil, nil, nil, nil, Config{})
+			devauth := NewDevAuth(&db, nil, nil, nil, Config{})
 			limit, err := devauth.GetTenantLimit(ctx, tc.inName, tc.inTenant)
 
 			if tc.outErr != nil {
@@ -1638,7 +1633,7 @@ func TestDevAuthGetDevCountByStatus(t *testing.T) {
 			db := mstore.DataStore{}
 			db.On("GetDevCountByStatus", ctx, tc.status).Return(tc.dbCnt, tc.dbErr)
 
-			devauth := NewDevAuth(&db, nil, nil, nil, nil, Config{})
+			devauth := NewDevAuth(&db, nil, nil, nil, Config{})
 			cnt, err := devauth.GetDevCountByStatus(ctx, tc.status)
 
 			if tc.err != nil {
@@ -1678,7 +1673,7 @@ func TestDevAuthProvisionTenant(t *testing.T) {
 				"1.1.0",
 			).Return(tc.datastoreError)
 			db.On("WithAutomigrate").Return(&db)
-			devauth := NewDevAuth(&db, nil, nil, nil, nil, Config{})
+			devauth := NewDevAuth(&db, nil, nil, nil, Config{})
 
 			err := devauth.ProvisionTenant(ctx, "foo")
 
@@ -1791,7 +1786,7 @@ func TestDevAuthDeleteAuthSet(t *testing.T) {
 				tc.devId).Return(
 				tc.dbDeleteDeviceErr)
 
-			devauth := NewDevAuth(&db, nil, nil, nil, nil, Config{})
+			devauth := NewDevAuth(&db, nil, nil, nil, Config{})
 			err := devauth.DeleteAuthSet(ctx, tc.devId, tc.authId)
 
 			if tc.outErr != "" {
@@ -1858,7 +1853,7 @@ func TestDeleteTokens(t *testing.T) {
 			db.On("DeleteTokens", ctxMatcher).
 				Return(tc.dbErrDeleteTokens)
 
-			devauth := NewDevAuth(&db, nil, nil, nil, nil, Config{})
+			devauth := NewDevAuth(&db, nil, nil, nil, Config{})
 			err := devauth.DeleteTokens(ctx, tc.tenantId, tc.deviceId)
 
 			if tc.outErr != nil {

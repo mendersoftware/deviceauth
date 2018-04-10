@@ -1,4 +1,4 @@
-// Copyright 2017 Northern.tech AS
+// Copyright 2018 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -24,7 +24,6 @@ import (
 
 	api_http "github.com/mendersoftware/deviceauth/api/http"
 	"github.com/mendersoftware/deviceauth/client/deviceadm"
-	"github.com/mendersoftware/deviceauth/client/inventory"
 	"github.com/mendersoftware/deviceauth/client/orchestrator"
 	"github.com/mendersoftware/deviceauth/client/tenant"
 	dconfig "github.com/mendersoftware/deviceauth/config"
@@ -77,9 +76,6 @@ func RunServer(c config.Reader) error {
 	devAdmClientConf := deviceadm.Config{
 		DevAdmAddr: c.GetString(dconfig.SettingDevAdmAddr),
 	}
-	invClientConf := inventory.Config{
-		InventoryAddr: c.GetString(dconfig.SettingInventoryAddr),
-	}
 	orchClientConf := orchestrator.Config{
 		OrchestratorAddr: c.GetString(dconfig.SettingOrchestratorAddr),
 		Timeout:          time.Duration(30) * time.Second,
@@ -87,7 +83,6 @@ func RunServer(c config.Reader) error {
 
 	devauth := devauth.NewDevAuth(db,
 		deviceadm.NewClient(devAdmClientConf),
-		inventory.NewClient(invClientConf),
 		orchestrator.NewClient(orchClientConf),
 		jwtHandler,
 		devauth.Config{

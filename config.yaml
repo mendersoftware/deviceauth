@@ -54,12 +54,6 @@
 
 # devadm_addr: http://mender-device-auth:8080
 
-# Inventory service address
-# Defaults to: http://mender-inventory:8080
-# Overwrite with environment variable: DEVICEAUTH_INVENTORY_ADDR
-
-# inventory_addr: http://mender-inventory:8080
-
 # Conductor service address
 # Defaults to: http://mender-conductor:8080
 # Overwrite with environment variable: DEVICEAUTH_DEVICE_AUTH_ORCHESTRATOR
