@@ -38,7 +38,7 @@ func TestGetClient(t *testing.T) {
 func TestClientAddDeviceSuccess(t *testing.T) {
 	t.Parallel()
 
-	s, rd := ct.NewMockServer(http.StatusNoContent)
+	s, rd := ct.NewMockServer(http.StatusNoContent, nil)
 	defer s.Close()
 
 	c := NewClient(Config{
@@ -55,7 +55,7 @@ func TestClientAddDeviceSuccess(t *testing.T) {
 func TestClientAddDeviceFail(t *testing.T) {
 	t.Parallel()
 
-	s, rd := ct.NewMockServer(http.StatusBadRequest)
+	s, rd := ct.NewMockServer(http.StatusBadRequest, nil)
 	defer s.Close()
 
 	c := NewClient(Config{
@@ -132,7 +132,7 @@ func TestClientAddDeviceTimeout(t *testing.T) {
 func TestClientUpdateStatusInternalSuccess(t *testing.T) {
 	t.Parallel()
 
-	s, rd := ct.NewMockServer(http.StatusOK)
+	s, rd := ct.NewMockServer(http.StatusOK, nil)
 	defer s.Close()
 
 	c := NewClient(Config{
@@ -150,7 +150,7 @@ func TestClientUpdateStatusInternalSuccess(t *testing.T) {
 func TestClientUpdateStatusInternalFail(t *testing.T) {
 	t.Parallel()
 
-	s, rd := ct.NewMockServer(http.StatusBadRequest)
+	s, rd := ct.NewMockServer(http.StatusBadRequest, nil)
 	defer s.Close()
 
 	c := NewClient(Config{

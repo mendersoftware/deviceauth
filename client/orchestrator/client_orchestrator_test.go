@@ -35,7 +35,7 @@ func TestGetClient(t *testing.T) {
 func TestClientReqSuccess(t *testing.T) {
 	t.Parallel()
 
-	s, rd := ct.NewMockServer(http.StatusOK)
+	s, rd := ct.NewMockServer(http.StatusOK, nil)
 	defer s.Close()
 
 	c := NewClient(Config{
@@ -52,7 +52,7 @@ func TestClientReqSuccess(t *testing.T) {
 func TestClientReqFail(t *testing.T) {
 	t.Parallel()
 
-	s, rd := ct.NewMockServer(http.StatusBadRequest)
+	s, rd := ct.NewMockServer(http.StatusBadRequest, nil)
 	defer s.Close()
 
 	c := NewClient(Config{
