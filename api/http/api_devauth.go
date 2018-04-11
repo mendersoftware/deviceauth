@@ -158,8 +158,15 @@ func (d *DevAuthApiHandlers) SubmitAuthRequestHandler(w rest.ResponseWriter, r *
 	}
 
 	token, err := d.devAuth.SubmitAuthRequest(ctx, &authreq)
+
+	if err != nil && devauth.IsErrDevAuthUnauthorized(err) {
+		rest_utils.RestErrWithWarningMsg(w, r, l, err,
+			http.StatusUnauthorized, errors.Cause(err).Error())
+		return
+	}
+
 	switch err {
-	case devauth.ErrDevAuthUnauthorized, devauth.ErrDevIdAuthIdMismatch, devauth.ErrMaxDeviceCountReached:
+	case devauth.ErrDevIdAuthIdMismatch, devauth.ErrMaxDeviceCountReached:
 		// error is always set to unauthorized, client does not need to
 		// know why
 		rest_utils.RestErrWithWarningMsg(w, r, l, devauth.ErrDevAuthUnauthorized,

@@ -31,6 +31,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
+	"github.com/mendersoftware/deviceauth/client/tenant"
 	"github.com/mendersoftware/deviceauth/devauth"
 	"github.com/mendersoftware/deviceauth/devauth/mocks"
 	"github.com/mendersoftware/deviceauth/jwt"
@@ -203,9 +204,12 @@ func TestApiDevAuthSubmitAuthReq(t *testing.T) {
 				"",
 				t),
 			"",
-			devauth.ErrDevAuthUnauthorized,
+			devauth.MakeErrDevAuthUnauthorized(
+				tenant.MakeErrTokenVerificationFailed(
+					errors.New("account suspended"),
+				)),
 			401,
-			RestError("unauthorized"),
+			RestError("account suspended"),
 		},
 		{
 			//complete body + signature, auth ok
