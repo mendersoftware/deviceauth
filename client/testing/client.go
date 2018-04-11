@@ -28,7 +28,7 @@ type TestReqData struct {
 }
 
 // return mock http server returning status code 'status'
-func NewMockServer(status int) (*httptest.Server, *TestReqData) {
+func NewMockServer(status int, body []byte) (*httptest.Server, *TestReqData) {
 	rdata := &TestReqData{}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
@@ -36,6 +36,7 @@ func NewMockServer(status int) (*httptest.Server, *TestReqData) {
 		rdata.Headers = r.Header
 		rdata.Url = r.URL
 		w.WriteHeader(status)
+		w.Write(body)
 	}))
 	return srv, rdata
 }
