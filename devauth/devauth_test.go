@@ -31,7 +31,6 @@ import (
 	mdevadm "github.com/mendersoftware/deviceauth/client/deviceadm/mocks"
 	"github.com/mendersoftware/deviceauth/client/orchestrator"
 	morchestrator "github.com/mendersoftware/deviceauth/client/orchestrator/mocks"
-	"github.com/mendersoftware/deviceauth/client/tenant"
 	mtenant "github.com/mendersoftware/deviceauth/client/tenant/mocks"
 	"github.com/mendersoftware/deviceauth/jwt"
 	mjwt "github.com/mendersoftware/deviceauth/jwt/mocks"
@@ -201,10 +200,10 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 
 			inReq: req,
 
-			err: ErrDevAuthUnauthorized,
+			err: errors.New("dev auth: unauthorized: token verification failed: account suspended"),
 
 			tenantVerify:          true,
-			tenantVerificationErr: tenant.ErrTokenVerificationFailed,
+			tenantVerificationErr: errors.New("token verification failed: account suspended"),
 		},
 		{
 			//new device - tenant token verification failed because of other reasons

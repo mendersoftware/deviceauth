@@ -1,4 +1,4 @@
-// Copyright 2017 Northern.tech AS
+// Copyright 2018 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -16,10 +16,12 @@ package tenant
 import (
 	"context"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/mendersoftware/go-lib-micro/apiclient"
 	"github.com/mendersoftware/go-lib-micro/log"
+	"github.com/mendersoftware/go-lib-micro/rest_utils"
 	"github.com/pkg/errors"
 
 	"github.com/mendersoftware/deviceauth/utils"
@@ -32,9 +34,17 @@ const (
 	defaultReqTimeout = time.Duration(10) * time.Second
 )
 
-var (
-	ErrTokenVerificationFailed = errors.New("token verification failed")
+const (
+	MsgErrTokenVerificationFailed = "token verification failed"
 )
+
+func IsErrTokenVerificationFailed(e error) bool {
+	return strings.HasPrefix(e.Error(), MsgErrTokenVerificationFailed)
+}
+
+func MakeErrTokenVerificationFailed(apiErr error) error {
+	return errors.Wrap(apiErr, MsgErrTokenVerificationFailed)
+}
 
 // ClientConfig conveys client configuration
 type Config struct {
@@ -87,7 +97,12 @@ func (tc *Client) VerifyToken(ctx context.Context, token string,
 	switch rsp.StatusCode {
 
 	case http.StatusUnauthorized: // 401, verification result negative
-		return ErrTokenVerificationFailed
+		apiErr := rest_utils.ParseApiError(rsp.Body)
+		if !rest_utils.IsApiError(apiErr) {
+			return errors.Errorf("failed to parse tenantadm api error response")
+		}
+
+		return MakeErrTokenVerificationFailed(apiErr)
 
 	case http.StatusOK: // 200, token verified
 		return nil

@@ -17,6 +17,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/Azure/go-autorest/autorest/to"
@@ -40,12 +41,24 @@ import (
 	uto "github.com/mendersoftware/deviceauth/utils/to"
 )
 
+const (
+	MsgErrDevAuthUnauthorized = "dev auth: unauthorized"
+)
+
 var (
-	ErrDevAuthUnauthorized   = errors.New("dev auth: unauthorized")
+	ErrDevAuthUnauthorized   = errors.New(MsgErrDevAuthUnauthorized)
 	ErrDevIdAuthIdMismatch   = errors.New("dev auth: dev ID and auth ID mismatch")
 	ErrMaxDeviceCountReached = errors.New("maximum number of accepted devices reached")
 	ErrDeviceExists          = errors.New("device already exists")
 )
+
+func IsErrDevAuthUnauthorized(e error) bool {
+	return strings.HasPrefix(e.Error(), MsgErrDevAuthUnauthorized)
+}
+
+func MakeErrDevAuthUnauthorized(e error) error {
+	return errors.Wrap(e, MsgErrDevAuthUnauthorized)
+}
 
 // Expiration Timeout should be moved to database
 // Do we need Expiration Timeout per device?
@@ -190,9 +203,9 @@ func (d *DevAuth) SubmitAuthRequest(ctx context.Context, r *model.AuthReq) (stri
 		// verify tenant token with tenant administration
 		err := d.cTenant.VerifyToken(ctx, r.TenantToken, d.clientGetter())
 		if err != nil {
-			if err == tenant.ErrTokenVerificationFailed {
+			if tenant.IsErrTokenVerificationFailed(err) {
 				l.Errorf("failed to verify tenant token")
-				return "", ErrDevAuthUnauthorized
+				return "", MakeErrDevAuthUnauthorized(err)
 			}
 
 			return "", errors.New("request to verify tenant token failed")

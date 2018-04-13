@@ -1,4 +1,4 @@
-// Copyright 2017 Northern.tech AS
+// Copyright 2018 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@ package tenant
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"testing"
@@ -38,6 +39,7 @@ func TestClient(t *testing.T) {
 
 	tcs := []struct {
 		status int
+		body   []byte
 		token  string
 		err    error
 	}{
@@ -56,7 +58,8 @@ func TestClient(t *testing.T) {
 		},
 		{
 			status: http.StatusUnauthorized,
-			err:    ErrTokenVerificationFailed,
+			body:   restError("account suspended"),
+			err:    errors.New("token verification failed: account suspended"),
 		},
 	}
 
@@ -65,7 +68,7 @@ func TestClient(t *testing.T) {
 		t.Run(fmt.Sprintf("status %v", tc.status), func(t *testing.T) {
 			t.Parallel()
 
-			s, rd := ct.NewMockServer(tc.status)
+			s, rd := ct.NewMockServer(tc.status, tc.body)
 
 			c := NewClient(Config{
 				TenantAdmAddr: s.URL,
@@ -81,4 +84,9 @@ func TestClient(t *testing.T) {
 			s.Close()
 		})
 	}
+}
+
+func restError(msg string) []byte {
+	err, _ := json.Marshal(map[string]interface{}{"error": msg, "request_id": "test"})
+	return err
 }

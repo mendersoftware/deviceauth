@@ -51,7 +51,10 @@ class TestMultiTenant:
 
         handlers = [
             ('POST', '/api/internal/v1/tenantadm/tenants/verify',
-             lambda _: (401, {}, '')),
+             lambda _: (401, {}, {
+                    'request_id': 'test',
+                    'error': 'ignoreme'
+                 })),
         ]
         with mockserver.run_fake(get_fake_tenantadm_addr(),
                                 handlers=handlers) as fake:
