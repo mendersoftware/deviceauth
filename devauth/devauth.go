@@ -365,12 +365,11 @@ func (d *DevAuth) processAuthRequest(ctx context.Context, r *model.AuthReq) (*mo
 	}
 
 	areq := &model.AuthSet{
-		IdData:      r.IdData,
-		TenantToken: r.TenantToken,
-		PubKey:      r.PubKey,
-		DeviceId:    dev.Id,
-		Status:      model.DevStatusPending,
-		Timestamp:   uto.TimePtr(time.Now()),
+		IdData:    r.IdData,
+		PubKey:    r.PubKey,
+		DeviceId:  dev.Id,
+		Status:    model.DevStatusPending,
+		Timestamp: uto.TimePtr(time.Now()),
 	}
 	added := true
 	// record authentication request

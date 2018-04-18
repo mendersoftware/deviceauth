@@ -27,7 +27,6 @@ const (
 type AuthSet struct {
 	Id                string     `json:"id" bson:"_id,omitempty"`
 	IdData            string     `json:"id_data" bson:"id_data,omitempty"`
-	TenantToken       string     `json:"tenant_token" bson:"tenant_token,omitempty"`
 	PubKey            string     `json:"pubkey" bson:"pubkey,omitempty"`
 	DeviceId          string     `json:"-" bson:"device_id,omitempty"`
 	Timestamp         *time.Time `json:"ts" bson:"ts,omitempty"`
@@ -37,7 +36,6 @@ type AuthSet struct {
 
 type AuthSetUpdate struct {
 	IdData            string     `bson:"id_data,omitempty"`
-	TenantToken       string     `bson:"tenant_token,omitempty"`
 	PubKey            string     `bson:"pubkey,omitempty"`
 	DeviceId          string     `bson:"device_id,omitempty"`
 	Timestamp         *time.Time `bson:"ts,omitempty"`

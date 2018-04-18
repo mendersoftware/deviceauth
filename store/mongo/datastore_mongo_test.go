@@ -40,10 +40,10 @@ const (
 
 // data set
 var (
-	dev1   = model.NewDevice("id1", "idData1", "", "")
-	dev2   = model.NewDevice("id2", "idData2", "", "")
-	token1 = model.NewToken("id1", "devId1", "token1")
-	token2 = model.NewToken("id2", "devId2", "token2")
+	dev1   = model.NewDevice("id1", "idData1", "")
+	dev2   = model.NewDevice("id2", "idData2", "")
+	token1 = model.NewToken("id1", "devId1")
+	token2 = model.NewToken("id2", "devId2")
 	tenant = "foo"
 )
 
@@ -81,7 +81,6 @@ func getDb(ctx context.Context) *DataStoreMongo {
 // custom Device comparison with 'compareTime'
 func compareDevices(expected *model.Device, actual *model.Device, t *testing.T) {
 	assert.Equal(t, expected.Id, actual.Id)
-	assert.Equal(t, expected.TenantToken, actual.TenantToken)
 	assert.Equal(t, expected.PubKey, actual.PubKey)
 	assert.Equal(t, expected.IdData, actual.IdData)
 	assert.Equal(t, expected.Status, actual.Status)
@@ -169,7 +168,6 @@ func TestStoreGetDeviceByIdentityData(t *testing.T) {
 // custom AuthSet comparison with 'compareTime'
 func compareAuthSet(expected *model.AuthSet, actual *model.AuthSet, t *testing.T) {
 	assert.Equal(t, expected.IdData, actual.IdData)
-	assert.Equal(t, expected.TenantToken, actual.TenantToken)
 	assert.Equal(t, expected.PubKey, actual.PubKey)
 	assert.Equal(t, expected.DeviceId, actual.DeviceId)
 	assert.Equal(t, expected.Status, actual.Status)
@@ -184,12 +182,11 @@ func TestStoreAddDevice(t *testing.T) {
 
 	//setup
 	dev := &model.Device{
-		TenantToken: "tenant",
-		PubKey:      "pubkey",
-		IdData:      "iddata",
-		Status:      "pending",
-		CreatedTs:   time.Now(),
-		UpdatedTs:   time.Now(),
+		PubKey:    "pubkey",
+		IdData:    "iddata",
+		Status:    "pending",
+		CreatedTs: time.Now(),
+		UpdatedTs: time.Now(),
 	}
 
 	ctx := identity.WithContext(context.Background(), &identity.Identity{
