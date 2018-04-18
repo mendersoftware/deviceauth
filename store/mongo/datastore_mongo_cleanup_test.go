@@ -40,7 +40,6 @@ func TestGetDevicesBeingDecommissioned(t *testing.T) {
 				model.Device{
 					Id:              "001",
 					IdData:          "001",
-					TenantToken:     "",
 					PubKey:          "001",
 					Status:          model.DevStatusPending,
 					Decommissioning: false,
@@ -48,7 +47,6 @@ func TestGetDevicesBeingDecommissioned(t *testing.T) {
 				model.Device{
 					Id:              "002",
 					IdData:          "002",
-					TenantToken:     "",
 					PubKey:          "002",
 					Status:          model.DevStatusPending,
 					Decommissioning: true,
@@ -58,7 +56,6 @@ func TestGetDevicesBeingDecommissioned(t *testing.T) {
 				model.Device{
 					Id:              "002",
 					IdData:          "002",
-					TenantToken:     "",
 					PubKey:          "002",
 					Status:          model.DevStatusPending,
 					Decommissioning: true,
@@ -70,7 +67,6 @@ func TestGetDevicesBeingDecommissioned(t *testing.T) {
 				model.Device{
 					Id:              "001",
 					IdData:          "001",
-					TenantToken:     "",
 					PubKey:          "001",
 					Status:          model.DevStatusPending,
 					Decommissioning: false,
@@ -78,7 +74,6 @@ func TestGetDevicesBeingDecommissioned(t *testing.T) {
 				model.Device{
 					Id:              "002",
 					IdData:          "002",
-					TenantToken:     "",
 					PubKey:          "002",
 					Status:          model.DevStatusPending,
 					Decommissioning: true,
@@ -136,7 +131,6 @@ func TestDeleteDevicesBeingDecommissioned(t *testing.T) {
 				model.Device{
 					Id:              "001",
 					IdData:          "001",
-					TenantToken:     "",
 					PubKey:          "001",
 					Status:          model.DevStatusPending,
 					Decommissioning: false,
@@ -144,7 +138,6 @@ func TestDeleteDevicesBeingDecommissioned(t *testing.T) {
 				model.Device{
 					Id:              "002",
 					IdData:          "002",
-					TenantToken:     "",
 					PubKey:          "002",
 					Status:          model.DevStatusPending,
 					Decommissioning: true,
@@ -156,7 +149,6 @@ func TestDeleteDevicesBeingDecommissioned(t *testing.T) {
 				model.Device{
 					Id:              "001",
 					IdData:          "001",
-					TenantToken:     "",
 					PubKey:          "001",
 					Status:          model.DevStatusPending,
 					Decommissioning: false,
@@ -164,7 +156,6 @@ func TestDeleteDevicesBeingDecommissioned(t *testing.T) {
 				model.Device{
 					Id:              "002",
 					IdData:          "002",
-					TenantToken:     "",
 					PubKey:          "002",
 					Status:          model.DevStatusPending,
 					Decommissioning: true,
@@ -239,7 +230,6 @@ func TestGetBrokenAuthSets(t *testing.T) {
 				model.Device{
 					Id:              "001",
 					IdData:          "001",
-					TenantToken:     "",
 					PubKey:          "001",
 					Status:          model.DevStatusPending,
 					Decommissioning: false,
@@ -247,7 +237,6 @@ func TestGetBrokenAuthSets(t *testing.T) {
 				model.Device{
 					Id:              "002",
 					IdData:          "002",
-					TenantToken:     "",
 					PubKey:          "002",
 					Status:          model.DevStatusPending,
 					Decommissioning: false,
@@ -275,7 +264,6 @@ func TestGetBrokenAuthSets(t *testing.T) {
 				model.Device{
 					Id:              "001",
 					IdData:          "001",
-					TenantToken:     "",
 					PubKey:          "001",
 					Status:          model.DevStatusPending,
 					Decommissioning: false,
@@ -283,7 +271,6 @@ func TestGetBrokenAuthSets(t *testing.T) {
 				model.Device{
 					Id:              "002",
 					IdData:          "002",
-					TenantToken:     "",
 					PubKey:          "002",
 					Status:          model.DevStatusPending,
 					Decommissioning: false,
@@ -312,7 +299,6 @@ func TestGetBrokenAuthSets(t *testing.T) {
 				model.Device{
 					Id:              "001",
 					IdData:          "001",
-					TenantToken:     "",
 					PubKey:          "001",
 					Status:          model.DevStatusPending,
 					Decommissioning: false,
@@ -320,7 +306,6 @@ func TestGetBrokenAuthSets(t *testing.T) {
 				model.Device{
 					Id:              "002",
 					IdData:          "002",
-					TenantToken:     "",
 					PubKey:          "002",
 					Status:          model.DevStatusPending,
 					Decommissioning: true,
@@ -397,7 +382,6 @@ func TestDeleteBrokenAuthSets(t *testing.T) {
 				model.Device{
 					Id:              "001",
 					IdData:          "001",
-					TenantToken:     "",
 					PubKey:          "001",
 					Status:          model.DevStatusPending,
 					Decommissioning: false,
@@ -405,7 +389,6 @@ func TestDeleteBrokenAuthSets(t *testing.T) {
 				model.Device{
 					Id:              "002",
 					IdData:          "002",
-					TenantToken:     "",
 					PubKey:          "002",
 					Status:          model.DevStatusPending,
 					Decommissioning: false,
@@ -431,7 +414,6 @@ func TestDeleteBrokenAuthSets(t *testing.T) {
 				model.Device{
 					Id:              "001",
 					IdData:          "001",
-					TenantToken:     "",
 					PubKey:          "001",
 					Status:          model.DevStatusPending,
 					Decommissioning: false,
@@ -439,7 +421,6 @@ func TestDeleteBrokenAuthSets(t *testing.T) {
 				model.Device{
 					Id:              "002",
 					IdData:          "002",
-					TenantToken:     "",
 					PubKey:          "002",
 					Status:          model.DevStatusPending,
 					Decommissioning: false,
@@ -466,7 +447,6 @@ func TestDeleteBrokenAuthSets(t *testing.T) {
 				model.Device{
 					Id:              "001",
 					IdData:          "001",
-					TenantToken:     "",
 					PubKey:          "001",
 					Status:          model.DevStatusPending,
 					Decommissioning: false,
@@ -474,7 +454,6 @@ func TestDeleteBrokenAuthSets(t *testing.T) {
 				model.Device{
 					Id:              "002",
 					IdData:          "002",
-					TenantToken:     "",
 					PubKey:          "002",
 					Status:          model.DevStatusPending,
 					Decommissioning: true,
@@ -549,7 +528,6 @@ func TestGetBrokenTokens(t *testing.T) {
 				model.Device{
 					Id:              "001",
 					IdData:          "001",
-					TenantToken:     "",
 					PubKey:          "001",
 					Status:          model.DevStatusPending,
 					Decommissioning: false,
@@ -557,7 +535,6 @@ func TestGetBrokenTokens(t *testing.T) {
 				model.Device{
 					Id:              "002",
 					IdData:          "002",
-					TenantToken:     "",
 					PubKey:          "002",
 					Status:          model.DevStatusPending,
 					Decommissioning: false,
@@ -582,7 +559,6 @@ func TestGetBrokenTokens(t *testing.T) {
 				model.Device{
 					Id:              "001",
 					IdData:          "001",
-					TenantToken:     "",
 					PubKey:          "001",
 					Status:          model.DevStatusPending,
 					Decommissioning: false,
@@ -590,7 +566,6 @@ func TestGetBrokenTokens(t *testing.T) {
 				model.Device{
 					Id:              "002",
 					IdData:          "002",
-					TenantToken:     "",
 					PubKey:          "002",
 					Status:          model.DevStatusPending,
 					Decommissioning: false,
@@ -616,7 +591,6 @@ func TestGetBrokenTokens(t *testing.T) {
 				model.Device{
 					Id:              "001",
 					IdData:          "001",
-					TenantToken:     "",
 					PubKey:          "001",
 					Status:          model.DevStatusPending,
 					Decommissioning: false,
@@ -624,7 +598,6 @@ func TestGetBrokenTokens(t *testing.T) {
 				model.Device{
 					Id:              "002",
 					IdData:          "002",
-					TenantToken:     "",
 					PubKey:          "002",
 					Status:          model.DevStatusPending,
 					Decommissioning: true,
@@ -696,7 +669,6 @@ func TestDeleteBrokenTokens(t *testing.T) {
 				model.Device{
 					Id:              "001",
 					IdData:          "001",
-					TenantToken:     "",
 					PubKey:          "001",
 					Status:          model.DevStatusPending,
 					Decommissioning: false,
@@ -704,7 +676,6 @@ func TestDeleteBrokenTokens(t *testing.T) {
 				model.Device{
 					Id:              "002",
 					IdData:          "002",
-					TenantToken:     "",
 					PubKey:          "002",
 					Status:          model.DevStatusPending,
 					Decommissioning: false,
@@ -728,7 +699,6 @@ func TestDeleteBrokenTokens(t *testing.T) {
 				model.Device{
 					Id:              "001",
 					IdData:          "001",
-					TenantToken:     "",
 					PubKey:          "001",
 					Status:          model.DevStatusPending,
 					Decommissioning: false,
@@ -736,7 +706,6 @@ func TestDeleteBrokenTokens(t *testing.T) {
 				model.Device{
 					Id:              "002",
 					IdData:          "002",
-					TenantToken:     "",
 					PubKey:          "002",
 					Status:          model.DevStatusPending,
 					Decommissioning: false,
@@ -761,7 +730,6 @@ func TestDeleteBrokenTokens(t *testing.T) {
 				model.Device{
 					Id:              "001",
 					IdData:          "001",
-					TenantToken:     "",
 					PubKey:          "001",
 					Status:          model.DevStatusPending,
 					Decommissioning: false,
@@ -769,7 +737,6 @@ func TestDeleteBrokenTokens(t *testing.T) {
 				model.Device{
 					Id:              "002",
 					IdData:          "002",
-					TenantToken:     "",
 					PubKey:          "002",
 					Status:          model.DevStatusPending,
 					Decommissioning: true,

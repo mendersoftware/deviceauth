@@ -42,8 +42,8 @@ const (
 var (
 	dev1   = model.NewDevice("id1", "idData1", "")
 	dev2   = model.NewDevice("id2", "idData2", "")
-	token1 = model.NewToken("id1", "devId1")
-	token2 = model.NewToken("id2", "devId2")
+	token1 = model.NewToken("id1", "devId1", "token1")
+	token2 = model.NewToken("id2", "devId2", "token2")
 	tenant = "foo"
 )
 
