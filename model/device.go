@@ -30,7 +30,6 @@ const (
 // otherwise the underscore will be removed upon write to mongo
 type Device struct {
 	Id              string    `json:"id" bson:"_id,omitempty"`
-	TenantToken     string    `json:"-" bson:"tenant_token,omitempty"`
 	PubKey          string    `json:"-" bson:",omitempty"`
 	IdData          string    `json:"id_data" bson:"id_data,omitempty"`
 	Status          string    `json:"-" bson:",omitempty"`
@@ -41,7 +40,6 @@ type Device struct {
 }
 
 type DeviceUpdate struct {
-	TenantToken     string     `json:"-" bson:"tenant_token,omitempty"`
 	PubKey          string     `json:"-" bson:",omitempty"`
 	IdData          string     `json:"id_data" bson:"id_data,omitempty"`
 	Status          string     `json:"-" bson:",omitempty"`
@@ -49,13 +47,12 @@ type DeviceUpdate struct {
 	UpdatedTs       *time.Time `json:"updated_ts" bson:"updated_ts,omitempty"`
 }
 
-func NewDevice(id, id_data, pubkey, tenant_token string) *Device {
+func NewDevice(id, id_data, pubkey string) *Device {
 	now := time.Now()
 
 	return &Device{
 		Id:              id,
 		IdData:          id_data,
-		TenantToken:     tenant_token,
 		PubKey:          pubkey,
 		Status:          DevStatusPending,
 		Decommissioning: false,
