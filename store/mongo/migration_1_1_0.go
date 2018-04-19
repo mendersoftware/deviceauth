@@ -70,7 +70,6 @@ func (m *migration_1_1_0) Up(from migrate.Version) error {
 		aset := model.AuthSet{
 			Id:                asetId,
 			IdData:            olddev.IdData,
-			TenantToken:       olddev.TenantToken,
 			PubKey:            olddev.PubKey,
 			DeviceId:          olddev.Id,
 			Status:            olddev.Status,

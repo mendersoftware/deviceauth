@@ -42,7 +42,6 @@ func TestMaintenanceWithDataStore(t *testing.T) {
 		model.Device{
 			Id:              "001",
 			IdData:          "001",
-			TenantToken:     "",
 			PubKey:          "001",
 			Status:          model.DevStatusPending,
 			Decommissioning: false,
@@ -50,7 +49,6 @@ func TestMaintenanceWithDataStore(t *testing.T) {
 		model.Device{
 			Id:              "002",
 			IdData:          "002",
-			TenantToken:     "",
 			PubKey:          "002",
 			Status:          model.DevStatusPending,
 			Decommissioning: true,

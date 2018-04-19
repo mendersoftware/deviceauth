@@ -136,7 +136,7 @@ func NewDevAuth(d store.DataStore, cda deviceadm.ClientRunner,
 }
 
 func (d *DevAuth) getDeviceFromAuthRequest(ctx context.Context, r *model.AuthReq) (*model.Device, error) {
-	dev := model.NewDevice("", r.IdData, r.PubKey, r.TenantToken)
+	dev := model.NewDevice("", r.IdData, r.PubKey)
 
 	l := log.FromContext(ctx)
 
@@ -365,12 +365,11 @@ func (d *DevAuth) processAuthRequest(ctx context.Context, r *model.AuthReq) (*mo
 	}
 
 	areq := &model.AuthSet{
-		IdData:      r.IdData,
-		TenantToken: r.TenantToken,
-		PubKey:      r.PubKey,
-		DeviceId:    dev.Id,
-		Status:      model.DevStatusPending,
-		Timestamp:   uto.TimePtr(time.Now()),
+		IdData:    r.IdData,
+		PubKey:    r.PubKey,
+		DeviceId:  dev.Id,
+		Status:    model.DevStatusPending,
+		Timestamp: uto.TimePtr(time.Now()),
 	}
 	added := true
 	// record authentication request
@@ -631,7 +630,7 @@ func (d *DevAuth) PreauthorizeDevice(ctx context.Context, req *model.PreAuthReq)
 	// additionally on inserting the auth set (can't add an id data index on auth set - would prevent key rotation)
 
 	// FIXME: tenant_token is "" on purpose, will be removed
-	dev := model.NewDevice(req.DeviceId, req.IdData, req.PubKey, "")
+	dev := model.NewDevice(req.DeviceId, req.IdData, req.PubKey)
 	dev.Status = model.DevStatusPreauth
 
 	err := d.db.AddDevice(ctx, *dev)
