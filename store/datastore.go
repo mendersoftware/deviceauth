@@ -34,6 +34,10 @@ var (
 	ErrObjectExists = errors.New("object exists")
 )
 
+const (
+	NoCollectionErrMsg = "ns doesn't exist"
+)
+
 type DataStore interface {
 	// retrieve device by Mender-assigned device ID
 	//returns ErrDevNotFound if device not found
