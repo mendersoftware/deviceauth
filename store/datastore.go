@@ -32,6 +32,8 @@ var (
 	ErrLimitNotFound = errors.New("limit not found")
 	// device already exists
 	ErrObjectExists = errors.New("object exists")
+	// device status unknown
+	ErrDevStatusBroken = errors.New("cannot qualify device status")
 )
 
 const (
@@ -100,6 +102,9 @@ type DataStore interface {
 	// get the number of devices with a given admission status
 	// computed based on aggregated auth set statuses
 	GetDevCountByStatus(ctx context.Context, status string) (int, error)
+
+	// gets device status
+	GetDeviceStatus(ctx context.Context, dev_id string) (string, error)
 
 	MigrateTenant(ctx context.Context, version string, tenant string) error
 	WithAutomigrate() DataStore

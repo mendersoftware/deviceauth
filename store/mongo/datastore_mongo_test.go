@@ -1751,3 +1751,227 @@ func TestStoreDeleteAuthSetForDevice(t *testing.T) {
 		})
 	}
 }
+
+func TestStoreGetDeviceStatus(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestStoreGetDeviceStatus in short mode.")
+	}
+
+	testCases := map[string]struct {
+		devId      string
+		tenant     string
+		inAuthSets []interface{}
+
+		status string
+		err    string
+	}{
+		"ok, accepted": {
+			devId: "001",
+			inAuthSets: []interface{}{
+				model.AuthSet{
+					Id:       "1",
+					DeviceId: "001",
+					Status:   model.DevStatusAccepted,
+				},
+				model.AuthSet{
+					Id:       "2",
+					DeviceId: "001",
+					Status:   model.DevStatusPending,
+				},
+				model.AuthSet{
+					Id:       "3",
+					DeviceId: "001",
+					Status:   model.DevStatusRejected,
+				},
+				model.AuthSet{
+					Id:       "4",
+					DeviceId: "001",
+					Status:   model.DevStatusPreauth,
+				},
+				model.AuthSet{
+					Id:       "5",
+					DeviceId: "001",
+					Status:   model.DevStatusPending,
+				},
+				model.AuthSet{
+					Id:       "6",
+					DeviceId: "001",
+					Status:   model.DevStatusRejected,
+				},
+				model.AuthSet{
+					Id:       "7",
+					DeviceId: "001",
+					Status:   model.DevStatusRejected,
+				},
+			},
+			tenant: tenant,
+			status: model.DevStatusAccepted,
+			err:    "",
+		},
+		"ok, preauthorized": {
+			devId: "001",
+			inAuthSets: []interface{}{
+				model.AuthSet{
+					Id: "1",
+					// different device
+					DeviceId: "002",
+					Status:   model.DevStatusAccepted,
+				},
+				model.AuthSet{
+					Id:       "2",
+					DeviceId: "001",
+					Status:   model.DevStatusPending,
+				},
+				model.AuthSet{
+					Id:       "3",
+					DeviceId: "001",
+					Status:   model.DevStatusRejected,
+				},
+				model.AuthSet{
+					Id:       "4",
+					DeviceId: "001",
+					Status:   model.DevStatusPreauth,
+				},
+			},
+			tenant: tenant,
+			status: model.DevStatusPreauth,
+			err:    "",
+		},
+		"ok, pending": {
+			devId: "001",
+			inAuthSets: []interface{}{
+				model.AuthSet{
+					Id:       "2",
+					DeviceId: "001",
+					Status:   model.DevStatusPending,
+				},
+				model.AuthSet{
+					Id:       "3",
+					DeviceId: "001",
+					Status:   model.DevStatusRejected,
+				},
+			},
+			tenant: tenant,
+			status: model.DevStatusPending,
+			err:    "",
+		},
+		"ok, rejected": {
+			devId: "001",
+			inAuthSets: []interface{}{
+				model.AuthSet{
+					Id:       "1",
+					DeviceId: "001",
+					Status:   model.DevStatusRejected,
+				},
+				model.AuthSet{
+					Id:       "2",
+					DeviceId: "001",
+					Status:   model.DevStatusRejected,
+				},
+				model.AuthSet{
+					Id:       "3",
+					DeviceId: "001",
+					Status:   model.DevStatusRejected,
+				},
+			},
+			tenant: tenant,
+			status: model.DevStatusRejected,
+			err:    "",
+		},
+		"dev not found - no auth sets": {
+			devId:  "001",
+			tenant: tenant,
+			status: "",
+			err:    store.ErrDevNotFound.Error(),
+		},
+		"dev not found - different device id": {
+			devId: "005",
+			inAuthSets: []interface{}{
+				model.AuthSet{
+					Id:       "1",
+					DeviceId: "001",
+					Status:   model.DevStatusRejected,
+				},
+				model.AuthSet{
+					Id:       "2",
+					DeviceId: "001",
+					Status:   model.DevStatusRejected,
+				},
+				model.AuthSet{
+					Id:       "3",
+					DeviceId: "001",
+					Status:   model.DevStatusRejected,
+				},
+			},
+			tenant: tenant,
+			status: "",
+			err:    store.ErrDevNotFound.Error(),
+		},
+		"error, too many accepted": {
+			devId: "001",
+			inAuthSets: []interface{}{
+				model.AuthSet{
+					Id:       "2",
+					DeviceId: "001",
+					Status:   model.DevStatusAccepted,
+				},
+				model.AuthSet{
+					Id:       "3",
+					DeviceId: "001",
+					Status:   model.DevStatusAccepted,
+				},
+			},
+			tenant: tenant,
+			status: "",
+			err:    store.ErrDevStatusBroken.Error(),
+		},
+		"error, too many preauth": {
+			devId: "001",
+			inAuthSets: []interface{}{
+				model.AuthSet{
+					Id:       "2",
+					DeviceId: "001",
+					Status:   model.DevStatusPreauth,
+				},
+				model.AuthSet{
+					Id:       "3",
+					DeviceId: "001",
+					Status:   model.DevStatusPreauth,
+				},
+			},
+			tenant: tenant,
+			status: "",
+			err:    store.ErrDevStatusBroken.Error(),
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(fmt.Sprintf("tc: %s", name), func(t *testing.T) {
+			ctx := context.Background()
+			if tc.tenant != "" {
+				ctx = identity.WithContext(ctx, &identity.Identity{
+					Tenant: tc.tenant,
+				})
+			}
+
+			db := getDb(ctx)
+			defer db.session.Close()
+
+			if len(tc.inAuthSets) > 0 {
+				s := db.session.Copy()
+				defer s.Close()
+
+				coll := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbAuthSetColl)
+				assert.NoError(t, coll.Insert(tc.inAuthSets...))
+			}
+
+			status, err := db.GetDeviceStatus(ctx, tc.devId)
+			if tc.err != "" {
+				assert.Equal(t, tc.err, err.Error())
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tc.status, status)
+			}
+		})
+	}
+}

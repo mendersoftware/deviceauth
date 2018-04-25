@@ -285,6 +285,27 @@ func (_m *DataStore) GetDeviceByIdentityData(ctx context.Context, idata string) 
 	return r0, r1
 }
 
+// GetDeviceStatus provides a mock function with given fields: ctx, dev_id
+func (_m *DataStore) GetDeviceStatus(ctx context.Context, dev_id string) (string, error) {
+	ret := _m.Called(ctx, dev_id)
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func(context.Context, string) string); ok {
+		r0 = rf(ctx, dev_id)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, dev_id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetDevices provides a mock function with given fields: ctx, skip, limit
 func (_m *DataStore) GetDevices(ctx context.Context, skip uint, limit uint) ([]model.Device, error) {
 	ret := _m.Called(ctx, skip, limit)

@@ -763,6 +763,78 @@ func (db *DataStoreMongo) GetDevCountByStatus(ctx context.Context, status string
 	return resp["count"].(int), err
 }
 
+func (db *DataStoreMongo) GetDeviceStatus(ctx context.Context, devId string) (string, error) {
+	s := db.session.Copy()
+	defer s.Close()
+
+	var statuses = map[string]int{}
+
+	c := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbAuthSetColl)
+
+	// get device auth sets; group by status
+
+	job := &mgo.MapReduce{
+		Map:    "function() { emit(this.status, 1) }",
+		Reduce: "function(key, values) { return Array.sum(values) }",
+	}
+
+	filter := model.AuthSet{
+		DeviceId: devId,
+	}
+
+	var result []struct {
+		Status string `bson:"_id"`
+		Value  int
+	}
+
+	_, err := c.Find(filter).MapReduce(job, &result)
+	if err != nil {
+		if err.Error() == store.NoCollectionErrMsg {
+			return "", store.ErrDevNotFound
+		}
+		return "", err
+	}
+
+	if len(result) == 0 {
+		return "", store.ErrDevNotFound
+	}
+
+	for _, res := range result {
+		statuses[res.Status] = res.Value
+	}
+
+	status, err := getDeviceStatus(statuses)
+	if err != nil {
+		return "", err
+	}
+
+	return status, nil
+}
+
+func getDeviceStatus(statuses map[string]int) (string, error) {
+	if statuses[model.DevStatusAccepted] > 1 || statuses[model.DevStatusPreauth] > 1 {
+		return "", store.ErrDevStatusBroken
+	}
+
+	if statuses[model.DevStatusAccepted] == 1 {
+		return model.DevStatusAccepted, nil
+	}
+
+	if statuses[model.DevStatusPreauth] == 1 {
+		return model.DevStatusPreauth, nil
+	}
+
+	if statuses[model.DevStatusPending] > 0 {
+		return model.DevStatusPending, nil
+	}
+
+	if statuses[model.DevStatusRejected] > 0 {
+		return model.DevStatusRejected, nil
+	}
+
+	return "", store.ErrDevStatusBroken
+}
+
 func (db *DataStoreMongo) GetTenantDbs() ([]string, error) {
 	return migrate.GetTenantDbs(db.session, ctxstore.IsTenantDb(DbName))
 }
