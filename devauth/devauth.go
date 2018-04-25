@@ -279,6 +279,8 @@ func (d *DevAuth) SubmitAuthRequest(ctx context.Context, r *model.AuthReq) (stri
 }
 
 func (d *DevAuth) processPreAuthRequest(ctx context.Context, r *model.AuthReq) (*model.AuthSet, error) {
+	var deviceAlreadyAccepted bool
+
 	// authset exists?
 	aset, err := d.db.GetAuthSetByDataKey(ctx, r.IdData, r.PubKey)
 	switch err {
@@ -293,6 +295,21 @@ func (d *DevAuth) processPreAuthRequest(ctx context.Context, r *model.AuthReq) (
 	// if authset status is not 'preauthorized', nothing to do
 	if aset.Status != model.DevStatusPreauth {
 		return nil, nil
+	}
+
+	// check the device status
+	// if the device status is accepted then do not trigger provisioning workflow
+	// this needs to be checked before changing authentication set status
+	status, err := d.db.GetDeviceStatus(ctx, aset.DeviceId)
+	if err != nil {
+		if err == store.ErrDevNotFound {
+			return nil, err
+		}
+		return nil, errors.Wrap(err, "Cannot determine device status")
+	}
+
+	if status == model.DevStatusAccepted {
+		deviceAlreadyAccepted = true
 	}
 
 	// auth set is ok for auto-accepting, check device limit
@@ -314,19 +331,21 @@ func (d *DevAuth) processPreAuthRequest(ctx context.Context, r *model.AuthReq) (
 		return nil, errors.Wrap(err, "devadm update status error")
 	}
 
-	reqId := requestid.FromContext(ctx)
+	if !deviceAlreadyAccepted {
+		reqId := requestid.FromContext(ctx)
 
-	// submit device accepted job
-	if err := d.cOrch.SubmitProvisionDeviceJob(
-		ctx,
-		orchestrator.ProvisionDeviceReq{
-			RequestId:     reqId,
-			Authorization: ctxhttpheader.FromContext(ctx, "Authorization"),
-			Device: model.Device{
-				Id: aset.DeviceId,
-			},
-		}); err != nil {
-		return nil, errors.Wrap(err, "submit device provisioning job error")
+		// submit device accepted job
+		if err := d.cOrch.SubmitProvisionDeviceJob(
+			ctx,
+			orchestrator.ProvisionDeviceReq{
+				RequestId:     reqId,
+				Authorization: ctxhttpheader.FromContext(ctx, "Authorization"),
+				Device: model.Device{
+					Id: aset.DeviceId,
+				},
+			}); err != nil {
+			return nil, errors.Wrap(err, "submit device provisioning job error")
+		}
 	}
 
 	// persist the 'accepted' status in both auth set, and device
@@ -527,6 +546,39 @@ func (d *DevAuth) DeleteAuthSet(ctx context.Context, devId string, authId string
 }
 
 func (d *DevAuth) AcceptDeviceAuth(ctx context.Context, device_id string, auth_id string) error {
+	var deviceAlreadyAccepted bool
+
+	l := log.FromContext(ctx)
+
+	aset, err := d.db.GetAuthSetById(ctx, auth_id)
+	if err != nil {
+		if err == store.ErrDevNotFound {
+			return err
+		}
+		return errors.Wrap(err, "db get auth set error")
+	}
+
+	// check the device status
+	// if the device status is accepted then do not trigger provisioning workflow
+	// this needs to be checked before changing authentication set status
+	status, err := d.db.GetDeviceStatus(ctx, device_id)
+	if err != nil {
+		if err == store.ErrDevNotFound {
+			return err
+		}
+		return errors.Wrap(err, "Cannot determine device status")
+	}
+
+	if status == model.DevStatusAccepted {
+		deviceAlreadyAccepted = true
+	}
+
+	// device authentication set already accepted, nothing to do here
+	if aset.Status == model.DevStatusAccepted {
+		l.Debugf("Device %s already accepted", device_id)
+		return nil
+	}
+
 	// possible race, consider accept-count-unaccept pattern if that's problematic
 	allow, err := d.canAcceptDevice(ctx)
 	if err != nil {
@@ -541,12 +593,8 @@ func (d *DevAuth) AcceptDeviceAuth(ctx context.Context, device_id string, auth_i
 		return err
 	}
 
-	aset, err := d.db.GetAuthSetById(ctx, auth_id)
-	if err != nil {
-		if err == store.ErrDevNotFound {
-			return err
-		}
-		return errors.Wrap(err, "db get auth set error")
+	if deviceAlreadyAccepted {
+		return nil
 	}
 
 	reqId := requestid.FromContext(ctx)
