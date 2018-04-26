@@ -19,6 +19,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/mendersoftware/deviceauth/model"
+	"github.com/mendersoftware/deviceauth/store"
 )
 
 const noCollectionErrMsg = "ns doesn't exist"
@@ -230,8 +231,6 @@ func (db *DataStoreMongo) DeleteBrokenTokens(dbName string) error {
 	s := db.session.Copy()
 	defer s.Close()
 
-	noCollectionErrMsg := "ns doesn't exist"
-
 	deviceIds := []string{}
 	c := s.DB(dbName).C(DbTokensColl)
 
@@ -249,7 +248,7 @@ func (db *DataStoreMongo) DeleteBrokenTokens(dbName string) error {
 
 	_, err := c.Find(nil).MapReduce(job, &result)
 	if err != nil {
-		if err.Error() == noCollectionErrMsg {
+		if err.Error() == store.NoCollectionErrMsg {
 			return nil
 		}
 		return err
