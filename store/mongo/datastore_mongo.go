@@ -656,6 +656,7 @@ func (db *DataStoreMongo) GetDevCountByStatus(ctx context.Context, status string
 
 	// group by dev id and auth set status, count status occurences:
 	// {_id: {"devid": "dev1", "status": "accepted"}, count: 1}
+	// {_id: {"devid": "dev1", "status": "preauthorized"}, count: 3}
 	// {_id: {"devid": "dev1", "status": "pending"}, count: 2}
 	// {_id: {"devid": "dev1", "status": "rejected"}, count: 0}
 	// etc. for all devs
@@ -673,6 +674,7 @@ func (db *DataStoreMongo) GetDevCountByStatus(ctx context.Context, status string
 
 	// project to:
 	// {device_id: "1", accepted: 1}
+	// {device_id: "1", preauthorized: 3}
 	// {device_id: "1", pending: 2}
 	// {device_id: "1", rejected: 0}
 	// clunky - no easy way to transform values into fields
@@ -684,9 +686,14 @@ func (db *DataStoreMongo) GetDevCountByStatus(ctx context.Context, status string
 					{"$eq": []string{"$_id.status", "accepted"}},
 					{"accepted": "$count"},
 					{"$cond": []bson.M{
-						{"$eq": []string{"$_id.status", "pending"}},
-						{"pending": "$count"},
-						{"rejected": "$count"},
+						{"$eq": []string{"$_id.status", "preauthorized"}},
+						{"preauthorized": "$count"},
+						{"$cond": []bson.M{
+							{"$eq": []string{"$_id.status", "pending"}},
+							{"pending": "$count"},
+							{"rejected": "$count"},
+						},
+						},
 					},
 					},
 				},
@@ -695,13 +702,14 @@ func (db *DataStoreMongo) GetDevCountByStatus(ctx context.Context, status string
 	}
 
 	// group again to get aggregate per-status counts
-	// {device_id: "1", accepted: 1, pending: 2, rejected: 0}
+	// {device_id: "1", accepted: 1, preauthorized: 3, pending: 2, rejected: 0}
 	sum := bson.M{
 		"$group": bson.M{
-			"_id":      "$devid",
-			"accepted": bson.M{"$sum": "$res.accepted"},
-			"pending":  bson.M{"$sum": "$res.pending"},
-			"rejected": bson.M{"$sum": "$res.rejected"},
+			"_id":           "$devid",
+			"accepted":      bson.M{"$sum": "$res.accepted"},
+			"preauthorized": bson.M{"$sum": "$res.preauthorized"},
+			"pending":       bson.M{"$sum": "$res.pending"},
+			"rejected":      bson.M{"$sum": "$res.rejected"},
 		}}
 
 	// actually filter devices according to status
@@ -716,14 +724,28 @@ func (db *DataStoreMongo) GetDevCountByStatus(ctx context.Context, status string
 		}
 	}
 
-	// device is pending if it has no accepted sets and
+	// device is pending if it has no accepted and no preauthorized sets and
 	// has pending sets
 	if status == "pending" {
 		filt = bson.M{
 			"$match": bson.M{
 				"$and": []bson.M{
 					{"accepted": bson.M{"$eq": 0}},
+					{"preauthorized": bson.M{"$eq": 0}},
 					{"pending": bson.M{"$gt": 0}},
+				},
+			},
+		}
+	}
+
+	// device is preauthorized if it has no accepted and
+	// has preauthorized sets
+	if status == "preauthorized" {
+		filt = bson.M{
+			"$match": bson.M{
+				"$and": []bson.M{
+					{"accepted": bson.M{"$eq": 0}},
+					{"preauthorized": bson.M{"$gt": 0}},
 				},
 			},
 		}
@@ -735,6 +757,7 @@ func (db *DataStoreMongo) GetDevCountByStatus(ctx context.Context, status string
 			"$match": bson.M{
 				"$and": []bson.M{
 					{"accepted": bson.M{"$eq": 0}},
+					{"preauthorized": bson.M{"$eq": 0}},
 					{"pending": bson.M{"$eq": 0}},
 					{"rejected": bson.M{"$gt": 0}},
 				},
