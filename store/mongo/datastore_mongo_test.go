@@ -1520,59 +1520,76 @@ func TestStoreGetDevCountByStatus(t *testing.T) {
 	})
 
 	testCases := []struct {
-		accepted int
-		pending  int
-		rejected int
+		accepted      int
+		preauthorized int
+		pending       int
+		rejected      int
 	}{
 		{
-			accepted: 0,
-			pending:  4,
-			rejected: 0,
+			accepted:      0,
+			preauthorized: 0,
+			pending:       4,
+			rejected:      0,
 		},
 		{
-			accepted: 5,
-			pending:  0,
-			rejected: 0,
+			accepted:      5,
+			preauthorized: 0,
+			pending:       0,
+			rejected:      0,
 		},
 		{
-			accepted: 0,
-			pending:  0,
-			rejected: 6,
+			accepted:      0,
+			preauthorized: 0,
+			pending:       0,
+			rejected:      6,
 		},
 		{
-			accepted: 4,
-			pending:  2,
-			rejected: 1,
+			accepted:      0,
+			preauthorized: 9,
+			pending:       0,
+			rejected:      0,
 		},
 		{
-			accepted: 1,
-			pending:  4,
-			rejected: 2,
+			accepted:      4,
+			preauthorized: 3,
+			pending:       2,
+			rejected:      1,
 		},
 		{
-			accepted: 10,
-			pending:  30,
-			rejected: 12,
+			accepted:      1,
+			preauthorized: 4,
+			pending:       4,
+			rejected:      2,
 		},
 		{
-			accepted: 10,
-			pending:  30,
-			rejected: 0,
+			accepted:      10,
+			preauthorized: 22,
+			pending:       30,
+			rejected:      12,
 		},
 		{
-			accepted: 0,
-			pending:  30,
-			rejected: 12,
+			accepted:      10,
+			preauthorized: 1,
+			pending:       30,
+			rejected:      0,
 		},
 		{
-			accepted: 10,
-			pending:  0,
-			rejected: 12,
+			accepted:      0,
+			preauthorized: 0,
+			pending:       30,
+			rejected:      12,
 		},
 		{
-			accepted: 0,
-			pending:  0,
-			rejected: 0,
+			accepted:      10,
+			preauthorized: 7,
+			pending:       0,
+			rejected:      12,
+		},
+		{
+			accepted:      0,
+			preauthorized: 0,
+			pending:       0,
+			rejected:      0,
 		},
 	}
 
@@ -1583,7 +1600,7 @@ func TestStoreGetDevCountByStatus(t *testing.T) {
 			s := db.session.Copy()
 			defer s.Close()
 
-			devs := getDevsWithStatuses(tc.accepted, tc.pending, tc.rejected)
+			devs := getDevsWithStatuses(tc.accepted, tc.preauthorized, tc.pending, tc.rejected)
 
 			// populate DB with a set of devices
 			for d, set := range devs {
@@ -1597,23 +1614,25 @@ func TestStoreGetDevCountByStatus(t *testing.T) {
 			}
 
 			cntAcc, err := db.GetDevCountByStatus(ctx, "accepted")
+			cntPre, err := db.GetDevCountByStatus(ctx, "preauthorized")
 			cntPen, err := db.GetDevCountByStatus(ctx, "pending")
 			cntRej, err := db.GetDevCountByStatus(ctx, "rejected")
 			cntAll, err := db.GetDevCountByStatus(ctx, "")
 
 			assert.NoError(t, err)
 			assert.Equal(t, tc.accepted, cntAcc)
+			assert.Equal(t, tc.preauthorized, cntPre)
 			assert.Equal(t, tc.pending, cntPen)
 			assert.Equal(t, tc.rejected, cntRej)
-			assert.Equal(t, tc.rejected+tc.accepted+tc.pending, cntAll)
+			assert.Equal(t, tc.rejected+tc.accepted+tc.pending+tc.preauthorized, cntAll)
 		})
 	}
 }
 
-// generate a list of devices having the desired number of total accepted/pending/rejected devices
+// generate a list of devices having the desired number of total accepted/preauthorized/pending/rejected devices
 // auth sets for these devs will generated semi-randomly to aggregate to a given device's target status
-func getDevsWithStatuses(accepted, pending, rejected int) map[*model.Device][]model.AuthSet {
-	total := accepted + pending + rejected
+func getDevsWithStatuses(accepted, preauthorized, pending, rejected int) map[*model.Device][]model.AuthSet {
+	total := accepted + preauthorized + pending + rejected
 
 	res := make(map[*model.Device][]model.AuthSet)
 
@@ -1623,6 +1642,8 @@ func getDevsWithStatuses(accepted, pending, rejected int) map[*model.Device][]mo
 			status = "accepted"
 		} else if i < (accepted + rejected) {
 			status = "rejected"
+		} else if i < (accepted + rejected + preauthorized) {
+			status = "preauthorized"
 		}
 		dev, sets := getDevWithStatus(i, status)
 		res[dev] = sets
