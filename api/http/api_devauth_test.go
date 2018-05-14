@@ -1417,3 +1417,94 @@ func TestApiDeleteTokens(t *testing.T) {
 		})
 	}
 }
+
+func TestApiDevAuthGetTenantDeviceStatus(t *testing.T) {
+	t.Parallel()
+
+	// enforce specific field naming in errors returned by API
+	updateRestErrorFieldName()
+
+	tcases := map[string]struct {
+		tid string
+		did string
+
+		daStatus *model.Status
+		daErr    error
+
+		checker mt.ResponseChecker
+	}{
+		"ok": {
+			tid: "foo",
+			did: "bar",
+
+			daStatus: &model.Status{Status: "accepted"},
+
+			checker: mt.NewJSONResponse(
+				http.StatusOK,
+				nil,
+				model.Status{Status: "accepted"}),
+		},
+		"error: tenant id empty": {
+			did: "bar",
+
+			checker: mt.NewJSONResponse(
+				http.StatusBadRequest,
+				nil,
+				restError("tenant id (tid) cannot be empty")),
+		},
+		"error: device id empty": {
+			tid: "foo",
+
+			checker: mt.NewJSONResponse(
+				http.StatusBadRequest,
+				nil,
+				restError("device id (did) cannot be empty")),
+		},
+		"error: not found": {
+			tid: "foo",
+			did: "bar",
+
+			daErr: devauth.ErrDeviceNotFound,
+
+			checker: mt.NewJSONResponse(
+				http.StatusNotFound,
+				nil,
+				restError("device not found")),
+		},
+		"error: generic": {
+			tid: "foo",
+			did: "bar",
+
+			daErr: errors.New("generic error"),
+
+			checker: mt.NewJSONResponse(
+				http.StatusInternalServerError,
+				nil,
+				restError("internal error")),
+		},
+	}
+
+	for i := range tcases {
+		tc := tcases[i]
+		t.Run(fmt.Sprintf("tc %s", i), func(t *testing.T) {
+			t.Parallel()
+
+			req := makeReq("GET",
+				fmt.Sprintf("http://1.2.3.4/api/internal/v1/devauth/tenants/%s/devices/%s/status", tc.tid, tc.did),
+				"",
+				nil)
+
+			da := &mocks.App{}
+			da.On("GetTenantDeviceStatus",
+				mtest.ContextMatcher(),
+				tc.tid,
+				tc.did,
+			).Return(tc.daStatus, tc.daErr)
+
+			apih := makeMockApiHandler(t, da)
+
+			recorded := test.RunRequest(t, apih, req)
+			mt.CheckResponse(t, tc.checker, recorded)
+		})
+	}
+}
