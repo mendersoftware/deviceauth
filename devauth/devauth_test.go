@@ -1954,3 +1954,72 @@ func TestDeleteTokens(t *testing.T) {
 		})
 	}
 }
+
+func TestGetTenantDeviceStatus(t *testing.T) {
+	t.Parallel()
+
+	testCases := map[string]struct {
+		tenantId string
+		deviceId string
+
+		dbGetDeviceStatus    string
+		dbGetDeviceStatusErr error
+
+		outErr    error
+		outStatus model.Status
+	}{
+		"ok": {
+			tenantId: "foo",
+			deviceId: "dev-foo",
+
+			dbGetDeviceStatus: "accepted",
+			outStatus:         model.Status{Status: "accepted"},
+		},
+		"error, not found": {
+			tenantId: "foo",
+			deviceId: "dev-foo",
+
+			dbGetDeviceStatusErr: store.ErrDevNotFound,
+			outErr:               ErrDeviceNotFound,
+		},
+		"error, generic": {
+			tenantId: "foo",
+			deviceId: "dev-foo",
+
+			dbGetDeviceStatusErr: store.ErrDevStatusBroken,
+			outErr:               errors.New("cannot get status for device dev-foo: cannot qualify device status"),
+		},
+	}
+
+	for n := range testCases {
+		tc := testCases[n]
+		t.Run(fmt.Sprintf("tc %s", n), func(t *testing.T) {
+			t.Parallel()
+
+			ctx := context.Background()
+			ctxMatcher := mock.MatchedBy(func(c context.Context) bool {
+				ident := identity.FromContext(c)
+				assert.NotNil(t, ident)
+				assert.Equal(t, tc.tenantId, ident.Tenant)
+
+				return true
+			})
+
+			db := mstore.DataStore{}
+			db.On("GetDeviceStatus",
+				ctxMatcher,
+				tc.deviceId,
+			).Return(tc.dbGetDeviceStatus, tc.dbGetDeviceStatusErr)
+
+			devauth := NewDevAuth(&db, nil, nil, nil, Config{})
+			status, err := devauth.GetTenantDeviceStatus(ctx, tc.tenantId, tc.deviceId)
+
+			if tc.outErr != nil {
+				assert.EqualError(t, err, tc.outErr.Error())
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tc.outStatus, *status)
+			}
+		})
+	}
+}

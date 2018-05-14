@@ -50,6 +50,7 @@ var (
 	ErrDevIdAuthIdMismatch   = errors.New("dev auth: dev ID and auth ID mismatch")
 	ErrMaxDeviceCountReached = errors.New("maximum number of accepted devices reached")
 	ErrDeviceExists          = errors.New("device already exists")
+	ErrDeviceNotFound        = errors.New("device not found")
 )
 
 func IsErrDevAuthUnauthorized(e error) bool {
@@ -99,6 +100,8 @@ type App interface {
 	GetDevCountByStatus(ctx context.Context, status string) (int, error)
 
 	ProvisionTenant(ctx context.Context, tenant_id string) error
+
+	GetTenantDeviceStatus(ctx context.Context, tenantId, deviceId string) (*model.Status, error)
 }
 
 type DevAuth struct {
@@ -920,4 +923,21 @@ func (d *DevAuth) ProvisionTenant(ctx context.Context, tenant_id string) error {
 	dbname := mstore.DbFromContext(tenantCtx, mongo.DbName)
 
 	return d.db.WithAutomigrate().MigrateTenant(ctx, dbname, mongo.DbVersion)
+}
+
+func (d *DevAuth) GetTenantDeviceStatus(ctx context.Context, tenantId, deviceId string) (*model.Status, error) {
+	tenantCtx := identity.WithContext(ctx, &identity.Identity{
+		Tenant: tenantId,
+	})
+
+	status, err := d.db.GetDeviceStatus(tenantCtx, deviceId)
+	switch err {
+	case nil:
+		return &model.Status{Status: status}, nil
+	case store.ErrDevNotFound:
+		return nil, ErrDeviceNotFound
+	default:
+		return nil, errors.Wrapf(err, "cannot get status for device %s", deviceId)
+
+	}
 }
