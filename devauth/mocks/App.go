@@ -192,6 +192,29 @@ func (_m *App) GetLimit(ctx context.Context, name string) (*model.Limit, error) 
 	return r0, r1
 }
 
+// GetTenantDeviceStatus provides a mock function with given fields: ctx, tenantId, deviceId
+func (_m *App) GetTenantDeviceStatus(ctx context.Context, tenantId string, deviceId string) (*model.Status, error) {
+	ret := _m.Called(ctx, tenantId, deviceId)
+
+	var r0 *model.Status
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) *model.Status); ok {
+		r0 = rf(ctx, tenantId, deviceId)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*model.Status)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = rf(ctx, tenantId, deviceId)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetTenantLimit provides a mock function with given fields: ctx, name, tenant_id
 func (_m *App) GetTenantLimit(ctx context.Context, name string, tenant_id string) (*model.Limit, error) {
 	ret := _m.Called(ctx, name, tenant_id)

@@ -42,10 +42,11 @@ const (
 	uriLimit         = "/api/management/v1/devauth/limits/:name"
 
 	// internal API
-	uriTokenVerify = "/api/internal/v1/devauth/tokens/verify"
-	uriTenantLimit = "/api/internal/v1/devauth/tenant/:id/limits/:name"
-	uriTokens      = "/api/internal/v1/devauth/tokens"
-	uriTenants     = "/api/internal/v1/devauth/tenants"
+	uriTokenVerify        = "/api/internal/v1/devauth/tokens/verify"
+	uriTenantLimit        = "/api/internal/v1/devauth/tenant/:id/limits/:name"
+	uriTokens             = "/api/internal/v1/devauth/tokens"
+	uriTenants            = "/api/internal/v1/devauth/tenants"
+	uriTenantDeviceStatus = "/api/internal/v1/devauth/tenants/:tid/devices/:did/status"
 
 	HdrAuthReqSign = "X-MEN-Signature"
 )
@@ -100,6 +101,8 @@ func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
 		rest.Get(uriLimit, d.GetLimit),
 
 		rest.Post(uriTenants, d.ProvisionTenantHandler),
+
+		rest.Get(uriTenantDeviceStatus, d.GetTenantDeviceStatus),
 	}
 
 	app, err := rest.MakeRouter(
@@ -554,6 +557,35 @@ func (d *DevAuthApiHandlers) ProvisionTenantHandler(w rest.ResponseWriter, r *re
 	}
 
 	w.WriteHeader(http.StatusCreated)
+}
+
+func (d *DevAuthApiHandlers) GetTenantDeviceStatus(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+
+	l := log.FromContext(ctx)
+
+	tid := r.PathParam("tid")
+	did := r.PathParam("did")
+
+	if tid == "" {
+		rest_utils.RestErrWithLog(w, r, l, errors.New("tenant id (tid) cannot be empty"), http.StatusBadRequest)
+		return
+	}
+
+	if did == "" {
+		rest_utils.RestErrWithLog(w, r, l, errors.New("device id (did) cannot be empty"), http.StatusBadRequest)
+		return
+	}
+
+	status, err := d.devAuth.GetTenantDeviceStatus(ctx, tid, did)
+	switch err {
+	case nil:
+		w.WriteJson(status)
+	case devauth.ErrDeviceNotFound:
+		rest_utils.RestErrWithLog(w, r, l, err, http.StatusNotFound)
+	default:
+		rest_utils.RestErrWithLogInternal(w, r, l, err)
+	}
 }
 
 // Validate status.

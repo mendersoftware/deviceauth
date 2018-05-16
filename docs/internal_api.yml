@@ -143,6 +143,40 @@ paths:
           schema:
            $ref: "#/definitions/Error"
 
+  /tenants/{tid}/devices/{did}/status:
+    get:
+      summary: Get the status of a tenant's device
+      description: |
+          Returns the overall status of the device, computed over the statuses of its various authsets.
+      parameters:
+        - name: tid
+          in: path
+          description: Tenant identifier.
+          required: true
+          type: string
+        - name: did
+          in: path
+          description: Device identifier.
+          required: true
+          type: string
+      responses:
+        200:
+          description: Success.
+          schema:
+            $ref: '#/definitions/Status'
+        400:
+          description: Invalid parameters. See error message for details.
+          schema:
+            $ref: '#/definitions/Error'
+        404:
+          description: Tenant or device not found.
+          schema:
+            $ref: '#/definitions/Error'
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/Error"
+
 definitions:
   NewTenant:
     description: New tenant descriptor.
@@ -179,3 +213,20 @@ definitions:
       application/json:
           error: "failed to decode device group data: JSON payload is empty"
           request_id: "f7881e82-0492-49fb-b459-795654e7188a"
+
+  Status:
+    description: Admission status of the device.
+    type: object
+    properties:
+      status:
+        type: string
+        enum:
+          - pending
+          - accepted
+          - rejected
+          - preauthorized
+    required:
+      - status
+    example:
+      application/json:
+          status: "accepted"
