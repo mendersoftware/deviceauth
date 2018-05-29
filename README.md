@@ -27,6 +27,7 @@ At any time, the administrator can also revoke the JWT in case it was compromise
 
 ## Getting started
 
+Testing feature branch CI.
 To start using Mender, we recommend that you begin with the Getting started
 section in [the Mender documentation](https://docs.mender.io/).
 
