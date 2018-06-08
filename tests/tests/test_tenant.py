@@ -102,6 +102,30 @@ class TestMultiTenant:
         TestMultiTenant.verify_tenant_dev_present(management_api, d.identity, '',
                                                   present=False)
 
+    def test_auth_req_fake_tenantadm_tenant_suspended(self, management_api, device_api,
+                                                          tenant_foobar, clean_migrated_db):
+        d = Device()
+        da = DevAuthorizer(tenant_token=tenant_foobar)
+        url = device_api.auth_requests_url
+
+        handlers = [
+            ('POST', '/api/internal/v1/tenantadm/tenants/verify',
+             lambda _: (401, {}, {
+                    'request_id': 'test',
+                    'error': 'account suspended'
+                 })),
+        ]
+        with mockserver.run_fake(get_fake_tenantadm_addr(),
+                                handlers=handlers) as fake:
+            rsp = device_auth_req(url, da, d)
+            assert rsp.status_code == 401
+            assert rsp.json()['error'] == 'account suspended'
+
+        # request failed, so device should not even be listed as known for the
+        # default tenant
+        TestMultiTenant.verify_tenant_dev_present(management_api, d.identity, '',
+                                                  present=False)
+
     @staticmethod
     def get_device(management_api, identity, token):
         if token:
