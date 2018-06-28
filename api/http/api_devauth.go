@@ -58,15 +58,17 @@ var (
 
 type DevAuthApiHandlers struct {
 	devAuth devauth.App
+	db      store.DataStore
 }
 
 type DevAuthApiStatus struct {
 	Status string `json:"status"`
 }
 
-func NewDevAuthApiHandlers(devAuth devauth.App) ApiHandler {
+func NewDevAuthApiHandlers(devAuth devauth.App, db store.DataStore) ApiHandler {
 	return &DevAuthApiHandlers{
 		devAuth: devAuth,
+		db:      db,
 	}
 }
 
