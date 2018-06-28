@@ -62,8 +62,8 @@ func runTestRequest(t *testing.T, handler http.Handler, req *http.Request, code 
 	return recorded
 }
 
-func makeMockApiHandler(t *testing.T, da devauth.App) http.Handler {
-	handlers := NewDevAuthApiHandlers(da)
+func makeMockApiHandler(t *testing.T, da devauth.App, db store.DataStore) http.Handler {
+	handlers := NewDevAuthApiHandlers(da, db)
 	assert.NotNil(t, handlers)
 
 	app, err := handlers.GetApp()
@@ -260,7 +260,7 @@ func TestApiDevAuthSubmitAuthReq(t *testing.T) {
 					},
 					tc.devAuthErr)
 
-			apih := makeMockApiHandler(t, da)
+			apih := makeMockApiHandler(t, da, nil)
 
 			recorded := runTestRequest(t, apih, tc.req, tc.code, tc.body)
 			if tc.code == http.StatusOK {
@@ -382,7 +382,7 @@ func TestApiDevAuthPreauthDevice(t *testing.T) {
 				tc.body).
 				Return(tc.devAuthErr)
 
-			apih := makeMockApiHandler(t, da)
+			apih := makeMockApiHandler(t, da, nil)
 
 			//make request
 			req := makeReq("POST",
@@ -455,7 +455,7 @@ func TestApiDevAuthUpdateStatusDevice(t *testing.T) {
 		mock.AnythingOfType("string"),
 		mock.AnythingOfType("string")).Return(mockaction)
 
-	apih := makeMockApiHandler(t, da)
+	apih := makeMockApiHandler(t, da, nil)
 	// enforce specific field naming in errors returned by API
 	updateRestErrorFieldName()
 
@@ -610,7 +610,7 @@ func TestApiDevAuthVerifyToken(t *testing.T) {
 				mock.AnythingOfType("string")).
 				Return(tc.err)
 
-			apih := makeMockApiHandler(t, da)
+			apih := makeMockApiHandler(t, da, nil)
 			if len(tc.headers) > 0 {
 				tc.req.Header.Set("authorization", tc.headers["authorization"])
 			}
@@ -664,7 +664,7 @@ func TestApiDevAuthDeleteToken(t *testing.T) {
 				mock.AnythingOfType("string")).
 				Return(tc.err)
 
-			apih := makeMockApiHandler(t, da)
+			apih := makeMockApiHandler(t, da, nil)
 			runTestRequest(t, apih, tc.req, tc.code, tc.body)
 		})
 	}
@@ -718,7 +718,7 @@ func TestApiGetDevice(t *testing.T) {
 				mock.AnythingOfType("string")).
 				Return(tc.device, tc.err)
 
-			apih := makeMockApiHandler(t, da)
+			apih := makeMockApiHandler(t, da, nil)
 			runTestRequest(t, apih, tc.req, tc.code, tc.body)
 		})
 	}
@@ -809,7 +809,7 @@ func TestApiGetDevices(t *testing.T) {
 				tc.skip, tc.limit).Return(
 				tc.devices, tc.err)
 
-			apih := makeMockApiHandler(t, da)
+			apih := makeMockApiHandler(t, da, nil)
 			runTestRequest(t, apih, tc.req, tc.code, tc.body)
 		})
 	}
@@ -864,7 +864,7 @@ func TestApiDevAuthDecommissionDevice(t *testing.T) {
 				mock.AnythingOfType("string")).
 				Return(tc.err)
 
-			apih := makeMockApiHandler(t, da)
+			apih := makeMockApiHandler(t, da, nil)
 			runTestRequest(t, apih, tc.req, tc.code, tc.body)
 		})
 	}
@@ -939,7 +939,7 @@ func TestApiDevAuthPutTenantLimit(t *testing.T) {
 				tc.limit).
 				Return(tc.err)
 
-			apih := makeMockApiHandler(t, da)
+			apih := makeMockApiHandler(t, da, nil)
 			runTestRequest(t, apih, tc.req, tc.code, tc.body)
 		})
 	}
@@ -1008,7 +1008,7 @@ func TestApiDevAuthGetLimit(t *testing.T) {
 				tc.limit).
 				Return(tc.daLimit, tc.daErr)
 
-			apih := makeMockApiHandler(t, da)
+			apih := makeMockApiHandler(t, da, nil)
 			runTestRequest(t, apih, req, tc.code, tc.body)
 		})
 	}
@@ -1086,7 +1086,7 @@ func TestApiDevAuthGetTenantLimit(t *testing.T) {
 				tc.tenantId).
 				Return(tc.daLimit, tc.daErr)
 
-			apih := makeMockApiHandler(t, da)
+			apih := makeMockApiHandler(t, da, nil)
 			runTestRequest(t, apih, req, tc.code, tc.body)
 		})
 	}
@@ -1207,7 +1207,7 @@ func TestApiDevAuthGetDevicesCount(t *testing.T) {
 				tc.status).
 				Return(tc.daCnt, tc.daErr)
 
-			apih := makeMockApiHandler(t, da)
+			apih := makeMockApiHandler(t, da, nil)
 			runTestRequest(t, apih, req, tc.code, tc.body)
 		})
 	}
@@ -1261,7 +1261,7 @@ func TestApiDevAuthPostTenants(t *testing.T) {
 			mock.MatchedBy(func(c context.Context) bool { return true }),
 			mock.AnythingOfType("string")).Return(tc.devAuthErr)
 
-		apih := makeMockApiHandler(t, da)
+		apih := makeMockApiHandler(t, da, nil)
 
 		rest.ErrorFieldName = "error"
 
@@ -1336,7 +1336,7 @@ func TestApiDevAuthDeleteDeviceAuthSet(t *testing.T) {
 				"bar").
 				Return(tc.err)
 
-			apih := makeMockApiHandler(t, da)
+			apih := makeMockApiHandler(t, da, nil)
 			runTestRequest(t, apih, tc.req, tc.code, tc.body)
 		})
 	}
@@ -1410,7 +1410,7 @@ func TestApiDeleteTokens(t *testing.T) {
 				"",
 				nil)
 
-			apih := makeMockApiHandler(t, da)
+			apih := makeMockApiHandler(t, da, nil)
 
 			recorded := test.RunRequest(t, apih, req)
 			mt.CheckResponse(t, tc.checker, recorded)
@@ -1501,7 +1501,7 @@ func TestApiDevAuthGetTenantDeviceStatus(t *testing.T) {
 				tc.did,
 			).Return(tc.daStatus, tc.daErr)
 
-			apih := makeMockApiHandler(t, da)
+			apih := makeMockApiHandler(t, da, nil)
 
 			recorded := test.RunRequest(t, apih, req)
 			mt.CheckResponse(t, tc.checker, recorded)
