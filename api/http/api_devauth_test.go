@@ -37,6 +37,7 @@ import (
 	"github.com/mendersoftware/deviceauth/jwt"
 	"github.com/mendersoftware/deviceauth/model"
 	"github.com/mendersoftware/deviceauth/store"
+	smocks "github.com/mendersoftware/deviceauth/store/mocks"
 	mtest "github.com/mendersoftware/deviceauth/utils/testing"
 	mt "github.com/mendersoftware/go-lib-micro/testing"
 )
@@ -538,6 +539,149 @@ func TestApiDevAuthUpdateStatusDevice(t *testing.T) {
 		})
 	}
 
+}
+
+func TestApiDevAuthDevAdmUpdateAuthSetStatus(t *testing.T) {
+	t.Parallel()
+
+	// enforce specific field naming in errors returned by API
+	updateRestErrorFieldName()
+
+	tcases := map[string]struct {
+		status interface{}
+		aid    string
+
+		dbGetAuthSetRes *model.AuthSet
+		dbGetAuthSetErr error
+
+		appAcceptRejectErr error
+
+		code int
+		body string
+	}{
+		"ok": {
+			status:          &model.Status{Status: model.DevStatusAccepted},
+			aid:             "foo",
+			dbGetAuthSetRes: &model.AuthSet{Id: "foo", DeviceId: "bar"},
+			body:            string(asJSON(&model.Status{Status: "accepted"})),
+			code:            http.StatusOK,
+		},
+		"ok 2": {
+			status:          &model.Status{Status: model.DevStatusRejected},
+			aid:             "foo",
+			dbGetAuthSetRes: &model.AuthSet{Id: "foo", DeviceId: "bar"},
+			body:            string(asJSON(&model.Status{Status: "rejected"})),
+			code:            http.StatusOK,
+		},
+		"error: empty payload": {
+			status: nil,
+			code:   http.StatusBadRequest,
+			body:   RestError("failed to decode status data: JSON payload is empty"),
+		},
+		"error: invalid status": {
+			status: &model.Status{Status: "foo"},
+			code:   http.StatusBadRequest,
+			body:   RestError("incorrect device status"),
+		},
+		"error: get auth set: not found": {
+			status: &model.Status{Status: model.DevStatusAccepted},
+
+			aid:             "foo",
+			dbGetAuthSetErr: store.ErrDevNotFound,
+
+			body: RestError("authorization set not found"),
+			code: http.StatusNotFound,
+		},
+		"error: get auth set: generic": {
+			status: &model.Status{Status: model.DevStatusRejected},
+
+			aid:             "foo",
+			dbGetAuthSetErr: errors.New("some internal error"),
+
+			body: RestError("internal error"),
+			code: http.StatusInternalServerError,
+		},
+		"error: accept: not found": {
+			status: &model.Status{Status: model.DevStatusAccepted},
+
+			aid:                "foo",
+			dbGetAuthSetRes:    &model.AuthSet{Id: "foo", DeviceId: "dev-foo"},
+			appAcceptRejectErr: store.ErrDevNotFound,
+
+			body: RestError("authorization set not found"),
+			code: http.StatusNotFound,
+		},
+		"error: accept: max devices": {
+			status: &model.Status{Status: model.DevStatusAccepted},
+
+			aid:                "foo",
+			dbGetAuthSetRes:    &model.AuthSet{Id: "foo", DeviceId: "dev-foo"},
+			appAcceptRejectErr: devauth.ErrMaxDeviceCountReached,
+
+			body: RestError("maximum number of accepted devices reached"),
+			code: http.StatusUnprocessableEntity,
+		},
+		"error: accept: generic": {
+			status: &model.Status{Status: model.DevStatusAccepted},
+
+			aid:                "foo",
+			dbGetAuthSetRes:    &model.AuthSet{Id: "foo", DeviceId: "dev-foo"},
+			appAcceptRejectErr: errors.New("some internal error"),
+
+			body: RestError("internal error"),
+			code: http.StatusInternalServerError,
+		},
+		"error: reject: not found": {
+			status: &model.Status{Status: model.DevStatusRejected},
+
+			aid:                "foo",
+			dbGetAuthSetRes:    &model.AuthSet{Id: "foo", DeviceId: "dev-foo"},
+			appAcceptRejectErr: store.ErrDevNotFound,
+
+			body: RestError("authorization set not found"),
+			code: http.StatusNotFound,
+		},
+		"error: reject: generic": {
+			status: &model.Status{Status: model.DevStatusRejected},
+
+			aid:                "foo",
+			dbGetAuthSetRes:    &model.AuthSet{Id: "foo", DeviceId: "dev-foo"},
+			appAcceptRejectErr: errors.New("some internal error"),
+
+			body: RestError("internal error"),
+			code: http.StatusInternalServerError,
+		},
+	}
+
+	for idx := range tcases {
+		tc := tcases[idx]
+		t.Run(fmt.Sprintf("tc %s", idx), func(t *testing.T) {
+			t.Parallel()
+
+			req := test.MakeSimpleRequest("PUT",
+				fmt.Sprintf("http://1.2.3.4/api/management/v1/admission/devices/%s/status", tc.aid),
+				tc.status)
+
+			da := &mocks.App{}
+			da.On("AcceptDeviceAuth",
+				mtest.ContextMatcher(),
+				mock.AnythingOfType("string"),
+				tc.aid).Return(tc.appAcceptRejectErr)
+			da.On("RejectDeviceAuth",
+				mtest.ContextMatcher(),
+				mock.AnythingOfType("string"),
+				tc.aid).Return(tc.appAcceptRejectErr)
+
+			db := &smocks.DataStore{}
+			db.On("GetAuthSetById",
+				mtest.ContextMatcher(),
+				tc.aid).Return(tc.dbGetAuthSetRes, tc.dbGetAuthSetErr)
+
+			apih := makeMockApiHandler(t, da, db)
+
+			runTestRequest(t, apih, req, tc.code, tc.body)
+		})
+	}
 }
 
 func TestApiDevAuthVerifyToken(t *testing.T) {
