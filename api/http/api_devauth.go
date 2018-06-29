@@ -576,11 +576,13 @@ func (d *DevAuthApiHandlers) DevAdmUpdateAuthSetStatusHandler(w rest.ResponseWri
 		break
 	case store.ErrDevNotFound:
 		rest_utils.RestErrWithLog(w, r, l, store.ErrAuthSetNotFound, http.StatusNotFound)
+		return
 	default:
 		rest_utils.RestErrWithLogInternal(w, r, l,
 			errors.Wrapf(err,
 				"failed to fetch auth set %s",
 				authid))
+		return
 	}
 
 	if status.Status == model.DevStatusAccepted {
