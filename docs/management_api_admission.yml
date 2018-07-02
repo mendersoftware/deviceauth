@@ -1,0 +1,99 @@
+swagger: '2.0'
+
+info:
+  version: '1'
+  title: Device admission
+  description: |
+    An API for device admission handling. Intended for use by the web GUI.
+
+basePath: '/api/management/v1/admission'
+host: 'docker.mender.io'
+
+schemes:
+  - https
+
+paths:
+  /devices/{id}/status:
+    put:
+      summary: Update the admission status of a selected device
+      description: |
+        Changes the given device's admission status.
+        Valid state transitions:
+        - 'pending' -> 'accepted'
+        - 'pending' -> 'rejected'
+        - 'rejected' -> 'accepted'
+        - 'accepted' -> 'rejected'
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          type: string
+          format: Bearer [token]
+          description: Contains the JWT token issued by the User Administration and Authentication Service.
+        - name: id
+          in: path
+          description: Device authentication data set identifier.
+          required: true
+          type: string
+        - name: status
+          in: body
+          description: New status
+          required: true
+          schema:
+            $ref: '#/definitions/Status'
+      responses:
+        200:
+          description: The status of the device authentication data set was successfully updated.
+          schema:
+            $ref: "#/definitions/Status"
+          examples:
+            application/json:
+              status: "accepted"
+        400:
+          description: |
+              The request body is malformed or the state transition is invalid. See error for details.
+          schema:
+            $ref: "#/definitions/Error"
+        404:
+          description: The device authentication data set was not found.
+          schema:
+            $ref: "#/definitions/Error"
+        422:
+          description: Request cannot be fulfilled e.g. because of accepted device count limit. See error for details.
+          schema:
+            $ref: "#/definitions/Error"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/Error"
+
+definitions:
+  Status:
+    description: Admission status of device authentication data set.
+    type: object
+    properties:
+      status:
+        type: string
+        enum:
+          - pending
+          - accepted
+          - rejected
+    required:
+      - status
+    example:
+      application/json:
+          status: "accepted"
+  Error:
+    description: Error descriptor.
+    type: object
+    properties:
+      error:
+        description: Description of the error.
+        type: string
+      request_id:
+        description: Request ID (same as in X-MEN-RequestID header).
+        type: string
+    example:
+      application/json:
+          error: "failed to decode device group data: JSON payload is empty"
+          request_id: "f7881e82-0492-49fb-b459-795654e7188a"
