@@ -37,6 +37,7 @@ import (
 	"github.com/mendersoftware/deviceauth/jwt"
 	"github.com/mendersoftware/deviceauth/model"
 	"github.com/mendersoftware/deviceauth/store"
+	smocks "github.com/mendersoftware/deviceauth/store/mocks"
 	mtest "github.com/mendersoftware/deviceauth/utils/testing"
 	mt "github.com/mendersoftware/go-lib-micro/testing"
 )
@@ -62,8 +63,8 @@ func runTestRequest(t *testing.T, handler http.Handler, req *http.Request, code 
 	return recorded
 }
 
-func makeMockApiHandler(t *testing.T, da devauth.App) http.Handler {
-	handlers := NewDevAuthApiHandlers(da)
+func makeMockApiHandler(t *testing.T, da devauth.App, db store.DataStore) http.Handler {
+	handlers := NewDevAuthApiHandlers(da, db)
 	assert.NotNil(t, handlers)
 
 	app, err := handlers.GetApp()
@@ -260,7 +261,7 @@ func TestApiDevAuthSubmitAuthReq(t *testing.T) {
 					},
 					tc.devAuthErr)
 
-			apih := makeMockApiHandler(t, da)
+			apih := makeMockApiHandler(t, da, nil)
 
 			recorded := runTestRequest(t, apih, tc.req, tc.code, tc.body)
 			if tc.code == http.StatusOK {
@@ -382,7 +383,7 @@ func TestApiDevAuthPreauthDevice(t *testing.T) {
 				tc.body).
 				Return(tc.devAuthErr)
 
-			apih := makeMockApiHandler(t, da)
+			apih := makeMockApiHandler(t, da, nil)
 
 			//make request
 			req := makeReq("POST",
@@ -455,7 +456,7 @@ func TestApiDevAuthUpdateStatusDevice(t *testing.T) {
 		mock.AnythingOfType("string"),
 		mock.AnythingOfType("string")).Return(mockaction)
 
-	apih := makeMockApiHandler(t, da)
+	apih := makeMockApiHandler(t, da, nil)
 	// enforce specific field naming in errors returned by API
 	updateRestErrorFieldName()
 
@@ -540,6 +541,149 @@ func TestApiDevAuthUpdateStatusDevice(t *testing.T) {
 
 }
 
+func TestApiDevAuthDevAdmUpdateAuthSetStatus(t *testing.T) {
+	t.Parallel()
+
+	// enforce specific field naming in errors returned by API
+	updateRestErrorFieldName()
+
+	tcases := map[string]struct {
+		status interface{}
+		aid    string
+
+		dbGetAuthSetRes *model.AuthSet
+		dbGetAuthSetErr error
+
+		appAcceptRejectErr error
+
+		code int
+		body string
+	}{
+		"ok": {
+			status:          &model.Status{Status: model.DevStatusAccepted},
+			aid:             "foo",
+			dbGetAuthSetRes: &model.AuthSet{Id: "foo", DeviceId: "bar"},
+			body:            string(asJSON(&model.Status{Status: "accepted"})),
+			code:            http.StatusOK,
+		},
+		"ok 2": {
+			status:          &model.Status{Status: model.DevStatusRejected},
+			aid:             "foo",
+			dbGetAuthSetRes: &model.AuthSet{Id: "foo", DeviceId: "bar"},
+			body:            string(asJSON(&model.Status{Status: "rejected"})),
+			code:            http.StatusOK,
+		},
+		"error: empty payload": {
+			status: nil,
+			code:   http.StatusBadRequest,
+			body:   RestError("failed to decode status data: JSON payload is empty"),
+		},
+		"error: invalid status": {
+			status: &model.Status{Status: "foo"},
+			code:   http.StatusBadRequest,
+			body:   RestError("incorrect device status"),
+		},
+		"error: get auth set: not found": {
+			status: &model.Status{Status: model.DevStatusAccepted},
+
+			aid:             "foo",
+			dbGetAuthSetErr: store.ErrDevNotFound,
+
+			body: RestError("authorization set not found"),
+			code: http.StatusNotFound,
+		},
+		"error: get auth set: generic": {
+			status: &model.Status{Status: model.DevStatusRejected},
+
+			aid:             "foo",
+			dbGetAuthSetErr: errors.New("some internal error"),
+
+			body: RestError("internal error"),
+			code: http.StatusInternalServerError,
+		},
+		"error: accept: not found": {
+			status: &model.Status{Status: model.DevStatusAccepted},
+
+			aid:                "foo",
+			dbGetAuthSetRes:    &model.AuthSet{Id: "foo", DeviceId: "dev-foo"},
+			appAcceptRejectErr: store.ErrDevNotFound,
+
+			body: RestError("authorization set not found"),
+			code: http.StatusNotFound,
+		},
+		"error: accept: max devices": {
+			status: &model.Status{Status: model.DevStatusAccepted},
+
+			aid:                "foo",
+			dbGetAuthSetRes:    &model.AuthSet{Id: "foo", DeviceId: "dev-foo"},
+			appAcceptRejectErr: devauth.ErrMaxDeviceCountReached,
+
+			body: RestError("maximum number of accepted devices reached"),
+			code: http.StatusUnprocessableEntity,
+		},
+		"error: accept: generic": {
+			status: &model.Status{Status: model.DevStatusAccepted},
+
+			aid:                "foo",
+			dbGetAuthSetRes:    &model.AuthSet{Id: "foo", DeviceId: "dev-foo"},
+			appAcceptRejectErr: errors.New("some internal error"),
+
+			body: RestError("internal error"),
+			code: http.StatusInternalServerError,
+		},
+		"error: reject: not found": {
+			status: &model.Status{Status: model.DevStatusRejected},
+
+			aid:                "foo",
+			dbGetAuthSetRes:    &model.AuthSet{Id: "foo", DeviceId: "dev-foo"},
+			appAcceptRejectErr: store.ErrDevNotFound,
+
+			body: RestError("authorization set not found"),
+			code: http.StatusNotFound,
+		},
+		"error: reject: generic": {
+			status: &model.Status{Status: model.DevStatusRejected},
+
+			aid:                "foo",
+			dbGetAuthSetRes:    &model.AuthSet{Id: "foo", DeviceId: "dev-foo"},
+			appAcceptRejectErr: errors.New("some internal error"),
+
+			body: RestError("internal error"),
+			code: http.StatusInternalServerError,
+		},
+	}
+
+	for idx := range tcases {
+		tc := tcases[idx]
+		t.Run(fmt.Sprintf("tc %s", idx), func(t *testing.T) {
+			t.Parallel()
+
+			req := test.MakeSimpleRequest("PUT",
+				fmt.Sprintf("http://1.2.3.4/api/management/v1/admission/devices/%s/status", tc.aid),
+				tc.status)
+
+			da := &mocks.App{}
+			da.On("AcceptDeviceAuth",
+				mtest.ContextMatcher(),
+				mock.AnythingOfType("string"),
+				tc.aid).Return(tc.appAcceptRejectErr)
+			da.On("RejectDeviceAuth",
+				mtest.ContextMatcher(),
+				mock.AnythingOfType("string"),
+				tc.aid).Return(tc.appAcceptRejectErr)
+
+			db := &smocks.DataStore{}
+			db.On("GetAuthSetById",
+				mtest.ContextMatcher(),
+				tc.aid).Return(tc.dbGetAuthSetRes, tc.dbGetAuthSetErr)
+
+			apih := makeMockApiHandler(t, da, db)
+
+			runTestRequest(t, apih, req, tc.code, tc.body)
+		})
+	}
+}
+
 func TestApiDevAuthVerifyToken(t *testing.T) {
 	t.Parallel()
 
@@ -610,7 +754,7 @@ func TestApiDevAuthVerifyToken(t *testing.T) {
 				mock.AnythingOfType("string")).
 				Return(tc.err)
 
-			apih := makeMockApiHandler(t, da)
+			apih := makeMockApiHandler(t, da, nil)
 			if len(tc.headers) > 0 {
 				tc.req.Header.Set("authorization", tc.headers["authorization"])
 			}
@@ -664,7 +808,7 @@ func TestApiDevAuthDeleteToken(t *testing.T) {
 				mock.AnythingOfType("string")).
 				Return(tc.err)
 
-			apih := makeMockApiHandler(t, da)
+			apih := makeMockApiHandler(t, da, nil)
 			runTestRequest(t, apih, tc.req, tc.code, tc.body)
 		})
 	}
@@ -718,7 +862,7 @@ func TestApiGetDevice(t *testing.T) {
 				mock.AnythingOfType("string")).
 				Return(tc.device, tc.err)
 
-			apih := makeMockApiHandler(t, da)
+			apih := makeMockApiHandler(t, da, nil)
 			runTestRequest(t, apih, tc.req, tc.code, tc.body)
 		})
 	}
@@ -809,7 +953,7 @@ func TestApiGetDevices(t *testing.T) {
 				tc.skip, tc.limit).Return(
 				tc.devices, tc.err)
 
-			apih := makeMockApiHandler(t, da)
+			apih := makeMockApiHandler(t, da, nil)
 			runTestRequest(t, apih, tc.req, tc.code, tc.body)
 		})
 	}
@@ -864,7 +1008,7 @@ func TestApiDevAuthDecommissionDevice(t *testing.T) {
 				mock.AnythingOfType("string")).
 				Return(tc.err)
 
-			apih := makeMockApiHandler(t, da)
+			apih := makeMockApiHandler(t, da, nil)
 			runTestRequest(t, apih, tc.req, tc.code, tc.body)
 		})
 	}
@@ -939,7 +1083,7 @@ func TestApiDevAuthPutTenantLimit(t *testing.T) {
 				tc.limit).
 				Return(tc.err)
 
-			apih := makeMockApiHandler(t, da)
+			apih := makeMockApiHandler(t, da, nil)
 			runTestRequest(t, apih, tc.req, tc.code, tc.body)
 		})
 	}
@@ -1008,7 +1152,7 @@ func TestApiDevAuthGetLimit(t *testing.T) {
 				tc.limit).
 				Return(tc.daLimit, tc.daErr)
 
-			apih := makeMockApiHandler(t, da)
+			apih := makeMockApiHandler(t, da, nil)
 			runTestRequest(t, apih, req, tc.code, tc.body)
 		})
 	}
@@ -1086,7 +1230,7 @@ func TestApiDevAuthGetTenantLimit(t *testing.T) {
 				tc.tenantId).
 				Return(tc.daLimit, tc.daErr)
 
-			apih := makeMockApiHandler(t, da)
+			apih := makeMockApiHandler(t, da, nil)
 			runTestRequest(t, apih, req, tc.code, tc.body)
 		})
 	}
@@ -1207,7 +1351,7 @@ func TestApiDevAuthGetDevicesCount(t *testing.T) {
 				tc.status).
 				Return(tc.daCnt, tc.daErr)
 
-			apih := makeMockApiHandler(t, da)
+			apih := makeMockApiHandler(t, da, nil)
 			runTestRequest(t, apih, req, tc.code, tc.body)
 		})
 	}
@@ -1261,7 +1405,7 @@ func TestApiDevAuthPostTenants(t *testing.T) {
 			mock.MatchedBy(func(c context.Context) bool { return true }),
 			mock.AnythingOfType("string")).Return(tc.devAuthErr)
 
-		apih := makeMockApiHandler(t, da)
+		apih := makeMockApiHandler(t, da, nil)
 
 		rest.ErrorFieldName = "error"
 
@@ -1336,7 +1480,7 @@ func TestApiDevAuthDeleteDeviceAuthSet(t *testing.T) {
 				"bar").
 				Return(tc.err)
 
-			apih := makeMockApiHandler(t, da)
+			apih := makeMockApiHandler(t, da, nil)
 			runTestRequest(t, apih, tc.req, tc.code, tc.body)
 		})
 	}
@@ -1410,7 +1554,7 @@ func TestApiDeleteTokens(t *testing.T) {
 				"",
 				nil)
 
-			apih := makeMockApiHandler(t, da)
+			apih := makeMockApiHandler(t, da, nil)
 
 			recorded := test.RunRequest(t, apih, req)
 			mt.CheckResponse(t, tc.checker, recorded)
@@ -1501,7 +1645,7 @@ func TestApiDevAuthGetTenantDeviceStatus(t *testing.T) {
 				tc.did,
 			).Return(tc.daStatus, tc.daErr)
 
-			apih := makeMockApiHandler(t, da)
+			apih := makeMockApiHandler(t, da, nil)
 
 			recorded := test.RunRequest(t, apih, req)
 			mt.CheckResponse(t, tc.checker, recorded)
