@@ -110,6 +110,8 @@ func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
 		rest.Get(uriTenantDeviceStatus, d.GetTenantDeviceStatus),
 
 		rest.Put(uriDevadmAuthSetStatus, d.DevAdmUpdateAuthSetStatusHandler),
+
+		rest.Get(uriDevadmAuthSetStatus, d.DevAdmGetAuthSetStatusHandler),
 	}
 
 	app, err := rest.MakeRouter(
@@ -602,6 +604,39 @@ func (d *DevAuthApiHandlers) DevAdmUpdateAuthSetStatusHandler(w rest.ResponseWri
 		rest_utils.RestErrWithLogInternal(w, r, l,
 			errors.Wrap(err,
 				"failed to change auth set status"))
+	}
+}
+
+func (d *DevAuthApiHandlers) DevAdmGetAuthSetStatusHandler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+	l := log.FromContext(ctx)
+
+	authid := r.PathParam("aid")
+
+	// get authset directly from store
+	aset, err := d.db.GetAuthSetById(ctx, authid)
+	switch err {
+	case nil:
+		break
+	case store.ErrDevNotFound:
+		rest_utils.RestErrWithLog(w, r, l, store.ErrAuthSetNotFound, http.StatusNotFound)
+		return
+	default:
+		rest_utils.RestErrWithLogInternal(w, r, l,
+			errors.Wrapf(err,
+				"failed to fetch auth set %s",
+				authid))
+		return
+	}
+
+	switch err {
+	case nil:
+		w.WriteJson(&model.Status{Status: aset.Status})
+	case store.ErrDevNotFound:
+		rest_utils.RestErrWithLog(w, r, l, store.ErrAuthSetNotFound, http.StatusNotFound)
+	default:
+		rest_utils.RestErrWithLogInternal(w, r, l,
+			errors.Wrap(err, "failed to get auth set status"))
 	}
 }
 

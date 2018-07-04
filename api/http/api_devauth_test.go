@@ -684,6 +684,74 @@ func TestApiDevAuthDevAdmUpdateAuthSetStatus(t *testing.T) {
 	}
 }
 
+func TestApiDevAuthDevAdmGetDeviceStatus(t *testing.T) {
+	t.Parallel()
+
+	// enforce specific field naming in errors returned by API
+	updateRestErrorFieldName()
+
+	tcases := map[string]struct {
+		aid string
+
+		dbAuthSet *model.AuthSet
+		dbErr     error
+
+		checker mt.ResponseChecker
+	}{
+		"ok": {
+			aid: "foo",
+
+			dbAuthSet: &model.AuthSet{Status: "accepted"},
+
+			checker: mt.NewJSONResponse(
+				http.StatusOK,
+				nil,
+				model.Status{Status: "accepted"}),
+		},
+		"error: not found": {
+			aid: "foo",
+
+			dbErr: store.ErrDevNotFound,
+
+			checker: mt.NewJSONResponse(
+				http.StatusNotFound,
+				nil,
+				restError("authorization set not found")),
+		},
+		"error: generic": {
+			aid: "foo",
+
+			dbErr: errors.New("generic error"),
+
+			checker: mt.NewJSONResponse(
+				http.StatusInternalServerError,
+				nil,
+				restError("internal error")),
+		},
+	}
+
+	for i := range tcases {
+		tc := tcases[i]
+		t.Run(fmt.Sprintf("tc %s", i), func(t *testing.T) {
+			t.Parallel()
+
+			req := makeReq("GET",
+				fmt.Sprintf("http://1.2.3.4/api/management/v1/admission/devices/%s/status", tc.aid),
+				"", nil)
+
+			db := &smocks.DataStore{}
+			db.On("GetAuthSetById",
+				mtest.ContextMatcher(),
+				tc.aid).Return(tc.dbAuthSet, tc.dbErr)
+
+			apih := makeMockApiHandler(t, nil, db)
+
+			recorded := test.RunRequest(t, apih, req)
+			mt.CheckResponse(t, tc.checker, recorded)
+		})
+	}
+}
+
 func TestApiDevAuthVerifyToken(t *testing.T) {
 	t.Parallel()
 
