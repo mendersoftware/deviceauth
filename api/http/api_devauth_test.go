@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"sync"
 	"testing"
 
@@ -1719,4 +1720,158 @@ func TestApiDevAuthGetTenantDeviceStatus(t *testing.T) {
 			mt.CheckResponse(t, tc.checker, recorded)
 		})
 	}
+}
+
+func TestApiDevAuthDevAdmGetDevices(t *testing.T) {
+	t.Parallel()
+
+	// enforce specific field naming in errors returned by API
+	updateRestErrorFieldName()
+
+	tcases := map[string]struct {
+		skip   int
+		limit  int
+		filter store.AuthSetFilter
+
+		getAuthSetsRes []model.DevAdmAuthSet
+		getAuthSetsErr error
+
+		req *http.Request
+
+		code  int
+		body  string
+		links []string
+	}{
+		"valid pagination, no next page": {
+			skip:  15,
+			limit: 6,
+
+			req: test.MakeSimpleRequest("GET",
+				"http://1.2.3.4/api/management/v1/admission/devices?page=4&per_page=5", nil),
+
+			getAuthSetsRes: mockAuthSets(5),
+
+			code: 200,
+			body: ToJsonString(mockAuthSets(5)),
+			links: []string{
+				`<http://1.2.3.4/api/management/v1/admission/devices?page=3&per_page=5>; rel="prev"`,
+				`<http://1.2.3.4/api/management/v1/admission/devices?page=1&per_page=5>; rel="first"`,
+			},
+		},
+
+		"valid pagination, with next page": {
+			skip:  15,
+			limit: 6,
+
+			req: test.MakeSimpleRequest("GET",
+				"http://1.2.3.4/api/management/v1/admission/devices?page=4&per_page=5", nil),
+
+			getAuthSetsRes: mockAuthSets(9),
+
+			code: 200,
+			body: ToJsonString(mockAuthSets(5)),
+			links: []string{
+				`<http://1.2.3.4/api/management/v1/admission/devices?page=3&per_page=5>; rel="prev"`,
+				`<http://1.2.3.4/api/management/v1/admission/devices?page=1&per_page=5>; rel="first"`,
+			},
+		},
+		"invalid pagination: format": {
+			req: test.MakeSimpleRequest("GET",
+				"http://1.2.3.4/api/management/v1/admission/devices?page=foo&per_page=5", nil),
+			code: 400,
+			body: RestError(rest_utils.MsgQueryParmInvalid("page")),
+		},
+		"invalid pagination: bounds": {
+			req: test.MakeSimpleRequest("GET",
+				"http://1.2.3.4/api/management/v1/admission/devices?page=0&per_page=5", nil),
+			code: 400,
+			body: RestError(rest_utils.MsgQueryParmLimit("page")),
+		},
+		"valid status: accepted": {
+			skip:   15,
+			limit:  6,
+			filter: store.AuthSetFilter{Status: "accepted"},
+
+			getAuthSetsRes: mockAuthSets(6),
+			req: test.MakeSimpleRequest("GET",
+				"http://1.2.3.4/api/management/v1/admission/devices?page=4&per_page=5&status=accepted", nil),
+			code: 200,
+			body: ToJsonString(mockAuthSets(5)),
+		},
+		"valid status: preauthorized": {
+			skip:   15,
+			limit:  6,
+			filter: store.AuthSetFilter{Status: "preauthorized"},
+
+			getAuthSetsRes: mockAuthSets(6),
+			req: test.MakeSimpleRequest("GET",
+				"http://1.2.3.4/api/management/v1/admission/devices?page=4&per_page=5&status=preauthorized", nil),
+			code: 200,
+			body: ToJsonString(mockAuthSets(5)),
+		},
+		"invalid status": {
+			req: test.MakeSimpleRequest("GET",
+				"http://1.2.3.4/api/management/v1/admission/devices?page=1&per_page=5&status=foo", nil),
+			code: 400,
+			body: RestError(rest_utils.MsgQueryParmOneOf("status", DevStatuses)),
+		},
+		"db.GetAuthSets error": {
+			skip:           15,
+			limit:          6,
+			getAuthSetsErr: errors.New("db error"),
+			req: test.MakeSimpleRequest("GET",
+				"http://1.2.3.4/api/management/v1/admission/devices?page=4&per_page=5", nil),
+			code: 500,
+			body: RestError("internal error"),
+		},
+	}
+
+	for idx := range tcases {
+		tc := tcases[idx]
+		t.Run(fmt.Sprintf("tc %s", idx), func(t *testing.T) {
+			t.Parallel()
+
+			db := &smocks.DataStore{}
+			db.On("GetAuthSets",
+				mtest.ContextMatcher(),
+				tc.skip,
+				tc.limit,
+				tc.filter).Return(tc.getAuthSetsRes, tc.getAuthSetsErr)
+
+			apih := makeMockApiHandler(t, nil, db)
+
+			recorded := runTestRequest(t, apih, tc.req, tc.code, tc.body)
+
+			for _, h := range tc.links {
+				assert.Equal(t, h, ExtractHeader("Link", h, recorded))
+			}
+		})
+	}
+}
+
+func mockAuthSets(num int) []model.DevAdmAuthSet {
+	var sets []model.DevAdmAuthSet
+	for i := 0; i < num; i++ {
+		sets = append(sets, model.DevAdmAuthSet{
+			Id:       strconv.Itoa(i),
+			DeviceId: strconv.Itoa(i),
+		})
+	}
+	return sets
+}
+
+func ExtractHeader(hdr, val string, r *test.Recorded) string {
+	rec := r.Recorder
+	for _, v := range rec.Header()[hdr] {
+		if v == val {
+			return v
+		}
+	}
+
+	return ""
+}
+
+func ToJsonString(data interface{}) string {
+	j, _ := json.Marshal(data)
+	return string(j)
 }
