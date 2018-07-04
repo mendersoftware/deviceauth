@@ -66,6 +66,38 @@ paths:
           description: Internal server error.
           schema:
             $ref: "#/definitions/Error"
+    get:
+      summary: Check the admission status of a selected device authentication data set
+      description: Returns the admission status of a particular device authentication data set.
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          type: string
+          format: Bearer [token]
+          description: Contains the JWT token issued by the User Administration and Authentication Service.
+        - name: id
+          in: path
+          description: Device authentication data set identifier.
+          required: true
+          type: string
+      responses:
+        200:
+          description: |
+            Successful response - the device's admission status is returned.
+          schema:
+            $ref: "#/definitions/Status"
+          examples:
+            application/json:
+              status: "accepted"
+        404:
+          description: The device authentication data set was not found.
+          schema:
+            $ref: "#/definitions/Error"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/Error"
 
 definitions:
   Status:
