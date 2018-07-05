@@ -93,6 +93,48 @@ paths:
           schema:
             $ref: "#/definitions/Error"
 
+    post:
+      summary: Submit a preauthorized device authentication data set
+      description: |
+        Adds the device authentication data set to the database with a 'preauthorized'
+        admission status. The device identity data set must not yet exist in the DB (regardless of status).
+
+        When the device requests authentication from deviceauth the next time, it will be issued
+        a token without further user intervention.
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          type: string
+          format: Bearer [token]
+          description: Contains the JWT token issued by the User Administration and Authentication Service.
+        - name: auth_set
+          in: body
+          description: The authentication data set to be preauthorized
+          required: true
+          schema:
+            $ref: '#/definitions/AuthSet'
+      responses:
+        201:
+          description: Device authentication data set submitted successfully.
+          headers:
+            Location:
+              type: string
+              description: Link to the created auth set.
+        400:
+          description: |
+              The request body is malformed. See error for details.
+          schema:
+            $ref: "#/definitions/Error"
+        409:
+          description: Authentication data set (identity data) already exists.
+          schema:
+            $ref: '#/definitions/Error'
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/Error"
+
   /devices/{id}/status:
     put:
       summary: Update the admission status of a selected device
@@ -195,6 +237,23 @@ definitions:
     example:
       application/json:
           status: "accepted"
+  AuthSet:
+    description: New device authentication data set.
+    type: object
+    required:
+      - device_identity
+      - key
+    properties:
+      device_identity:
+        description: The identity data of the device.
+        type: string
+      key:
+        description: Device public key.
+        type: string
+    example:
+      application/json:
+        device_identity: "{\"mac\":\"00:01:02:03:04:05\", \"sku\":\"My Device 1\", \"sn\":\"SN1234567890\"}"
+        key: "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAzogVU7RGDilbsoUt/DdH\nVJvcepl0A5+xzGQ50cq1VE/Dyyy8Zp0jzRXCnnu9nu395mAFSZGotZVr+sWEpO3c\nyC3VmXdBZmXmQdZqbdD/GuixJOYfqta2ytbIUPRXFN7/I7sgzxnXWBYXYmObYvdP\nokP0mQanY+WKxp7Q16pt1RoqoAd0kmV39g13rFl35muSHbSBoAW3GBF3gO+mF5Ty\n1ddp/XcgLOsmvNNjY+2HOD5F/RX0fs07mWnbD7x+xz7KEKjF+H7ZpkqCwmwCXaf0\niyYyh1852rti3Afw4mDxuVSD7sd9ggvYMc0QHIpQNkD4YWOhNiE1AB0zH57VbUYG\nUwIDAQAB\n-----END PUBLIC KEY-----\n"
   Error:
     description: Error descriptor.
     type: object
