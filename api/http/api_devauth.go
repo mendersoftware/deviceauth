@@ -19,6 +19,7 @@ import (
 	"strings"
 
 	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/globalsign/mgo/bson"
 	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/mendersoftware/go-lib-micro/rest_utils"
 	"github.com/pkg/errors"
@@ -115,7 +116,10 @@ func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
 		rest.Put(uriDevadmAuthSetStatus, d.DevAdmUpdateAuthSetStatusHandler),
 
 		rest.Get(uriDevadmAuthSetStatus, d.DevAdmGetAuthSetStatusHandler),
+
 		rest.Get(uriDevadmDevices, d.DevAdmGetDevicesHandler),
+
+		rest.Post(uriDevadmDevices, d.DevAdmPostDevicesHandler),
 	}
 
 	app, err := rest.MakeRouter(
@@ -693,6 +697,39 @@ func (d *DevAuthApiHandlers) DevAdmGetDevicesHandler(w rest.ResponseWriter, r *r
 	}
 
 	w.WriteJson(devs[:len])
+}
+
+func (d *DevAuthApiHandlers) DevAdmPostDevicesHandler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+	l := log.FromContext(ctx)
+
+	// parse authenticate set
+	defer r.Body.Close()
+	authSet, err := model.ParseDevAdmAuthSetReq(r.Body)
+	if err != nil {
+		rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		return
+	}
+	// translate to devauth object
+	req := &model.PreAuthReq{
+		DeviceId:  bson.NewObjectId().Hex(),
+		AuthSetId: bson.NewObjectId().Hex(),
+		IdData:    authSet.DeviceId,
+		PubKey:    authSet.Key,
+	}
+
+	//TODO: handle identity attributes in one of the tasks of the MEN-1965 epic
+
+	err = d.devAuth.PreauthorizeDevice(ctx, req)
+	switch err {
+	case nil:
+		w.WriteHeader(http.StatusCreated)
+	case devauth.ErrDeviceExists:
+		rest_utils.RestErrWithLog(w, r, l, err, http.StatusConflict)
+	default:
+		rest_utils.RestErrWithLogInternal(w, r, l, err)
+	}
+
 }
 
 func (d *DevAuthApiHandlers) ProvisionTenantHandler(w rest.ResponseWriter, r *rest.Request) {
