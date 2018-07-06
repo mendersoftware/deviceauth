@@ -834,6 +834,31 @@ func (db *DataStoreMongo) GetDeviceStatus(ctx context.Context, devId string) (st
 	return status, nil
 }
 
+func (db *DataStoreMongo) GetAuthSets(ctx context.Context, skip, limit int, filter store.AuthSetFilter) ([]model.DevAdmAuthSet, error) {
+	s := db.session.Copy()
+	defer s.Close()
+
+	c := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbAuthSetColl)
+
+	res := []model.AuthSet{}
+
+	err := c.Find(filter).Sort("id").Skip(skip).Limit(limit).All(&res)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to fetch auth sets")
+	}
+
+	resDevAdm := make([]model.DevAdmAuthSet, len(res))
+	for i, r := range res {
+		rda, err := model.NewDevAdmAuthSet(r)
+		resDevAdm[i] = *rda
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to fetch auth sets")
+		}
+	}
+
+	return resDevAdm, nil
+}
+
 func getDeviceStatus(statuses map[string]int) (string, error) {
 	if statuses[model.DevStatusAccepted] > 1 || statuses[model.DevStatusPreauth] > 1 {
 		return "", store.ErrDevStatusBroken

@@ -50,6 +50,7 @@ const (
 
 	// migrated devadm api
 	uriDevadmAuthSetStatus = "/api/management/v1/admission/devices/:aid/status"
+	uriDevadmDevices       = "/api/management/v1/admission/devices"
 
 	HdrAuthReqSign = "X-MEN-Signature"
 )
@@ -57,6 +58,8 @@ const (
 var (
 	ErrIncorrectStatus = errors.New("incorrect device status")
 	ErrNoAuthHeader    = errors.New("no authorization header")
+
+	DevStatuses = []string{model.DevStatusPending, model.DevStatusRejected, model.DevStatusAccepted, model.DevStatusPreauth}
 )
 
 type DevAuthApiHandlers struct {
@@ -112,6 +115,7 @@ func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
 		rest.Put(uriDevadmAuthSetStatus, d.DevAdmUpdateAuthSetStatusHandler),
 
 		rest.Get(uriDevadmAuthSetStatus, d.DevAdmGetAuthSetStatusHandler),
+		rest.Get(uriDevadmDevices, d.DevAdmGetDevicesHandler),
 	}
 
 	app, err := rest.MakeRouter(
@@ -638,6 +642,57 @@ func (d *DevAuthApiHandlers) DevAdmGetAuthSetStatusHandler(w rest.ResponseWriter
 		rest_utils.RestErrWithLogInternal(w, r, l,
 			errors.Wrap(err, "failed to get auth set status"))
 	}
+}
+
+func (d *DevAuthApiHandlers) DevAdmGetDevicesHandler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+	l := log.FromContext(ctx)
+
+	page, perPage, err := rest_utils.ParsePagination(r)
+	if err != nil {
+		rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		return
+	}
+
+	status, err := rest_utils.ParseQueryParmStr(r, "status", false, DevStatuses)
+	if err != nil {
+		rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		return
+	}
+
+	deviceId, err := rest_utils.ParseQueryParmStr(r, "device_id", false, nil)
+	if err != nil {
+		rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		return
+	}
+
+	//get one extra device to see if there's a 'next' page
+	devs, err := d.db.GetAuthSets(ctx,
+		int((page-1)*perPage), int(perPage+1),
+		store.AuthSetFilter{
+			Status:   status,
+			DeviceID: deviceId,
+		})
+
+	if err != nil {
+		rest_utils.RestErrWithLogInternal(w, r, l, errors.Wrap(err, "failed to list devices"))
+		return
+	}
+
+	len := len(devs)
+	hasNext := false
+	if uint64(len) > perPage {
+		hasNext = true
+		len = int(perPage)
+	}
+
+	links := rest_utils.MakePageLinkHdrs(r, page, perPage, hasNext)
+
+	for _, l := range links {
+		w.Header().Add("Link", l)
+	}
+
+	w.WriteJson(devs[:len])
 }
 
 func (d *DevAuthApiHandlers) ProvisionTenantHandler(w rest.ResponseWriter, r *rest.Request) {
