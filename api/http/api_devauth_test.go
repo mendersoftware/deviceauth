@@ -1752,7 +1752,7 @@ func TestApiDevAuthDevAdmGetDevices(t *testing.T) {
 			getAuthSetsRes: mockAuthSets(5),
 
 			code: 200,
-			body: ToJsonString(mockAuthSets(5)),
+			body: toJsonString(t, mockAuthSets(5)),
 			links: []string{
 				`<http://1.2.3.4/api/management/v1/admission/devices?page=3&per_page=5>; rel="prev"`,
 				`<http://1.2.3.4/api/management/v1/admission/devices?page=1&per_page=5>; rel="first"`,
@@ -1769,7 +1769,7 @@ func TestApiDevAuthDevAdmGetDevices(t *testing.T) {
 			getAuthSetsRes: mockAuthSets(9),
 
 			code: 200,
-			body: ToJsonString(mockAuthSets(5)),
+			body: toJsonString(t, mockAuthSets(5)),
 			links: []string{
 				`<http://1.2.3.4/api/management/v1/admission/devices?page=3&per_page=5>; rel="prev"`,
 				`<http://1.2.3.4/api/management/v1/admission/devices?page=1&per_page=5>; rel="first"`,
@@ -1796,7 +1796,7 @@ func TestApiDevAuthDevAdmGetDevices(t *testing.T) {
 			req: test.MakeSimpleRequest("GET",
 				"http://1.2.3.4/api/management/v1/admission/devices?page=4&per_page=5&status=accepted", nil),
 			code: 200,
-			body: ToJsonString(mockAuthSets(5)),
+			body: toJsonString(t, mockAuthSets(5)),
 		},
 		"valid status: preauthorized": {
 			skip:   15,
@@ -1807,7 +1807,7 @@ func TestApiDevAuthDevAdmGetDevices(t *testing.T) {
 			req: test.MakeSimpleRequest("GET",
 				"http://1.2.3.4/api/management/v1/admission/devices?page=4&per_page=5&status=preauthorized", nil),
 			code: 200,
-			body: ToJsonString(mockAuthSets(5)),
+			body: toJsonString(t, mockAuthSets(5)),
 		},
 		"invalid status": {
 			req: test.MakeSimpleRequest("GET",
@@ -1871,7 +1871,99 @@ func ExtractHeader(hdr, val string, r *test.Recorded) string {
 	return ""
 }
 
-func ToJsonString(data interface{}) string {
-	j, _ := json.Marshal(data)
-	return string(j)
+func TestApiDevAuthDevAdmPostDeviceAuth(t *testing.T) {
+	testCases := map[string]struct {
+		body interface{}
+
+		devAuthErr error
+
+		checker mt.ResponseChecker
+	}{
+		"ok": {
+			body: &model.DevAdmAuthSetReq{Key: "foo-key", DeviceId: toJsonString(t,
+				map[string]string{
+					"mac": "00:00:00:01",
+				}),
+			},
+			checker: mt.NewJSONResponse(
+				http.StatusCreated,
+				nil,
+				nil),
+		},
+		"error: empty request": {
+			body: nil,
+			checker: mt.NewJSONResponse(
+				http.StatusBadRequest,
+				nil,
+				restError("EOF")),
+		},
+		"error: generic": {
+			body: &model.DevAdmAuthSetReq{Key: "foo-key", DeviceId: toJsonString(t,
+				map[string]string{
+					"mac": "00:00:00:01",
+				})},
+			devAuthErr: errors.New("generic error"),
+			checker: mt.NewJSONResponse(
+				http.StatusInternalServerError,
+				nil,
+				restError("internal error")),
+		},
+		"error: no key": {
+			body: &model.DevAdmAuthSetReq{Key: "", DeviceId: toJsonString(t,
+				map[string]string{
+					"mac": "00:00:00:01",
+				})},
+			checker: mt.NewJSONResponse(
+				http.StatusBadRequest,
+				nil,
+				restError("key: non zero value required")),
+		},
+		"error: no identity data": {
+			body: &model.DevAdmAuthSetReq{Key: "foo-key"},
+			checker: mt.NewJSONResponse(
+				http.StatusBadRequest,
+				nil,
+				restError("device_identity: non zero value required")),
+		},
+		"error: conflict": {
+			body: &model.DevAdmAuthSetReq{Key: "foo-key", DeviceId: toJsonString(t,
+				map[string]string{
+					"mac": "00:00:00:01",
+				})},
+			devAuthErr: devauth.ErrDeviceExists,
+			checker: mt.NewJSONResponse(
+				http.StatusConflict,
+				nil,
+				restError("device already exists")),
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Logf("test case: %s", name)
+		da := &mocks.App{}
+		da.On("PreauthorizeDevice",
+			mtest.ContextMatcher(),
+			mock.AnythingOfType("*model.PreAuthReq")).
+			Return(tc.devAuthErr)
+
+		apih := makeMockApiHandler(t, da, nil)
+
+		//make request
+		req := makeReq("POST",
+			"http://1.2.3.4/api/management/v1/admission/devices",
+			"",
+			tc.body)
+
+		recorded := test.RunRequest(t, apih, req)
+		mt.CheckResponse(t, tc.checker, recorded)
+	}
+}
+
+func toJsonString(t *testing.T, d interface{}) string {
+	out, err := json.Marshal(d)
+	if err != nil {
+		t.FailNow()
+	}
+
+	return string(out)
 }
