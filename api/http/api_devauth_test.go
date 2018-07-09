@@ -1849,6 +1849,102 @@ func TestApiDevAuthDevAdmGetDevices(t *testing.T) {
 	}
 }
 
+func TestApiDevAuthDevAdmGetDevice(t *testing.T) {
+	t.Parallel()
+
+	// enforce specific field naming in errors returned by API
+	updateRestErrorFieldName()
+
+	tcases := map[string]struct {
+		aid string
+
+		dbAuthSet *model.AuthSet
+		dbErr     error
+
+		checker mt.ResponseChecker
+	}{
+		"ok": {
+			aid: "foo",
+
+			dbAuthSet: &model.AuthSet{
+				Id:       "foo",
+				DeviceId: "foo-dev",
+				IdData:   `{"sn": "dev-foo-sn"}`,
+				Status:   "accepted",
+				PubKey:   "foo-dev-key",
+			},
+			checker: mt.NewJSONResponse(
+				http.StatusOK,
+				nil,
+				&model.DevAdmAuthSet{
+					Id:             "foo",
+					DeviceId:       "foo-dev",
+					DeviceIdentity: `{"sn": "dev-foo-sn"}`,
+					Status:         "accepted",
+					Key:            "foo-dev-key",
+					Attributes: map[string]interface{}{
+						"sn": "dev-foo-sn",
+					}}),
+		},
+		"error: not found": {
+			aid: "foo",
+
+			dbErr: store.ErrDevNotFound,
+			checker: mt.NewJSONResponse(
+				http.StatusNotFound,
+				nil,
+				restError("authorization set not found")),
+		},
+		"error: generic db error": {
+			aid: "foo",
+
+			dbErr: errors.New("an error"),
+			checker: mt.NewJSONResponse(
+				http.StatusInternalServerError,
+				nil,
+				restError("internal error")),
+		},
+		"error: auth set conversion error": {
+			aid: "foo",
+
+			dbAuthSet: &model.AuthSet{
+				Id:       "foo",
+				DeviceId: "foo-dev",
+				IdData:   "not json",
+				Status:   "accepted",
+				PubKey:   "foo-dev-key",
+			},
+			checker: mt.NewJSONResponse(
+				http.StatusInternalServerError,
+				nil,
+				restError("internal error")),
+		},
+	}
+
+	for idx := range tcases {
+		tc := tcases[idx]
+		t.Run(fmt.Sprintf("tc %s", idx), func(t *testing.T) {
+			t.Parallel()
+
+			db := &smocks.DataStore{}
+			db.On("GetAuthSetById",
+				mtest.ContextMatcher(),
+				tc.aid).Return(tc.dbAuthSet, tc.dbErr)
+
+			apih := makeMockApiHandler(t, nil, db)
+
+			//make request
+			req := makeReq("GET",
+				"http://1.2.3.4/api/management/v1/admission/devices/"+tc.aid,
+				"",
+				nil)
+			recorded := test.RunRequest(t, apih, req)
+
+			mt.CheckResponse(t, tc.checker, recorded)
+		})
+	}
+}
+
 func mockAuthSets(num int) []model.DevAdmAuthSet {
 	var sets []model.DevAdmAuthSet
 	for i := 0; i < num; i++ {
