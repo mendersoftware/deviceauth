@@ -52,6 +52,7 @@ const (
 	// migrated devadm api
 	uriDevadmAuthSetStatus = "/api/management/v1/admission/devices/:aid/status"
 	uriDevadmDevices       = "/api/management/v1/admission/devices"
+	uriDevadmDevice        = "/api/management/v1/admission/devices/:aid"
 
 	HdrAuthReqSign = "X-MEN-Signature"
 )
@@ -120,6 +121,7 @@ func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
 		rest.Get(uriDevadmDevices, d.DevAdmGetDevicesHandler),
 
 		rest.Post(uriDevadmDevices, d.DevAdmPostDevicesHandler),
+		rest.Get(uriDevadmDevice, d.DevAdmGetDeviceHandler),
 	}
 
 	app, err := rest.MakeRouter(
@@ -780,6 +782,33 @@ func (d *DevAuthApiHandlers) GetTenantDeviceStatus(w rest.ResponseWriter, r *res
 	default:
 		rest_utils.RestErrWithLogInternal(w, r, l, err)
 	}
+}
+
+func (d *DevAuthApiHandlers) DevAdmGetDeviceHandler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+	l := log.FromContext(ctx)
+
+	authid := r.PathParam("aid")
+
+	auth, err := d.db.GetAuthSetById(ctx, authid)
+	switch err {
+	case nil:
+		break
+	case store.ErrDevNotFound:
+		rest_utils.RestErrWithLog(w, r, l, store.ErrAuthSetNotFound, http.StatusNotFound)
+		return
+	default:
+		rest_utils.RestErrWithLogInternal(w, r, l, err)
+		return
+	}
+
+	devadm_auth, err := model.NewDevAdmAuthSet(*auth)
+	if err != nil {
+		rest_utils.RestErrWithLogInternal(w, r, l, err)
+		return
+	}
+
+	w.WriteJson(devadm_auth)
 }
 
 // Validate status.
