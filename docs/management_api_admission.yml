@@ -135,6 +135,48 @@ paths:
           schema:
             $ref: "#/definitions/Error"
 
+  /devices/{id}:
+    get:
+      summary: Get the details of a selected device authentication data set
+      description: Returns the details of a particular device authentication data set.
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          type: string
+          format: Bearer [token]
+          description: Contains the JWT token issued by the User Administration and Authentication Service.
+        - name: id
+          in: path
+          description: Device authentication data set identifier.
+          required: true
+          type: string
+      responses:
+        200:
+          description: Successful response - a device authentication data set is returned.
+          schema:
+            $ref: "#/definitions/Device"
+          examples:
+            application/json:
+              id: "291ae0e5956c69c2267489213df4459d19ed48a806603def19d417d004a4b67e"
+              device_id: "58be8208dd77460001fe0d78"
+              device_identity: "{\"mac\":\"00:01:02:03:04:05\", \"sku\":\"My Device 1\", \"sn\":\"SN1234567890\"}"
+              key: "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAzogVU7RGDilbsoUt/DdH\nVJvcepl0A5+xzGQ50cq1VE/Dyyy8Zp0jzRXCnnu9nu395mAFSZGotZVr+sWEpO3c\nyC3VmXdBZmXmQdZqbdD/GuixJOYfqta2ytbIUPRXFN7/I7sgzxnXWBYXYmObYvdP\nokP0mQanY+WKxp7Q16pt1RoqoAd0kmV39g13rFl35muSHbSBoAW3GBF3gO+mF5Ty\n1ddp/XcgLOsmvNNjY+2HOD5F/RX0fs07mWnbD7x+xz7KEKjF+H7ZpkqCwmwCXaf0\niyYyh1852rti3Afw4mDxuVSD7sd9ggvYMc0QHIpQNkD4YWOhNiE1AB0zH57VbUYG\nUwIDAQAB\n-----END PUBLIC KEY-----\n"
+              status: "pending"
+              attributes:
+                mac: "00:01:02:03:04:05"
+                sku: "My Device 1"
+                sn:  "SN1234567890"
+              request_time: "2016-10-03T16:58:51.639Z"
+        404:
+          description: The device authentication data set was not found.
+          schema:
+            $ref: "#/definitions/Error"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/Error"
+
   /devices/{id}/status:
     put:
       summary: Update the admission status of a selected device
