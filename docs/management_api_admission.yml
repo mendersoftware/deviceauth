@@ -177,6 +177,29 @@ paths:
           schema:
             $ref: "#/definitions/Error"
 
+    delete:
+      summary: Remove device authentication data set
+      description: Removes all device authentication data set data.
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          type: string
+          format: Bearer [token]
+          description: Contains the JWT token issued by the User Administration and Authentication Service.
+        - name: id
+          in: path
+          description: Device authentication data set identifier
+          required: true
+          type: string
+      responses:
+        204:
+          description: The device authentication data set was removed.
+        500:
+          description: Internal server error.
+          schema:
+           $ref: "#/definitions/Error"
+
   /devices/{id}/status:
     put:
       summary: Update the admission status of a selected device
