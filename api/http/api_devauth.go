@@ -122,6 +122,7 @@ func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
 
 		rest.Post(uriDevadmDevices, d.DevAdmPostDevicesHandler),
 		rest.Get(uriDevadmDevice, d.DevAdmGetDeviceHandler),
+		rest.Delete(uriDevadmDevice, d.DevAdmDeleteDeviceAuthSetHandler),
 	}
 
 	app, err := rest.MakeRouter(
@@ -347,6 +348,38 @@ func (d *DevAuthApiHandlers) DeleteDeviceAuthSetHandler(w rest.ResponseWriter, r
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (d *DevAuthApiHandlers) DevAdmDeleteDeviceAuthSetHandler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+
+	l := log.FromContext(ctx)
+
+	authId := r.PathParam("aid")
+
+	aset, err := d.db.GetAuthSetById(ctx, authId)
+	switch err {
+	case nil:
+		break
+	case store.ErrDevNotFound:
+		w.WriteHeader(http.StatusNoContent)
+		return
+	default:
+		rest_utils.RestErrWithLogInternal(w, r, l, err)
+		return
+	}
+
+	err = d.devAuth.DeleteAuthSet(ctx, aset.DeviceId, authId)
+	switch err {
+	case nil:
+		w.WriteHeader(http.StatusNoContent)
+	case store.ErrDevNotFound:
+		w.WriteHeader(http.StatusNoContent)
+		return
+	default:
+		rest_utils.RestErrWithLogInternal(w, r, l, err)
+		return
+	}
 }
 
 func (d *DevAuthApiHandlers) DeleteTokenHandler(w rest.ResponseWriter, r *rest.Request) {
