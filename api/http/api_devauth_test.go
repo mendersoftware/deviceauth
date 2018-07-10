@@ -1945,6 +1945,134 @@ func TestApiDevAuthDevAdmGetDevice(t *testing.T) {
 	}
 }
 
+func TestApiDevAuthDevAdmDeleteDeviceAuthSet(t *testing.T) {
+	t.Parallel()
+
+	// enforce specific field naming in errors returned by API
+	updateRestErrorFieldName()
+
+	tcases := map[string]struct {
+		aid string
+
+		dbAuthSet *model.AuthSet
+		dbErr     error
+
+		daErr error
+
+		checker mt.ResponseChecker
+	}{
+		"ok": {
+			aid: "foo",
+
+			dbAuthSet: &model.AuthSet{
+				Id:       "foo",
+				DeviceId: "foo-dev",
+				IdData:   `{"sn": "dev-foo-sn"}`,
+				Status:   "accepted",
+				PubKey:   "foo-dev-key",
+			},
+
+			checker: mt.NewJSONResponse(
+				http.StatusNoContent,
+				nil,
+				nil),
+		},
+		"error: not found (db)": {
+			aid: "foo",
+
+			dbErr: store.ErrDevNotFound,
+
+			checker: mt.NewJSONResponse(
+				http.StatusNoContent,
+				nil,
+				nil),
+		},
+
+		"error: not found(app)": {
+			aid: "foo",
+
+			dbAuthSet: &model.AuthSet{
+				Id:       "foo",
+				DeviceId: "foo-dev",
+				IdData:   `{"sn": "dev-foo-sn"}`,
+				Status:   "accepted",
+				PubKey:   "foo-dev-key",
+			},
+
+			daErr: store.ErrDevNotFound,
+
+			checker: mt.NewJSONResponse(
+				http.StatusNoContent,
+				nil,
+				nil),
+		},
+		"error: generic db error": {
+			aid: "foo",
+
+			dbErr: errors.New("an error"),
+
+			checker: mt.NewJSONResponse(
+				http.StatusInternalServerError,
+				nil,
+				restError("internal error")),
+		},
+		"error: generic app error": {
+			aid: "foo",
+
+			dbAuthSet: &model.AuthSet{
+				Id:       "foo",
+				DeviceId: "foo-dev",
+				IdData:   `{"sn": "dev-foo-sn"}`,
+				Status:   "accepted",
+				PubKey:   "foo-dev-key",
+			},
+
+			daErr: errors.New("an error"),
+
+			checker: mt.NewJSONResponse(
+				http.StatusInternalServerError,
+				nil,
+				restError("internal error")),
+		},
+	}
+
+	for idx := range tcases {
+		tc := tcases[idx]
+		t.Run(fmt.Sprintf("tc %s", idx), func(t *testing.T) {
+			t.Parallel()
+
+			db := &smocks.DataStore{}
+			db.On("GetAuthSetById",
+				mtest.ContextMatcher(),
+				tc.aid).Return(tc.dbAuthSet, tc.dbErr)
+
+			da := &mocks.App{}
+			if tc.dbAuthSet != nil {
+				da.On("DeleteAuthSet",
+					mtest.ContextMatcher(),
+					tc.dbAuthSet.DeviceId,
+					tc.aid).Return(tc.daErr)
+			} else {
+				da.On("DeleteAuthSet",
+					mtest.ContextMatcher(),
+					mock.AnythingOfType("string"),
+					tc.aid).Return(tc.daErr)
+			}
+
+			apih := makeMockApiHandler(t, da, db)
+
+			//make request
+			req := makeReq("DELETE",
+				"http://1.2.3.4/api/management/v1/admission/devices/"+tc.aid,
+				"",
+				nil)
+			recorded := test.RunRequest(t, apih, req)
+
+			mt.CheckResponse(t, tc.checker, recorded)
+		})
+	}
+}
+
 func mockAuthSets(num int) []model.DevAdmAuthSet {
 	var sets []model.DevAdmAuthSet
 	for i := 0; i < num; i++ {
