@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"sync"
 	"testing"
 
@@ -37,6 +38,7 @@ import (
 	"github.com/mendersoftware/deviceauth/jwt"
 	"github.com/mendersoftware/deviceauth/model"
 	"github.com/mendersoftware/deviceauth/store"
+	smocks "github.com/mendersoftware/deviceauth/store/mocks"
 	mtest "github.com/mendersoftware/deviceauth/utils/testing"
 	mt "github.com/mendersoftware/go-lib-micro/testing"
 )
@@ -62,8 +64,8 @@ func runTestRequest(t *testing.T, handler http.Handler, req *http.Request, code 
 	return recorded
 }
 
-func makeMockApiHandler(t *testing.T, da devauth.App) http.Handler {
-	handlers := NewDevAuthApiHandlers(da)
+func makeMockApiHandler(t *testing.T, da devauth.App, db store.DataStore) http.Handler {
+	handlers := NewDevAuthApiHandlers(da, db)
 	assert.NotNil(t, handlers)
 
 	app, err := handlers.GetApp()
@@ -260,7 +262,7 @@ func TestApiDevAuthSubmitAuthReq(t *testing.T) {
 					},
 					tc.devAuthErr)
 
-			apih := makeMockApiHandler(t, da)
+			apih := makeMockApiHandler(t, da, nil)
 
 			recorded := runTestRequest(t, apih, tc.req, tc.code, tc.body)
 			if tc.code == http.StatusOK {
@@ -382,7 +384,7 @@ func TestApiDevAuthPreauthDevice(t *testing.T) {
 				tc.body).
 				Return(tc.devAuthErr)
 
-			apih := makeMockApiHandler(t, da)
+			apih := makeMockApiHandler(t, da, nil)
 
 			//make request
 			req := makeReq("POST",
@@ -455,7 +457,7 @@ func TestApiDevAuthUpdateStatusDevice(t *testing.T) {
 		mock.AnythingOfType("string"),
 		mock.AnythingOfType("string")).Return(mockaction)
 
-	apih := makeMockApiHandler(t, da)
+	apih := makeMockApiHandler(t, da, nil)
 	// enforce specific field naming in errors returned by API
 	updateRestErrorFieldName()
 
@@ -540,6 +542,217 @@ func TestApiDevAuthUpdateStatusDevice(t *testing.T) {
 
 }
 
+func TestApiDevAuthDevAdmUpdateAuthSetStatus(t *testing.T) {
+	t.Parallel()
+
+	// enforce specific field naming in errors returned by API
+	updateRestErrorFieldName()
+
+	tcases := map[string]struct {
+		status interface{}
+		aid    string
+
+		dbGetAuthSetRes *model.AuthSet
+		dbGetAuthSetErr error
+
+		appAcceptRejectErr error
+
+		code int
+		body string
+	}{
+		"ok": {
+			status:          &model.Status{Status: model.DevStatusAccepted},
+			aid:             "foo",
+			dbGetAuthSetRes: &model.AuthSet{Id: "foo", DeviceId: "bar"},
+			body:            string(asJSON(&model.Status{Status: "accepted"})),
+			code:            http.StatusOK,
+		},
+		"ok 2": {
+			status:          &model.Status{Status: model.DevStatusRejected},
+			aid:             "foo",
+			dbGetAuthSetRes: &model.AuthSet{Id: "foo", DeviceId: "bar"},
+			body:            string(asJSON(&model.Status{Status: "rejected"})),
+			code:            http.StatusOK,
+		},
+		"error: empty payload": {
+			status: nil,
+			code:   http.StatusBadRequest,
+			body:   RestError("failed to decode status data: JSON payload is empty"),
+		},
+		"error: invalid status": {
+			status: &model.Status{Status: "foo"},
+			code:   http.StatusBadRequest,
+			body:   RestError("incorrect device status"),
+		},
+		"error: get auth set: not found": {
+			status: &model.Status{Status: model.DevStatusAccepted},
+
+			aid:             "foo",
+			dbGetAuthSetErr: store.ErrDevNotFound,
+
+			body: RestError("authorization set not found"),
+			code: http.StatusNotFound,
+		},
+		"error: get auth set: generic": {
+			status: &model.Status{Status: model.DevStatusRejected},
+
+			aid:             "foo",
+			dbGetAuthSetErr: errors.New("some internal error"),
+
+			body: RestError("internal error"),
+			code: http.StatusInternalServerError,
+		},
+		"error: accept: not found": {
+			status: &model.Status{Status: model.DevStatusAccepted},
+
+			aid:                "foo",
+			dbGetAuthSetRes:    &model.AuthSet{Id: "foo", DeviceId: "dev-foo"},
+			appAcceptRejectErr: store.ErrDevNotFound,
+
+			body: RestError("authorization set not found"),
+			code: http.StatusNotFound,
+		},
+		"error: accept: max devices": {
+			status: &model.Status{Status: model.DevStatusAccepted},
+
+			aid:                "foo",
+			dbGetAuthSetRes:    &model.AuthSet{Id: "foo", DeviceId: "dev-foo"},
+			appAcceptRejectErr: devauth.ErrMaxDeviceCountReached,
+
+			body: RestError("maximum number of accepted devices reached"),
+			code: http.StatusUnprocessableEntity,
+		},
+		"error: accept: generic": {
+			status: &model.Status{Status: model.DevStatusAccepted},
+
+			aid:                "foo",
+			dbGetAuthSetRes:    &model.AuthSet{Id: "foo", DeviceId: "dev-foo"},
+			appAcceptRejectErr: errors.New("some internal error"),
+
+			body: RestError("internal error"),
+			code: http.StatusInternalServerError,
+		},
+		"error: reject: not found": {
+			status: &model.Status{Status: model.DevStatusRejected},
+
+			aid:                "foo",
+			dbGetAuthSetRes:    &model.AuthSet{Id: "foo", DeviceId: "dev-foo"},
+			appAcceptRejectErr: store.ErrDevNotFound,
+
+			body: RestError("authorization set not found"),
+			code: http.StatusNotFound,
+		},
+		"error: reject: generic": {
+			status: &model.Status{Status: model.DevStatusRejected},
+
+			aid:                "foo",
+			dbGetAuthSetRes:    &model.AuthSet{Id: "foo", DeviceId: "dev-foo"},
+			appAcceptRejectErr: errors.New("some internal error"),
+
+			body: RestError("internal error"),
+			code: http.StatusInternalServerError,
+		},
+	}
+
+	for idx := range tcases {
+		tc := tcases[idx]
+		t.Run(fmt.Sprintf("tc %s", idx), func(t *testing.T) {
+			t.Parallel()
+
+			req := test.MakeSimpleRequest("PUT",
+				fmt.Sprintf("http://1.2.3.4/api/management/v1/admission/devices/%s/status", tc.aid),
+				tc.status)
+
+			da := &mocks.App{}
+			da.On("AcceptDeviceAuth",
+				mtest.ContextMatcher(),
+				mock.AnythingOfType("string"),
+				tc.aid).Return(tc.appAcceptRejectErr)
+			da.On("RejectDeviceAuth",
+				mtest.ContextMatcher(),
+				mock.AnythingOfType("string"),
+				tc.aid).Return(tc.appAcceptRejectErr)
+
+			db := &smocks.DataStore{}
+			db.On("GetAuthSetById",
+				mtest.ContextMatcher(),
+				tc.aid).Return(tc.dbGetAuthSetRes, tc.dbGetAuthSetErr)
+
+			apih := makeMockApiHandler(t, da, db)
+
+			runTestRequest(t, apih, req, tc.code, tc.body)
+		})
+	}
+}
+
+func TestApiDevAuthDevAdmGetDeviceStatus(t *testing.T) {
+	t.Parallel()
+
+	// enforce specific field naming in errors returned by API
+	updateRestErrorFieldName()
+
+	tcases := map[string]struct {
+		aid string
+
+		dbAuthSet *model.AuthSet
+		dbErr     error
+
+		checker mt.ResponseChecker
+	}{
+		"ok": {
+			aid: "foo",
+
+			dbAuthSet: &model.AuthSet{Status: "accepted"},
+
+			checker: mt.NewJSONResponse(
+				http.StatusOK,
+				nil,
+				model.Status{Status: "accepted"}),
+		},
+		"error: not found": {
+			aid: "foo",
+
+			dbErr: store.ErrDevNotFound,
+
+			checker: mt.NewJSONResponse(
+				http.StatusNotFound,
+				nil,
+				restError("authorization set not found")),
+		},
+		"error: generic": {
+			aid: "foo",
+
+			dbErr: errors.New("generic error"),
+
+			checker: mt.NewJSONResponse(
+				http.StatusInternalServerError,
+				nil,
+				restError("internal error")),
+		},
+	}
+
+	for i := range tcases {
+		tc := tcases[i]
+		t.Run(fmt.Sprintf("tc %s", i), func(t *testing.T) {
+			t.Parallel()
+
+			req := makeReq("GET",
+				fmt.Sprintf("http://1.2.3.4/api/management/v1/admission/devices/%s/status", tc.aid),
+				"", nil)
+
+			db := &smocks.DataStore{}
+			db.On("GetAuthSetById",
+				mtest.ContextMatcher(),
+				tc.aid).Return(tc.dbAuthSet, tc.dbErr)
+
+			apih := makeMockApiHandler(t, nil, db)
+
+			recorded := test.RunRequest(t, apih, req)
+			mt.CheckResponse(t, tc.checker, recorded)
+		})
+	}
+}
+
 func TestApiDevAuthVerifyToken(t *testing.T) {
 	t.Parallel()
 
@@ -610,7 +823,7 @@ func TestApiDevAuthVerifyToken(t *testing.T) {
 				mock.AnythingOfType("string")).
 				Return(tc.err)
 
-			apih := makeMockApiHandler(t, da)
+			apih := makeMockApiHandler(t, da, nil)
 			if len(tc.headers) > 0 {
 				tc.req.Header.Set("authorization", tc.headers["authorization"])
 			}
@@ -664,7 +877,7 @@ func TestApiDevAuthDeleteToken(t *testing.T) {
 				mock.AnythingOfType("string")).
 				Return(tc.err)
 
-			apih := makeMockApiHandler(t, da)
+			apih := makeMockApiHandler(t, da, nil)
 			runTestRequest(t, apih, tc.req, tc.code, tc.body)
 		})
 	}
@@ -718,7 +931,7 @@ func TestApiGetDevice(t *testing.T) {
 				mock.AnythingOfType("string")).
 				Return(tc.device, tc.err)
 
-			apih := makeMockApiHandler(t, da)
+			apih := makeMockApiHandler(t, da, nil)
 			runTestRequest(t, apih, tc.req, tc.code, tc.body)
 		})
 	}
@@ -809,7 +1022,7 @@ func TestApiGetDevices(t *testing.T) {
 				tc.skip, tc.limit).Return(
 				tc.devices, tc.err)
 
-			apih := makeMockApiHandler(t, da)
+			apih := makeMockApiHandler(t, da, nil)
 			runTestRequest(t, apih, tc.req, tc.code, tc.body)
 		})
 	}
@@ -864,7 +1077,7 @@ func TestApiDevAuthDecommissionDevice(t *testing.T) {
 				mock.AnythingOfType("string")).
 				Return(tc.err)
 
-			apih := makeMockApiHandler(t, da)
+			apih := makeMockApiHandler(t, da, nil)
 			runTestRequest(t, apih, tc.req, tc.code, tc.body)
 		})
 	}
@@ -939,7 +1152,7 @@ func TestApiDevAuthPutTenantLimit(t *testing.T) {
 				tc.limit).
 				Return(tc.err)
 
-			apih := makeMockApiHandler(t, da)
+			apih := makeMockApiHandler(t, da, nil)
 			runTestRequest(t, apih, tc.req, tc.code, tc.body)
 		})
 	}
@@ -1008,7 +1221,7 @@ func TestApiDevAuthGetLimit(t *testing.T) {
 				tc.limit).
 				Return(tc.daLimit, tc.daErr)
 
-			apih := makeMockApiHandler(t, da)
+			apih := makeMockApiHandler(t, da, nil)
 			runTestRequest(t, apih, req, tc.code, tc.body)
 		})
 	}
@@ -1086,7 +1299,7 @@ func TestApiDevAuthGetTenantLimit(t *testing.T) {
 				tc.tenantId).
 				Return(tc.daLimit, tc.daErr)
 
-			apih := makeMockApiHandler(t, da)
+			apih := makeMockApiHandler(t, da, nil)
 			runTestRequest(t, apih, req, tc.code, tc.body)
 		})
 	}
@@ -1207,7 +1420,7 @@ func TestApiDevAuthGetDevicesCount(t *testing.T) {
 				tc.status).
 				Return(tc.daCnt, tc.daErr)
 
-			apih := makeMockApiHandler(t, da)
+			apih := makeMockApiHandler(t, da, nil)
 			runTestRequest(t, apih, req, tc.code, tc.body)
 		})
 	}
@@ -1261,7 +1474,7 @@ func TestApiDevAuthPostTenants(t *testing.T) {
 			mock.MatchedBy(func(c context.Context) bool { return true }),
 			mock.AnythingOfType("string")).Return(tc.devAuthErr)
 
-		apih := makeMockApiHandler(t, da)
+		apih := makeMockApiHandler(t, da, nil)
 
 		rest.ErrorFieldName = "error"
 
@@ -1336,7 +1549,7 @@ func TestApiDevAuthDeleteDeviceAuthSet(t *testing.T) {
 				"bar").
 				Return(tc.err)
 
-			apih := makeMockApiHandler(t, da)
+			apih := makeMockApiHandler(t, da, nil)
 			runTestRequest(t, apih, tc.req, tc.code, tc.body)
 		})
 	}
@@ -1410,7 +1623,7 @@ func TestApiDeleteTokens(t *testing.T) {
 				"",
 				nil)
 
-			apih := makeMockApiHandler(t, da)
+			apih := makeMockApiHandler(t, da, nil)
 
 			recorded := test.RunRequest(t, apih, req)
 			mt.CheckResponse(t, tc.checker, recorded)
@@ -1501,10 +1714,480 @@ func TestApiDevAuthGetTenantDeviceStatus(t *testing.T) {
 				tc.did,
 			).Return(tc.daStatus, tc.daErr)
 
-			apih := makeMockApiHandler(t, da)
+			apih := makeMockApiHandler(t, da, nil)
 
 			recorded := test.RunRequest(t, apih, req)
 			mt.CheckResponse(t, tc.checker, recorded)
 		})
 	}
+}
+
+func TestApiDevAuthDevAdmGetDevices(t *testing.T) {
+	t.Parallel()
+
+	// enforce specific field naming in errors returned by API
+	updateRestErrorFieldName()
+
+	tcases := map[string]struct {
+		skip   int
+		limit  int
+		filter store.AuthSetFilter
+
+		getAuthSetsRes []model.DevAdmAuthSet
+		getAuthSetsErr error
+
+		req *http.Request
+
+		code  int
+		body  string
+		links []string
+	}{
+		"valid pagination, no next page": {
+			skip:  15,
+			limit: 6,
+
+			req: test.MakeSimpleRequest("GET",
+				"http://1.2.3.4/api/management/v1/admission/devices?page=4&per_page=5", nil),
+
+			getAuthSetsRes: mockAuthSets(5),
+
+			code: 200,
+			body: toJsonString(t, mockAuthSets(5)),
+			links: []string{
+				`<http://1.2.3.4/api/management/v1/admission/devices?page=3&per_page=5>; rel="prev"`,
+				`<http://1.2.3.4/api/management/v1/admission/devices?page=1&per_page=5>; rel="first"`,
+			},
+		},
+
+		"valid pagination, with next page": {
+			skip:  15,
+			limit: 6,
+
+			req: test.MakeSimpleRequest("GET",
+				"http://1.2.3.4/api/management/v1/admission/devices?page=4&per_page=5", nil),
+
+			getAuthSetsRes: mockAuthSets(9),
+
+			code: 200,
+			body: toJsonString(t, mockAuthSets(5)),
+			links: []string{
+				`<http://1.2.3.4/api/management/v1/admission/devices?page=3&per_page=5>; rel="prev"`,
+				`<http://1.2.3.4/api/management/v1/admission/devices?page=1&per_page=5>; rel="first"`,
+			},
+		},
+		"invalid pagination: format": {
+			req: test.MakeSimpleRequest("GET",
+				"http://1.2.3.4/api/management/v1/admission/devices?page=foo&per_page=5", nil),
+			code: 400,
+			body: RestError(rest_utils.MsgQueryParmInvalid("page")),
+		},
+		"invalid pagination: bounds": {
+			req: test.MakeSimpleRequest("GET",
+				"http://1.2.3.4/api/management/v1/admission/devices?page=0&per_page=5", nil),
+			code: 400,
+			body: RestError(rest_utils.MsgQueryParmLimit("page")),
+		},
+		"valid status: accepted": {
+			skip:   15,
+			limit:  6,
+			filter: store.AuthSetFilter{Status: "accepted"},
+
+			getAuthSetsRes: mockAuthSets(6),
+			req: test.MakeSimpleRequest("GET",
+				"http://1.2.3.4/api/management/v1/admission/devices?page=4&per_page=5&status=accepted", nil),
+			code: 200,
+			body: toJsonString(t, mockAuthSets(5)),
+		},
+		"valid status: preauthorized": {
+			skip:   15,
+			limit:  6,
+			filter: store.AuthSetFilter{Status: "preauthorized"},
+
+			getAuthSetsRes: mockAuthSets(6),
+			req: test.MakeSimpleRequest("GET",
+				"http://1.2.3.4/api/management/v1/admission/devices?page=4&per_page=5&status=preauthorized", nil),
+			code: 200,
+			body: toJsonString(t, mockAuthSets(5)),
+		},
+		"invalid status": {
+			req: test.MakeSimpleRequest("GET",
+				"http://1.2.3.4/api/management/v1/admission/devices?page=1&per_page=5&status=foo", nil),
+			code: 400,
+			body: RestError(rest_utils.MsgQueryParmOneOf("status", DevStatuses)),
+		},
+		"db.GetAuthSets error": {
+			skip:           15,
+			limit:          6,
+			getAuthSetsErr: errors.New("db error"),
+			req: test.MakeSimpleRequest("GET",
+				"http://1.2.3.4/api/management/v1/admission/devices?page=4&per_page=5", nil),
+			code: 500,
+			body: RestError("internal error"),
+		},
+	}
+
+	for idx := range tcases {
+		tc := tcases[idx]
+		t.Run(fmt.Sprintf("tc %s", idx), func(t *testing.T) {
+			t.Parallel()
+
+			db := &smocks.DataStore{}
+			db.On("GetAuthSets",
+				mtest.ContextMatcher(),
+				tc.skip,
+				tc.limit,
+				tc.filter).Return(tc.getAuthSetsRes, tc.getAuthSetsErr)
+
+			apih := makeMockApiHandler(t, nil, db)
+
+			recorded := runTestRequest(t, apih, tc.req, tc.code, tc.body)
+
+			for _, h := range tc.links {
+				assert.Equal(t, h, ExtractHeader("Link", h, recorded))
+			}
+		})
+	}
+}
+
+func TestApiDevAuthDevAdmGetDevice(t *testing.T) {
+	t.Parallel()
+
+	// enforce specific field naming in errors returned by API
+	updateRestErrorFieldName()
+
+	tcases := map[string]struct {
+		aid string
+
+		dbAuthSet *model.AuthSet
+		dbErr     error
+
+		checker mt.ResponseChecker
+	}{
+		"ok": {
+			aid: "foo",
+
+			dbAuthSet: &model.AuthSet{
+				Id:       "foo",
+				DeviceId: "foo-dev",
+				IdData:   `{"sn": "dev-foo-sn"}`,
+				Status:   "accepted",
+				PubKey:   "foo-dev-key",
+			},
+			checker: mt.NewJSONResponse(
+				http.StatusOK,
+				nil,
+				&model.DevAdmAuthSet{
+					Id:             "foo",
+					DeviceId:       "foo-dev",
+					DeviceIdentity: `{"sn": "dev-foo-sn"}`,
+					Status:         "accepted",
+					Key:            "foo-dev-key",
+					Attributes: map[string]interface{}{
+						"sn": "dev-foo-sn",
+					}}),
+		},
+		"error: not found": {
+			aid: "foo",
+
+			dbErr: store.ErrDevNotFound,
+			checker: mt.NewJSONResponse(
+				http.StatusNotFound,
+				nil,
+				restError("authorization set not found")),
+		},
+		"error: generic db error": {
+			aid: "foo",
+
+			dbErr: errors.New("an error"),
+			checker: mt.NewJSONResponse(
+				http.StatusInternalServerError,
+				nil,
+				restError("internal error")),
+		},
+		"error: auth set conversion error": {
+			aid: "foo",
+
+			dbAuthSet: &model.AuthSet{
+				Id:       "foo",
+				DeviceId: "foo-dev",
+				IdData:   "not json",
+				Status:   "accepted",
+				PubKey:   "foo-dev-key",
+			},
+			checker: mt.NewJSONResponse(
+				http.StatusInternalServerError,
+				nil,
+				restError("internal error")),
+		},
+	}
+
+	for idx := range tcases {
+		tc := tcases[idx]
+		t.Run(fmt.Sprintf("tc %s", idx), func(t *testing.T) {
+			t.Parallel()
+
+			db := &smocks.DataStore{}
+			db.On("GetAuthSetById",
+				mtest.ContextMatcher(),
+				tc.aid).Return(tc.dbAuthSet, tc.dbErr)
+
+			apih := makeMockApiHandler(t, nil, db)
+
+			//make request
+			req := makeReq("GET",
+				"http://1.2.3.4/api/management/v1/admission/devices/"+tc.aid,
+				"",
+				nil)
+			recorded := test.RunRequest(t, apih, req)
+
+			mt.CheckResponse(t, tc.checker, recorded)
+		})
+	}
+}
+
+func TestApiDevAuthDevAdmDeleteDeviceAuthSet(t *testing.T) {
+	t.Parallel()
+
+	// enforce specific field naming in errors returned by API
+	updateRestErrorFieldName()
+
+	tcases := map[string]struct {
+		aid string
+
+		dbAuthSet *model.AuthSet
+		dbErr     error
+
+		daErr error
+
+		checker mt.ResponseChecker
+	}{
+		"ok": {
+			aid: "foo",
+
+			dbAuthSet: &model.AuthSet{
+				Id:       "foo",
+				DeviceId: "foo-dev",
+				IdData:   `{"sn": "dev-foo-sn"}`,
+				Status:   "accepted",
+				PubKey:   "foo-dev-key",
+			},
+
+			checker: mt.NewJSONResponse(
+				http.StatusNoContent,
+				nil,
+				nil),
+		},
+		"error: not found (db)": {
+			aid: "foo",
+
+			dbErr: store.ErrDevNotFound,
+
+			checker: mt.NewJSONResponse(
+				http.StatusNoContent,
+				nil,
+				nil),
+		},
+
+		"error: not found(app)": {
+			aid: "foo",
+
+			dbAuthSet: &model.AuthSet{
+				Id:       "foo",
+				DeviceId: "foo-dev",
+				IdData:   `{"sn": "dev-foo-sn"}`,
+				Status:   "accepted",
+				PubKey:   "foo-dev-key",
+			},
+
+			daErr: store.ErrDevNotFound,
+
+			checker: mt.NewJSONResponse(
+				http.StatusNoContent,
+				nil,
+				nil),
+		},
+		"error: generic db error": {
+			aid: "foo",
+
+			dbErr: errors.New("an error"),
+
+			checker: mt.NewJSONResponse(
+				http.StatusInternalServerError,
+				nil,
+				restError("internal error")),
+		},
+		"error: generic app error": {
+			aid: "foo",
+
+			dbAuthSet: &model.AuthSet{
+				Id:       "foo",
+				DeviceId: "foo-dev",
+				IdData:   `{"sn": "dev-foo-sn"}`,
+				Status:   "accepted",
+				PubKey:   "foo-dev-key",
+			},
+
+			daErr: errors.New("an error"),
+
+			checker: mt.NewJSONResponse(
+				http.StatusInternalServerError,
+				nil,
+				restError("internal error")),
+		},
+	}
+
+	for idx := range tcases {
+		tc := tcases[idx]
+		t.Run(fmt.Sprintf("tc %s", idx), func(t *testing.T) {
+			t.Parallel()
+
+			db := &smocks.DataStore{}
+			db.On("GetAuthSetById",
+				mtest.ContextMatcher(),
+				tc.aid).Return(tc.dbAuthSet, tc.dbErr)
+
+			da := &mocks.App{}
+			if tc.dbAuthSet != nil {
+				da.On("DeleteAuthSet",
+					mtest.ContextMatcher(),
+					tc.dbAuthSet.DeviceId,
+					tc.aid).Return(tc.daErr)
+			} else {
+				da.On("DeleteAuthSet",
+					mtest.ContextMatcher(),
+					mock.AnythingOfType("string"),
+					tc.aid).Return(tc.daErr)
+			}
+
+			apih := makeMockApiHandler(t, da, db)
+
+			//make request
+			req := makeReq("DELETE",
+				"http://1.2.3.4/api/management/v1/admission/devices/"+tc.aid,
+				"",
+				nil)
+			recorded := test.RunRequest(t, apih, req)
+
+			mt.CheckResponse(t, tc.checker, recorded)
+		})
+	}
+}
+
+func mockAuthSets(num int) []model.DevAdmAuthSet {
+	var sets []model.DevAdmAuthSet
+	for i := 0; i < num; i++ {
+		sets = append(sets, model.DevAdmAuthSet{
+			Id:       strconv.Itoa(i),
+			DeviceId: strconv.Itoa(i),
+		})
+	}
+	return sets
+}
+
+func ExtractHeader(hdr, val string, r *test.Recorded) string {
+	rec := r.Recorder
+	for _, v := range rec.Header()[hdr] {
+		if v == val {
+			return v
+		}
+	}
+
+	return ""
+}
+
+func TestApiDevAuthDevAdmPostDeviceAuth(t *testing.T) {
+	testCases := map[string]struct {
+		body interface{}
+
+		devAuthErr error
+
+		checker mt.ResponseChecker
+	}{
+		"ok": {
+			body: &model.DevAdmAuthSetReq{Key: "foo-key", DeviceId: toJsonString(t,
+				map[string]string{
+					"mac": "00:00:00:01",
+				}),
+			},
+			checker: mt.NewJSONResponse(
+				http.StatusCreated,
+				nil,
+				nil),
+		},
+		"error: empty request": {
+			body: nil,
+			checker: mt.NewJSONResponse(
+				http.StatusBadRequest,
+				nil,
+				restError("EOF")),
+		},
+		"error: generic": {
+			body: &model.DevAdmAuthSetReq{Key: "foo-key", DeviceId: toJsonString(t,
+				map[string]string{
+					"mac": "00:00:00:01",
+				})},
+			devAuthErr: errors.New("generic error"),
+			checker: mt.NewJSONResponse(
+				http.StatusInternalServerError,
+				nil,
+				restError("internal error")),
+		},
+		"error: no key": {
+			body: &model.DevAdmAuthSetReq{Key: "", DeviceId: toJsonString(t,
+				map[string]string{
+					"mac": "00:00:00:01",
+				})},
+			checker: mt.NewJSONResponse(
+				http.StatusBadRequest,
+				nil,
+				restError("key: non zero value required")),
+		},
+		"error: no identity data": {
+			body: &model.DevAdmAuthSetReq{Key: "foo-key"},
+			checker: mt.NewJSONResponse(
+				http.StatusBadRequest,
+				nil,
+				restError("device_identity: non zero value required")),
+		},
+		"error: conflict": {
+			body: &model.DevAdmAuthSetReq{Key: "foo-key", DeviceId: toJsonString(t,
+				map[string]string{
+					"mac": "00:00:00:01",
+				})},
+			devAuthErr: devauth.ErrDeviceExists,
+			checker: mt.NewJSONResponse(
+				http.StatusConflict,
+				nil,
+				restError("device already exists")),
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Logf("test case: %s", name)
+		da := &mocks.App{}
+		da.On("PreauthorizeDevice",
+			mtest.ContextMatcher(),
+			mock.AnythingOfType("*model.PreAuthReq")).
+			Return(tc.devAuthErr)
+
+		apih := makeMockApiHandler(t, da, nil)
+
+		//make request
+		req := makeReq("POST",
+			"http://1.2.3.4/api/management/v1/admission/devices",
+			"",
+			tc.body)
+
+		recorded := test.RunRequest(t, apih, req)
+		mt.CheckResponse(t, tc.checker, recorded)
+	}
+}
+
+func toJsonString(t *testing.T, d interface{}) string {
+	out, err := json.Marshal(d)
+	if err != nil {
+		t.FailNow()
+	}
+
+	return string(out)
 }

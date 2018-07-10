@@ -19,6 +19,7 @@ import (
 	"strings"
 
 	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/globalsign/mgo/bson"
 	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/mendersoftware/go-lib-micro/rest_utils"
 	"github.com/pkg/errors"
@@ -48,25 +49,34 @@ const (
 	uriTenants            = "/api/internal/v1/devauth/tenants"
 	uriTenantDeviceStatus = "/api/internal/v1/devauth/tenants/:tid/devices/:did/status"
 
+	// migrated devadm api
+	uriDevadmAuthSetStatus = "/api/management/v1/admission/devices/:aid/status"
+	uriDevadmDevices       = "/api/management/v1/admission/devices"
+	uriDevadmDevice        = "/api/management/v1/admission/devices/:aid"
+
 	HdrAuthReqSign = "X-MEN-Signature"
 )
 
 var (
 	ErrIncorrectStatus = errors.New("incorrect device status")
 	ErrNoAuthHeader    = errors.New("no authorization header")
+
+	DevStatuses = []string{model.DevStatusPending, model.DevStatusRejected, model.DevStatusAccepted, model.DevStatusPreauth}
 )
 
 type DevAuthApiHandlers struct {
 	devAuth devauth.App
+	db      store.DataStore
 }
 
 type DevAuthApiStatus struct {
 	Status string `json:"status"`
 }
 
-func NewDevAuthApiHandlers(devAuth devauth.App) ApiHandler {
+func NewDevAuthApiHandlers(devAuth devauth.App, db store.DataStore) ApiHandler {
 	return &DevAuthApiHandlers{
 		devAuth: devAuth,
+		db:      db,
 	}
 }
 
@@ -103,6 +113,16 @@ func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
 		rest.Post(uriTenants, d.ProvisionTenantHandler),
 
 		rest.Get(uriTenantDeviceStatus, d.GetTenantDeviceStatus),
+
+		rest.Put(uriDevadmAuthSetStatus, d.DevAdmUpdateAuthSetStatusHandler),
+
+		rest.Get(uriDevadmAuthSetStatus, d.DevAdmGetAuthSetStatusHandler),
+
+		rest.Get(uriDevadmDevices, d.DevAdmGetDevicesHandler),
+
+		rest.Post(uriDevadmDevices, d.DevAdmPostDevicesHandler),
+		rest.Get(uriDevadmDevice, d.DevAdmGetDeviceHandler),
+		rest.Delete(uriDevadmDevice, d.DevAdmDeleteDeviceAuthSetHandler),
 	}
 
 	app, err := rest.MakeRouter(
@@ -330,6 +350,38 @@ func (d *DevAuthApiHandlers) DeleteDeviceAuthSetHandler(w rest.ResponseWriter, r
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (d *DevAuthApiHandlers) DevAdmDeleteDeviceAuthSetHandler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+
+	l := log.FromContext(ctx)
+
+	authId := r.PathParam("aid")
+
+	aset, err := d.db.GetAuthSetById(ctx, authId)
+	switch err {
+	case nil:
+		break
+	case store.ErrDevNotFound:
+		w.WriteHeader(http.StatusNoContent)
+		return
+	default:
+		rest_utils.RestErrWithLogInternal(w, r, l, err)
+		return
+	}
+
+	err = d.devAuth.DeleteAuthSet(ctx, aset.DeviceId, authId)
+	switch err {
+	case nil:
+		w.WriteHeader(http.StatusNoContent)
+	case store.ErrDevNotFound:
+		w.WriteHeader(http.StatusNoContent)
+		return
+	default:
+		rest_utils.RestErrWithLogInternal(w, r, l, err)
+		return
+	}
+}
+
 func (d *DevAuthApiHandlers) DeleteTokenHandler(w rest.ResponseWriter, r *rest.Request) {
 	ctx := r.Context()
 
@@ -538,6 +590,183 @@ func (d *DevAuthApiHandlers) DeleteTokensHandler(w rest.ResponseWriter, r *rest.
 	}
 }
 
+func (d *DevAuthApiHandlers) DevAdmUpdateAuthSetStatusHandler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+	l := log.FromContext(ctx)
+
+	authid := r.PathParam("aid")
+
+	var status model.Status
+	err := r.DecodeJsonPayload(&status)
+	if err != nil {
+		rest_utils.RestErrWithLog(w, r, l,
+			errors.Wrap(err, "failed to decode status data"),
+			http.StatusBadRequest)
+		return
+	}
+
+	// validate status
+	if status.Status != model.DevStatusAccepted &&
+		status.Status != model.DevStatusRejected {
+		rest_utils.RestErrWithLog(w, r, l,
+			errors.New("incorrect device status"),
+			http.StatusBadRequest)
+		return
+	}
+
+	// get device id with authset directly from store
+	aset, err := d.db.GetAuthSetById(ctx, authid)
+	switch err {
+	case nil:
+		break
+	case store.ErrDevNotFound:
+		rest_utils.RestErrWithLog(w, r, l, store.ErrAuthSetNotFound, http.StatusNotFound)
+		return
+	default:
+		rest_utils.RestErrWithLogInternal(w, r, l,
+			errors.Wrapf(err,
+				"failed to fetch auth set %s",
+				authid))
+		return
+	}
+
+	if status.Status == model.DevStatusAccepted {
+		err = d.devAuth.AcceptDeviceAuth(ctx, aset.DeviceId, authid)
+	} else if status.Status == model.DevStatusRejected {
+		err = d.devAuth.RejectDeviceAuth(ctx, aset.DeviceId, authid)
+	}
+
+	switch err {
+	case nil:
+		w.WriteJson(&status)
+	case store.ErrDevNotFound:
+		rest_utils.RestErrWithLog(w, r, l, store.ErrAuthSetNotFound, http.StatusNotFound)
+	case devauth.ErrMaxDeviceCountReached:
+		rest_utils.RestErrWithLog(w, r, l, err, http.StatusUnprocessableEntity)
+	default:
+		rest_utils.RestErrWithLogInternal(w, r, l,
+			errors.Wrap(err,
+				"failed to change auth set status"))
+	}
+}
+
+func (d *DevAuthApiHandlers) DevAdmGetAuthSetStatusHandler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+	l := log.FromContext(ctx)
+
+	authid := r.PathParam("aid")
+
+	// get authset directly from store
+	aset, err := d.db.GetAuthSetById(ctx, authid)
+	switch err {
+	case nil:
+		break
+	case store.ErrDevNotFound:
+		rest_utils.RestErrWithLog(w, r, l, store.ErrAuthSetNotFound, http.StatusNotFound)
+		return
+	default:
+		rest_utils.RestErrWithLogInternal(w, r, l,
+			errors.Wrapf(err,
+				"failed to fetch auth set %s",
+				authid))
+		return
+	}
+
+	switch err {
+	case nil:
+		w.WriteJson(&model.Status{Status: aset.Status})
+	case store.ErrDevNotFound:
+		rest_utils.RestErrWithLog(w, r, l, store.ErrAuthSetNotFound, http.StatusNotFound)
+	default:
+		rest_utils.RestErrWithLogInternal(w, r, l,
+			errors.Wrap(err, "failed to get auth set status"))
+	}
+}
+
+func (d *DevAuthApiHandlers) DevAdmGetDevicesHandler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+	l := log.FromContext(ctx)
+
+	page, perPage, err := rest_utils.ParsePagination(r)
+	if err != nil {
+		rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		return
+	}
+
+	status, err := rest_utils.ParseQueryParmStr(r, "status", false, DevStatuses)
+	if err != nil {
+		rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		return
+	}
+
+	deviceId, err := rest_utils.ParseQueryParmStr(r, "device_id", false, nil)
+	if err != nil {
+		rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		return
+	}
+
+	//get one extra device to see if there's a 'next' page
+	devs, err := d.db.GetAuthSets(ctx,
+		int((page-1)*perPage), int(perPage+1),
+		store.AuthSetFilter{
+			Status:   status,
+			DeviceID: deviceId,
+		})
+
+	if err != nil {
+		rest_utils.RestErrWithLogInternal(w, r, l, errors.Wrap(err, "failed to list devices"))
+		return
+	}
+
+	len := len(devs)
+	hasNext := false
+	if uint64(len) > perPage {
+		hasNext = true
+		len = int(perPage)
+	}
+
+	links := rest_utils.MakePageLinkHdrs(r, page, perPage, hasNext)
+
+	for _, l := range links {
+		w.Header().Add("Link", l)
+	}
+
+	w.WriteJson(devs[:len])
+}
+
+func (d *DevAuthApiHandlers) DevAdmPostDevicesHandler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+	l := log.FromContext(ctx)
+
+	// parse authenticate set
+	defer r.Body.Close()
+	authSet, err := model.ParseDevAdmAuthSetReq(r.Body)
+	if err != nil {
+		rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		return
+	}
+	// translate to devauth object
+	req := &model.PreAuthReq{
+		DeviceId:  bson.NewObjectId().Hex(),
+		AuthSetId: bson.NewObjectId().Hex(),
+		IdData:    authSet.DeviceId,
+		PubKey:    authSet.Key,
+	}
+
+	//TODO: handle identity attributes in one of the tasks of the MEN-1965 epic
+
+	err = d.devAuth.PreauthorizeDevice(ctx, req)
+	switch err {
+	case nil:
+		w.WriteHeader(http.StatusCreated)
+	case devauth.ErrDeviceExists:
+		rest_utils.RestErrWithLog(w, r, l, err, http.StatusConflict)
+	default:
+		rest_utils.RestErrWithLogInternal(w, r, l, err)
+	}
+
+}
+
 func (d *DevAuthApiHandlers) ProvisionTenantHandler(w rest.ResponseWriter, r *rest.Request) {
 	ctx := r.Context()
 	l := log.FromContext(ctx)
@@ -586,6 +815,33 @@ func (d *DevAuthApiHandlers) GetTenantDeviceStatus(w rest.ResponseWriter, r *res
 	default:
 		rest_utils.RestErrWithLogInternal(w, r, l, err)
 	}
+}
+
+func (d *DevAuthApiHandlers) DevAdmGetDeviceHandler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+	l := log.FromContext(ctx)
+
+	authid := r.PathParam("aid")
+
+	auth, err := d.db.GetAuthSetById(ctx, authid)
+	switch err {
+	case nil:
+		break
+	case store.ErrDevNotFound:
+		rest_utils.RestErrWithLog(w, r, l, store.ErrAuthSetNotFound, http.StatusNotFound)
+		return
+	default:
+		rest_utils.RestErrWithLogInternal(w, r, l, err)
+		return
+	}
+
+	devadm_auth, err := model.NewDevAdmAuthSet(*auth)
+	if err != nil {
+		rest_utils.RestErrWithLogInternal(w, r, l, err)
+		return
+	}
+
+	w.WriteJson(devadm_auth)
 }
 
 // Validate status.

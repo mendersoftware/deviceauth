@@ -40,6 +40,11 @@ const (
 	NoCollectionErrMsg = "ns doesn't exist"
 )
 
+type AuthSetFilter struct {
+	DeviceID string `bson:"device_id,omitempty"`
+	Status   string `bson:"status,omitempty"`
+}
+
 type DataStore interface {
 	// retrieve device by Mender-assigned device ID
 	//returns ErrDevNotFound if device not found
@@ -105,6 +110,8 @@ type DataStore interface {
 
 	// gets device status
 	GetDeviceStatus(ctx context.Context, dev_id string) (string, error)
+
+	GetAuthSets(ctx context.Context, skip, limit int, filter AuthSetFilter) ([]model.DevAdmAuthSet, error)
 
 	MigrateTenant(ctx context.Context, version string, tenant string) error
 	WithAutomigrate() DataStore
