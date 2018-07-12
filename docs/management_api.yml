@@ -361,6 +361,9 @@ definitions:
           type: array
           items:
               $ref: "#/definitions/AuthSet"
+      decommissioning:
+          type: boolean
+          description: Devices that are part of ongoing decomissioning process will return True
   AuthSet:
     description: Authentication data set
     type: object
