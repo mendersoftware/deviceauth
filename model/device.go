@@ -33,7 +33,7 @@ type Device struct {
 	PubKey          string    `json:"-" bson:",omitempty"`
 	IdData          string    `json:"id_data" bson:"id_data,omitempty"`
 	Status          string    `json:"-" bson:",omitempty"`
-	Decommissioning bool      `json:"-" bson:",omitempty"`
+	Decommissioning bool      `json:"decommissioning" bson:",omitempty"`
 	CreatedTs       time.Time `json:"created_ts" bson:"created_ts,omitempty"`
 	UpdatedTs       time.Time `json:"updated_ts" bson:"updated_ts,omitempty"`
 	AuthSets        []AuthSet `json:"auth_sets" bson:"-"`
