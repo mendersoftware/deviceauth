@@ -17,7 +17,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/globalsign/mgo/bson"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	ctxstore "github.com/mendersoftware/go-lib-micro/store"
@@ -68,13 +67,12 @@ func (m *migration_1_1_0) Up(from migrate.Version) error {
 		asetId := olddev.Id
 
 		aset := model.AuthSet{
-			Id:                asetId,
-			IdData:            olddev.IdData,
-			PubKey:            olddev.PubKey,
-			DeviceId:          olddev.Id,
-			Status:            olddev.Status,
-			Timestamp:         &olddev.UpdatedTs,
-			AdmissionNotified: to.BoolPtr(true),
+			Id:        asetId,
+			IdData:    olddev.IdData,
+			PubKey:    olddev.PubKey,
+			DeviceId:  olddev.Id,
+			Status:    olddev.Status,
+			Timestamp: &olddev.UpdatedTs,
 		}
 
 		if err := s.DB(ctxstore.DbFromContext(m.ctx, DbName)).

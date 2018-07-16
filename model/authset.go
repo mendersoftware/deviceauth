@@ -28,22 +28,20 @@ const (
 )
 
 type AuthSet struct {
-	Id                string     `json:"id" bson:"_id,omitempty"`
-	IdData            string     `json:"id_data" bson:"id_data,omitempty"`
-	PubKey            string     `json:"pubkey" bson:"pubkey,omitempty"`
-	DeviceId          string     `json:"-" bson:"device_id,omitempty"`
-	Timestamp         *time.Time `json:"ts" bson:"ts,omitempty"`
-	Status            string     `json:"status" bson:"status,omitempty"`
-	AdmissionNotified *bool      `json:"-" bson:"admission_notified,omitempty"`
+	Id        string     `json:"id" bson:"_id,omitempty"`
+	IdData    string     `json:"id_data" bson:"id_data,omitempty"`
+	PubKey    string     `json:"pubkey" bson:"pubkey,omitempty"`
+	DeviceId  string     `json:"-" bson:"device_id,omitempty"`
+	Timestamp *time.Time `json:"ts" bson:"ts,omitempty"`
+	Status    string     `json:"status" bson:"status,omitempty"`
 }
 
 type AuthSetUpdate struct {
-	IdData            string     `bson:"id_data,omitempty"`
-	PubKey            string     `bson:"pubkey,omitempty"`
-	DeviceId          string     `bson:"device_id,omitempty"`
-	Timestamp         *time.Time `bson:"ts,omitempty"`
-	Status            string     `bson:"status,omitempty"`
-	AdmissionNotified *bool      `bson:"admission_notified,omitempty"`
+	IdData    string     `bson:"id_data,omitempty"`
+	PubKey    string     `bson:"pubkey,omitempty"`
+	DeviceId  string     `bson:"device_id,omitempty"`
+	Timestamp *time.Time `bson:"ts,omitempty"`
+	Status    string     `bson:"status,omitempty"`
 }
 
 type DevAdmAuthSet struct {
