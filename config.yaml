@@ -14,7 +14,7 @@
 # middleware: dev
 
 # Mongodb connection string
-# Defaults to: mongo-device-adm
+# Defaults to: mongo-device-auth
 # Overwrite with environment variable: DEVICEAUTH_MONGO
 
 # mongo: mongo-device-auth
