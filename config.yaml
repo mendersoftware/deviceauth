@@ -48,12 +48,6 @@
 
 # mongo_password: secret
 
-# Device admission service address
-# Defaults to: http://mender-device-adm:8080
-# Overwrite with environment variable: DEVICEAUTH_DEVADM_ADDR
-
-# devadm_addr: http://mender-device-auth:8080
-
 # Conductor service address
 # Defaults to: http://mender-conductor:8080
 # Overwrite with environment variable: DEVICEAUTH_DEVICE_AUTH_ORCHESTRATOR
