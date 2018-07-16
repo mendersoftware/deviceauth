@@ -31,7 +31,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/satori/go.uuid"
 
-	"github.com/mendersoftware/deviceauth/client/deviceadm"
 	"github.com/mendersoftware/deviceauth/client/orchestrator"
 	"github.com/mendersoftware/deviceauth/client/tenant"
 	"github.com/mendersoftware/deviceauth/jwt"
@@ -106,7 +105,6 @@ type App interface {
 
 type DevAuth struct {
 	db           store.DataStore
-	cDevAdm      deviceadm.ClientRunner
 	cOrch        orchestrator.ClientRunner
 	cTenant      tenant.ClientRunner
 	jwt          jwt.Handler
@@ -124,12 +122,11 @@ type Config struct {
 	MaxDevicesLimitDefault uint64
 }
 
-func NewDevAuth(d store.DataStore, cda deviceadm.ClientRunner,
-	co orchestrator.ClientRunner, jwt jwt.Handler, config Config) *DevAuth {
+func NewDevAuth(d store.DataStore, co orchestrator.ClientRunner,
+	jwt jwt.Handler, config Config) *DevAuth {
 
 	return &DevAuth{
 		db:           d,
-		cDevAdm:      cda,
 		cOrch:        co,
 		jwt:          jwt,
 		clientGetter: simpleApiClientGetter,
@@ -325,15 +322,6 @@ func (d *DevAuth) processPreAuthRequest(ctx context.Context, r *model.AuthReq) (
 		return nil, ErrMaxDeviceCountReached
 	}
 
-	// propagate 'accepted' status to deviceadm
-	sreq := deviceadm.UpdateStatusReq{
-		Status: model.DevStatusAccepted,
-	}
-
-	if err := d.cDevAdm.UpdateStatusInternal(ctx, aset.Id, sreq, d.clientGetter()); err != nil {
-		return nil, errors.Wrap(err, "devadm update status error")
-	}
-
 	if !deviceAlreadyAccepted {
 		reqId := requestid.FromContext(ctx)
 
@@ -372,9 +360,8 @@ func (d *DevAuth) processPreAuthRequest(ctx context.Context, r *model.AuthReq) (
 	return aset, nil
 }
 
-// processAuthRequest will process incoming auth request, record authentication
-// data information it contains and optionally upload the data to device
-// admission service. Returns a tupe (auth set, error). If no errors were
+// processAuthRequest will process incoming auth request and record authentication
+// data information it contains. Returns a tupe (auth set, error). If no errors were
 // present, model.AuthSet.Status will indicate the status of device admission
 func (d *DevAuth) processAuthRequest(ctx context.Context, r *model.AuthReq) (*model.AuthSet, error) {
 
@@ -393,13 +380,10 @@ func (d *DevAuth) processAuthRequest(ctx context.Context, r *model.AuthReq) (*mo
 		Status:    model.DevStatusPending,
 		Timestamp: uto.TimePtr(time.Now()),
 	}
-	added := true
 	// record authentication request
 	err = d.db.AddAuthSet(ctx, *areq)
 	if err != nil && err != store.ErrObjectExists {
 		return nil, err
-	} else if err == store.ErrObjectExists {
-		added = false
 	}
 	// either the request was added or it was already present in the DB, get
 	// it now
@@ -407,29 +391,6 @@ func (d *DevAuth) processAuthRequest(ctx context.Context, r *model.AuthReq) (*mo
 	if err != nil {
 		l.Error("failed to find device auth set but could not add one either")
 		return nil, errors.New("failed to locate device auth set")
-	}
-
-	// it it was indeed added (a new request), pass it to admission service
-	if added || !to.Bool(areq.AdmissionNotified) {
-		admreq := deviceadm.AdmReq{
-			AuthId:   areq.Id,
-			DeviceId: dev.Id,
-			IdData:   r.IdData,
-			PubKey:   r.PubKey,
-		}
-		if err := d.cDevAdm.AddDevice(ctx, admreq, d.clientGetter()); err != nil {
-			// we've failed to submit the request, no worries, just
-			// return an error
-			return nil, errors.Wrap(err, "devadm add device error")
-		}
-
-		if err := d.db.UpdateAuthSet(ctx, *areq, model.AuthSetUpdate{
-			AdmissionNotified: to.BoolPtr(true),
-		}); err != nil {
-			l.Errorf("failed to update auth set data: %v", err)
-			// nothing bad happens here, we'll try to post the
-			// request next time device pings us
-		}
 	}
 
 	return areq, nil

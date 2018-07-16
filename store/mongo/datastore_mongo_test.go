@@ -932,18 +932,14 @@ func TestStoreAuthSet(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, as)
 
-	assert.False(t, to.Bool(as.AdmissionNotified))
-
 	err = db.UpdateAuthSet(ctx, asin, model.AuthSetUpdate{
-		AdmissionNotified: to.BoolPtr(true),
-		Timestamp:         uto.TimePtr(time.Now()),
+		Timestamp: uto.TimePtr(time.Now()),
 	})
 	assert.NoError(t, err)
 
 	as, err = db.GetAuthSetByDataKey(ctx, "foobar", "pubkey-1")
 	assert.NoError(t, err)
 	assert.NotNil(t, as)
-	assert.True(t, to.Bool(as.AdmissionNotified))
 	assert.WithinDuration(t, time.Now(), uto.Time(as.Timestamp), time.Second)
 
 	// clear timestamp field
@@ -957,7 +953,6 @@ func TestStoreAuthSet(t *testing.T) {
 	as, err = db.GetAuthSetByDataKey(ctx, "foobar", "pubkey-2")
 	assert.NoError(t, err)
 	assert.NotNil(t, as)
-	assert.True(t, to.Bool(as.AdmissionNotified))
 
 	asid, err := db.GetAuthSetById(ctx, as.Id)
 	assert.NoError(t, err)
