@@ -139,7 +139,7 @@ def cli():
 
 @pytest.fixture(scope="session")
 def mongo():
-    return MongoClient('mender-mongo-device-auth:27017')
+    return MongoClient('mender-mongo:27017')
 
 
 def mongo_cleanup(mongo):
