@@ -31,7 +31,7 @@ from Crypto.Signature import PKCS1_v1_5
 from Crypto.Hash import SHA256
 
 from client import SimpleInternalClient, SimpleManagementClient, \
-    BaseDevicesApiClient
+    BaseDevicesApiClient, SimpleAdmissionClient
 
 import mockserver
 import os
@@ -182,6 +182,11 @@ def internal_api():
 @pytest.yield_fixture(scope='session')
 def device_api():
     yield BaseDevicesApiClient()
+
+
+@pytest.yield_fixture(scope='session')
+def admission_api():
+    yield SimpleAdmissionClient()
 
 
 def make_fake_tenant_token(tenant):
