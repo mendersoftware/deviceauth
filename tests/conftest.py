@@ -28,3 +28,8 @@ def pytest_configure(config):
     # configure bravado related loggers to be less verbose
     logging.getLogger('swagger_spec_validator').setLevel(logging.INFO)
     logging.getLogger('bravado_core').setLevel(logging.INFO)
+    host = config.getoption("host")
+    if not host:
+        print("you didn't pass all of the required arguments")
+        print(host)
+        sys.exit(1)
