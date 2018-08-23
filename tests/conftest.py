@@ -19,6 +19,7 @@ def pytest_addoption(parser):
                      help="host running API")
     parser.addoption("--spec", default="../docs/internal_api.yml")
     parser.addoption("--management-spec", default="../docs/management_api.yml")
+    parser.addoption("--admission-spec", default="../docs/management_api_admission.yml")
 
 def pytest_configure(config):
     lvl = logging.INFO
