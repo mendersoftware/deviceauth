@@ -19,6 +19,7 @@ def pytest_addoption(parser):
                      help="host running API")
     parser.addoption("--spec", default="../docs/internal_api.yml")
     parser.addoption("--management-spec", default="../docs/management_api.yml")
+    parser.addoption("--admission-spec", default="../docs/management_api_admission.yml")
 
 def pytest_configure(config):
     lvl = logging.INFO
@@ -28,3 +29,8 @@ def pytest_configure(config):
     # configure bravado related loggers to be less verbose
     logging.getLogger('swagger_spec_validator').setLevel(logging.INFO)
     logging.getLogger('bravado_core').setLevel(logging.INFO)
+    host = config.getoption("host")
+    if not host:
+        print("you didn't pass all of the required arguments")
+        print(host)
+        sys.exit(1)
