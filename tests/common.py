@@ -57,7 +57,7 @@ class Device(object):
     def __init__(self, id_data=None):
         if id_data is None:
             mac = ":".join(["{:02x}".format(random.randint(0x00, 0xFF), 'x') for i in range(6)])
-            self.identity = json.dumps({"mac": mac})
+            self.identity = json.dumps({"mac": mac}).replace(" ","")
         else:
             self.identity = id_data
 
