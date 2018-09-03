@@ -17,6 +17,8 @@ import (
 	"encoding/json"
 	"io"
 
+	"github.com/mendersoftware/deviceauth/utils"
+
 	"github.com/asaskevich/govalidator"
 )
 
@@ -46,6 +48,12 @@ func ParsePreAuthReq(source io.Reader) (*PreAuthReq, error) {
 func (r *PreAuthReq) Validate() error {
 	if _, err := govalidator.ValidateStruct(*r); err != nil {
 		return err
+	}
+
+	if sorted, err := utils.JsonSort(r.IdData); err != nil {
+		return err
+	} else {
+		r.IdData = sorted
 	}
 
 	return nil

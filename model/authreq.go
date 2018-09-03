@@ -15,6 +15,8 @@ package model
 
 import (
 	"errors"
+
+	"github.com/mendersoftware/deviceauth/utils"
 )
 
 // note: fields with underscores need the 'bson' decorator
@@ -32,6 +34,12 @@ func (r *AuthReq) Validate() error {
 
 	if r.PubKey == "" {
 		return errors.New("pubkey must be provided")
+	}
+
+	if sorted, err := utils.JsonSort(r.IdData); err != nil {
+		return err
+	} else {
+		r.IdData = sorted
 	}
 
 	// not checking tenant token for now - TODO
