@@ -54,16 +54,15 @@ def sign_data(data, privateKey):
 
 
 class Device(object):
-    def __init__(self, mac=None):
-        self.mac = mac or \
-                   ":".join(["{:02x}".format(random.randint(0x00, 0xFF), 'x') for i in range(6)])
+    def __init__(self, id_data=None):
+        if id_data is None:
+            mac = ":".join(["{:02x}".format(random.randint(0x00, 0xFF), 'x') for i in range(6)])
+            self.identity = json.dumps({"mac": mac})
+        else:
+            self.identity = id_data
+
         self.private_key, self.public_key = get_keypair()
         self.token = ""
-
-    @property
-    def identity(self):
-        """Provides device identity as a string"""
-        return json.dumps({"mac": self.mac})
 
     def rotate_key(self):
         self.private_key, self.public_key = get_keypair()

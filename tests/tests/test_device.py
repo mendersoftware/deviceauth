@@ -228,6 +228,51 @@ class TestDevice:
             TestDevice.verify_device_count(management_api, 'accepted', 0)
             TestDevice.verify_device_count(management_api, 'rejected', 0)
 
+    def test_id_data_formatting(self, device_api, management_api, clean_migrated_db):
+        reference_id_data = [
+                '{"attribute_foo":"foo"}',
+                '{"attribute_bar":2, "attribute_foo":1}',
+                '{"attribute_foo":"foo","mac": "00:00:00:01","sn": "0001"}',
+        ]
+
+        reformatted_id_data = [
+                '{"attribute_foo": "foo"}',
+                ' { "attribute_foo": "foo" }',
+                '{"attribute_foo":1, "attribute_bar":2}',
+                '{ "attribute_foo":1, "attribute_bar":2}',
+                '{"sn": "0001","mac": "00:00:00:01","attribute_foo":"foo"}',
+        ]
+
+        # submit first auth req with 'reference data', second with 'reformatted' data
+        # must result in only 3 devices
+        with deviceadm.run_fake_for_device(deviceadm.ANY_DEVICE) as server:
+            for reference in reference_id_data:
+                dev = Device(reference)
+                da = DevAuthorizer()
+                rsp = device_auth_req(device_api.auth_requests_url, da, dev)
+                assert rsp.status_code == 401
+
+        devs = management_api.list_devices()
+        assert len(devs) == 3
+
+        with deviceadm.run_fake_for_device(deviceadm.ANY_DEVICE) as server:
+            for reformatted in reformatted_id_data:
+                dev = Device(reformatted)
+                da = DevAuthorizer()
+                rsp = device_auth_req(device_api.auth_requests_url, da, dev)
+                assert rsp.status_code == 401
+
+        devs = management_api.list_devices()
+        assert len(devs) == 3
+
+        # verify we have the correct id data
+        json_reference_id_data = [json.loads(i) for i in reference_id_data]
+        for d in devs:
+            api_id_data=json.loads(d.id_data)
+            found_in_reference = [x for x in json_reference_id_data if x == api_id_data]
+            assert len(found_in_reference) == 1
+
+
 class TestDeviceMultiTenant:
     @pytest.mark.parametrize('tenant_foobar_devices', ['5'], indirect=True)
     def test_device_limit_applied(self, management_api, internal_api,
