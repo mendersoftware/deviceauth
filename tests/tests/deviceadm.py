@@ -28,7 +28,8 @@ def auth_set_put_for_device(device=None, status=204):
         authset = json.loads(request.body.decode())
         log.info('new auth put %s', authset)
         if device:
-            assert authset.get('device_identity', None) == device.identity
+            assert json.loads(authset.get('device_identity', None)) == json.loads(device.identity)
+
             assert authset.get('key', None) == device.public_key
         else:
             assert authset.get('device_identity', None)

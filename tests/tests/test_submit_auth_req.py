@@ -33,7 +33,7 @@ PRIVKEY, PUBKEY = get_keypair()
 DEVID = 'devid-preauth'
 AID = 'aid-preauth'
 MAC = 'mac-preauth'
-IDDATA = json.dumps({'mac': MAC})
+IDDATA = json.dumps({'mac': MAC}).replace(" ","")
 
 @pytest.yield_fixture(scope='function')
 def clean_migrated_db(clean_db, cli, request):
@@ -114,15 +114,18 @@ def tenantadm_fake_tenant_verify():
 
 class TestDevicesSubmitAuthRequestBase:
     def _do_test_ok_preauth(self, management_api, device_api, tenant_token=""):
-        d = Device()
+        d = Device(IDDATA)
         d.public_key = PUBKEY
         d.private_key = PRIVKEY
-        d.mac = MAC
 
         da = DevAuthorizer(tenant_token=tenant_token)
 
         # get the authset id - need it for the url
         auth = management_api.make_auth(tenant_token)
+
+        dbg = management_api.list_devices()
+        print(dbg)
+
         dev = management_api.find_device_by_identity(d.identity, **auth)
         assert dev
 
@@ -149,10 +152,9 @@ class TestDevicesSubmitAuthRequestBase:
                 management_api.accept_device(dev.id, aid, **auth)
 
         try:
-            d = Device()
+            d = Device(IDDATA)
             d.public_key = PUBKEY
             d.private_key = PRIVKEY
-            d.mac = MAC
 
             da = DevAuthorizer(tenant_token)
 

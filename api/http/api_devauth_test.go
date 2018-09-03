@@ -149,7 +149,7 @@ func TestApiDevAuthSubmitAuthReq(t *testing.T) {
 			//incomplete body
 			makeAuthReq(
 				map[string]interface{}{
-					"id_data":      "id-0001",
+					"id_data":      `{"sn":"0001"}`,
 					"tenant_token": "tenant-0001",
 				},
 				privkey,
@@ -164,7 +164,7 @@ func TestApiDevAuthSubmitAuthReq(t *testing.T) {
 			//complete body, missing signature header
 			makeAuthReq(
 				map[string]interface{}{
-					"id_data":      "id-0001",
+					"id_data":      `{"sn":"0001"}`,
 					"pubkey":       pubkeyStr,
 					"tenant_token": "tenant-0001",
 				},
@@ -180,7 +180,7 @@ func TestApiDevAuthSubmitAuthReq(t *testing.T) {
 			//complete body, invalid signature header
 			makeAuthReq(
 				map[string]interface{}{
-					"id_data":      "id-0001",
+					"id_data":      `{"sn":"0001"}`,
 					"pubkey":       pubkeyStr,
 					"tenant_token": "tenant-0001",
 				},
@@ -196,7 +196,7 @@ func TestApiDevAuthSubmitAuthReq(t *testing.T) {
 			//complete body + signature, auth error
 			makeAuthReq(
 				map[string]interface{}{
-					"id_data":      "id-0001",
+					"id_data":      `{"sn":"0001"}`,
 					"pubkey":       pubkeyStr,
 					"tenant_token": "tenant-0001",
 				},
@@ -212,10 +212,26 @@ func TestApiDevAuthSubmitAuthReq(t *testing.T) {
 			RestError("account suspended"),
 		},
 		{
+			//invalid id data (not json)
+			makeAuthReq(
+				map[string]interface{}{
+					"id_data":      `"sn":"0001"`,
+					"pubkey":       pubkeyStr,
+					"tenant_token": "tenant-0001",
+				},
+				privkey,
+				"",
+				t),
+			"",
+			nil,
+			400,
+			RestError("invalid auth request: invalid character ':' after top-level value"),
+		},
+		{
 			//complete body + signature, auth ok
 			makeAuthReq(
 				map[string]interface{}{
-					"id_data":      "id-0001",
+					"id_data":      `{"sn":"0001"}`,
 					"pubkey":       pubkeyStr,
 					"tenant_token": "tenant-0001",
 				},
@@ -231,7 +247,7 @@ func TestApiDevAuthSubmitAuthReq(t *testing.T) {
 			//complete body + signature, auth ok, tenant token empty
 			makeAuthReq(
 				map[string]interface{}{
-					"id_data": "id-0001",
+					"id_data": `{"sn":"0001"}`,
 					"pubkey":  pubkeyStr,
 				},
 				privkey,
@@ -288,7 +304,7 @@ func TestApiDevAuthPreauthDevice(t *testing.T) {
 			body: &model.PreAuthReq{
 				AuthSetId: "auth-set-id",
 				DeviceId:  "device-id",
-				IdData:    "id-data",
+				IdData:    `{"sn":"0001"}`,
 				PubKey:    "pubkey",
 			},
 			checker: mt.NewJSONResponse(
@@ -296,10 +312,22 @@ func TestApiDevAuthPreauthDevice(t *testing.T) {
 				nil,
 				nil),
 		},
+		"invalid: id data is not json": {
+			body: &model.PreAuthReq{
+				AuthSetId: "auth-set-id",
+				DeviceId:  "device-id",
+				IdData:    `"sn":"0001"`,
+				PubKey:    "pubkey",
+			},
+			checker: mt.NewJSONResponse(
+				http.StatusBadRequest,
+				nil,
+				restError("failed to decode preauth request: invalid character ':' after top-level value")),
+		},
 		"invalid: no auth set id": {
 			body: &model.PreAuthReq{
 				DeviceId: "device-id",
-				IdData:   "id-data",
+				IdData:   `{"sn":"0001"}`,
 				PubKey:   "pubkey",
 			},
 			checker: mt.NewJSONResponse(
@@ -310,7 +338,7 @@ func TestApiDevAuthPreauthDevice(t *testing.T) {
 		"invalid: no device_id": {
 			body: &model.PreAuthReq{
 				AuthSetId: "auth-set-id",
-				IdData:    "id-data",
+				IdData:    `{"sn":"0001"}`,
 				PubKey:    "pubkey",
 			},
 			checker: mt.NewJSONResponse(
@@ -333,7 +361,7 @@ func TestApiDevAuthPreauthDevice(t *testing.T) {
 			body: &model.PreAuthReq{
 				AuthSetId: "auth-set-id",
 				DeviceId:  "device-id",
-				IdData:    "id-data",
+				IdData:    `{"sn":"0001"}`,
 			},
 			checker: mt.NewJSONResponse(
 				http.StatusBadRequest,
@@ -350,7 +378,7 @@ func TestApiDevAuthPreauthDevice(t *testing.T) {
 			body: &model.PreAuthReq{
 				AuthSetId: "auth-set-id",
 				DeviceId:  "device-id",
-				IdData:    "id-data",
+				IdData:    `{"sn":"0001"}`,
 				PubKey:    "pubkey",
 			},
 			devAuthErr: devauth.ErrDeviceExists,
@@ -363,7 +391,7 @@ func TestApiDevAuthPreauthDevice(t *testing.T) {
 			body: &model.PreAuthReq{
 				AuthSetId: "auth-set-id",
 				DeviceId:  "device-id",
-				IdData:    "id-data",
+				IdData:    `{"sn":"0001"}`,
 				PubKey:    "pubkey",
 			},
 			devAuthErr: errors.New("generic"),

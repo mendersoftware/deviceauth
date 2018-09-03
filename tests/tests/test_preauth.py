@@ -25,7 +25,7 @@ class TestManagementPreauthorizeBase:
         aid = '1'
         device_id = '2'
         key = 'key'
-        iddata = json.dumps({'foo': 'bar'})
+        iddata = '{"foo":"bar"}'
 
         req = management_api.make_preauth_req(aid, device_id, iddata, key)
         _, rsp = management_api.preauthorize(req, **kwargs)
