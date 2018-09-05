@@ -15,7 +15,7 @@ paths:
     get:
       summary: Get a list of tenant's devices.
       description: |
-        Provides a list of tenant's devices, with optional device status filter.
+        Provides a list of tenant's devices, sorted by creation date, with optional device status filter.
       parameters:
         - name: Authorization
           in: header
