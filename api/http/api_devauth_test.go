@@ -309,6 +309,8 @@ func TestApiDevAuthPreauthDevice(t *testing.T) {
 	// enforce specific field naming in errors returned by API
 	updateRestErrorFieldName()
 
+	pubkeyStr := mtest.LoadPubKeyStr("testdata/public.pem", t)
+
 	testCases := map[string]struct {
 		body interface{}
 
@@ -321,7 +323,7 @@ func TestApiDevAuthPreauthDevice(t *testing.T) {
 				AuthSetId: "auth-set-id",
 				DeviceId:  "device-id",
 				IdData:    `{"sn":"0001"}`,
-				PubKey:    "pubkey",
+				PubKey:    pubkeyStr,
 			},
 			checker: mt.NewJSONResponse(
 				http.StatusCreated,
@@ -333,7 +335,7 @@ func TestApiDevAuthPreauthDevice(t *testing.T) {
 				AuthSetId: "auth-set-id",
 				DeviceId:  "device-id",
 				IdData:    `"sn":"0001"`,
-				PubKey:    "pubkey",
+				PubKey:    pubkeyStr,
 			},
 			checker: mt.NewJSONResponse(
 				http.StatusBadRequest,
@@ -344,7 +346,7 @@ func TestApiDevAuthPreauthDevice(t *testing.T) {
 			body: &model.PreAuthReq{
 				DeviceId: "device-id",
 				IdData:   `{"sn":"0001"}`,
-				PubKey:   "pubkey",
+				PubKey:   pubkeyStr,
 			},
 			checker: mt.NewJSONResponse(
 				http.StatusBadRequest,
@@ -355,7 +357,7 @@ func TestApiDevAuthPreauthDevice(t *testing.T) {
 			body: &model.PreAuthReq{
 				AuthSetId: "auth-set-id",
 				IdData:    `{"sn":"0001"}`,
-				PubKey:    "pubkey",
+				PubKey:    pubkeyStr,
 			},
 			checker: mt.NewJSONResponse(
 				http.StatusBadRequest,
@@ -366,7 +368,7 @@ func TestApiDevAuthPreauthDevice(t *testing.T) {
 			body: &model.PreAuthReq{
 				AuthSetId: "auth-set-id",
 				DeviceId:  "device-id",
-				PubKey:    "pubkey",
+				PubKey:    pubkeyStr,
 			},
 			checker: mt.NewJSONResponse(
 				http.StatusBadRequest,
@@ -390,12 +392,25 @@ func TestApiDevAuthPreauthDevice(t *testing.T) {
 				nil,
 				restError("failed to decode preauth request: EOF")),
 		},
+		"invalid public key": {
+			body: &model.PreAuthReq{
+				AuthSetId: "auth-set-id",
+				DeviceId:  "device-id",
+				IdData:    `{"sn":"0001"}`,
+				PubKey:    "invalid",
+			},
+			devAuthErr: devauth.ErrDeviceExists,
+			checker: mt.NewJSONResponse(
+				http.StatusBadRequest,
+				nil,
+				restError("failed to decode preauth request: cannot decode public key")),
+		},
 		"devauth: device exists": {
 			body: &model.PreAuthReq{
 				AuthSetId: "auth-set-id",
 				DeviceId:  "device-id",
 				IdData:    `{"sn":"0001"}`,
-				PubKey:    "pubkey",
+				PubKey:    pubkeyStr,
 			},
 			devAuthErr: devauth.ErrDeviceExists,
 			checker: mt.NewJSONResponse(
@@ -408,7 +423,7 @@ func TestApiDevAuthPreauthDevice(t *testing.T) {
 				AuthSetId: "auth-set-id",
 				DeviceId:  "device-id",
 				IdData:    `{"sn":"0001"}`,
-				PubKey:    "pubkey",
+				PubKey:    pubkeyStr,
 			},
 			devAuthErr: errors.New("generic"),
 			checker: mt.NewJSONResponse(
