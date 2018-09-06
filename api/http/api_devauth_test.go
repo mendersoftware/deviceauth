@@ -258,6 +258,22 @@ func TestApiDevAuthSubmitAuthReq(t *testing.T) {
 			200,
 			"dummytoken",
 		},
+		{
+			//complete body, invalid public key
+			makeAuthReq(
+				map[string]interface{}{
+					"id_data":      `{"sn":"0001"}`,
+					"pubkey":       "invalid",
+					"tenant_token": "tenant-0001",
+				},
+				privkey,
+				"",
+				t),
+			"dummytoken",
+			nil,
+			400,
+			RestError("invalid auth request: cannot decode public key"),
+		},
 	}
 
 	for i := range testCases {
