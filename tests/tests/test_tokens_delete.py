@@ -9,6 +9,8 @@ from common import Device, DevAuthorizer, device_auth_req, \
     management_api, internal_api, device_api, \
     get_fake_tenantadm_addr, make_fake_tenant_token
 
+from cryptutil import compare_keys
+
 import deviceadm
 import orchestrator
 import mockserver
@@ -79,7 +81,7 @@ def accepted_tenants_devices(device_api, management_api, clean_migrated_db, cli,
 
                 devid = dev.id
                 for a in dev.auth_sets:
-                    if a.pubkey == d.public_key:
+                    if compare_keys(a.pubkey, d.public_key):
                         aid = a.id
                         break
 

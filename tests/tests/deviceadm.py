@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-# Copyright 2017 Northern.tech AS
+# Copyright 2018 Northern.tech AS
 #
 #    Licensed under the Apache License, Version 2.0 (the "License");
 #    you may not use this file except in compliance with the License.
@@ -17,8 +17,10 @@ import os
 import logging
 
 from contextlib import contextmanager
+from Crypto.PublicKey import RSA
 
 import mockserver
+from cryptutil import compare_keys
 
 
 def auth_set_put_for_device(device=None, status=204):
@@ -30,7 +32,7 @@ def auth_set_put_for_device(device=None, status=204):
         if device:
             assert json.loads(authset.get('device_identity', None)) == json.loads(device.identity)
 
-            assert authset.get('key', None) == device.public_key
+            assert compare_keys(authset.get('key', None), device.public_key)
         else:
             assert authset.get('device_identity', None)
             assert authset.get('key', None)
