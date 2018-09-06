@@ -14,12 +14,14 @@
 package model
 
 import (
+	"crypto/rsa"
 	"encoding/json"
 	"io"
 
-	"github.com/mendersoftware/deviceauth/utils"
-
 	"github.com/asaskevich/govalidator"
+	"github.com/pkg/errors"
+
+	"github.com/mendersoftware/deviceauth/utils"
 )
 
 type PreAuthReq struct {
@@ -55,6 +57,24 @@ func (r *PreAuthReq) Validate() error {
 	} else {
 		r.IdData = sorted
 	}
+
+	//normalize key
+	key, err := utils.ParsePubKey(r.PubKey)
+	if err != nil {
+		return err
+	}
+
+	keyStruct, ok := key.(*rsa.PublicKey)
+	if !ok {
+		return errors.New("cannot decode public key")
+	}
+
+	serialized, err := utils.SerializePubKey(keyStruct)
+	if err != nil {
+		return err
+	}
+
+	r.PubKey = serialized
 
 	return nil
 }
