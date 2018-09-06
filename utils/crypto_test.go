@@ -57,17 +57,6 @@ func TestVerifyAuthReqSign(t *testing.T) {
 			test.LoadPrivKey("testdata/private_invalid.pem", t),
 			"verification failed: crypto/rsa: verification error",
 		},
-		{
-			//invalid public key
-			`{
-				"id_data": {"mac": "deadbeef"},
-				"tenant_token": "token"
-				"seq_no": 1
-			}`,
-			"invalidpubkey",
-			test.LoadPrivKey("testdata/private.pem", t),
-			ErrMsgVerify,
-		},
 	}
 
 	for i := range testCases {
@@ -77,8 +66,11 @@ func TestVerifyAuthReqSign(t *testing.T) {
 
 			signed := test.AuthReqSign([]byte(tc.content), tc.privkey, t)
 
-			err := VerifyAuthReqSign(string(signed),
-				tc.pubkeyStr,
+			pubkey, err := ParsePubKey(tc.pubkeyStr)
+			assert.NoError(t, err)
+
+			err = VerifyAuthReqSign(string(signed),
+				pubkey,
 				[]byte(tc.content))
 
 			if tc.err != "" {

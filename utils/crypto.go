@@ -35,7 +35,7 @@ const (
 	PubKeyBlockType = "PUBLIC KEY"
 )
 
-func VerifyAuthReqSign(signature, pubkey string, content []byte) error {
+func VerifyAuthReqSign(signature string, pubkey interface{}, content []byte) error {
 	hash := sha256.New()
 	_, err := bytes.NewReader(content).WriteTo(hash)
 	if err != nil {
@@ -47,22 +47,12 @@ func VerifyAuthReqSign(signature, pubkey string, content []byte) error {
 		return errors.Wrap(err, ErrMsgVerify)
 	}
 
-	block, _ := pem.Decode([]byte(pubkey))
-	if block == nil || block.Type != PubKeyBlockType {
-		return errors.New(ErrMsgVerify)
-	}
-
-	key, err := x509.ParsePKIXPublicKey(block.Bytes)
-	if err != nil {
-		return errors.Wrap(err, ErrMsgVerify)
-	}
-
-	keyStruct, ok := key.(*rsa.PublicKey)
+	key, ok := pubkey.(*rsa.PublicKey)
 	if !ok {
 		return errors.Wrap(err, ErrMsgVerify)
 	}
 
-	err = rsa.VerifyPKCS1v15(keyStruct, crypto.SHA256, hash.Sum(nil), decodedSig)
+	err = rsa.VerifyPKCS1v15(key, crypto.SHA256, hash.Sum(nil), decodedSig)
 	if err != nil {
 		return errors.Wrap(err, ErrMsgVerify)
 	}
