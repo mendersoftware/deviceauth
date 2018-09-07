@@ -1,4 +1,4 @@
-// Copyright 2017 Northern.tech AS
+// Copyright 2018 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -16,6 +16,8 @@ package utils
 import (
 	"bytes"
 	"crypto"
+	"crypto/dsa"
+	"crypto/ecdsa"
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
@@ -33,7 +35,7 @@ const (
 	PubKeyBlockType = "PUBLIC KEY"
 )
 
-func VerifyAuthReqSign(signature, pubkey string, content []byte) error {
+func VerifyAuthReqSign(signature string, pubkey interface{}, content []byte) error {
 	hash := sha256.New()
 	_, err := bytes.NewReader(content).WriteTo(hash)
 	if err != nil {
@@ -45,25 +47,56 @@ func VerifyAuthReqSign(signature, pubkey string, content []byte) error {
 		return errors.Wrap(err, ErrMsgVerify)
 	}
 
-	block, _ := pem.Decode([]byte(pubkey))
-	if block == nil || block.Type != PubKeyBlockType {
-		return errors.New(ErrMsgVerify)
-	}
-
-	key, err := x509.ParsePKIXPublicKey(block.Bytes)
-	if err != nil {
-		return errors.Wrap(err, ErrMsgVerify)
-	}
-
-	keyStruct, ok := key.(*rsa.PublicKey)
+	key, ok := pubkey.(*rsa.PublicKey)
 	if !ok {
 		return errors.Wrap(err, ErrMsgVerify)
 	}
 
-	err = rsa.VerifyPKCS1v15(keyStruct, crypto.SHA256, hash.Sum(nil), decodedSig)
+	err = rsa.VerifyPKCS1v15(key, crypto.SHA256, hash.Sum(nil), decodedSig)
 	if err != nil {
 		return errors.Wrap(err, ErrMsgVerify)
 	}
 
 	return nil
+}
+
+//ParsePubKey
+func ParsePubKey(pubkey string) (interface{}, error) {
+	block, _ := pem.Decode([]byte(pubkey))
+	if block == nil || block.Type != PubKeyBlockType {
+		return nil, errors.New("cannot decode public key")
+	}
+
+	key, err := x509.ParsePKIXPublicKey(block.Bytes)
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot decode public key")
+	}
+
+	return key, nil
+}
+
+func SerializePubKey(key interface{}) (string, error) {
+
+	switch key.(type) {
+	case *rsa.PublicKey, *dsa.PublicKey, *ecdsa.PublicKey:
+		break
+	default:
+		return "", errors.New("unrecognizable public key type")
+	}
+
+	asn1, err := x509.MarshalPKIXPublicKey(key)
+	if err != nil {
+		return "", err
+	}
+
+	out := pem.EncodeToMemory(&pem.Block{
+		Type:  "PUBLIC KEY",
+		Bytes: asn1,
+	})
+
+	if out == nil {
+		return "", err
+	}
+
+	return string(out), nil
 }
