@@ -2155,6 +2155,17 @@ func ExtractHeader(hdr, val string, r *test.Recorded) string {
 }
 
 func TestApiDevAuthDevAdmPostDeviceAuth(t *testing.T) {
+	validKey := `
+-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAzogVU7RGDilbsoUt/DdH
+VJvcepl0A5+xzGQ50cq1VE/Dyyy8Zp0jzRXCnnu9nu395mAFSZGotZVr+sWEpO3c
+yC3VmXdBZmXmQdZqbdD/GuixJOYfqta2ytbIUPRXFN7/I7sgzxnXWBYXYmObYvdP
+okP0mQanY+WKxp7Q16pt1RoqoAd0kmV39g13rFl35muSHbSBoAW3GBF3gO+mF5Ty
+1ddp/XcgLOsmvNNjY+2HOD5F/RX0fs07mWnbD7x+xz7KEKjF+H7ZpkqCwmwCXaf0
+iyYyh1852rti3Afw4mDxuVSD7sd9ggvYMc0QHIpQNkD4YWOhNiE1AB0zH57VbUYG
+UwIDAQAB
+-----END PUBLIC KEY-----`
+
 	testCases := map[string]struct {
 		body interface{}
 
@@ -2163,7 +2174,7 @@ func TestApiDevAuthDevAdmPostDeviceAuth(t *testing.T) {
 		checker mt.ResponseChecker
 	}{
 		"ok": {
-			body: &model.DevAdmAuthSetReq{Key: "foo-key", DeviceId: toJsonString(t,
+			body: &model.DevAdmAuthSetReq{Key: validKey, DeviceId: toJsonString(t,
 				map[string]string{
 					"mac": "00:00:00:01",
 				}),
@@ -2173,6 +2184,17 @@ func TestApiDevAuthDevAdmPostDeviceAuth(t *testing.T) {
 				nil,
 				nil),
 		},
+		"error, invalid key": {
+			body: &model.DevAdmAuthSetReq{Key: "foo", DeviceId: toJsonString(t,
+				map[string]string{
+					"mac": "00:00:00:01",
+				}),
+			},
+			checker: mt.NewJSONResponse(
+				http.StatusBadRequest,
+				nil,
+				restError("cannot decode public key")),
+		},
 		"error: empty request": {
 			body: nil,
 			checker: mt.NewJSONResponse(
@@ -2181,7 +2203,7 @@ func TestApiDevAuthDevAdmPostDeviceAuth(t *testing.T) {
 				restError("EOF")),
 		},
 		"error: generic": {
-			body: &model.DevAdmAuthSetReq{Key: "foo-key", DeviceId: toJsonString(t,
+			body: &model.DevAdmAuthSetReq{Key: validKey, DeviceId: toJsonString(t,
 				map[string]string{
 					"mac": "00:00:00:01",
 				})},
@@ -2202,14 +2224,14 @@ func TestApiDevAuthDevAdmPostDeviceAuth(t *testing.T) {
 				restError("key: non zero value required")),
 		},
 		"error: no identity data": {
-			body: &model.DevAdmAuthSetReq{Key: "foo-key"},
+			body: &model.DevAdmAuthSetReq{Key: validKey},
 			checker: mt.NewJSONResponse(
 				http.StatusBadRequest,
 				nil,
 				restError("device_identity: non zero value required")),
 		},
 		"error: conflict": {
-			body: &model.DevAdmAuthSetReq{Key: "foo-key", DeviceId: toJsonString(t,
+			body: &model.DevAdmAuthSetReq{Key: validKey, DeviceId: toJsonString(t,
 				map[string]string{
 					"mac": "00:00:00:01",
 				})},
