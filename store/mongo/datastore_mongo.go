@@ -35,7 +35,7 @@ import (
 )
 
 const (
-	DbVersion     = "1.1.0"
+	DbVersion     = "1.2.0"
 	DbName        = "deviceauth"
 	DbDevicesColl = "devices"
 	DbAuthSetColl = "auth_sets"
@@ -401,6 +401,10 @@ func (db *DataStoreMongo) MigrateTenant(ctx context.Context, database, version s
 
 	migrations := []migrate.Migration{
 		&migration_1_1_0{
+			ms:  db,
+			ctx: ctx,
+		},
+		&migration_1_2_0{
 			ms:  db,
 			ctx: ctx,
 		},

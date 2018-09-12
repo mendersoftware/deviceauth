@@ -719,7 +719,7 @@ func TestStoreMigrate(t *testing.T) {
 		DbVersion + " no automigrate": {
 			automigrate: false,
 			version:     DbVersion,
-			err:         "failed to apply migrations: db needs migration: deviceauth has version 0.0.0, needs version 1.1.0",
+			err:         "failed to apply migrations: db needs migration: deviceauth has version 0.0.0, needs version 1.2.0",
 		},
 		DbVersion + " multitenant": {
 			automigrate: true,
@@ -731,7 +731,7 @@ func TestStoreMigrate(t *testing.T) {
 			automigrate: false,
 			tenantDbs:   []string{"deviceauth-tenant1id", "deviceauth-tenant2id"},
 			version:     DbVersion,
-			err:         "failed to apply migrations: db needs migration: deviceauth-tenant1id has version 0.0.0, needs version 1.1.0",
+			err:         "failed to apply migrations: db needs migration: deviceauth-tenant1id has version 0.0.0, needs version 1.2.0",
 		},
 		"0.1 error": {
 			automigrate: true,

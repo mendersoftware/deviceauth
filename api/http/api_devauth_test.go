@@ -151,7 +151,7 @@ func TestApiDevAuthSubmitAuthReq(t *testing.T) {
 			//incomplete body
 			makeAuthReq(
 				map[string]interface{}{
-					"id_data":      "id-0001",
+					"id_data":      `{"sn":"0001"}`,
 					"tenant_token": "tenant-0001",
 				},
 				privkey,
@@ -166,7 +166,7 @@ func TestApiDevAuthSubmitAuthReq(t *testing.T) {
 			//complete body, missing signature header
 			makeAuthReq(
 				map[string]interface{}{
-					"id_data":      "id-0001",
+					"id_data":      `{"sn":"0001"}`,
 					"pubkey":       pubkeyStr,
 					"tenant_token": "tenant-0001",
 				},
@@ -182,7 +182,7 @@ func TestApiDevAuthSubmitAuthReq(t *testing.T) {
 			//complete body, invalid signature header
 			makeAuthReq(
 				map[string]interface{}{
-					"id_data":      "id-0001",
+					"id_data":      `{"sn":"0001"}`,
 					"pubkey":       pubkeyStr,
 					"tenant_token": "tenant-0001",
 				},
@@ -198,7 +198,7 @@ func TestApiDevAuthSubmitAuthReq(t *testing.T) {
 			//complete body + signature, auth error
 			makeAuthReq(
 				map[string]interface{}{
-					"id_data":      "id-0001",
+					"id_data":      `{"sn":"0001"}`,
 					"pubkey":       pubkeyStr,
 					"tenant_token": "tenant-0001",
 				},
@@ -214,10 +214,26 @@ func TestApiDevAuthSubmitAuthReq(t *testing.T) {
 			RestError("account suspended"),
 		},
 		{
+			//invalid id data (not json)
+			makeAuthReq(
+				map[string]interface{}{
+					"id_data":      `"sn":"0001"`,
+					"pubkey":       pubkeyStr,
+					"tenant_token": "tenant-0001",
+				},
+				privkey,
+				"",
+				t),
+			"",
+			nil,
+			400,
+			RestError("invalid auth request: invalid character ':' after top-level value"),
+		},
+		{
 			//complete body + signature, auth ok
 			makeAuthReq(
 				map[string]interface{}{
-					"id_data":      "id-0001",
+					"id_data":      `{"sn":"0001"}`,
 					"pubkey":       pubkeyStr,
 					"tenant_token": "tenant-0001",
 				},
@@ -233,7 +249,7 @@ func TestApiDevAuthSubmitAuthReq(t *testing.T) {
 			//complete body + signature, auth ok, tenant token empty
 			makeAuthReq(
 				map[string]interface{}{
-					"id_data": "id-0001",
+					"id_data": `{"sn":"0001"}`,
 					"pubkey":  pubkeyStr,
 				},
 				privkey,
@@ -243,6 +259,22 @@ func TestApiDevAuthSubmitAuthReq(t *testing.T) {
 			nil,
 			200,
 			"dummytoken",
+		},
+		{
+			//complete body, invalid public key
+			makeAuthReq(
+				map[string]interface{}{
+					"id_data":      `{"sn":"0001"}`,
+					"pubkey":       "invalid",
+					"tenant_token": "tenant-0001",
+				},
+				privkey,
+				"",
+				t),
+			"dummytoken",
+			nil,
+			400,
+			RestError("invalid auth request: cannot decode public key"),
 		},
 	}
 
@@ -279,6 +311,8 @@ func TestApiDevAuthPreauthDevice(t *testing.T) {
 	// enforce specific field naming in errors returned by API
 	updateRestErrorFieldName()
 
+	pubkeyStr := mtest.LoadPubKeyStr("testdata/public.pem", t)
+
 	testCases := map[string]struct {
 		body interface{}
 
@@ -290,19 +324,31 @@ func TestApiDevAuthPreauthDevice(t *testing.T) {
 			body: &model.PreAuthReq{
 				AuthSetId: "auth-set-id",
 				DeviceId:  "device-id",
-				IdData:    "id-data",
-				PubKey:    "pubkey",
+				IdData:    `{"sn":"0001"}`,
+				PubKey:    pubkeyStr,
 			},
 			checker: mt.NewJSONResponse(
 				http.StatusCreated,
 				nil,
 				nil),
 		},
+		"invalid: id data is not json": {
+			body: &model.PreAuthReq{
+				AuthSetId: "auth-set-id",
+				DeviceId:  "device-id",
+				IdData:    `"sn":"0001"`,
+				PubKey:    pubkeyStr,
+			},
+			checker: mt.NewJSONResponse(
+				http.StatusBadRequest,
+				nil,
+				restError("failed to decode preauth request: invalid character ':' after top-level value")),
+		},
 		"invalid: no auth set id": {
 			body: &model.PreAuthReq{
 				DeviceId: "device-id",
-				IdData:   "id-data",
-				PubKey:   "pubkey",
+				IdData:   `{"sn":"0001"}`,
+				PubKey:   pubkeyStr,
 			},
 			checker: mt.NewJSONResponse(
 				http.StatusBadRequest,
@@ -312,8 +358,8 @@ func TestApiDevAuthPreauthDevice(t *testing.T) {
 		"invalid: no device_id": {
 			body: &model.PreAuthReq{
 				AuthSetId: "auth-set-id",
-				IdData:    "id-data",
-				PubKey:    "pubkey",
+				IdData:    `{"sn":"0001"}`,
+				PubKey:    pubkeyStr,
 			},
 			checker: mt.NewJSONResponse(
 				http.StatusBadRequest,
@@ -324,7 +370,7 @@ func TestApiDevAuthPreauthDevice(t *testing.T) {
 			body: &model.PreAuthReq{
 				AuthSetId: "auth-set-id",
 				DeviceId:  "device-id",
-				PubKey:    "pubkey",
+				PubKey:    pubkeyStr,
 			},
 			checker: mt.NewJSONResponse(
 				http.StatusBadRequest,
@@ -335,7 +381,7 @@ func TestApiDevAuthPreauthDevice(t *testing.T) {
 			body: &model.PreAuthReq{
 				AuthSetId: "auth-set-id",
 				DeviceId:  "device-id",
-				IdData:    "id-data",
+				IdData:    `{"sn":"0001"}`,
 			},
 			checker: mt.NewJSONResponse(
 				http.StatusBadRequest,
@@ -348,12 +394,25 @@ func TestApiDevAuthPreauthDevice(t *testing.T) {
 				nil,
 				restError("failed to decode preauth request: EOF")),
 		},
+		"invalid public key": {
+			body: &model.PreAuthReq{
+				AuthSetId: "auth-set-id",
+				DeviceId:  "device-id",
+				IdData:    `{"sn":"0001"}`,
+				PubKey:    "invalid",
+			},
+			devAuthErr: devauth.ErrDeviceExists,
+			checker: mt.NewJSONResponse(
+				http.StatusBadRequest,
+				nil,
+				restError("failed to decode preauth request: cannot decode public key")),
+		},
 		"devauth: device exists": {
 			body: &model.PreAuthReq{
 				AuthSetId: "auth-set-id",
 				DeviceId:  "device-id",
-				IdData:    "id-data",
-				PubKey:    "pubkey",
+				IdData:    `{"sn":"0001"}`,
+				PubKey:    pubkeyStr,
 			},
 			devAuthErr: devauth.ErrDeviceExists,
 			checker: mt.NewJSONResponse(
@@ -365,8 +424,8 @@ func TestApiDevAuthPreauthDevice(t *testing.T) {
 			body: &model.PreAuthReq{
 				AuthSetId: "auth-set-id",
 				DeviceId:  "device-id",
-				IdData:    "id-data",
-				PubKey:    "pubkey",
+				IdData:    `{"sn":"0001"}`,
+				PubKey:    pubkeyStr,
 			},
 			devAuthErr: errors.New("generic"),
 			checker: mt.NewJSONResponse(

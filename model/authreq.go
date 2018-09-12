@@ -1,4 +1,4 @@
-// Copyright 2017 Northern.tech AS
+// Copyright 2018 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -14,7 +14,10 @@
 package model
 
 import (
+	"crypto/rsa"
 	"errors"
+
+	"github.com/mendersoftware/deviceauth/utils"
 )
 
 // note: fields with underscores need the 'bson' decorator
@@ -23,6 +26,9 @@ type AuthReq struct {
 	IdData      string `json:"id_data" bson:"id_data"`
 	TenantToken string `json:"tenant_token" bson:"tenant_token"`
 	PubKey      string `json:"pubkey"`
+
+	//helpers, not serialized
+	PubKeyStruct *rsa.PublicKey `json:"-" bson:"-"`
 }
 
 func (r *AuthReq) Validate() error {
@@ -32,6 +38,32 @@ func (r *AuthReq) Validate() error {
 
 	if r.PubKey == "" {
 		return errors.New("pubkey must be provided")
+	}
+
+	// normalize pubkey by parsing+serializing the key string
+	//in between, save it in a temp field because it will be useful outside of Validate()
+	key, err := utils.ParsePubKey(r.PubKey)
+	if err != nil {
+		return err
+	}
+
+	keyStruct, ok := key.(*rsa.PublicKey)
+	if !ok {
+		return errors.New("cannot decode public key")
+	}
+	r.PubKeyStruct = keyStruct
+
+	serialized, err := utils.SerializePubKey(keyStruct)
+	if err != nil {
+		return err
+	}
+
+	r.PubKey = serialized
+
+	if sorted, err := utils.JsonSort(r.IdData); err != nil {
+		return err
+	} else {
+		r.IdData = sorted
 	}
 
 	// not checking tenant token for now - TODO
