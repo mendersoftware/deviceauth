@@ -142,6 +142,7 @@ class TestAdmissionPostDevices(TestAdmissionPostDevicesBase):
     def test_bad_req_iddata(self, admission_api, clean_migrated_db):
         self._test_bad_req_iddata(admission_api, clean_migrated_db)
 
+    @pytest.mark.skip(reason="must wait until iddata/key normalization in POST auth_requests is merged")
     @pytest.mark.parametrize('devices', ['5'], indirect=True)
     def test_conflict(self, admission_api, devices):
         self._test_conflict(admission_api, devices)
@@ -269,6 +270,7 @@ class TestAdmissionPostDevicesMultitenant(TestAdmissionPostDevicesBase):
         auth = {"Authorization": "Bearer " + tenant_foobar}
         self._test_bad_key(admission_api, tenant_foobar_clean_migrated_db, auth)
 
+    @pytest.mark.skip(reason="must wait until iddata/key normalization in POST auth_requests is merged")
     @pytest.mark.parametrize('tenant_foobar_devices', ['5'], indirect=True)
     def test_conflict(self, admission_api, tenant_foobar_devices, tenant_foobar):
         auth = {"Authorization": "Bearer " + tenant_foobar}
