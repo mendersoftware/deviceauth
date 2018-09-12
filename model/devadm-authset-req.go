@@ -73,6 +73,14 @@ func ParseDevAdmAuthSetReq(source io.Reader) (*DevAdmAuthSetReq, error) {
 		return nil, errors.New("no attributes provided")
 	}
 
+	// validate/normalize id data
+	// enough to re-encode via stdlib to get alphabetical key sort
+	if sorted, err := json.Marshal(req.Attributes); err != nil {
+		return nil, err
+	} else {
+		req.DeviceId = string(sorted)
+	}
+
 	return &req, nil
 }
 

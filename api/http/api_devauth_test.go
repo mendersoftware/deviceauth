@@ -2230,6 +2230,13 @@ UwIDAQAB
 				nil,
 				restError("device_identity: non zero value required")),
 		},
+		"error: invalid id data": {
+			body: &model.DevAdmAuthSetReq{Key: validKey, DeviceId: "{mac: 1234}"},
+			checker: mt.NewJSONResponse(
+				http.StatusBadRequest,
+				nil,
+				restError("failed to decode attributes data: invalid character 'm' looking for beginning of object key string")),
+		},
 		"error: conflict": {
 			body: &model.DevAdmAuthSetReq{Key: validKey, DeviceId: toJsonString(t,
 				map[string]string{
