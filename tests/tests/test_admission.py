@@ -112,6 +112,29 @@ class TestAdmissionPostDevicesBase:
         asets = admission_api.get_devices(auth=auth)
         assert len(asets) == 0
 
+    def _test_id_data_formatting(self, admission_api, clean_migrated_db, auth=None):
+        _, pub = get_keypair()
+
+        iddata = [
+                "{\"mac\": \"mac1\", \"sn\": \"sn1\"}",
+                "{\"sn\": \"sn1\", \"mac\": \"mac1\"}",
+                "{\"mac\":\"mac1\",\"sn\": \"sn1\"}",
+                "{\"sn\":\"sn1\",\"mac\":\"mac1\"}",
+        ]
+
+        res = admission_api.preauthorize(iddata[0], pub, auth)
+
+        for i in iddata[1:]:
+            try:
+                admission_api.preauthorize(i, pub, auth)
+            except bravado.exception.HTTPError as e:
+                assert e.response.status_code == 409
+                assert e.response.swagger_result.error == 'device already exists'
+
+        asets = admission_api.get_devices(auth=auth)
+        assert len(asets) == 1
+
+
 class TestAdmissionPostDevices(TestAdmissionPostDevicesBase):
     def test_ok(self, admission_api, clean_migrated_db):
         self._test_ok(admission_api, clean_migrated_db)
@@ -125,6 +148,9 @@ class TestAdmissionPostDevices(TestAdmissionPostDevicesBase):
 
     def test_bad_key(self, admission_api, clean_migrated_db):
         self._test_bad_key(admission_api, clean_migrated_db)
+
+    def test_id_data_formatting(self, admission_api, clean_migrated_db):
+        self._test_id_data_formatting(admission_api, clean_migrated_db)
 
 class TestAdmissionChangeStatus(AdmissionClient):
 
@@ -247,3 +273,7 @@ class TestAdmissionPostDevicesMultitenant(TestAdmissionPostDevicesBase):
     def test_conflict(self, admission_api, tenant_foobar_devices, tenant_foobar):
         auth = {"Authorization": "Bearer " + tenant_foobar}
         self._test_conflict(admission_api, tenant_foobar_devices, auth)
+
+    def test_id_data_formatting(self, admission_api, tenant_foobar_clean_migrated_db, tenant_foobar):
+        auth = {"Authorization": "Bearer " + tenant_foobar}
+        self._test_id_data_formatting(admission_api, tenant_foobar_clean_migrated_db, auth)
