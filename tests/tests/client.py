@@ -216,6 +216,90 @@ class SimpleManagementClient(ManagementClient):
             'pubkey': pubkey
         }
 
+class AdmissionClient(SwaggerApiClient):
+    api_url = "http://%s/api/management/v1/admission/" % \
+              pytest.config.getoption("host")
+
+    log = logging.getLogger('client.AdmissionClient')
+
+    spec_option = 'admission_spec'
+    api_type = "admission"
+
+    # default user auth - single user, single tenant
+    uauth = {"Authorization": "Bearer foobarbaz"}
+
+    def setup(self):
+        self.setup_swagger()
+
+    def get_devices(self, page=1, status=None, auth=None):
+        if auth is None:
+            auth=self.uauth
+        r, h = self.client.devices.get_devices(page=page, status=status, _request_options={"headers": auth}).result()
+        for i in parse_header_links(h.headers["link"]):
+            if i["rel"] == "next":
+                page = int(dict(urlparse.parse_qs(urlparse.urlsplit(i["url"]).query))["page"][0])
+                return r + self.get_devices(page=page, auth=auth)
+        else:
+            return r
+
+    def change_status(self, authset_id, status, auth=None):
+        if auth is None:
+            auth = self.uauth
+
+        Status = self.client.get_model('Status')
+        s = Status(status=status)
+
+        self.client.devices.put_devices_id_status(id=authset_id, status=s, _request_options={"headers": auth}).result()
+
+    def preauthorize(self, identity, key, auth=None):
+        """
+            Add a preauthorized device.
+        """
+        if auth is None:
+            auth = self.uauth
+
+        AuthSet = self.client.get_model('AuthSet')
+        authset = AuthSet(
+                device_identity=identity,
+                key=key)
+
+        self.client.devices.post_devices(auth_set=authset, _request_options={"headers": auth}).result()
+
+    def put_device(self, id, devid, key, device_identity, auth=None):
+        if auth is None:
+            auth = self.uauth
+
+        NewDevice = self.client.get_model('NewDevice')
+        new_device = NewDevice(
+                device_id=devid,
+                key=key,
+                device_identity=device_identity)
+        self.client.devices.put_devices_id(id=id, device=new_device, _request_options={"headers": auth}).result()
+
+    def delete_device_mgmt(self, id, auth=None):
+        """
+           Remove device (auth set) via management API.
+        """
+        if auth is None:
+            auth = self.uauth
+
+        print(self.make_api_url('/devices/{}'.format(id)))
+        return requests.delete(self.make_api_url('/devices/{}'.format(id)), headers=auth)
+
+    def make_user_auth(self, user_id, tenant_id=None):
+        """
+            Prepare an almost-valid JWT auth header, suitable for consumption by deviceadm.
+        """
+        jwt = common.make_id_jwt(user_id, tenant_id)
+        return {"Authorization": "Bearer " + jwt}
+
+
+class SimpleAdmissionClient(AdmissionClient):
+    log = logging.getLogger('client.AdmissionClientSimple')
+
+    def __init__(self):
+        self.setup_swagger()
+
 class CliClient:
     cmd = '/testing/deviceauth'
 

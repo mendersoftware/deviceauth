@@ -27,8 +27,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	"github.com/mendersoftware/deviceauth/client/deviceadm"
-	mdevadm "github.com/mendersoftware/deviceauth/client/deviceadm/mocks"
 	"github.com/mendersoftware/deviceauth/client/orchestrator"
 	morchestrator "github.com/mendersoftware/deviceauth/client/orchestrator/mocks"
 	mtenant "github.com/mendersoftware/deviceauth/client/tenant/mocks"
@@ -72,8 +70,6 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 		addDeviceErr  error
 		addAuthSetErr error
 
-		admissionNotified bool
-
 		devAdmErr error
 
 		tenantVerify          bool
@@ -92,8 +88,7 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 		},
 		{
 			//existing device, existing auth set, auth set accepted,
-			//admission was notified, so we should get a token right
-			//away
+			//so we should get a token right away
 			desc: "known, accepted, give out token",
 
 			inReq: req,
@@ -104,8 +99,6 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 			devStatus:     model.DevStatusAccepted,
 			getDevByIdKey: pubKey,
 			getDevByKeyId: devId,
-
-			admissionNotified: true,
 
 			res: "dummytoken",
 		},
@@ -123,8 +116,6 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 			getDevByIdKey: pubKey,
 			getDevByKeyId: devId,
 
-			admissionNotified: true,
-
 			err: ErrDevAuthUnauthorized,
 		},
 		{
@@ -139,8 +130,6 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 			devStatus:     model.DevStatusPending,
 			getDevByIdKey: pubKey,
 			getDevByKeyId: devId,
-
-			admissionNotified: true,
 
 			err: ErrDevAuthUnauthorized,
 		},
@@ -182,17 +171,6 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 			getAuthSetErr: store.ErrDevNotFound,
 
 			err: errors.New("failed to locate device auth set"),
-		},
-		{
-			//new device - admission error
-			desc: "new device, admission request fail",
-
-			inReq: req,
-
-			getDevByKeyId: devId,
-			devAdmErr:     errors.New("failed to add device"),
-
-			err: errors.New("devadm add device error: failed to add device"),
 		},
 		{
 			//new device - tenant token verification failed
@@ -263,8 +241,6 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 			addDeviceErr:  store.ErrObjectExists,
 			addAuthSetErr: store.ErrObjectExists,
 
-			admissionNotified: true,
-
 			tenantVerify: true,
 			err:          ErrDevAuthUnauthorized,
 		},
@@ -289,8 +265,6 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 
 			getDevByIdKey: pubKey,
 			getDevByKeyId: devId,
-
-			admissionNotified: true,
 
 			tenantVerify: true,
 
@@ -354,24 +328,19 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 				mock.MatchedBy(
 					func(m model.AuthSet) bool {
 						return m.DeviceId == devId
-
 					}),
-				mock.MatchedBy(
-					func(m model.AuthSetUpdate) bool {
-						return to.Bool(m.AdmissionNotified) == true
-					})).Return(nil)
+				mock.AnythingOfType("model.AuthSetUpdate")).Return(nil)
 			db.On("GetAuthSetByDataKey",
 				ctxMatcher,
 				idData, pubKey).Return(
 				func(ctx context.Context, idata string, key string) *model.AuthSet {
 					if tc.getAuthSetErr == nil {
 						return &model.AuthSet{
-							Id:                authId,
-							DeviceId:          tc.getDevByKeyId,
-							IdData:            idData,
-							PubKey:            key,
-							Status:            tc.devStatus,
-							AdmissionNotified: to.BoolPtr(tc.admissionNotified),
+							Id:       authId,
+							DeviceId: tc.getDevByKeyId,
+							IdData:   idData,
+							PubKey:   key,
+							Status:   tc.devStatus,
 						}
 					}
 					return nil
@@ -381,22 +350,6 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 			db.On("AddToken",
 				ctxMatcher,
 				mock.AnythingOfType("model.Token")).Return(nil)
-
-			cda := mdevadm.ClientRunner{}
-			if !tc.admissionNotified {
-				// setup admission client mock only if admission
-				// was not notified yet as per test case
-				cda.On("AddDevice",
-					ctxMatcher,
-					mock.MatchedBy(func(r deviceadm.AdmReq) bool {
-						return (r.AuthId == authId) &&
-							(r.IdData == idData) &&
-							(r.DeviceId == devId) &&
-							(r.PubKey == pubKey)
-					}),
-					mock.AnythingOfType("*apiclient.HttpApi")).
-					Return(tc.devAdmErr)
-			}
 
 			jwth := mjwt.Handler{}
 			jwth.On("ToJWT",
@@ -409,7 +362,7 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 				})).
 				Return("dummytoken", nil)
 
-			devauth := NewDevAuth(&db, &cda, nil, &jwth, Config{})
+			devauth := NewDevAuth(&db, nil, &jwth, Config{})
 
 			if tc.tenantVerify {
 				ct := mtenant.ClientRunner{}
@@ -461,8 +414,6 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 
 		dbDeviceStatus        string
 		dbGetDeviceStatustErr error
-
-		devadmUpdateStatusErr error
 
 		coSubmitProvisionDeviceJobErr error
 
@@ -516,22 +467,6 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 			dbGetLimitErr:  errors.New("db error"),
 			dbDeviceStatus: model.DevStatusPending,
 			err:            errors.New("can't get current device limit: db error"),
-		},
-		{
-			desc: "error: failed to propagate to deviceadm",
-			dbGetAuthSetByDataKeyRes: &model.AuthSet{
-				IdData:   inReq.IdData,
-				DeviceId: dummyDevId,
-				PubKey:   inReq.PubKey,
-				Status:   model.DevStatusPreauth,
-			},
-			dbGetLimitRes: &model.Limit{
-				Value: 5,
-			},
-			dbGetDevCountByStatusRes: 0,
-			dbDeviceStatus:           model.DevStatusPending,
-			devadmUpdateStatusErr:    errors.New("http error"),
-			err: errors.New("devadm update status error: http error"),
 		},
 		{
 			desc: "error: failed to submit job to conductor",
@@ -659,18 +594,6 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 			db.On("GetDeviceStatus",
 				context.Background(), mock.AnythingOfType("string")).Return(tc.dbDeviceStatus, tc.dbGetDeviceStatustErr)
 
-			cda := mdevadm.ClientRunner{}
-
-			// an auto-accepted device must be propagated to deviceadm
-			cda.On("UpdateStatusInternal",
-				ctx,
-				mock.AnythingOfType("string"),
-				mock.MatchedBy(func(r deviceadm.UpdateStatusReq) bool {
-					return (r.Status == model.DevStatusAccepted)
-				}),
-				mock.AnythingOfType("*apiclient.HttpApi"),
-			).Return(tc.devadmUpdateStatusErr)
-
 			// token serialization - happy path only, errors tested elsewhere
 			jwth := mjwt.Handler{}
 			jwth.On("ToJWT",
@@ -683,7 +606,7 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 				Return(tc.coSubmitProvisionDeviceJobErr)
 
 			// setup devauth
-			devauth := NewDevAuth(&db, &cda, &co, &jwth, Config{})
+			devauth := NewDevAuth(&db, &co, &jwth, Config{})
 
 			// test
 			res, err := devauth.SubmitAuthRequest(ctx, &inReq)
@@ -792,7 +715,7 @@ func TestDevAuthPreauthorizeDevice(t *testing.T) {
 							(m.PubKey == tc.req.PubKey)
 					})).Return(tc.addAuthSetErr)
 
-			devauth := NewDevAuth(&db, nil, nil, nil, Config{})
+			devauth := NewDevAuth(&db, nil, nil, Config{})
 			err := devauth.PreauthorizeDevice(context.Background(), tc.req)
 
 			if tc.err != nil {
@@ -1005,7 +928,7 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 				mock.AnythingOfType("orchestrator.ProvisionDeviceReq")).
 				Return(tc.coSubmitProvisionDeviceJobErr)
 
-			devauth := NewDevAuth(&db, nil, &co, nil, Config{})
+			devauth := NewDevAuth(&db, &co, nil, Config{})
 			err := devauth.AcceptDeviceAuth(context.Background(), "dummy_devid", "dummy_aid")
 
 			if tc.outErr != "" {
@@ -1071,7 +994,7 @@ func TestDevAuthRejectDevice(t *testing.T) {
 			db.On("DeleteTokenByDevId", context.Background(), "dummy_devid").Return(
 				tc.dbDelDevTokenErr)
 
-			devauth := NewDevAuth(&db, nil, nil, nil, Config{})
+			devauth := NewDevAuth(&db, nil, nil, Config{})
 			err := devauth.RejectDeviceAuth(context.Background(), "dummy_devid", "dummy_aid")
 
 			if tc.dbErr != nil || (tc.dbDelDevTokenErr != nil &&
@@ -1138,7 +1061,7 @@ func TestDevAuthResetDevice(t *testing.T) {
 			db.On("DeleteTokenByDevId", context.Background(), "dummy_devid").Return(
 				tc.dbDelDevTokenErr)
 
-			devauth := NewDevAuth(&db, nil, nil, nil, Config{})
+			devauth := NewDevAuth(&db, nil, nil, Config{})
 			err := devauth.ResetDeviceAuth(context.Background(), "dummy_devid", "dummy_aid")
 
 			if tc.dbErr != nil ||
@@ -1295,7 +1218,7 @@ func TestDevAuthVerifyToken(t *testing.T) {
 			db := &mstore.DataStore{}
 			ja := &mjwt.Handler{}
 
-			devauth := NewDevAuth(db, nil, nil, ja, Config{})
+			devauth := NewDevAuth(db, nil, ja, Config{})
 			if tc.tenantVerify {
 				// ok to pass nil tenantadm client here
 				devauth = devauth.WithTenantVerification(nil)
@@ -1429,7 +1352,7 @@ func TestDevAuthDecommissionDevice(t *testing.T) {
 				tc.devId).Return(
 				tc.dbDeleteDeviceErr)
 
-			devauth := NewDevAuth(&db, nil, &co, nil, Config{})
+			devauth := NewDevAuth(&db, &co, nil, Config{})
 			err := devauth.DecommissionDevice(ctx, tc.devId)
 
 			if tc.outErr != "" {
@@ -1487,7 +1410,7 @@ func TestDevAuthSetTenantLimit(t *testing.T) {
 				tc.limit).
 				Return(tc.dbPutLimitErr)
 
-			devauth := NewDevAuth(&db, nil, nil, nil, Config{})
+			devauth := NewDevAuth(&db, nil, nil, Config{})
 			err := devauth.SetTenantLimit(ctx, tc.tenantId, tc.limit)
 
 			if tc.outErr != "" {
@@ -1578,7 +1501,7 @@ func TestDevAuthGetLimit(t *testing.T) {
 			db := mstore.DataStore{}
 			db.On("GetLimit", ctx, tc.inName).Return(tc.dbLimit, tc.dbErr)
 
-			devauth := NewDevAuth(&db, nil, nil, nil,
+			devauth := NewDevAuth(&db, nil, nil,
 				Config{MaxDevicesLimitDefault: tc.maxDevicesLimitDefaultConfig})
 			limit, err := devauth.GetLimit(ctx, tc.inName)
 
@@ -1660,7 +1583,7 @@ func TestDevAuthGetTenantLimit(t *testing.T) {
 				Run(verifyCtx).
 				Return(tc.dbLimit, tc.dbErr)
 
-			devauth := NewDevAuth(&db, nil, nil, nil, Config{})
+			devauth := NewDevAuth(&db, nil, nil, Config{})
 			limit, err := devauth.GetTenantLimit(ctx, tc.inName, tc.inTenant)
 
 			if tc.outErr != nil {
@@ -1723,7 +1646,7 @@ func TestDevAuthGetDevCountByStatus(t *testing.T) {
 			db := mstore.DataStore{}
 			db.On("GetDevCountByStatus", ctx, tc.status).Return(tc.dbCnt, tc.dbErr)
 
-			devauth := NewDevAuth(&db, nil, nil, nil, Config{})
+			devauth := NewDevAuth(&db, nil, nil, Config{})
 			cnt, err := devauth.GetDevCountByStatus(ctx, tc.status)
 
 			if tc.err != nil {
@@ -1763,7 +1686,7 @@ func TestDevAuthProvisionTenant(t *testing.T) {
 				"1.2.0",
 			).Return(tc.datastoreError)
 			db.On("WithAutomigrate").Return(&db)
-			devauth := NewDevAuth(&db, nil, nil, nil, Config{})
+			devauth := NewDevAuth(&db, nil, nil, Config{})
 
 			err := devauth.ProvisionTenant(ctx, "foo")
 
@@ -1876,7 +1799,7 @@ func TestDevAuthDeleteAuthSet(t *testing.T) {
 				tc.devId).Return(
 				tc.dbDeleteDeviceErr)
 
-			devauth := NewDevAuth(&db, nil, nil, nil, Config{})
+			devauth := NewDevAuth(&db, nil, nil, Config{})
 			err := devauth.DeleteAuthSet(ctx, tc.devId, tc.authId)
 
 			if tc.outErr != "" {
@@ -1943,7 +1866,7 @@ func TestDeleteTokens(t *testing.T) {
 			db.On("DeleteTokens", ctxMatcher).
 				Return(tc.dbErrDeleteTokens)
 
-			devauth := NewDevAuth(&db, nil, nil, nil, Config{})
+			devauth := NewDevAuth(&db, nil, nil, Config{})
 			err := devauth.DeleteTokens(ctx, tc.tenantId, tc.deviceId)
 
 			if tc.outErr != nil {
@@ -2011,7 +1934,7 @@ func TestGetTenantDeviceStatus(t *testing.T) {
 				tc.deviceId,
 			).Return(tc.dbGetDeviceStatus, tc.dbGetDeviceStatusErr)
 
-			devauth := NewDevAuth(&db, nil, nil, nil, Config{})
+			devauth := NewDevAuth(&db, nil, nil, Config{})
 			status, err := devauth.GetTenantDeviceStatus(ctx, tc.tenantId, tc.deviceId)
 
 			if tc.outErr != nil {

@@ -23,7 +23,6 @@ import (
 	"github.com/pkg/errors"
 
 	api_http "github.com/mendersoftware/deviceauth/api/http"
-	"github.com/mendersoftware/deviceauth/client/deviceadm"
 	"github.com/mendersoftware/deviceauth/client/orchestrator"
 	"github.com/mendersoftware/deviceauth/client/tenant"
 	dconfig "github.com/mendersoftware/deviceauth/config"
@@ -73,16 +72,12 @@ func RunServer(c config.Reader) error {
 
 	jwtHandler := jwt.NewJWTHandlerRS256(privKey)
 
-	devAdmClientConf := deviceadm.Config{
-		DevAdmAddr: c.GetString(dconfig.SettingDevAdmAddr),
-	}
 	orchClientConf := orchestrator.Config{
 		OrchestratorAddr: c.GetString(dconfig.SettingOrchestratorAddr),
 		Timeout:          time.Duration(30) * time.Second,
 	}
 
 	devauth := devauth.NewDevAuth(db,
-		deviceadm.NewClient(devAdmClientConf),
 		orchestrator.NewClient(orchClientConf),
 		jwtHandler,
 		devauth.Config{
@@ -106,11 +101,11 @@ func RunServer(c config.Reader) error {
 		return errors.Wrap(err, "API setup failed")
 	}
 
-	devauthapi := api_http.NewDevAuthApiHandlers(devauth)
+	devauthapi := api_http.NewDevAuthApiHandlers(devauth, db)
 
 	apph, err := devauthapi.GetApp()
 	if err != nil {
-		return errors.Wrap(err, "device admission API handlers setup failed")
+		return errors.Wrap(err, "device authentication API handlers setup failed")
 	}
 	api.SetApp(apph)
 

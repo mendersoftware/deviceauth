@@ -18,5 +18,6 @@ HOST=${HOST="mender-device-auth:8080"}
 py.test-3 -s --tb=short --host $HOST \
           --spec $DIR/internal_api.yml \
           --management-spec $DIR/management_api.yml \
+          --admission-spec $DIR/management_api_admission.yml \
           --verbose --junitxml=$DIR/results.xml \
           $DIR/tests/test_*.py "$@"

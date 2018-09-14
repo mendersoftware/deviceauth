@@ -14,7 +14,7 @@
 # middleware: dev
 
 # Mongodb connection string
-# Defaults to: mongo-device-adm
+# Defaults to: mongo-device-auth
 # Overwrite with environment variable: DEVICEAUTH_MONGO
 
 # mongo: mongo-device-auth
@@ -47,12 +47,6 @@
 # Overwrite with environment variable: DEVICEAUTH_MONGO_PASSWORD
 
 # mongo_password: secret
-
-# Device admission service address
-# Defaults to: http://mender-device-adm:8080
-# Overwrite with environment variable: DEVICEAUTH_DEVADM_ADDR
-
-# devadm_addr: http://mender-device-auth:8080
 
 # Conductor service address
 # Defaults to: http://mender-conductor:8080
