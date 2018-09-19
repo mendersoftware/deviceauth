@@ -14,11 +14,14 @@
 package model
 
 import (
+	"crypto/rsa"
 	"encoding/json"
 	"io"
 
 	"github.com/asaskevich/govalidator"
 	"github.com/pkg/errors"
+
+	"github.com/mendersoftware/deviceauth/utils"
 )
 
 type DeviceAuthAttributes map[string]string
@@ -43,13 +46,39 @@ func ParseDevAdmAuthSetReq(source io.Reader) (*DevAdmAuthSetReq, error) {
 		return nil, err
 	}
 
-	err := json.Unmarshal([]byte(req.DeviceId), &(req.Attributes))
+	// validate/normalize key
+	key, err := utils.ParsePubKey(req.Key)
+	if err != nil {
+		return nil, err
+	}
+
+	keyStruct, ok := key.(*rsa.PublicKey)
+	if !ok {
+		return nil, errors.New("cannot decode public key")
+	}
+
+	serialized, err := utils.SerializePubKey(keyStruct)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Key = serialized
+
+	err = json.Unmarshal([]byte(req.DeviceId), &(req.Attributes))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to decode attributes data")
 	}
 
 	if len(req.Attributes) == 0 {
 		return nil, errors.New("no attributes provided")
+	}
+
+	// validate/normalize id data
+	// enough to re-encode via stdlib to get alphabetical key sort
+	if sorted, err := json.Marshal(req.Attributes); err != nil {
+		return nil, err
+	} else {
+		req.DeviceId = string(sorted)
 	}
 
 	return &req, nil

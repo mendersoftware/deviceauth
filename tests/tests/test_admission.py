@@ -6,7 +6,9 @@ from common import Device, DevAuthorizer, \
     device_auth_req, make_devices, devices, \
     clean_migrated_db, clean_db, mongo, cli, \
     management_api, admission_api, internal_api, device_api, \
-    tenant_foobar, tenant_foobar_devices, tenant_foobar_clean_migrated_db
+    tenant_foobar, tenant_foobar_devices, tenant_foobar_clean_migrated_db,\
+    get_keypair
+
 from tenantadm import fake_tenantadm
 import orchestrator
 
@@ -69,15 +71,17 @@ class TestAdmissionPostDevicesBase:
     def _test_ok(self, admission_api, clean_migrated_db, auth=None):
         identity = json.dumps({"mac": "new-preauth-mac"})
 
-        admission_api.preauthorize(identity, 'new-preauth-key', auth)
+        _, pub =  get_keypair()
+        admission_api.preauthorize(identity, pub, auth)
 
         asets = admission_api.get_devices(auth=auth)
         assert len(asets) == 1
         assert asets[0].status == 'preauthorized'
 
     def _test_bad_req_iddata(self, admission_api, clean_migrated_db, auth=None):
+        _, pub =  get_keypair()
         try:
-            admission_api.preauthorize('not-valid-json', 'new-preauth-key', auth)
+            admission_api.preauthorize('not-valid-json', pub, auth)
         except bravado.exception.HTTPError as e:
             assert e.response.status_code == 400
 
@@ -85,15 +89,51 @@ class TestAdmissionPostDevicesBase:
         assert len(asets) == 0
 
     def _test_conflict(self, admission_api, devices, auth=None):
+        _, pub =  get_keypair()
         for dev, _ in devices:
             try:
                 identity = dev.identity
-                admission_api.preauthorize(identity, 'new-preauth-key', auth)
+                admission_api.preauthorize(identity, pub, auth)
             except bravado.exception.HTTPError as e:
                 assert e.response.status_code == 409
 
         asets = admission_api.get_devices(auth=auth)
         assert len(asets) == len(devices)
+
+    def _test_bad_key(self, admission_api, clean_migrated_db, auth=None):
+        identity = json.dumps({"mac": "new-preauth-mac"})
+
+        try:
+            admission_api.preauthorize(identity, 'invalid', auth)
+        except bravado.exception.HTTPError as e:
+            assert e.response.status_code == 400
+            assert e.response.swagger_result.error == 'cannot decode public key'
+
+        asets = admission_api.get_devices(auth=auth)
+        assert len(asets) == 0
+
+    def _test_id_data_formatting(self, admission_api, clean_migrated_db, auth=None):
+        _, pub = get_keypair()
+
+        iddata = [
+                "{\"mac\": \"mac1\", \"sn\": \"sn1\"}",
+                "{\"sn\": \"sn1\", \"mac\": \"mac1\"}",
+                "{\"mac\":\"mac1\",\"sn\": \"sn1\"}",
+                "{\"sn\":\"sn1\",\"mac\":\"mac1\"}",
+        ]
+
+        res = admission_api.preauthorize(iddata[0], pub, auth)
+
+        for i in iddata[1:]:
+            try:
+                admission_api.preauthorize(i, pub, auth)
+            except bravado.exception.HTTPError as e:
+                assert e.response.status_code == 409
+                assert e.response.swagger_result.error == 'device already exists'
+
+        asets = admission_api.get_devices(auth=auth)
+        assert len(asets) == 1
+
 
 class TestAdmissionPostDevices(TestAdmissionPostDevicesBase):
     def test_ok(self, admission_api, clean_migrated_db):
@@ -105,6 +145,12 @@ class TestAdmissionPostDevices(TestAdmissionPostDevicesBase):
     @pytest.mark.parametrize('devices', ['5'], indirect=True)
     def test_conflict(self, admission_api, devices):
         self._test_conflict(admission_api, devices)
+
+    def test_bad_key(self, admission_api, clean_migrated_db):
+        self._test_bad_key(admission_api, clean_migrated_db)
+
+    def test_id_data_formatting(self, admission_api, clean_migrated_db):
+        self._test_id_data_formatting(admission_api, clean_migrated_db)
 
 class TestAdmissionChangeStatus(AdmissionClient):
 
@@ -219,7 +265,15 @@ class TestAdmissionPostDevicesMultitenant(TestAdmissionPostDevicesBase):
         auth = {"Authorization": "Bearer " + tenant_foobar}
         self._test_bad_req_iddata(admission_api, tenant_foobar_clean_migrated_db, auth)
 
+    def test_bad_key(self, admission_api, tenant_foobar_clean_migrated_db, tenant_foobar):
+        auth = {"Authorization": "Bearer " + tenant_foobar}
+        self._test_bad_key(admission_api, tenant_foobar_clean_migrated_db, auth)
+
     @pytest.mark.parametrize('tenant_foobar_devices', ['5'], indirect=True)
     def test_conflict(self, admission_api, tenant_foobar_devices, tenant_foobar):
         auth = {"Authorization": "Bearer " + tenant_foobar}
         self._test_conflict(admission_api, tenant_foobar_devices, auth)
+
+    def test_id_data_formatting(self, admission_api, tenant_foobar_clean_migrated_db, tenant_foobar):
+        auth = {"Authorization": "Bearer " + tenant_foobar}
+        self._test_id_data_formatting(admission_api, tenant_foobar_clean_migrated_db, auth)

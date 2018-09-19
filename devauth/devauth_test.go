@@ -1683,7 +1683,7 @@ func TestDevAuthProvisionTenant(t *testing.T) {
 			db := mstore.DataStore{}
 			db.On("MigrateTenant", ctx,
 				mock.AnythingOfType("string"),
-				"1.2.0",
+				"1.3.0",
 			).Return(tc.datastoreError)
 			db.On("WithAutomigrate").Return(&db)
 			devauth := NewDevAuth(&db, nil, nil, Config{})

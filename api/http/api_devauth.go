@@ -746,6 +746,7 @@ func (d *DevAuthApiHandlers) DevAdmPostDevicesHandler(w rest.ResponseWriter, r *
 		return
 	}
 	// translate to devauth object
+	// id data is already sorted/normalized in ParseDevAdmAuthReqSet
 	req := &model.PreAuthReq{
 		DeviceId:  bson.NewObjectId().Hex(),
 		AuthSetId: bson.NewObjectId().Hex(),
