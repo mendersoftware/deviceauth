@@ -592,7 +592,11 @@ func (d *DevAuth) setAuthSetStatus(ctx context.Context, device_id string, auth_i
 		return ErrDevIdAuthIdMismatch
 	}
 
-	if status == model.DevStatusRejected || status == model.DevStatusPending {
+	if aset.Status == status {
+		return nil
+	}
+
+	if aset.Status == model.DevStatusAccepted && (status == model.DevStatusRejected || status == model.DevStatusPending) {
 		// delete device token
 		err := d.db.DeleteTokenByDevId(ctx, aset.DeviceId)
 		if err != nil && err != store.ErrTokenNotFound {
