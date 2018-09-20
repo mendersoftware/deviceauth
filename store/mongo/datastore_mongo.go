@@ -821,13 +821,13 @@ func (db *DataStoreMongo) GetDeviceStatus(ctx context.Context, devId string) (st
 	_, err := c.Find(filter).MapReduce(job, &result)
 	if err != nil {
 		if err.Error() == store.NoCollectionErrMsg {
-			return "", store.ErrDevNotFound
+			return "", store.ErrAuthSetNotFound
 		}
 		return "", err
 	}
 
 	if len(result) == 0 {
-		return "", store.ErrDevNotFound
+		return "", store.ErrAuthSetNotFound
 	}
 
 	for _, res := range result {

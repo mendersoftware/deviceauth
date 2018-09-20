@@ -1894,11 +1894,11 @@ func TestStoreGetDeviceStatus(t *testing.T) {
 			status: model.DevStatusRejected,
 			err:    "",
 		},
-		"dev not found - no auth sets": {
+		"auth sets not found": {
 			devId:  "001",
 			tenant: tenant,
 			status: "",
-			err:    store.ErrDevNotFound.Error(),
+			err:    store.ErrAuthSetNotFound.Error(),
 		},
 		"dev not found - different device id": {
 			devId: "005",
@@ -1921,7 +1921,7 @@ func TestStoreGetDeviceStatus(t *testing.T) {
 			},
 			tenant: tenant,
 			status: "",
-			err:    store.ErrDevNotFound.Error(),
+			err:    store.ErrAuthSetNotFound.Error(),
 		},
 		"error, too many accepted": {
 			devId: "001",

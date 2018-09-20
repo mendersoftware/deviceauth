@@ -901,6 +901,9 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 				context.Background(), model.DevStatusAccepted).Return(tc.dbCount, tc.dbCountErr)
 			db.On("GetDeviceStatus",
 				context.Background(), "dummy_devid").Return(tc.dbDeviceStatus, tc.dbGetDeviceStatustErr)
+			db.On("UpdateDevice", context.Background(),
+				mock.AnythingOfType("model.Device"),
+				mock.AnythingOfType("model.DeviceUpdate")).Return(nil)
 
 			if tc.aset != nil {
 				// for rejecting all auth sets
@@ -974,6 +977,7 @@ func TestDevAuthRejectDevice(t *testing.T) {
 			aset: &model.AuthSet{
 				Id:       "dummy_aid",
 				DeviceId: "dummy_devid",
+				Status:   "accepted",
 			},
 			dbDelDevTokenErr: errors.New("some error"),
 			outErr:           "db delete device token error: some error",
@@ -993,6 +997,12 @@ func TestDevAuthRejectDevice(t *testing.T) {
 			}
 			db.On("DeleteTokenByDevId", context.Background(), "dummy_devid").Return(
 				tc.dbDelDevTokenErr)
+			db.On("GetDeviceStatus", context.Background(),
+				"dummy_devid").Return(
+				"accpted", nil)
+			db.On("UpdateDevice", context.Background(),
+				mock.AnythingOfType("model.Device"),
+				mock.AnythingOfType("model.DeviceUpdate")).Return(nil)
 
 			devauth := NewDevAuth(&db, nil, nil, Config{})
 			err := devauth.RejectDeviceAuth(context.Background(), "dummy_devid", "dummy_aid")
@@ -1033,6 +1043,7 @@ func TestDevAuthResetDevice(t *testing.T) {
 			aset: &model.AuthSet{
 				Id:       "dummy_aid",
 				DeviceId: "dummy_devid",
+				Status:   "accepted",
 			},
 			dbDelDevTokenErr: store.ErrTokenNotFound,
 			outErr:           "db delete device token error: token not found",
@@ -1041,6 +1052,7 @@ func TestDevAuthResetDevice(t *testing.T) {
 			aset: &model.AuthSet{
 				Id:       "dummy_aid",
 				DeviceId: "dummy_devid",
+				Status:   "accepted",
 			},
 			dbDelDevTokenErr: errors.New("some error"),
 			outErr:           "db delete device token error: some error",
@@ -1060,6 +1072,12 @@ func TestDevAuthResetDevice(t *testing.T) {
 			}
 			db.On("DeleteTokenByDevId", context.Background(), "dummy_devid").Return(
 				tc.dbDelDevTokenErr)
+			db.On("GetDeviceStatus", context.Background(),
+				"dummy_devid").Return(
+				"accpted", nil)
+			db.On("UpdateDevice", context.Background(),
+				mock.AnythingOfType("model.Device"),
+				mock.AnythingOfType("model.DeviceUpdate")).Return(nil)
 
 			devauth := NewDevAuth(&db, nil, nil, Config{})
 			err := devauth.ResetDeviceAuth(context.Background(), "dummy_devid", "dummy_aid")
@@ -1351,6 +1369,9 @@ func TestDevAuthDecommissionDevice(t *testing.T) {
 			db.On("DeleteDevice", ctx,
 				tc.devId).Return(
 				tc.dbDeleteDeviceErr)
+			db.On("UpdateDevice", ctx,
+				mock.AnythingOfType("model.Device"),
+				mock.AnythingOfType("model.DeviceUpdate")).Return(nil)
 
 			devauth := NewDevAuth(&db, &co, nil, Config{})
 			err := devauth.DecommissionDevice(ctx, tc.devId)
@@ -1500,6 +1521,9 @@ func TestDevAuthGetLimit(t *testing.T) {
 
 			db := mstore.DataStore{}
 			db.On("GetLimit", ctx, tc.inName).Return(tc.dbLimit, tc.dbErr)
+			db.On("UpdateDevice", ctx,
+				mock.AnythingOfType("model.Device"),
+				mock.AnythingOfType("model.DeviceUpdate")).Return(nil)
 
 			devauth := NewDevAuth(&db, nil, nil,
 				Config{MaxDevicesLimitDefault: tc.maxDevicesLimitDefaultConfig})
@@ -1713,6 +1737,8 @@ func TestDevAuthDeleteAuthSet(t *testing.T) {
 		dbDeleteAuthSetForDeviceErr error
 		dbGetAuthSetsForDeviceErr   error
 		dbDeleteDeviceErr           error
+		dbGetDeviceStatusErr        error
+		dbUpdateDeviceErr           error
 
 		authSet *model.AuthSet
 
@@ -1767,8 +1793,20 @@ func TestDevAuthDeleteAuthSet(t *testing.T) {
 			dbDeleteDeviceErr: errors.New("DeleteDevice Error"),
 		},
 		{
-			devId:  "devId10",
-			authId: "authId10",
+			devId:                "devId10",
+			authId:               "authId10",
+			dbGetDeviceStatusErr: errors.New("Get Device Status Error"),
+			outErr:               "Cannot determine device status: Get Device Status Error",
+		},
+		{
+			devId:             "devId11",
+			authId:            "authId11",
+			dbUpdateDeviceErr: errors.New("Update Device Error"),
+			outErr:            "failed to update device status: Update Device Error",
+		},
+		{
+			devId:  "devId12",
+			authId: "authId12",
 		},
 	}
 
@@ -1798,6 +1836,12 @@ func TestDevAuthDeleteAuthSet(t *testing.T) {
 			db.On("DeleteDevice", ctx,
 				tc.devId).Return(
 				tc.dbDeleteDeviceErr)
+			db.On("GetDeviceStatus", ctx,
+				tc.devId).Return(
+				"accpted", tc.dbGetDeviceStatusErr)
+			db.On("UpdateDevice", ctx,
+				mock.AnythingOfType("model.Device"),
+				mock.AnythingOfType("model.DeviceUpdate")).Return(tc.dbUpdateDeviceErr)
 
 			devauth := NewDevAuth(&db, nil, nil, Config{})
 			err := devauth.DeleteAuthSet(ctx, tc.devId, tc.authId)
