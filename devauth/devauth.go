@@ -648,7 +648,11 @@ func (d *DevAuth) setAuthSetStatus(ctx context.Context, device_id string, auth_i
 		return errors.Wrap(err, "db update device auth set error")
 	}
 
-	return d.updateDeviceStatus(ctx, device_id, "")
+	if status == model.DevStatusAccepted {
+		return d.updateDeviceStatus(ctx, device_id, status)
+	} else {
+		return d.updateDeviceStatus(ctx, device_id, "")
+	}
 }
 
 func (d *DevAuth) RejectDeviceAuth(ctx context.Context, device_id string, auth_id string) error {
