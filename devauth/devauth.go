@@ -300,15 +300,12 @@ func (d *DevAuth) processPreAuthRequest(ctx context.Context, r *model.AuthReq) (
 	// check the device status
 	// if the device status is accepted then do not trigger provisioning workflow
 	// this needs to be checked before changing authentication set status
-	status, err := d.db.GetDeviceStatus(ctx, aset.DeviceId)
+	dev, err := d.db.GetDeviceById(ctx, aset.DeviceId)
 	if err != nil {
-		if err == store.ErrDevNotFound {
-			return nil, err
-		}
-		return nil, errors.Wrap(err, "Cannot determine device status")
+		return nil, err
 	}
 
-	if status == model.DevStatusAccepted {
+	if dev.Status == model.DevStatusAccepted {
 		deviceAlreadyAccepted = true
 	}
 
@@ -545,15 +542,12 @@ func (d *DevAuth) AcceptDeviceAuth(ctx context.Context, device_id string, auth_i
 	// check the device status
 	// if the device status is accepted then do not trigger provisioning workflow
 	// this needs to be checked before changing authentication set status
-	status, err := d.db.GetDeviceStatus(ctx, device_id)
+	dev, err := d.db.GetDeviceById(ctx, device_id)
 	if err != nil {
-		if err == store.ErrDevNotFound {
-			return err
-		}
-		return errors.Wrap(err, "Cannot determine device status")
+		return err
 	}
 
-	if status == model.DevStatusAccepted {
+	if dev.Status == model.DevStatusAccepted {
 		deviceAlreadyAccepted = true
 	}
 
@@ -919,14 +913,14 @@ func (d *DevAuth) GetTenantDeviceStatus(ctx context.Context, tenantId, deviceId 
 		Tenant: tenantId,
 	})
 
-	status, err := d.db.GetDeviceStatus(tenantCtx, deviceId)
+	dev, err := d.db.GetDeviceById(tenantCtx, deviceId)
 	switch err {
 	case nil:
-		return &model.Status{Status: status}, nil
+		return &model.Status{Status: dev.Status}, nil
 	case store.ErrDevNotFound:
 		return nil, ErrDeviceNotFound
 	default:
-		return nil, errors.Wrapf(err, "cannot get status for device %s", deviceId)
+		return nil, errors.Wrapf(err, "get device %s failed", deviceId)
 
 	}
 }
