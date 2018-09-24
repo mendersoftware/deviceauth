@@ -412,8 +412,8 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 		dbGetDevCountByStatusRes int
 		dbGetDevCountByStatusErr error
 
-		dbDeviceStatus        string
-		dbGetDeviceStatustErr error
+		dev                *model.Device
+		dbGetDeviceByIdErr error
 
 		coSubmitProvisionDeviceJobErr error
 
@@ -432,14 +432,20 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 				Value: 5,
 			},
 			dbGetDevCountByStatusRes: 0,
-			dbDeviceStatus:           model.DevStatusPending,
-			res:                      dummyToken,
+			dev: &model.Device{
+				Id:     dummyDevId,
+				Status: model.DevStatusPending,
+			},
+			res: dummyToken,
 		},
 		{
 			desc: "error: can't get an existing authset",
 			dbGetAuthSetByDataKeyErr: errors.New("db error"),
-			dbDeviceStatus:           model.DevStatusPending,
-			err:                      errors.New("failed to fetch auth set: db error"),
+			dev: &model.Device{
+				Id:     dummyDevId,
+				Status: model.DevStatusPending,
+			},
+			err: errors.New("failed to fetch auth set: db error"),
 		},
 		{
 			desc: "error: preauthorized set would exceed limit",
@@ -453,8 +459,11 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 				Value: 5,
 			},
 			dbGetDevCountByStatusRes: 5,
-			dbDeviceStatus:           model.DevStatusPending,
-			err:                      ErrMaxDeviceCountReached,
+			dev: &model.Device{
+				Id:     dummyDevId,
+				Status: model.DevStatusPending,
+			},
+			err: ErrMaxDeviceCountReached,
 		},
 		{
 			desc: "error: can't get device limit",
@@ -464,9 +473,12 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 				PubKey:   inReq.PubKey,
 				Status:   model.DevStatusPreauth,
 			},
-			dbGetLimitErr:  errors.New("db error"),
-			dbDeviceStatus: model.DevStatusPending,
-			err:            errors.New("can't get current device limit: db error"),
+			dbGetLimitErr: errors.New("db error"),
+			dev: &model.Device{
+				Id:     dummyDevId,
+				Status: model.DevStatusPending,
+			},
+			err: errors.New("can't get current device limit: db error"),
 		},
 		{
 			desc: "error: failed to submit job to conductor",
@@ -479,8 +491,11 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 			dbGetLimitRes: &model.Limit{
 				Value: 5,
 			},
-			dbGetDevCountByStatusRes:      0,
-			dbDeviceStatus:                model.DevStatusPending,
+			dbGetDevCountByStatusRes: 0,
+			dev: &model.Device{
+				Id:     dummyDevId,
+				Status: model.DevStatusPending,
+			},
 			coSubmitProvisionDeviceJobErr: errors.New("conductor failed"),
 			err: errors.New("submit device provisioning job error: conductor failed"),
 		},
@@ -495,8 +510,11 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 			dbGetLimitRes: &model.Limit{
 				Value: 5,
 			},
-			dbGetDevCountByStatusRes:      0,
-			dbDeviceStatus:                model.DevStatusAccepted,
+			dbGetDevCountByStatusRes: 0,
+			dev: &model.Device{
+				Id:     dummyDevId,
+				Status: model.DevStatusAccepted,
+			},
 			coSubmitProvisionDeviceJobErr: errors.New("conductor shouldn't be called"),
 			res: dummyToken,
 		},
@@ -512,8 +530,8 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 				Value: 5,
 			},
 			dbGetDevCountByStatusRes: 0,
-			dbGetDeviceStatustErr:    errors.New("Get device status failed"),
-			err: errors.New("Cannot determine device status: Get device status failed"),
+			dbGetDeviceByIdErr:       errors.New("Get device failed"),
+			err:                      errors.New("Get device failed"),
 		},
 	}
 
@@ -591,8 +609,8 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 				mock.AnythingOfType("model.Token"),
 			).Return(nil)
 
-			db.On("GetDeviceStatus",
-				context.Background(), mock.AnythingOfType("string")).Return(tc.dbDeviceStatus, tc.dbGetDeviceStatustErr)
+			db.On("GetDeviceById",
+				context.Background(), dummyDevId).Return(tc.dev, tc.dbGetDeviceByIdErr)
 
 			// token serialization - happy path only, errors tested elsewhere
 			jwth := mjwt.Handler{}
@@ -739,8 +757,8 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 		dbCount    int
 		dbCountErr error
 
-		dbDeviceStatus        string
-		dbGetDeviceStatustErr error
+		dev                *model.Device
+		dbGetDeviceByIdErr error
 
 		dbUpdateErr               error
 		dbUpdateRevokeAuthSetsErr error
@@ -756,17 +774,23 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 				Id:       "dummy_aid",
 				DeviceId: "dummy_devid",
 			},
-			dbLimit:        &model.Limit{Value: 0},
-			dbDeviceStatus: model.DevStatusPending,
+			dev: &model.Device{
+				Id:     "dummy_devid",
+				Status: model.DevStatusPending,
+			},
+			dbLimit: &model.Limit{Value: 0},
 		},
 		{
 			aset: &model.AuthSet{
 				Id:       "dummy_aid",
 				DeviceId: "dummy_devid",
 			},
-			dbLimit:        &model.Limit{Value: 5},
-			dbCount:        4,
-			dbDeviceStatus: model.DevStatusPending,
+			dev: &model.Device{
+				Id:     "dummy_devid",
+				Status: model.DevStatusPending,
+			},
+			dbLimit: &model.Limit{Value: 5},
+			dbCount: 4,
 		},
 		{
 			aset: &model.AuthSet{
@@ -774,10 +798,13 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 				DeviceId: "dummy_devid",
 				Status:   model.DevStatusAccepted,
 			},
+			dev: &model.Device{
+				Id:     "dummy_devid",
+				Status: model.DevStatusPending,
+			},
 			coSubmitProvisionDeviceJobErr: errors.New("conductor shouldn't be called"),
-			dbLimit:        &model.Limit{Value: 5},
-			dbCount:        4,
-			dbDeviceStatus: model.DevStatusPending,
+			dbLimit: &model.Limit{Value: 5},
+			dbCount: 4,
 		},
 		{
 			aset: &model.AuthSet{
@@ -785,56 +812,70 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 				DeviceId: "dummy_devid",
 				Status:   model.DevStatusPending,
 			},
+			dev: &model.Device{
+				Id:     "dummy_devid",
+				Status: model.DevStatusAccepted,
+			},
 			coSubmitProvisionDeviceJobErr: errors.New("conductor shouldn't be called"),
-			dbLimit:        &model.Limit{Value: 5},
-			dbCount:        4,
-			dbDeviceStatus: model.DevStatusAccepted,
+			dbLimit: &model.Limit{Value: 5},
+			dbCount: 4,
 		},
 		{
 			aset: &model.AuthSet{
 				Id:       "dummy_aid",
 				DeviceId: "dummy_devid",
 			},
-			dbLimit:        &model.Limit{Value: 5},
-			dbCount:        5,
-			dbDeviceStatus: model.DevStatusPending,
-			outErr:         "maximum number of accepted devices reached",
+			dev: &model.Device{
+				Id:     "dummy_devid",
+				Status: model.DevStatusPending,
+			},
+			dbLimit: &model.Limit{Value: 5},
+			dbCount: 5,
+			outErr:  "maximum number of accepted devices reached",
 		},
 		{
 			aset: &model.AuthSet{
 				Id:       "dummy_aid",
 				DeviceId: "dummy_devid",
 			},
-			dbLimit:        &model.Limit{Value: 5},
-			dbCount:        6,
-			dbDeviceStatus: model.DevStatusPending,
-			outErr:         "maximum number of accepted devices reached",
+			dev: &model.Device{
+				Id:     "dummy_devid",
+				Status: model.DevStatusPending,
+			},
+			dbLimit: &model.Limit{Value: 5},
+			dbCount: 6,
+			outErr:  "maximum number of accepted devices reached",
 		},
 		{
 			aset: &model.AuthSet{
 				Id:       "dummy_aid",
 				DeviceId: "dummy_devid",
 			},
-			dbLimit:        &model.Limit{Value: 5},
-			dbLimitErr:     errors.New("error"),
-			dbDeviceStatus: model.DevStatusPending,
-			outErr:         "can't get current device limit: error",
+			dev: &model.Device{
+				Id:     "dummy_devid",
+				Status: model.DevStatusPending,
+			},
+			dbLimit:    &model.Limit{Value: 5},
+			dbLimitErr: errors.New("error"),
+			outErr:     "can't get current device limit: error",
 		},
 		{
 			aset: &model.AuthSet{
 				Id:       "dummy_aid",
 				DeviceId: "dummy_devid",
 			},
-			dbLimit:        &model.Limit{Value: 5},
-			dbCountErr:     errors.New("error"),
-			dbDeviceStatus: model.DevStatusPending,
-			outErr:         "can't get current device count: error",
+			dev: &model.Device{
+				Id:     "dummy_devid",
+				Status: model.DevStatusPending,
+			},
+			dbLimit:    &model.Limit{Value: 5},
+			dbCountErr: errors.New("error"),
+			outErr:     "can't get current device count: error",
 		},
 		{
-			dbLimit:        &model.Limit{Value: 0},
-			dbGetErr:       store.ErrDevNotFound,
-			dbDeviceStatus: model.DevStatusPending,
-			outErr:         store.ErrDevNotFound.Error(),
+			dbLimit:  &model.Limit{Value: 0},
+			dbGetErr: store.ErrDevNotFound,
+			outErr:   store.ErrDevNotFound.Error(),
 		},
 		{
 			dbLimit: &model.Limit{Value: 0},
@@ -842,28 +883,37 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 				Id:       "dummy_aid",
 				DeviceId: "dummy_devid",
 			},
-			dbUpdateErr:    errors.New("failed to update device"),
-			dbDeviceStatus: model.DevStatusPending,
-			outErr:         "db update device auth set error: failed to update device",
+			dev: &model.Device{
+				Id:     "dummy_devid",
+				Status: model.DevStatusPending,
+			},
+			dbUpdateErr: errors.New("failed to update device"),
+			outErr:      "db update device auth set error: failed to update device",
 		},
 		{
 			dbLimit: &model.Limit{Value: 0},
 			aset: &model.AuthSet{
 				Id:       "dummy_aid",
 				DeviceId: "dummy_devid",
+			},
+			dev: &model.Device{
+				Id:     "dummy_devid",
+				Status: model.DevStatusPending,
 			},
 			coSubmitProvisionDeviceJobErr: errors.New("conductor failed"),
-			dbDeviceStatus:                model.DevStatusPending,
-			outErr:                        "submit device provisioning job error: conductor failed",
+			outErr: "submit device provisioning job error: conductor failed",
 		},
 		{
 			dbLimit: &model.Limit{Value: 0},
 			aset: &model.AuthSet{
 				Id:       "dummy_aid",
 				DeviceId: "dummy_devid",
+			},
+			dev: &model.Device{
+				Id:     "dummy_devid",
+				Status: model.DevStatusPending,
 			},
 			dbUpdateRevokeAuthSetsErr: store.ErrAuthSetNotFound,
-			dbDeviceStatus:            model.DevStatusPending,
 		},
 		{
 			dbLimit: &model.Limit{Value: 0},
@@ -871,19 +921,22 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 				Id:       "dummy_aid",
 				DeviceId: "dummy_devid",
 			},
+			dev: &model.Device{
+				Id:     "dummy_devid",
+				Status: model.DevStatusPending,
+			},
 			dbUpdateRevokeAuthSetsErr: errors.New("foobar"),
-			dbDeviceStatus:            model.DevStatusPending,
-			outErr:                    "failed to reject auth sets: foobar",
+			outErr: "failed to reject auth sets: foobar",
 		},
 		{
 			aset: &model.AuthSet{
 				Id:       "dummy_aid",
 				DeviceId: "dummy_devid",
 			},
-			dbLimit:               &model.Limit{Value: 5},
-			dbCount:               4,
-			dbGetDeviceStatustErr: errors.New("Get device status failed"),
-			outErr:                "Cannot determine device status: Get device status failed",
+			dbLimit:            &model.Limit{Value: 5},
+			dbCount:            4,
+			dbGetDeviceByIdErr: errors.New("Get device failed"),
+			outErr:             "Get device failed",
 		},
 	}
 
@@ -899,8 +952,11 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 				context.Background(), model.LimitMaxDeviceCount).Return(tc.dbLimit, tc.dbLimitErr)
 			db.On("GetDevCountByStatus",
 				context.Background(), model.DevStatusAccepted).Return(tc.dbCount, tc.dbCountErr)
-			db.On("GetDeviceStatus",
-				context.Background(), "dummy_devid").Return(tc.dbDeviceStatus, tc.dbGetDeviceStatustErr)
+			db.On("GetDeviceById",
+				context.Background(), "dummy_devid").Return(tc.dev, tc.dbGetDeviceByIdErr)
+			db.On("UpdateDevice", context.Background(),
+				mock.AnythingOfType("model.Device"),
+				mock.AnythingOfType("model.DeviceUpdate")).Return(nil)
 
 			if tc.aset != nil {
 				// for rejecting all auth sets
@@ -974,6 +1030,7 @@ func TestDevAuthRejectDevice(t *testing.T) {
 			aset: &model.AuthSet{
 				Id:       "dummy_aid",
 				DeviceId: "dummy_devid",
+				Status:   "accepted",
 			},
 			dbDelDevTokenErr: errors.New("some error"),
 			outErr:           "db delete device token error: some error",
@@ -993,6 +1050,12 @@ func TestDevAuthRejectDevice(t *testing.T) {
 			}
 			db.On("DeleteTokenByDevId", context.Background(), "dummy_devid").Return(
 				tc.dbDelDevTokenErr)
+			db.On("GetDeviceStatus", context.Background(),
+				"dummy_devid").Return(
+				"accpted", nil)
+			db.On("UpdateDevice", context.Background(),
+				mock.AnythingOfType("model.Device"),
+				mock.AnythingOfType("model.DeviceUpdate")).Return(nil)
 
 			devauth := NewDevAuth(&db, nil, nil, Config{})
 			err := devauth.RejectDeviceAuth(context.Background(), "dummy_devid", "dummy_aid")
@@ -1033,6 +1096,7 @@ func TestDevAuthResetDevice(t *testing.T) {
 			aset: &model.AuthSet{
 				Id:       "dummy_aid",
 				DeviceId: "dummy_devid",
+				Status:   "accepted",
 			},
 			dbDelDevTokenErr: store.ErrTokenNotFound,
 			outErr:           "db delete device token error: token not found",
@@ -1041,6 +1105,7 @@ func TestDevAuthResetDevice(t *testing.T) {
 			aset: &model.AuthSet{
 				Id:       "dummy_aid",
 				DeviceId: "dummy_devid",
+				Status:   "accepted",
 			},
 			dbDelDevTokenErr: errors.New("some error"),
 			outErr:           "db delete device token error: some error",
@@ -1060,6 +1125,12 @@ func TestDevAuthResetDevice(t *testing.T) {
 			}
 			db.On("DeleteTokenByDevId", context.Background(), "dummy_devid").Return(
 				tc.dbDelDevTokenErr)
+			db.On("GetDeviceStatus", context.Background(),
+				"dummy_devid").Return(
+				"accpted", nil)
+			db.On("UpdateDevice", context.Background(),
+				mock.AnythingOfType("model.Device"),
+				mock.AnythingOfType("model.DeviceUpdate")).Return(nil)
 
 			devauth := NewDevAuth(&db, nil, nil, Config{})
 			err := devauth.ResetDeviceAuth(context.Background(), "dummy_devid", "dummy_aid")
@@ -1351,6 +1422,9 @@ func TestDevAuthDecommissionDevice(t *testing.T) {
 			db.On("DeleteDevice", ctx,
 				tc.devId).Return(
 				tc.dbDeleteDeviceErr)
+			db.On("UpdateDevice", ctx,
+				mock.AnythingOfType("model.Device"),
+				mock.AnythingOfType("model.DeviceUpdate")).Return(nil)
 
 			devauth := NewDevAuth(&db, &co, nil, Config{})
 			err := devauth.DecommissionDevice(ctx, tc.devId)
@@ -1500,6 +1574,9 @@ func TestDevAuthGetLimit(t *testing.T) {
 
 			db := mstore.DataStore{}
 			db.On("GetLimit", ctx, tc.inName).Return(tc.dbLimit, tc.dbErr)
+			db.On("UpdateDevice", ctx,
+				mock.AnythingOfType("model.Device"),
+				mock.AnythingOfType("model.DeviceUpdate")).Return(nil)
 
 			devauth := NewDevAuth(&db, nil, nil,
 				Config{MaxDevicesLimitDefault: tc.maxDevicesLimitDefaultConfig})
@@ -1713,6 +1790,8 @@ func TestDevAuthDeleteAuthSet(t *testing.T) {
 		dbDeleteAuthSetForDeviceErr error
 		dbGetAuthSetsForDeviceErr   error
 		dbDeleteDeviceErr           error
+		dbGetDeviceStatusErr        error
+		dbUpdateDeviceErr           error
 
 		authSet *model.AuthSet
 
@@ -1767,8 +1846,20 @@ func TestDevAuthDeleteAuthSet(t *testing.T) {
 			dbDeleteDeviceErr: errors.New("DeleteDevice Error"),
 		},
 		{
-			devId:  "devId10",
-			authId: "authId10",
+			devId:                "devId10",
+			authId:               "authId10",
+			dbGetDeviceStatusErr: errors.New("Get Device Status Error"),
+			outErr:               "Cannot determine device status: Get Device Status Error",
+		},
+		{
+			devId:             "devId11",
+			authId:            "authId11",
+			dbUpdateDeviceErr: errors.New("Update Device Error"),
+			outErr:            "failed to update device status: Update Device Error",
+		},
+		{
+			devId:  "devId12",
+			authId: "authId12",
 		},
 	}
 
@@ -1798,6 +1889,12 @@ func TestDevAuthDeleteAuthSet(t *testing.T) {
 			db.On("DeleteDevice", ctx,
 				tc.devId).Return(
 				tc.dbDeleteDeviceErr)
+			db.On("GetDeviceStatus", ctx,
+				tc.devId).Return(
+				"accpted", tc.dbGetDeviceStatusErr)
+			db.On("UpdateDevice", ctx,
+				mock.AnythingOfType("model.Device"),
+				mock.AnythingOfType("model.DeviceUpdate")).Return(tc.dbUpdateDeviceErr)
 
 			devauth := NewDevAuth(&db, nil, nil, Config{})
 			err := devauth.DeleteAuthSet(ctx, tc.devId, tc.authId)
@@ -1885,8 +1982,8 @@ func TestGetTenantDeviceStatus(t *testing.T) {
 		tenantId string
 		deviceId string
 
-		dbGetDeviceStatus    string
-		dbGetDeviceStatusErr error
+		dev                *model.Device
+		dbGetDeviceByIdErr error
 
 		outErr    error
 		outStatus model.Status
@@ -1895,22 +1992,26 @@ func TestGetTenantDeviceStatus(t *testing.T) {
 			tenantId: "foo",
 			deviceId: "dev-foo",
 
-			dbGetDeviceStatus: "accepted",
-			outStatus:         model.Status{Status: "accepted"},
+			dev: &model.Device{
+				Id:     "dev-foo",
+				Status: model.DevStatusAccepted,
+			},
+
+			outStatus: model.Status{Status: "accepted"},
 		},
 		"error, not found": {
 			tenantId: "foo",
 			deviceId: "dev-foo",
 
-			dbGetDeviceStatusErr: store.ErrDevNotFound,
-			outErr:               ErrDeviceNotFound,
+			dbGetDeviceByIdErr: store.ErrDevNotFound,
+			outErr:             ErrDeviceNotFound,
 		},
 		"error, generic": {
 			tenantId: "foo",
 			deviceId: "dev-foo",
 
-			dbGetDeviceStatusErr: store.ErrDevStatusBroken,
-			outErr:               errors.New("cannot get status for device dev-foo: cannot qualify device status"),
+			dbGetDeviceByIdErr: errors.New("get device error"),
+			outErr:             errors.New("get device dev-foo failed: get device error"),
 		},
 	}
 
@@ -1929,10 +2030,10 @@ func TestGetTenantDeviceStatus(t *testing.T) {
 			})
 
 			db := mstore.DataStore{}
-			db.On("GetDeviceStatus",
+			db.On("GetDeviceById",
 				ctxMatcher,
 				tc.deviceId,
-			).Return(tc.dbGetDeviceStatus, tc.dbGetDeviceStatusErr)
+			).Return(tc.dev, tc.dbGetDeviceByIdErr)
 
 			devauth := NewDevAuth(&db, nil, nil, Config{})
 			status, err := devauth.GetTenantDeviceStatus(ctx, tc.tenantId, tc.deviceId)
