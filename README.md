@@ -4,7 +4,7 @@
 [![Docker pulls](https://img.shields.io/docker/pulls/mendersoftware/deviceauth.svg?maxAge=3600)](https://hub.docker.com/r/mendersoftware/deviceauth/)
 
 Mender: Device Authentication Service
-==============================================
+=============================================
 
 Mender is an open source over-the-air (OTA) software updater for embedded Linux
 devices. Mender comprises a client running at the embedded device, as well as
