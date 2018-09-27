@@ -35,7 +35,7 @@ import (
 )
 
 const (
-	DbVersion     = "1.3.0"
+	DbVersion     = "1.4.0"
 	DbName        = "deviceauth"
 	DbDevicesColl = "devices"
 	DbAuthSetColl = "auth_sets"
