@@ -1,4 +1,4 @@
-// Copyright 2017 Northern.tech AS
+// Copyright 2018 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -154,11 +154,12 @@ func TestMockLicenses(t *testing.T) {
 		AssertTrue(t, err == nil)
 		fd.Close()
 		fd, err = os.Create("LICENSE")
+		fmt.Fprintln(fd, "Copyright 2018 Northern.tech")
 		AssertTrue(t, err == nil)
 		fd.Close()
 
 		fd, err = os.Create("LIC_FILES_CHKSUM.sha256")
-		fmt.Fprintln(fd, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  LICENSE")
+		fmt.Fprintln(fd, "a6dbc0b7761cdc73ba9169cd1eb48d6993de3ed48a3e3dfce039e5492e96ef00  LICENSE")
 		fmt.Fprintln(fd, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  vendor/dummy-site.org/test-repo/README.md")
 		AssertTrue(t, err == nil)
 		fd.Close()

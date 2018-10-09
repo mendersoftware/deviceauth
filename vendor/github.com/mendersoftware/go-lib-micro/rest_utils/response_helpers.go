@@ -1,4 +1,4 @@
-// Copyright 2017 Northern.tech AS
+// Copyright 2018 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -16,9 +16,9 @@ package rest_utils
 import (
 	"net/http"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 
 	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/mendersoftware/go-lib-micro/requestid"
@@ -27,14 +27,13 @@ import (
 // return selected http code + error message directly taken from error
 // log error
 func RestErrWithLog(w rest.ResponseWriter, r *rest.Request, l *log.Logger, e error, code int) {
-	RestErrWithLogMsg(w, r, l, e, code, e.Error())
+	RestErrWithLogMsg(w, r, l, e, code, "")
 }
 
 // return http 500, with an "internal error" message
 // log full error
 func RestErrWithLogInternal(w rest.ResponseWriter, r *rest.Request, l *log.Logger, e error) {
 	msg := "internal error"
-	e = errors.Wrap(e, msg)
 	RestErrWithLogMsg(w, r, l, e, http.StatusInternalServerError, msg)
 }
 
@@ -85,6 +84,13 @@ func RestErrWithPanicMsg(w rest.ResponseWriter, r *rest.Request, l *log.Logger, 
 // log full error with given log level
 func restErrWithLogMsg(w rest.ResponseWriter, r *rest.Request, l *log.Logger,
 	e error, code int, msg string, logLevel logrus.Level) {
+
+	if msg != "" {
+		e = errors.Wrap(e, msg)
+	} else {
+		msg = e.Error()
+	}
+
 	w.WriteHeader(code)
 	err := w.WriteJson(map[string]string{
 		rest.ErrorFieldName: msg,
@@ -95,16 +101,16 @@ func restErrWithLogMsg(w rest.ResponseWriter, r *rest.Request, l *log.Logger,
 	}
 	switch logLevel {
 	case logrus.DebugLevel:
-		l.F(log.Ctx{}).Debug(errors.Wrap(e, msg).Error())
+		l.F(log.Ctx{}).Debug(e.Error())
 	case logrus.InfoLevel:
-		l.F(log.Ctx{}).Info(errors.Wrap(e, msg).Error())
+		l.F(log.Ctx{}).Info(e.Error())
 	case logrus.WarnLevel:
-		l.F(log.Ctx{}).Warn(errors.Wrap(e, msg).Error())
+		l.F(log.Ctx{}).Warn(e.Error())
 	case logrus.ErrorLevel:
-		l.F(log.Ctx{}).Error(errors.Wrap(e, msg).Error())
+		l.F(log.Ctx{}).Error(e.Error())
 	case logrus.FatalLevel:
-		l.F(log.Ctx{}).Fatal(errors.Wrap(e, msg).Error())
+		l.F(log.Ctx{}).Fatal(e.Error())
 	case logrus.PanicLevel:
-		l.F(log.Ctx{}).Panic(errors.Wrap(e, msg).Error())
+		l.F(log.Ctx{}).Panic(e.Error())
 	}
 }

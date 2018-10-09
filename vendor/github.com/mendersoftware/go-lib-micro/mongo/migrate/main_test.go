@@ -1,4 +1,4 @@
-// Copyright 2017 Northern.tech AS
+// Copyright 2018 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -14,6 +14,7 @@
 package migrate_test
 
 import (
+	"flag"
 	"os"
 	"testing"
 
@@ -26,6 +27,7 @@ var db mtesting.TestDBRunner
 // Overwrites test execution and allows for test database setup
 func TestMain(m *testing.M) {
 	ltesting.MaybeDiscardLogs()
+	flag.Parse()
 
 	var status int
 	if !testing.Short() {

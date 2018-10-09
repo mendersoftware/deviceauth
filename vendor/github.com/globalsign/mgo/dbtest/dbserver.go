@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"runtime"
 	"strconv"
 	"time"
 
@@ -69,6 +70,8 @@ func (dbs *DBServer) start() {
 	dbs.server.Stderr = &dbs.output
 	err = dbs.server.Start()
 	if err != nil {
+		// print error to facilitate troubleshooting as the panic will be caught in a panic handler
+		fmt.Fprintf(os.Stderr, "mongod failed to start: %v\n", err)
 		panic(err)
 	}
 	dbs.tomb.Go(dbs.monitor)
@@ -111,7 +114,12 @@ func (dbs *DBServer) Stop() {
 	}
 	if dbs.server != nil {
 		dbs.tomb.Kill(nil)
-		dbs.server.Process.Signal(os.Interrupt)
+		// Windows doesn't support Interrupt
+		if runtime.GOOS == "windows" {
+			dbs.server.Process.Signal(os.Kill)
+		} else {
+			dbs.server.Process.Signal(os.Interrupt)
+		}
 		select {
 		case <-dbs.tomb.Dead():
 		case <-time.After(5 * time.Second):

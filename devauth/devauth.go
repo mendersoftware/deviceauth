@@ -235,11 +235,17 @@ func (d *DevAuth) SubmitAuthRequest(ctx context.Context, r *model.AuthReq) (stri
 		}
 	}
 
+	uid, err := uuid.NewV4()
+	if err != nil {
+		l.Errorf("failed to assign uuid: %v", err)
+		return "", err
+	}
+
 	// request was already present in DB, check its status
 	if authSet.Status == model.DevStatusAccepted {
 		rawJwt := &jwt.Token{
 			Claims: jwt.Claims{
-				ID:        uuid.NewV4().String(),
+				ID:        uid.String(),
 				Issuer:    d.config.Issuer,
 				ExpiresAt: time.Now().Unix() + d.config.ExpirationTime,
 				Subject:   authSet.DeviceId,

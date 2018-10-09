@@ -353,7 +353,7 @@ func TestApiDevAuthPreauthDevice(t *testing.T) {
 			checker: mt.NewJSONResponse(
 				http.StatusBadRequest,
 				nil,
-				restError("failed to decode preauth request: auth_set_id: non zero value required")),
+				restError("failed to decode preauth request: auth_set_id: non zero value required;")),
 		},
 		"invalid: no device_id": {
 			body: &model.PreAuthReq{
@@ -364,7 +364,7 @@ func TestApiDevAuthPreauthDevice(t *testing.T) {
 			checker: mt.NewJSONResponse(
 				http.StatusBadRequest,
 				nil,
-				restError("failed to decode preauth request: device_id: non zero value required")),
+				restError("failed to decode preauth request: device_id: non zero value required;")),
 		},
 		"invalid: no id data": {
 			body: &model.PreAuthReq{
@@ -375,7 +375,7 @@ func TestApiDevAuthPreauthDevice(t *testing.T) {
 			checker: mt.NewJSONResponse(
 				http.StatusBadRequest,
 				nil,
-				restError("failed to decode preauth request: id_data: non zero value required")),
+				restError("failed to decode preauth request: id_data: non zero value required;")),
 		},
 		"invalid: no pubkey": {
 			body: &model.PreAuthReq{
@@ -386,7 +386,7 @@ func TestApiDevAuthPreauthDevice(t *testing.T) {
 			checker: mt.NewJSONResponse(
 				http.StatusBadRequest,
 				nil,
-				restError("failed to decode preauth request: pubkey: non zero value required")),
+				restError("failed to decode preauth request: pubkey: non zero value required;")),
 		},
 		"invalid: no body": {
 			checker: mt.NewJSONResponse(
@@ -2221,14 +2221,14 @@ UwIDAQAB
 			checker: mt.NewJSONResponse(
 				http.StatusBadRequest,
 				nil,
-				restError("key: non zero value required")),
+				restError("key: non zero value required;")),
 		},
 		"error: no identity data": {
 			body: &model.DevAdmAuthSetReq{Key: validKey},
 			checker: mt.NewJSONResponse(
 				http.StatusBadRequest,
 				nil,
-				restError("device_identity: non zero value required")),
+				restError("device_identity: non zero value required;")),
 		},
 		"error: invalid id data": {
 			body: &model.DevAdmAuthSetReq{Key: validKey, DeviceId: "{mac: 1234}"},
