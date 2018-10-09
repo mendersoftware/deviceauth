@@ -90,12 +90,12 @@ func ExampleCredential_x509Authentication() {
 
 func ExampleSession_concurrency() {
 	// This example shows the best practise for concurrent use of a mgo session.
-	// 
+	//
 	// Internally mgo maintains a connection pool, dialling new connections as
-	// required. 
-	// 
+	// required.
+	//
 	// Some general suggestions:
-	// 		- Define a struct holding the original session, database name and 
+	// 		- Define a struct holding the original session, database name and
 	// 			collection name instead of passing them explicitly.
 	// 		- Define an interface abstracting your data access instead of exposing
 	// 			mgo to your application code directly.
@@ -107,7 +107,7 @@ func ExampleSession_concurrency() {
 
 		// Copy the session - if needed this will dial a new connection which
 		// can later be reused.
-		// 
+		//
 		// Calling close returns the connection to the pool.
 		conn := session.Copy()
 		defer conn.Close()
@@ -132,5 +132,46 @@ func ExampleSession_concurrency() {
 	}
 	wg.Wait()
 
+	session.Close()
+}
+
+func ExampleDial_usingSSL() {
+	// To connect via TLS/SSL (enforced for MongoDB Atlas for example) requires
+	// to set the ssl query param to true.
+	url := "mongodb://localhost:40003?ssl=true"
+
+	session, err := Dial(url)
+	if err != nil {
+		panic(err)
+	}
+
+	// Use session as normal
+	session.Close()
+}
+
+func ExampleDial_tlsConfig() {
+	// You can define a custom tlsConfig, this one enables TLS, like if you have
+	// ssl=true in the connection string.
+	url := "mongodb://localhost:40003"
+
+	tlsConfig := &tls.Config{
+		// This can be configured to use a private root CA - see the Credential
+		// x509 Authentication example.
+		//
+		// Please don't set InsecureSkipVerify to true - it makes using TLS
+		// pointless and is never the right answer!
+	}
+
+	dialInfo, err := ParseURL(url)
+	dialInfo.DialServer = func(addr *ServerAddr) (net.Conn, error) {
+		return tls.Dial("tcp", addr.String(), tlsConfig)
+	}
+
+	session, err := DialWithInfo(dialInfo)
+	if err != nil {
+		panic(err)
+	}
+
+	// Use session as normal
 	session.Close()
 }

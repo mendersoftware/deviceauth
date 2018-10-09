@@ -1055,8 +1055,6 @@ func (s *S) TestSocketTimeoutOnDial(c *C) {
 
 	timeout := 1 * time.Second
 
-	defer mgo.HackSyncSocketTimeout(timeout)()
-
 	s.Freeze("localhost:40001")
 
 	started := time.Now()
@@ -1583,6 +1581,9 @@ func (s *S) TestPoolLimitSimple(c *C) {
 		}
 		defer session.Close()
 
+		// So we can measure the stats for the blocking operation
+		mgo.ResetStats()
+
 		// Put one socket in use.
 		c.Assert(session.Ping(), IsNil)
 
@@ -1603,6 +1604,11 @@ func (s *S) TestPoolLimitSimple(c *C) {
 		session.Refresh()
 		delay := <-done
 		c.Assert(delay > 300*time.Millisecond, Equals, true, Commentf("Delay: %s", delay))
+		stats := mgo.GetStats()
+		c.Assert(stats.TimesSocketAcquired, Equals, 2)
+		c.Assert(stats.TimesWaitedForPool, Equals, 1)
+		c.Assert(stats.PoolTimeouts, Equals, 0)
+		c.Assert(stats.TotalPoolWaitTime > 300*time.Millisecond, Equals, true)
 	}
 }
 
@@ -1647,6 +1653,40 @@ func (s *S) TestPoolLimitMany(c *C) {
 	delay := time.Since(before)
 	c.Assert(delay > 3e9, Equals, true)
 	c.Assert(delay < 6e9, Equals, true)
+}
+
+func (s *S) TestPoolLimitTimeout(c *C) {
+	if *fast {
+		c.Skip("-fast")
+	}
+
+	session, err := mgo.Dial("localhost:40011")
+	c.Assert(err, IsNil)
+	defer session.Close()
+	session.SetPoolTimeout(1 * time.Second)
+	session.SetPoolLimit(1)
+
+	mgo.ResetStats()
+
+	// Put one socket in use.
+	c.Assert(session.Ping(), IsNil)
+
+	// Now block trying to get another one due to the pool limit.
+	copy := session.Copy()
+	defer copy.Close()
+	started := time.Now()
+	err = copy.Ping()
+	delay := time.Since(started)
+
+	c.Assert(delay > 900*time.Millisecond, Equals, true, Commentf("Delay: %s", delay))
+	c.Assert(delay < 1100*time.Millisecond, Equals, true, Commentf("Delay: %s", delay))
+	c.Assert(strings.Contains(err.Error(), "could not acquire connection within pool timeout"), Equals, true, Commentf("Error: %s", err))
+	stats := mgo.GetStats()
+	c.Assert(stats.PoolTimeouts, Equals, 1)
+	c.Assert(stats.TimesSocketAcquired, Equals, 1)
+	c.Assert(stats.TimesWaitedForPool, Equals, 1)
+	c.Assert(stats.TotalPoolWaitTime > 900*time.Millisecond, Equals, true)
+	c.Assert(stats.TotalPoolWaitTime < 1100*time.Millisecond, Equals, true)
 }
 
 func (s *S) TestSetModeEventualIterBug(c *C) {
@@ -1962,6 +2002,41 @@ func (s *S) TestConnectCloseConcurrency(c *C) {
 		}()
 	}
 	wg.Wait()
+}
+
+func (s *S) TestNoDeadlockOnClose(c *C) {
+	if *fast {
+		// Unfortunately I seem to need quite a high dial timeout to get this to work
+		// on my machine.
+		c.Skip("-fast")
+	}
+
+	var shouldStop int32
+	atomic.StoreInt32(&shouldStop, 0)
+
+	listener, err := net.Listen("tcp4", "127.0.0.1:")
+	c.Check(err, Equals, nil)
+
+	go func() {
+		for atomic.LoadInt32(&shouldStop) == 0 {
+			sock, err := listener.Accept()
+			if err != nil {
+				// Probs just closed
+				continue
+			}
+			sock.Close()
+		}
+	}()
+	defer func() {
+		atomic.StoreInt32(&shouldStop, 1)
+		listener.Close()
+	}()
+
+	session, err := mgo.DialWithTimeout(listener.Addr().String(), 10*time.Second)
+	// If execution reaches here, the deadlock did not happen and all is OK
+	if session != nil {
+		session.Close()
+	}
 }
 
 func (s *S) TestSelectServers(c *C) {

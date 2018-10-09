@@ -6,8 +6,6 @@
 
 package unix
 
-const _SYS_dup = SYS_DUP3
-
 //sys	EpollWait(epfd int, events []EpollEvent, msec int) (n int, err error) = SYS_EPOLL_PWAIT
 //sys	Fchown(fd int, uid int, gid int) (err error)
 //sys	Fstat(fd int, stat *Stat_t) (err error)
@@ -67,8 +65,6 @@ func Lstat(path string, stat *Stat_t) (err error) {
 //sys	recvmsg(s int, msg *Msghdr, flags int) (n int, err error)
 //sys	sendmsg(s int, msg *Msghdr, flags int) (n int, err error)
 //sys	mmap(addr uintptr, length uintptr, prot int, flags int, fd int, offset int64) (xaddr uintptr, err error)
-
-func Getpagesize() int { return 65536 }
 
 //sysnb	Gettimeofday(tv *Timeval) (err error)
 
@@ -178,3 +174,15 @@ const (
 	SYS_EPOLL_CREATE = 1042
 	SYS_EPOLL_WAIT   = 1069
 )
+
+func Poll(fds []PollFd, timeout int) (n int, err error) {
+	var ts *Timespec
+	if timeout >= 0 {
+		ts = new(Timespec)
+		*ts = NsecToTimespec(int64(timeout) * 1e6)
+	}
+	if len(fds) == 0 {
+		return ppoll(nil, 0, ts, nil)
+	}
+	return ppoll(&fds[0], len(fds), ts, nil)
+}

@@ -191,34 +191,45 @@ func tenantWithContext(ctx context.Context, tenantToken string) (context.Context
 	return ctx, nil
 }
 
+func (d *DevAuth) verifyTenantToken(ctx context.Context, tenantToken string) (context.Context, error) {
+	l := log.FromContext(ctx)
+	if tenantToken == "" {
+		l.Errorf("request is missing tenant token")
+		return ctx, ErrDevAuthUnauthorized
+	}
+
+	// verify tenant token with tenant administration
+	err := d.cTenant.VerifyToken(ctx, tenantToken, d.clientGetter())
+	if err != nil {
+		if tenant.IsErrTokenVerificationFailed(err) {
+			l.Errorf("failed to verify tenant token")
+			return ctx, MakeErrDevAuthUnauthorized(err)
+		}
+
+		return ctx, errors.New("request to verify tenant token failed")
+	}
+
+	tCtx, err := tenantWithContext(ctx, tenantToken)
+	if err != nil {
+		l.Errorf("failed to setup tenant context: %v", err)
+		return ctx, ErrDevAuthUnauthorized
+	}
+
+	// return updated context
+	return tCtx, nil
+}
+
 func (d *DevAuth) SubmitAuthRequest(ctx context.Context, r *model.AuthReq) (string, error) {
 	l := log.FromContext(ctx)
 
 	if d.verifyTenant {
-		if r.TenantToken == "" {
-			l.Errorf("request is missing tenant token")
-			return "", ErrDevAuthUnauthorized
-		}
-
-		// verify tenant token with tenant administration
-		err := d.cTenant.VerifyToken(ctx, r.TenantToken, d.clientGetter())
+		tctx, err := d.verifyTenantToken(ctx, r.TenantToken)
 		if err != nil {
-			if tenant.IsErrTokenVerificationFailed(err) {
-				l.Errorf("failed to verify tenant token")
-				return "", MakeErrDevAuthUnauthorized(err)
-			}
-
-			return "", errors.New("request to verify tenant token failed")
-		}
-
-		tCtx, err := tenantWithContext(ctx, r.TenantToken)
-		if err != nil {
-			l.Errorf("failed to setup tenant context: %v", err)
-			return "", ErrDevAuthUnauthorized
+			return "", err
 		}
 
 		// update context
-		ctx = tCtx
+		ctx = tctx
 	}
 
 	// first, try to handle preauthorization
@@ -235,11 +246,17 @@ func (d *DevAuth) SubmitAuthRequest(ctx context.Context, r *model.AuthReq) (stri
 		}
 	}
 
+	uid, err := uuid.NewV4()
+	if err != nil {
+		l.Errorf("failed to assign uuid: %v", err)
+		return "", err
+	}
+
 	// request was already present in DB, check its status
 	if authSet.Status == model.DevStatusAccepted {
 		rawJwt := &jwt.Token{
 			Claims: jwt.Claims{
-				ID:        uuid.NewV4().String(),
+				ID:        uid.String(),
 				Issuer:    d.config.Issuer,
 				ExpiresAt: time.Now().Unix() + d.config.ExpirationTime,
 				Subject:   authSet.DeviceId,
