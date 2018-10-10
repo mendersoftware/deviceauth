@@ -95,9 +95,9 @@ paths:
           schema:
             $ref: '#/definitions/Error'
         409:
-          description: Device already exists.
+          description: Device already exists. Response contains conflicting device.
           schema:
-            $ref: '#/definitions/Error'
+            $ref: '#/definitions/Device'
         500:
           description: Unexpected error
           schema:
