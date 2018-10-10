@@ -821,6 +821,7 @@ func randDevStatus() string {
 		model.DevStatusAccepted,
 		model.DevStatusPending,
 		model.DevStatusRejected,
+		model.DevStatusPreauth,
 	}
 	idx := rand.Int() % len(statuses)
 	return statuses[idx]
@@ -840,6 +841,8 @@ func TestStoreGetDevices(t *testing.T) {
 	// use 100 automatically creted devices
 	const devCount = 100
 
+	devsCountByStatus := make(map[string]int)
+
 	devs_list := make([]model.Device, 0, devCount)
 
 	// populate DB with a set of devices
@@ -853,52 +856,93 @@ func TestStoreGetDevices(t *testing.T) {
 		devs_list = append(devs_list, dev)
 		err := db.AddDevice(ctx, dev)
 		assert.NoError(t, err)
+		devsCountByStatus[dev.Status]++
 	}
 
-	testCases := []struct {
+	testCases := map[string]struct {
 		skip            uint
 		limit           uint
+		filter          store.DeviceFilter
 		expectedCount   int
 		expectedStartId int
 		expectedEndId   int
 	}{
-		{
+		"skip + limit": {
 			skip:            10,
 			limit:           5,
 			expectedCount:   5,
 			expectedStartId: 10,
 			expectedEndId:   14,
 		},
-		{
-			// end of the range
+		"end of the range": {
 			skip:            devCount - 10,
 			limit:           15,
 			expectedCount:   10,
 			expectedStartId: 90,
 			expectedEndId:   99,
 		},
-		{
-			// whole range
+		"whole range": {
 			skip:            0,
 			limit:           devCount,
 			expectedCount:   devCount,
 			expectedStartId: 0,
 			expectedEndId:   devCount - 1,
 		},
+		"filter acceted": {
+			skip:            0,
+			limit:           devCount,
+			filter:          store.DeviceFilter{Status: model.DevStatusAccepted},
+			expectedCount:   devCount,
+			expectedStartId: 0,
+			expectedEndId:   devCount - 1,
+		},
+		"filter rejected": {
+			skip:            0,
+			limit:           devCount,
+			filter:          store.DeviceFilter{Status: model.DevStatusRejected},
+			expectedCount:   devCount,
+			expectedStartId: 0,
+			expectedEndId:   devCount - 1,
+		},
+		"filter preauthorized": {
+			skip:            0,
+			limit:           devCount,
+			filter:          store.DeviceFilter{Status: model.DevStatusPreauth},
+			expectedCount:   devCount,
+			expectedStartId: 0,
+			expectedEndId:   devCount - 1,
+		},
+		"filter pending": {
+			skip:            0,
+			limit:           devCount,
+			filter:          store.DeviceFilter{Status: model.DevStatusPending},
+			expectedCount:   devCount,
+			expectedStartId: 0,
+			expectedEndId:   devCount - 1,
+		},
 	}
 
-	for i, tc := range testCases {
-		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
-			dbdevs, err := db.GetDevices(ctx, tc.skip, tc.limit)
+	for name := range testCases {
+		tc := testCases[name]
+		t.Run(fmt.Sprintf("tc %s", name), func(t *testing.T) {
+			dbdevs, err := db.GetDevices(ctx, tc.skip, tc.limit, tc.filter)
 			assert.NoError(t, err)
 
-			assert.Len(t, dbdevs, tc.expectedCount)
-			for i, dbidx := tc.expectedStartId, 0; i <= tc.expectedEndId; i, dbidx = i+1, dbidx+1 {
-				// make sure that ID is not empty
-				assert.NotEmpty(t, dbdevs[dbidx].Id)
-				// clear it now so that next assert does not fail
-				dbdevs[dbidx].Id = ""
-				assert.EqualValues(t, devs_list[i], dbdevs[dbidx])
+			emptyFilter := store.DeviceFilter{}
+			if tc.filter != emptyFilter {
+				for _, d := range dbdevs {
+					assert.Equal(t, tc.filter.Status, d.Status)
+					assert.Len(t, dbdevs, devsCountByStatus[tc.filter.Status])
+				}
+			} else {
+				assert.Len(t, dbdevs, tc.expectedCount)
+				for i, dbidx := tc.expectedStartId, 0; i <= tc.expectedEndId; i, dbidx = i+1, dbidx+1 {
+					// make sure that ID is not empty
+					assert.NotEmpty(t, dbdevs[dbidx].Id)
+					// clear it now so that next assert does not fail
+					dbdevs[dbidx].Id = ""
+					assert.EqualValues(t, devs_list[i], dbdevs[dbidx])
+				}
 			}
 		})
 	}

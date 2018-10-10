@@ -45,6 +45,10 @@ type AuthSetFilter struct {
 	Status   string `bson:"status,omitempty"`
 }
 
+type DeviceFilter struct {
+	Status string `bson:"status,omitempty"`
+}
+
 type DataStore interface {
 	// retrieve device by Mender-assigned device ID
 	//returns ErrDevNotFound if device not found
@@ -55,7 +59,7 @@ type DataStore interface {
 	GetDeviceByIdentityData(ctx context.Context, idata string) (*model.Device, error)
 
 	// list devices
-	GetDevices(ctx context.Context, skip, limit uint) ([]model.Device, error)
+	GetDevices(ctx context.Context, skip, limit uint, filter DeviceFilter) ([]model.Device, error)
 
 	AddDevice(ctx context.Context, d model.Device) error
 

@@ -138,7 +138,7 @@ func NewDataStoreMongo(config DataStoreMongoConfig) (*DataStoreMongo, error) {
 	return NewDataStoreMongoWithSession(masterSession), nil
 }
 
-func (db *DataStoreMongo) GetDevices(ctx context.Context, skip, limit uint) ([]model.Device, error) {
+func (db *DataStoreMongo) GetDevices(ctx context.Context, skip, limit uint, filter store.DeviceFilter) ([]model.Device, error) {
 	s := db.session.Copy()
 	defer s.Close()
 
@@ -146,7 +146,7 @@ func (db *DataStoreMongo) GetDevices(ctx context.Context, skip, limit uint) ([]m
 
 	res := []model.Device{}
 
-	err := c.Find(nil).Sort("_id").Skip(int(skip)).Limit(int(limit)).All(&res)
+	err := c.Find(filter).Sort("_id").Skip(int(skip)).Limit(int(limit)).All(&res)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to fetch device list")
 	}
