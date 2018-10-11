@@ -163,8 +163,9 @@ paths:
         Removes the device authentication set.
         Removing 'accepted' authentication set is equivalent
         to rejecting device and removing authentication set.
-        If there is only one authentication set for the device,
-        the device will also be deleted.
+        If there is only one authentication set for the device
+        and the device is 'preauthorized' then the device
+        will also be deleted.
       parameters:
         - name: Authorization
           in: header
