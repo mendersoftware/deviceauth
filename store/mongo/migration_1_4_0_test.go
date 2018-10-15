@@ -16,6 +16,7 @@ package mongo
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
@@ -26,6 +27,18 @@ import (
 )
 
 func TestMigration_1_4_0(t *testing.T) {
+	pubKey := `-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAzogVU7RGDilbsoUt/DdH
+VJvcepl0A5+xzGQ50cq1VE/Dyyy8Zp0jzRXCnnu9nu395mAFSZGotZVr+sWEpO3c
+yC3VmXdBZmXmQdZqbdD/GuixJOYfqta2ytbIUPRXFN7/I7sgzxnXWBYXYmObYvdP
+okP0mQanY+WKxp7Q16pt1RoqoAd0kmV39g13rFl35muSHbSBoAW3GBF3gO+mF5Ty
+1ddp/XcgLOsmvNNjY+2HOD5F/RX0fs07mWnbD7x+xz7KEKjF+H7ZpkqCwmwCXaf0
+iyYyh1852rti3Afw4mDxuVSD7sd9ggvYMc0QHIpQNkD4YWOhNiE1AB0zH57VbUYG
+UwIDAQAB
+-----END PUBLIC KEY-----`
+
+	ts := time.Now()
+
 	ctx := identity.WithContext(context.Background(), &identity.Identity{
 		Tenant: "foo",
 	})
@@ -55,46 +68,63 @@ func TestMigration_1_4_0(t *testing.T) {
 
 	devs := []model.Device{
 		{
-			Id:     "1",
-			IdData: "{\"sn\":\"0001\",\"mac\":\"00:00:00:01\"}",
-			Status: "pending",
+			Id:              "1",
+			IdData:          "{\"sn\":\"0001\",\"mac\":\"00:00:00:01\"}",
+			Status:          "pending",
+			Decommissioning: false,
+			CreatedTs:       ts,
+			UpdatedTs:       ts,
 		},
 		{
-			Id:     "2",
-			IdData: "{\"sn\":\"0002\",\"attr\":\"foo1\",\"mac\":\"00:00:00:02\"}",
-			Status: "rejected",
+			Id:              "2",
+			IdData:          "{\"sn\":\"0002\",\"attr\":\"foo1\",\"mac\":\"00:00:00:02\"}",
+			Status:          "rejected",
+			Decommissioning: false,
+			CreatedTs:       ts,
+			UpdatedTs:       ts,
 		},
 		{
-			Id:     "3",
-			IdData: "{\"sn\":\"0003\",\"attr\":\"foo3\",\"mac\":\"00:00:00:03\"}",
-			Status: "rejected",
+			Id:              "3",
+			IdData:          "{\"sn\":\"0003\",\"attr\":\"foo3\",\"mac\":\"00:00:00:03\"}",
+			Status:          "rejected",
+			Decommissioning: false,
+			CreatedTs:       ts,
+			UpdatedTs:       ts,
 		},
 	}
 
 	asets := []model.AuthSet{
 		{
-			Id:       "1",
-			DeviceId: "1",
-			IdData:   "{\"sn\":\"0001\",\"mac\":\"00:00:00:01\"}",
-			Status:   "accepted",
+			Id:        "1",
+			DeviceId:  "1",
+			IdData:    "{\"sn\":\"0001\",\"mac\":\"00:00:00:01\"}",
+			Status:    "accepted",
+			PubKey:    pubKey,
+			Timestamp: &ts,
 		},
 		{
-			Id:       "2",
-			DeviceId: "2",
-			IdData:   "{\"sn\":\"0002\",\"attr\":\"foo\",\"mac\":\"00:00:00:02\"}",
-			Status:   "rejected",
+			Id:        "2",
+			DeviceId:  "2",
+			IdData:    "{\"sn\":\"0002\",\"attr\":\"foo\",\"mac\":\"00:00:00:02\"}",
+			Status:    "rejected",
+			PubKey:    pubKey,
+			Timestamp: &ts,
 		},
 		{
-			Id:       "3",
-			DeviceId: "2",
-			IdData:   "{\"sn\":\"0002\",\"attr\":\"foo1\",\"mac\":\"00:00:00:02\"}",
-			Status:   "pending",
+			Id:        "3",
+			DeviceId:  "2",
+			IdData:    "{\"sn\":\"0002\",\"attr\":\"foo1\",\"mac\":\"00:00:00:02\"}",
+			Status:    "pending",
+			PubKey:    pubKey,
+			Timestamp: &ts,
 		},
 		{
-			Id:       "4",
-			DeviceId: "3",
-			IdData:   "{\"sn\":\"0003\",\"attr\":\"foo3\",\"mac\":\"00:00:00:03\"}",
-			Status:   "rejected",
+			Id:        "4",
+			DeviceId:  "3",
+			IdData:    "{\"sn\":\"0003\",\"attr\":\"foo3\",\"mac\":\"00:00:00:03\"}",
+			Status:    "rejected",
+			PubKey:    pubKey,
+			Timestamp: &ts,
 		},
 	}
 
@@ -124,6 +154,11 @@ func TestMigration_1_4_0(t *testing.T) {
 		status, err := db.GetDeviceStatus(ctx, dev.Id)
 		assert.NoError(t, err)
 		assert.Equal(t, status, dev.Status)
+
+		d.Status = status
+		d.UpdatedTs = dev.UpdatedTs
+
+		compareDevices(&d, &dev, t)
 	}
 
 	db.session.Close()
