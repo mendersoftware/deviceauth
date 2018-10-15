@@ -17,6 +17,7 @@ import (
 	"context"
 	"crypto/rsa"
 
+	"github.com/globalsign/mgo/bson"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	ctxstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/pkg/errors"
@@ -47,8 +48,10 @@ func (m *migration_1_3_0) Up(from migrate.Version) error {
 			return errors.Wrapf(err, "failed to normalize key of auth set %v: %v", set.Id, set.PubKey)
 		}
 
-		update := model.AuthSetUpdate{
-			PubKey: newKey,
+		update := bson.M{
+			"$set": model.AuthSetUpdate{
+				PubKey: newKey,
+			},
 		}
 
 		if err := s.DB(ctxstore.DbFromContext(m.ctx, DbName)).
@@ -74,8 +77,10 @@ func (m *migration_1_3_0) Up(from migrate.Version) error {
 			return errors.Wrapf(err, "failed to normalize key of device %v: %v", dev.Id, dev.PubKey)
 		}
 
-		update := model.DeviceUpdate{
-			PubKey: newKey,
+		update := bson.M{
+			"$set": model.DeviceUpdate{
+				PubKey: newKey,
+			},
 		}
 
 		if err := s.DB(ctxstore.DbFromContext(m.ctx, DbName)).

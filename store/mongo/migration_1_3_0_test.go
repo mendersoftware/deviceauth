@@ -17,6 +17,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
@@ -41,6 +42,8 @@ UwIDAQAB
 
 	badKey := `iyYyh1852rb`
 
+	ts := time.Now()
+
 	cases := map[string]struct {
 		sets []model.AuthSet
 		devs []model.Device
@@ -50,28 +53,36 @@ UwIDAQAB
 		"ok": {
 			devs: []model.Device{
 				{
-					Id:     "1",
-					IdData: "{\"sn\":\"0001\"}",
-					PubKey: goodKey,
+					Id:              "1",
+					IdData:          "{\"sn\":\"0001\"}",
+					PubKey:          goodKey,
+					Status:          "pending",
+					Decommissioning: false,
+					CreatedTs:       ts,
+					UpdatedTs:       ts,
 				},
 			},
 
 			sets: []model.AuthSet{
 				{
-					Id:       "1",
-					DeviceId: "1",
-					IdData:   "{\"sn\":\"0001\"}",
-					PubKey:   goodKey,
+					Id:        "1",
+					DeviceId:  "1",
+					IdData:    "{\"sn\":\"0001\"}",
+					PubKey:    goodKey,
+					Timestamp: &ts,
+					Status:    "pending",
 				},
 			},
 		},
 		"error, authset": {
 			sets: []model.AuthSet{
 				{
-					Id:       "1",
-					DeviceId: "1",
-					IdData:   "{\"sn\":\"0001\"}",
-					PubKey:   badKey,
+					Id:        "1",
+					DeviceId:  "1",
+					IdData:    "{\"sn\":\"0001\"}",
+					PubKey:    badKey,
+					Timestamp: &ts,
+					Status:    "pending",
 				},
 			},
 			err: errors.New("failed to normalize key of auth set 1: iyYyh1852rb: cannot decode public key"),
@@ -79,9 +90,13 @@ UwIDAQAB
 		"error, device": {
 			devs: []model.Device{
 				{
-					Id:     "1",
-					IdData: "{\"sn\":\"0001\"}",
-					PubKey: badKey,
+					Id:              "1",
+					IdData:          "{\"sn\":\"0001\"}",
+					PubKey:          badKey,
+					Status:          "pending",
+					Decommissioning: false,
+					CreatedTs:       ts,
+					UpdatedTs:       ts,
 				},
 			},
 			err: errors.New("failed to normalize key of device 1: iyYyh1852rb: cannot decode public key"),
@@ -119,7 +134,7 @@ UwIDAQAB
 
 			if tc.err == nil {
 				assert.NoError(t, err)
-				verify(t, ctx, db)
+				verify(t, ctx, db, tc.devs, tc.sets)
 			} else {
 				assert.EqualError(t, tc.err, err.Error())
 			}
@@ -147,35 +162,39 @@ func prep_1_2_0(t *testing.T, ctx context.Context, db *DataStoreMongo) {
 	}
 }
 
-func verify(t *testing.T, ctx context.Context, db *DataStoreMongo) {
+func verify(t *testing.T, ctx context.Context, db *DataStoreMongo, devs []model.Device, sets []model.AuthSet) {
 	s := db.session.Copy()
 
 	defer s.Close()
 
-	iter := s.DB(ctxstore.DbFromContext(ctx, DbName)).
-		C(DbAuthSetColl).Find(nil).Iter()
-
 	var set model.AuthSet
-
-	for iter.Next(&set) {
-		_, err := utils.ParsePubKey(set.PubKey)
+	for _, a := range sets {
+		err := s.DB(ctxstore.DbFromContext(ctx, DbName)).
+			C(DbAuthSetColl).FindId(a.Id).One(&set)
 		assert.NoError(t, err)
+
+		_, err = utils.ParsePubKey(set.PubKey)
+		assert.NoError(t, err)
+
+		newKey, err := normalizeKey(a.PubKey)
+		a.PubKey = newKey
+
+		compareAuthSet(&a, &set, t)
 	}
-
-	err := iter.Close()
-	assert.NoError(t, err)
-
-	iter = s.DB(ctxstore.DbFromContext(ctx, DbName)).
-		C(DbDevicesColl).Find(nil).Iter()
 
 	var dev model.Device
-
-	for iter.Next(&dev) {
-		_, err := utils.ParsePubKey(dev.PubKey)
+	for _, d := range devs {
+		err := s.DB(ctxstore.DbFromContext(ctx, DbName)).
+			C(DbDevicesColl).FindId(d.Id).One(&dev)
 		assert.NoError(t, err)
-	}
 
-	err = iter.Close()
-	assert.NoError(t, err)
+		_, err = utils.ParsePubKey(dev.PubKey)
+		assert.NoError(t, err)
+
+		newKey, err := normalizeKey(d.PubKey)
+		d.PubKey = newKey
+
+		compareDevices(&d, &dev, t)
+	}
 
 }
