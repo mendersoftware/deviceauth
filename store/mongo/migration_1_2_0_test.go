@@ -16,6 +16,7 @@ package mongo
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
@@ -42,32 +43,53 @@ func TestMigration_1_2_0(t *testing.T) {
 	err := mig110.Up(migrate.MakeVersion(0, 1, 0))
 	assert.NoError(t, err)
 
+	ts := time.Now()
+
 	devs := []model.Device{
 		{
-			Id:     "1",
-			IdData: "{\"sn\":\"0001\",\"mac\":\"00:00:00:01\"}",
+			Id:              "1",
+			PubKey:          "pubkey-1",
+			IdData:          "{\"sn\":\"0001\",\"mac\":\"00:00:00:01\"}",
+			Status:          "pending",
+			Decommissioning: false,
+			CreatedTs:       ts,
+			UpdatedTs:       ts,
 		},
 		{
-			Id:     "2",
-			IdData: "{\"sn\":\"0002\",\"attr\":\"foo1\",\"mac\":\"00:00:00:02\"}",
+			Id:              "2",
+			PubKey:          "pubkey-1",
+			IdData:          "{\"sn\":\"0002\",\"attr\":\"foo1\",\"mac\":\"00:00:00:02\"}",
+			Status:          "active",
+			Decommissioning: false,
+			CreatedTs:       ts,
+			UpdatedTs:       ts,
 		},
 	}
 
 	asets := []model.AuthSet{
 		{
-			Id:       "1",
-			DeviceId: "1",
-			IdData:   "{\"sn\":\"0001\",\"mac\":\"00:00:00:01\"}",
+			Id:        "1",
+			DeviceId:  "1",
+			IdData:    "{\"sn\":\"0001\",\"mac\":\"00:00:00:01\"}",
+			PubKey:    "pubkey-1",
+			Timestamp: &ts,
+			Status:    "pending",
 		},
 		{
-			Id:       "2",
-			DeviceId: "2",
-			IdData:   "{\"sn\":\"0002\",\"attr\":\"foo\",\"mac\":\"00:00:00:02\"}",
+			Id:        "2",
+			DeviceId:  "2",
+			IdData:    "{\"sn\":\"0002\",\"attr\":\"foo\",\"mac\":\"00:00:00:02\"}",
+			PubKey:    "pubkey-2",
+			Timestamp: &ts,
+			Status:    "active",
 		},
 		{
-			Id:       "3",
-			DeviceId: "2",
-			IdData:   "{\"sn\":\"0002\",\"attr\":\"foo1\",\"mac\":\"00:00:00:02\"}",
+			Id:        "3",
+			DeviceId:  "2",
+			IdData:    "{\"sn\":\"0002\",\"attr\":\"foo1\",\"mac\":\"00:00:00:02\"}",
+			PubKey:    "pubkey-3",
+			Timestamp: &ts,
+			Status:    "active",
 		},
 	}
 
@@ -98,7 +120,9 @@ func TestMigration_1_2_0(t *testing.T) {
 		id, err := utils.JsonSort(d.IdData)
 		assert.NoError(t, err)
 
-		assert.Equal(t, id, dev.IdData)
+		d.IdData = id
+
+		compareDevices(&d, &dev, t)
 	}
 
 	var set model.AuthSet
@@ -110,8 +134,9 @@ func TestMigration_1_2_0(t *testing.T) {
 		id, err := utils.JsonSort(a.IdData)
 		assert.NoError(t, err)
 
-		assert.Equal(t, id, set.IdData)
+		a.IdData = id
 
+		compareAuthSet(&a, &set, t)
 	}
 
 	db.session.Close()
