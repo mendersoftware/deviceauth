@@ -16,6 +16,7 @@ package mongo
 import (
 	"context"
 
+	"github.com/globalsign/mgo/bson"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	ctxstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/pkg/errors"
@@ -45,8 +46,10 @@ func (m *migration_1_2_0) Up(from migrate.Version) error {
 			return errors.Wrapf(err, "failed to sort id data of auth set  %v: %v", set.Id, set.IdData)
 		}
 
-		update := model.AuthSetUpdate{
-			IdData: newIdData,
+		update := bson.M{
+			"$set": model.AuthSetUpdate{
+				IdData: newIdData,
+			},
 		}
 
 		if err := s.DB(ctxstore.DbFromContext(m.ctx, DbName)).
@@ -72,8 +75,10 @@ func (m *migration_1_2_0) Up(from migrate.Version) error {
 			return errors.Wrapf(err, "failed to sort id data of device  %v: %v", dev.Id, set.IdData)
 		}
 
-		update := model.DeviceUpdate{
-			IdData: newIdData,
+		update := bson.M{
+			"$set": model.DeviceUpdate{
+				IdData: newIdData,
+			},
 		}
 
 		if err := s.DB(ctxstore.DbFromContext(m.ctx, DbName)).
