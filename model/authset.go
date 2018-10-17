@@ -21,10 +21,11 @@ import (
 )
 
 const (
-	AuthSetKeyIdData   = "id_data"
-	AuthSetKeyPubKey   = "pubkey"
-	AuthSetKeyDeviceId = "device_id"
-	AuthSetKeyStatus   = "status"
+	AuthSetKeyIdData       = "id_data"
+	AuthSetKeyPubKey       = "pubkey"
+	AuthSetKeyDeviceId     = "device_id"
+	AuthSetKeyStatus       = "status"
+	AuthSetKeyIdDataSha256 = "id_data_sha256"
 )
 
 type AuthSet struct {
