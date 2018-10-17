@@ -28,12 +28,14 @@ const (
 )
 
 type AuthSet struct {
-	Id        string     `json:"id" bson:"_id,omitempty"`
-	IdData    string     `json:"id_data" bson:"id_data,omitempty"`
-	PubKey    string     `json:"pubkey" bson:"pubkey,omitempty"`
-	DeviceId  string     `json:"-" bson:"device_id,omitempty"`
-	Timestamp *time.Time `json:"ts" bson:"ts,omitempty"`
-	Status    string     `json:"status" bson:"status,omitempty"`
+	Id           string                 `json:"id" bson:"_id,omitempty"`
+	IdData       string                 `json:"id_data" bson:"id_data,omitempty"`
+	IdDataStruct map[string]interface{} `bson:"id_data_struct,omitempty"`
+	IdDataSha256 []byte                 `bson:"id_data_sha256,omitempty"`
+	PubKey       string                 `json:"pubkey" bson:"pubkey,omitempty"`
+	DeviceId     string                 `json:"-" bson:"device_id,omitempty"`
+	Timestamp    *time.Time             `json:"ts" bson:"ts,omitempty"`
+	Status       string                 `json:"status" bson:"status,omitempty"`
 }
 
 type AuthSetUpdate struct {
