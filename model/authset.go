@@ -39,11 +39,13 @@ type AuthSet struct {
 }
 
 type AuthSetUpdate struct {
-	IdData    string     `bson:"id_data,omitempty"`
-	PubKey    string     `bson:"pubkey,omitempty"`
-	DeviceId  string     `bson:"device_id,omitempty"`
-	Timestamp *time.Time `bson:"ts,omitempty"`
-	Status    string     `bson:"status,omitempty"`
+	IdData       string                 `bson:"id_data,omitempty"`
+	IdDataStruct map[string]interface{} `bson:"id_data_struct,omitempty"`
+	IdDataSha256 []byte                 `bson:"id_data_sha256,omitempty"`
+	PubKey       string                 `bson:"pubkey,omitempty"`
+	DeviceId     string                 `bson:"device_id,omitempty"`
+	Timestamp    *time.Time             `bson:"ts,omitempty"`
+	Status       string                 `bson:"status,omitempty"`
 }
 
 type DevAdmAuthSet struct {

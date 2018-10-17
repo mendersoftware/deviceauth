@@ -42,11 +42,13 @@ type Device struct {
 }
 
 type DeviceUpdate struct {
-	PubKey          string     `json:"-" bson:",omitempty"`
-	IdData          string     `json:"id_data" bson:"id_data,omitempty"`
-	Status          string     `json:"-" bson:",omitempty"`
-	Decommissioning *bool      `json:"-" bson:",omitempty"`
-	UpdatedTs       *time.Time `json:"updated_ts" bson:"updated_ts,omitempty"`
+	PubKey          string                 `json:"-" bson:",omitempty"`
+	IdData          string                 `json:"id_data" bson:"id_data,omitempty"`
+	IdDataStruct    map[string]interface{} `bson:"id_data_struct,omitempty"`
+	IdDataSha256    []byte                 `bson:"id_data_sha256,omitempty"`
+	Status          string                 `json:"-" bson:",omitempty"`
+	Decommissioning *bool                  `json:"-" bson:",omitempty"`
+	UpdatedTs       *time.Time             `json:"updated_ts" bson:"updated_ts,omitempty"`
 }
 
 func NewDevice(id, id_data, pubkey string) *Device {
