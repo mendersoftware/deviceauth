@@ -21,27 +21,32 @@ import (
 )
 
 const (
-	AuthSetKeyIdData   = "id_data"
-	AuthSetKeyPubKey   = "pubkey"
-	AuthSetKeyDeviceId = "device_id"
-	AuthSetKeyStatus   = "status"
+	AuthSetKeyIdData       = "id_data"
+	AuthSetKeyPubKey       = "pubkey"
+	AuthSetKeyDeviceId     = "device_id"
+	AuthSetKeyStatus       = "status"
+	AuthSetKeyIdDataSha256 = "id_data_sha256"
 )
 
 type AuthSet struct {
-	Id        string     `json:"id" bson:"_id,omitempty"`
-	IdData    string     `json:"id_data" bson:"id_data,omitempty"`
-	PubKey    string     `json:"pubkey" bson:"pubkey,omitempty"`
-	DeviceId  string     `json:"-" bson:"device_id,omitempty"`
-	Timestamp *time.Time `json:"ts" bson:"ts,omitempty"`
-	Status    string     `json:"status" bson:"status,omitempty"`
+	Id           string                 `json:"id" bson:"_id,omitempty"`
+	IdData       string                 `json:"id_data" bson:"id_data,omitempty"`
+	IdDataStruct map[string]interface{} `bson:"id_data_struct,omitempty"`
+	IdDataSha256 []byte                 `bson:"id_data_sha256,omitempty"`
+	PubKey       string                 `json:"pubkey" bson:"pubkey,omitempty"`
+	DeviceId     string                 `json:"-" bson:"device_id,omitempty"`
+	Timestamp    *time.Time             `json:"ts" bson:"ts,omitempty"`
+	Status       string                 `json:"status" bson:"status,omitempty"`
 }
 
 type AuthSetUpdate struct {
-	IdData    string     `bson:"id_data,omitempty"`
-	PubKey    string     `bson:"pubkey,omitempty"`
-	DeviceId  string     `bson:"device_id,omitempty"`
-	Timestamp *time.Time `bson:"ts,omitempty"`
-	Status    string     `bson:"status,omitempty"`
+	IdData       string                 `bson:"id_data,omitempty"`
+	IdDataStruct map[string]interface{} `bson:"id_data_struct,omitempty"`
+	IdDataSha256 []byte                 `bson:"id_data_sha256,omitempty"`
+	PubKey       string                 `bson:"pubkey,omitempty"`
+	DeviceId     string                 `bson:"device_id,omitempty"`
+	Timestamp    *time.Time             `bson:"ts,omitempty"`
+	Status       string                 `bson:"status,omitempty"`
 }
 
 type DevAdmAuthSet struct {

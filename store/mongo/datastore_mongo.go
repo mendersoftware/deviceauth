@@ -42,8 +42,9 @@ const (
 	DbTokensColl  = "tokens"
 	DbLimitsColl  = "limits"
 
-	indexDevices_IdentityData                 = "devices:IdentityData"
-	indexAuthSet_DeviceId_IdentityData_PubKey = "auth_sets:DeviceId:IdData:PubKey"
+	indexDevices_IdentityData                       = "devices:IdentityData"
+	indexAuthSet_DeviceId_IdentityData_PubKey       = "auth_sets:DeviceId:IdData:PubKey"
+	indexAuthSet_DeviceId_IdentityDataSha256_PubKey = "auth_sets:IdDataSha256:PubKey"
 )
 
 var (

@@ -15,6 +15,7 @@ package mongo
 
 import (
 	"context"
+	"crypto/sha256"
 	"testing"
 	"time"
 
@@ -26,7 +27,7 @@ import (
 	"github.com/mendersoftware/deviceauth/model"
 )
 
-func TestMigration_1_4_0(t *testing.T) {
+func TestMigration_1_5_0(t *testing.T) {
 	pubKey := `-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAzogVU7RGDilbsoUt/DdH
 VJvcepl0A5+xzGQ50cq1VE/Dyyy8Zp0jzRXCnnu9nu395mAFSZGotZVr+sWEpO3c
@@ -59,11 +60,17 @@ UwIDAQAB
 		ms:  db,
 		ctx: ctx,
 	}
+	mig140 := migration_1_4_0{
+		ms:  db,
+		ctx: ctx,
+	}
 	err := mig110.Up(migrate.MakeVersion(1, 1, 0))
 	assert.NoError(t, err)
 	err = mig120.Up(migrate.MakeVersion(1, 2, 0))
 	assert.NoError(t, err)
 	err = mig130.Up(migrate.MakeVersion(1, 3, 0))
+	assert.NoError(t, err)
+	err = mig140.Up(migrate.MakeVersion(1, 4, 0))
 	assert.NoError(t, err)
 
 	devs := []model.Device{
@@ -71,7 +78,7 @@ UwIDAQAB
 			Id:              "1",
 			IdData:          "{\"sn\":\"0001\",\"mac\":\"00:00:00:01\"}",
 			PubKey:          pubKey,
-			Status:          "pending",
+			Status:          "accepted",
 			Decommissioning: false,
 			CreatedTs:       ts,
 			UpdatedTs:       ts,
@@ -80,7 +87,7 @@ UwIDAQAB
 			Id:              "2",
 			IdData:          "{\"sn\":\"0002\",\"attr\":\"foo1\",\"mac\":\"00:00:00:02\"}",
 			PubKey:          pubKey,
-			Status:          "rejected",
+			Status:          "pending",
 			Decommissioning: false,
 			CreatedTs:       ts,
 			UpdatedTs:       ts,
@@ -142,26 +149,56 @@ UwIDAQAB
 	}
 
 	// test new version
-	mig140 := migration_1_4_0{
+	mig150 := migration_1_5_0{
 		ms:  db,
 		ctx: ctx,
 	}
-	err = mig140.Up(migrate.MakeVersion(1, 4, 0))
+	err = mig150.Up(migrate.MakeVersion(1, 5, 0))
 	assert.NoError(t, err)
 
 	var dev model.Device
 	for _, d := range devs {
 		err = s.DB(ctxstore.DbFromContext(ctx, DbName)).
 			C(DbDevicesColl).FindId(d.Id).One(&dev)
+
 		assert.NoError(t, err)
+
 		status, err := db.GetDeviceStatus(ctx, dev.Id)
+
 		assert.NoError(t, err)
 		assert.Equal(t, status, dev.Status)
 
 		d.Status = status
 		d.UpdatedTs = dev.UpdatedTs
 
+		decoded, err := decode(dev.IdData)
+		assert.NoError(t, err)
+		d.IdDataStruct = decoded
+
+		hash := sha256.New()
+		hash.Write([]byte(dev.IdData))
+		d.IdDataSha256 = hash.Sum(nil)
+
 		compareDevices(&d, &dev, t)
+	}
+
+	var set model.AuthSet
+	for _, as := range asets {
+		err = s.DB(ctxstore.DbFromContext(ctx, DbName)).
+			C(DbAuthSetColl).FindId(as.Id).One(&set)
+		assert.NoError(t, err)
+
+		as.Timestamp = set.Timestamp
+
+		decoded, err := decode(as.IdData)
+		assert.NoError(t, err)
+		as.IdDataStruct = decoded
+
+		hash := sha256.New()
+		hash.Write([]byte(as.IdData))
+		as.IdDataSha256 = hash.Sum(nil)
+
+		compareAuthSet(&as, &set, t)
 	}
 
 	db.session.Close()
