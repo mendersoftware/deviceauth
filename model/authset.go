@@ -73,7 +73,7 @@ func NewDevAdmAuthSet(a AuthSet) (*DevAdmAuthSet, error) {
 	// decode them on the fly for the time being
 	err := json.Unmarshal([]byte(a.IdData), &as.Attributes)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to decode attributes for device %s, auth set", a.DeviceId, a.Id)
+		return nil, errors.Wrapf(err, "failed to decode attributes for device %s, auth set %s", a.DeviceId, a.Id)
 	}
 
 	return as, nil
