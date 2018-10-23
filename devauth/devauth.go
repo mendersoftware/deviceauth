@@ -15,6 +15,8 @@ package devauth
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -42,6 +44,7 @@ import (
 
 const (
 	MsgErrDevAuthUnauthorized = "dev auth: unauthorized"
+	MsgErrDevAuthBadRequest   = "dev auth: bad request"
 )
 
 var (
@@ -50,6 +53,7 @@ var (
 	ErrMaxDeviceCountReached = errors.New("maximum number of accepted devices reached")
 	ErrDeviceExists          = errors.New("device already exists")
 	ErrDeviceNotFound        = errors.New("device not found")
+	ErrDevAuthBadRequest     = errors.New(MsgErrDevAuthBadRequest)
 )
 
 func IsErrDevAuthUnauthorized(e error) bool {
@@ -58,6 +62,14 @@ func IsErrDevAuthUnauthorized(e error) bool {
 
 func MakeErrDevAuthUnauthorized(e error) error {
 	return errors.Wrap(e, MsgErrDevAuthUnauthorized)
+}
+
+func IsErrDevAuthBadRequest(e error) bool {
+	return strings.HasPrefix(e.Error(), MsgErrDevAuthBadRequest)
+}
+
+func MakeErrDevAuthBadRequest(e error) error {
+	return errors.Wrap(e, MsgErrDevAuthBadRequest)
 }
 
 // Expiration Timeout should be moved to database
@@ -140,8 +152,16 @@ func (d *DevAuth) getDeviceFromAuthRequest(ctx context.Context, r *model.AuthReq
 
 	l := log.FromContext(ctx)
 
+	idDataStruct, idDataSha256, err := parseIdData(r.IdData)
+	if err != nil {
+		return nil, MakeErrDevAuthBadRequest(err)
+	}
+
+	dev.IdDataStruct = idDataStruct
+	dev.IdDataSha256 = idDataSha256
+
 	// record device
-	err := d.db.AddDevice(ctx, *dev)
+	err = d.db.AddDevice(ctx, *dev)
 	if err != nil && err != store.ErrObjectExists {
 		l.Errorf("failed to add/find device: %v", err)
 		return nil, err
@@ -407,13 +427,21 @@ func (d *DevAuth) processAuthRequest(ctx context.Context, r *model.AuthReq) (*mo
 		return nil, err
 	}
 
-	areq := &model.AuthSet{
-		IdData:    r.IdData,
-		PubKey:    r.PubKey,
-		DeviceId:  dev.Id,
-		Status:    model.DevStatusPending,
-		Timestamp: uto.TimePtr(time.Now()),
+	idDataStruct, idDataSha256, err := parseIdData(r.IdData)
+	if err != nil {
+		return nil, MakeErrDevAuthBadRequest(err)
 	}
+
+	areq := &model.AuthSet{
+		IdData:       r.IdData,
+		IdDataStruct: idDataStruct,
+		IdDataSha256: idDataSha256,
+		PubKey:       r.PubKey,
+		DeviceId:     dev.Id,
+		Status:       model.DevStatusPending,
+		Timestamp:    uto.TimePtr(time.Now()),
+	}
+
 	// record authentication request
 	err = d.db.AddAuthSet(ctx, *areq)
 	if err != nil && err != store.ErrObjectExists {
@@ -674,6 +702,22 @@ func (d *DevAuth) ResetDeviceAuth(ctx context.Context, device_id string, auth_id
 	return d.setAuthSetStatus(ctx, device_id, auth_id, model.DevStatusPending)
 }
 
+func parseIdData(idData string) (map[string]interface{}, []byte, error) {
+	var idDataStruct map[string]interface{}
+	var idDataSha256 []byte
+
+	err := json.Unmarshal([]byte(idData), &idDataStruct)
+	if err != nil {
+		return idDataStruct, idDataSha256, errors.Wrapf(err, "failed to parse identity data: %s", idData)
+	}
+
+	hash := sha256.New()
+	hash.Write([]byte(idData))
+	idDataSha256 = hash.Sum(nil)
+
+	return idDataStruct, idDataSha256, nil
+}
+
 func (d *DevAuth) PreauthorizeDevice(ctx context.Context, req *model.PreAuthReq) error {
 	// try add device, if a device with the given id_data exists -
 	// the unique index on id_data will prevent it (conflict)
@@ -684,7 +728,15 @@ func (d *DevAuth) PreauthorizeDevice(ctx context.Context, req *model.PreAuthReq)
 	dev := model.NewDevice(req.DeviceId, req.IdData, req.PubKey)
 	dev.Status = model.DevStatusPreauth
 
-	err := d.db.AddDevice(ctx, *dev)
+	idDataStruct, idDataSha256, err := parseIdData(req.IdData)
+	if err != nil {
+		return MakeErrDevAuthBadRequest(err)
+	}
+
+	dev.IdDataStruct = idDataStruct
+	dev.IdDataSha256 = idDataSha256
+
+	err = d.db.AddDevice(ctx, *dev)
 	switch err {
 	case nil:
 		break
@@ -696,12 +748,14 @@ func (d *DevAuth) PreauthorizeDevice(ctx context.Context, req *model.PreAuthReq)
 
 	// record authentication request
 	authset := model.AuthSet{
-		Id:        req.AuthSetId,
-		IdData:    req.IdData,
-		PubKey:    req.PubKey,
-		DeviceId:  req.DeviceId,
-		Status:    model.DevStatusPreauth,
-		Timestamp: uto.TimePtr(time.Now()),
+		Id:           req.AuthSetId,
+		IdData:       req.IdData,
+		IdDataStruct: idDataStruct,
+		IdDataSha256: idDataSha256,
+		PubKey:       req.PubKey,
+		DeviceId:     req.DeviceId,
+		Status:       model.DevStatusPreauth,
+		Timestamp:    uto.TimePtr(time.Now()),
 	}
 
 	err = d.db.AddAuthSet(ctx, authset)

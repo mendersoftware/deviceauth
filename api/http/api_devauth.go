@@ -211,10 +211,16 @@ func (d *DevAuthApiHandlers) SubmitAuthRequestHandler(w rest.ResponseWriter, r *
 
 	token, err := d.devAuth.SubmitAuthRequest(ctx, &authreq)
 
-	if err != nil && devauth.IsErrDevAuthUnauthorized(err) {
-		rest_utils.RestErrWithWarningMsg(w, r, l, err,
-			http.StatusUnauthorized, errors.Cause(err).Error())
-		return
+	if err != nil {
+		if devauth.IsErrDevAuthUnauthorized(err) {
+			rest_utils.RestErrWithWarningMsg(w, r, l, err,
+				http.StatusUnauthorized, errors.Cause(err).Error())
+			return
+		} else if devauth.IsErrDevAuthBadRequest(err) {
+			rest_utils.RestErrWithWarningMsg(w, r, l, err,
+				http.StatusBadRequest, errors.Cause(err).Error())
+			return
+		}
 	}
 
 	switch err {
@@ -839,9 +845,14 @@ func (d *DevAuthApiHandlers) PostDevicesHandler(w rest.ResponseWriter, r *rest.R
 		PubKey:    authSet.Key,
 	}
 
-	//TODO: handle identity attributes in one of the tasks of the MEN-1965 epic
-
 	err = d.devAuth.PreauthorizeDevice(ctx, req)
+
+	if err != nil && devauth.IsErrDevAuthBadRequest(err) {
+		rest_utils.RestErrWithWarningMsg(w, r, l, err,
+			http.StatusBadRequest, errors.Cause(err).Error())
+		return
+	}
+
 	switch err {
 	case nil:
 		w.WriteHeader(http.StatusCreated)
