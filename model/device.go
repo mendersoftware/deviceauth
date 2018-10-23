@@ -24,6 +24,7 @@ const (
 	DevStatusPreauth  = "preauthorized"
 
 	DevKeyIdData = "id_data"
+	DevKeyStatus = "status"
 )
 
 // note: fields with underscores need the 'bson' decorator

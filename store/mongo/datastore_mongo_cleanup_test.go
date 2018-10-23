@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/mendersoftware/deviceauth/model"
+	"github.com/mendersoftware/deviceauth/store"
 )
 
 func TestGetDevicesBeingDecommissioned(t *testing.T) {
@@ -190,7 +191,7 @@ func TestDeleteDevicesBeingDecommissioned(t *testing.T) {
 			err := db.DeleteDevicesBeingDecommissioned(testDbName)
 			assert.NoError(t, err)
 
-			dbDevs, err := db.GetDevices(ctx, 0, 5)
+			dbDevs, err := db.GetDevices(ctx, 0, 5, store.DeviceFilter{})
 			assert.NoError(t, err)
 			for _, dbDev := range dbDevs {
 				assert.Equal(t, false, dbDev.Decommissioning)

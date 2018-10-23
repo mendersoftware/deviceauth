@@ -54,6 +54,9 @@ const (
 	uriDevadmDevices       = "/api/management/v1/admission/devices"
 	uriDevadmDevice        = "/api/management/v1/admission/devices/:aid"
 
+	// management API v2
+	v2uriDevices = "/api/management/v2/devauth/devices"
+
 	HdrAuthReqSign = "X-MEN-Signature"
 )
 
@@ -123,6 +126,9 @@ func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
 		rest.Post(uriDevadmDevices, d.DevAdmPostDevicesHandler),
 		rest.Get(uriDevadmDevice, d.DevAdmGetDeviceHandler),
 		rest.Delete(uriDevadmDevice, d.DevAdmDeleteDeviceAuthSetHandler),
+
+		// API v2
+		rest.Get(v2uriDevices, d.GetDevicesV2Handler),
 	}
 
 	app, err := rest.MakeRouter(
@@ -242,7 +248,7 @@ func (d *DevAuthApiHandlers) GetDevicesHandler(w rest.ResponseWriter, r *rest.Re
 
 	skip := (page - 1) * perPage
 	limit := perPage + 1
-	devs, err := d.devAuth.GetDevices(ctx, uint(skip), uint(limit))
+	devs, err := d.devAuth.GetDevices(ctx, uint(skip), uint(limit), store.DeviceFilter{})
 	if err != nil {
 		rest_utils.RestErrWithLogInternal(w, r, l, err)
 		return
@@ -261,6 +267,55 @@ func (d *DevAuthApiHandlers) GetDevicesHandler(w rest.ResponseWriter, r *rest.Re
 		w.Header().Add("Link", l)
 	}
 	w.WriteJson(devs[:len])
+}
+
+func (d *DevAuthApiHandlers) GetDevicesV2Handler(w rest.ResponseWriter, r *rest.Request) {
+
+	ctx := r.Context()
+
+	l := log.FromContext(ctx)
+
+	page, perPage, err := rest_utils.ParsePagination(r)
+	if err != nil {
+		rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		return
+	}
+
+	status, err := rest_utils.ParseQueryParmStr(r, model.DevKeyStatus, false, DevStatuses)
+	if err != nil {
+		rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		return
+	}
+
+	skip := (page - 1) * perPage
+	limit := perPage + 1
+	devs, err := d.devAuth.GetDevices(ctx, uint(skip), uint(limit),
+		store.DeviceFilter{Status: status})
+	if err != nil {
+		rest_utils.RestErrWithLogInternal(w, r, l, err)
+		return
+	}
+
+	len := len(devs)
+	hasNext := false
+	if uint64(len) > perPage {
+		hasNext = true
+		len = int(perPage)
+	}
+
+	links := rest_utils.MakePageLinkHdrs(r, page, perPage, hasNext)
+
+	for _, l := range links {
+		w.Header().Add("Link", l)
+	}
+
+	outDevs, err := devicesV2FromDbModel(devs[:len])
+	if err != nil {
+		rest_utils.RestErrWithLogInternal(w, r, l, err)
+		return
+	}
+
+	w.WriteJson(outDevs)
 }
 
 func (d *DevAuthApiHandlers) GetDevicesCountHandler(w rest.ResponseWriter, r *rest.Request) {

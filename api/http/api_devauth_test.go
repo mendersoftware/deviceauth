@@ -996,6 +996,112 @@ func TestApiGetDevice(t *testing.T) {
 	}
 }
 
+func TestApiGetDevicesV2(t *testing.T) {
+	t.Parallel()
+
+	// enforce specific field naming in errors returned by API
+	updateRestErrorFieldName()
+
+	devs := []model.Device{
+		{
+			Id:     "id1",
+			PubKey: "pubkey",
+			Status: model.DevStatusPending,
+		},
+		{
+			Id:     "id2",
+			PubKey: "pubkey2",
+			Status: model.DevStatusRejected,
+		},
+		{
+			Id:     "id3",
+			PubKey: "pubkey3",
+			Status: model.DevStatusRejected,
+		},
+		{
+			Id:     "id4",
+			PubKey: "pubkey4",
+			Status: model.DevStatusAccepted,
+		},
+		{
+			Id:     "id5",
+			PubKey: "pubkey5",
+			Status: model.DevStatusPreauth,
+		},
+	}
+
+	outDevs, err := devicesV2FromDbModel(devs)
+	assert.NoError(t, err)
+
+	tcases := map[string]struct {
+		req     *http.Request
+		code    int
+		body    string
+		devices []model.Device
+		err     error
+		skip    uint
+		limit   uint
+	}{
+		"ok": {
+			req: test.MakeSimpleRequest("GET",
+				"http://1.2.3.4/api/management/v2/devauth/devices", nil),
+			code:    http.StatusOK,
+			devices: devs,
+			err:     nil,
+			skip:    0,
+			limit:   rest_utils.PerPageDefault + 1,
+			body:    string(asJSON(outDevs)),
+		},
+		"no devices": {
+			req: test.MakeSimpleRequest("GET",
+				"http://1.2.3.4/api/management/v2/devauth/devices", nil),
+			code:    http.StatusOK,
+			devices: []model.Device{},
+			skip:    0,
+			limit:   rest_utils.PerPageDefault + 1,
+			err:     nil,
+			body:    "[]",
+		},
+		// this test does not check if the devices were skipped
+		// it is only checking if endpoint limits number of devices in the response
+		"limit number of devices": {
+			req: test.MakeSimpleRequest("GET",
+				"http://1.2.3.4/api/management/v2/devauth/devices?page=2&per_page=2", nil),
+			devices: devs,
+			skip:    2,
+			limit:   3,
+			code:    http.StatusOK,
+			// reqquested 2 devices per page, so expect only 2
+			body: string(asJSON(outDevs[:2])),
+		},
+		"internal error": {
+			req: test.MakeSimpleRequest("GET",
+				"http://1.2.3.4/api/management/v2/devauth/devices?page=2&per_page=2", nil),
+			skip:  2,
+			limit: 3,
+			code:  http.StatusInternalServerError,
+			err:   errors.New("failed"),
+			body:  RestError("internal error"),
+		},
+	}
+
+	for name := range tcases {
+		tc := tcases[name]
+		t.Run(fmt.Sprintf("tc %s", name), func(t *testing.T) {
+			t.Parallel()
+
+			da := &mocks.App{}
+			da.On("GetDevices",
+				mtest.ContextMatcher(),
+				tc.skip, tc.limit, mock.AnythingOfType("store.DeviceFilter")).Return(
+				tc.devices, tc.err)
+
+			apih := makeMockApiHandler(t, da, nil)
+			runTestRequest(t, apih, tc.req, tc.code, tc.body)
+		})
+	}
+}
+
 func TestApiGetDevices(t *testing.T) {
 	t.Parallel()
 
@@ -1078,7 +1184,7 @@ func TestApiGetDevices(t *testing.T) {
 			da := &mocks.App{}
 			da.On("GetDevices",
 				mtest.ContextMatcher(),
-				tc.skip, tc.limit).Return(
+				tc.skip, tc.limit, mock.AnythingOfType("store.DeviceFilter")).Return(
 				tc.devices, tc.err)
 
 			apih := makeMockApiHandler(t, da, nil)
