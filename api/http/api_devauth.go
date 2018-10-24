@@ -55,7 +55,13 @@ const (
 	uriDevadmDevice        = "/api/management/v1/admission/devices/:aid"
 
 	// management API v2
-	v2uriDevices = "/api/management/v2/devauth/devices"
+	v2uriDevices             = "/api/management/v2/devauth/devices"
+	v2uriDevicesCount        = "/api/management/v2/devauth/devices/count"
+	v2uriDevice              = "/api/management/v2/devauth/devices/:id"
+	v2uriDeviceAuthSet       = "/api/management/v2/devauth/devices/:id/auth/:aid"
+	v2uriDeviceAuthSetStatus = "/api/management/v2/devauth/devices/:id/auth/:aid/status"
+	v2uriToken               = "/api/management/v2/devauth/tokens/:id"
+	v2uriDevicesLimit        = "/api/management/v2/devauth/limits/:name"
 
 	HdrAuthReqSign = "X-MEN-Signature"
 )
@@ -123,12 +129,29 @@ func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
 
 		rest.Get(uriDevadmDevices, d.DevAdmGetDevicesHandler),
 
-		rest.Post(uriDevadmDevices, d.DevAdmPostDevicesHandler),
+		rest.Post(uriDevadmDevices, d.PostDevicesHandler),
 		rest.Get(uriDevadmDevice, d.DevAdmGetDeviceHandler),
 		rest.Delete(uriDevadmDevice, d.DevAdmDeleteDeviceAuthSetHandler),
 
 		// API v2
 		rest.Get(v2uriDevices, d.GetDevicesV2Handler),
+
+		// TODO: rest.Post(v2uriDevices, d.PostDevicesV2Handler),
+
+		// TODO: rest.Get(v2uriDevice, d.GetDeviceV2Handler),
+
+		rest.Delete(v2uriDevice, d.DeleteDeviceHandler),
+
+		rest.Delete(v2uriDeviceAuthSet, d.DeleteDeviceAuthSetHandler),
+
+		rest.Put(v2uriDeviceAuthSetStatus, d.UpdateDeviceStatusHandler),
+		rest.Get(v2uriDeviceAuthSetStatus, d.GetAuthSetStatusHandler),
+
+		rest.Get(v2uriDevicesCount, d.GetDevicesCountHandler),
+
+		rest.Delete(v2uriToken, d.DeleteTokenHandler),
+
+		rest.Get(v2uriDevicesLimit, d.GetLimit),
 	}
 
 	app, err := rest.MakeRouter(
@@ -495,9 +518,6 @@ func (d *DevAuthApiHandlers) UpdateDeviceStatusHandler(w rest.ResponseWriter, r 
 	devid := r.PathParam("id")
 	authid := r.PathParam("aid")
 
-	// TODO backwards compatibility, :id used to be device ID, but now it
-	// means authentication set ID
-
 	var status DevAuthApiStatus
 	err := r.DecodeJsonPayload(&status)
 	if err != nil {
@@ -715,18 +735,26 @@ func (d *DevAuthApiHandlers) DevAdmGetAuthSetStatusHandler(w rest.ResponseWriter
 	aset, err := d.db.GetAuthSetById(ctx, authid)
 	switch err {
 	case nil:
-		break
+		w.WriteJson(&model.Status{Status: aset.Status})
 	case store.ErrDevNotFound:
 		rest_utils.RestErrWithLog(w, r, l, store.ErrAuthSetNotFound, http.StatusNotFound)
-		return
 	default:
 		rest_utils.RestErrWithLogInternal(w, r, l,
 			errors.Wrapf(err,
 				"failed to fetch auth set %s",
 				authid))
-		return
 	}
+}
 
+func (d *DevAuthApiHandlers) GetAuthSetStatusHandler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+	l := log.FromContext(ctx)
+
+	devid := r.PathParam("id")
+	authid := r.PathParam("aid")
+
+	// get authset directly from store
+	aset, err := d.db.GetAuthSetById(ctx, authid)
 	switch err {
 	case nil:
 		w.WriteJson(&model.Status{Status: aset.Status})
@@ -734,7 +762,9 @@ func (d *DevAuthApiHandlers) DevAdmGetAuthSetStatusHandler(w rest.ResponseWriter
 		rest_utils.RestErrWithLog(w, r, l, store.ErrAuthSetNotFound, http.StatusNotFound)
 	default:
 		rest_utils.RestErrWithLogInternal(w, r, l,
-			errors.Wrap(err, "failed to get auth set status"))
+			errors.Wrapf(err,
+				"failed to fetch auth set %s for device %s",
+				authid, devid))
 	}
 }
 
@@ -789,7 +819,7 @@ func (d *DevAuthApiHandlers) DevAdmGetDevicesHandler(w rest.ResponseWriter, r *r
 	w.WriteJson(devs[:len])
 }
 
-func (d *DevAuthApiHandlers) DevAdmPostDevicesHandler(w rest.ResponseWriter, r *rest.Request) {
+func (d *DevAuthApiHandlers) PostDevicesHandler(w rest.ResponseWriter, r *rest.Request) {
 	ctx := r.Context()
 	l := log.FromContext(ctx)
 
