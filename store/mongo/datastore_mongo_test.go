@@ -15,6 +15,7 @@ package mongo
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"math/rand"
 	"sort"
@@ -49,6 +50,8 @@ var (
 
 // setup devices
 func setUpDevices(s *mgo.Session, ctx context.Context) error {
+	dev1.IdDataSha256 = getIdDataHash(dev1.IdData)
+	dev2.IdDataSha256 = getIdDataHash(dev2.IdData)
 	inputDevices := []interface{}{
 		dev1,
 		dev2,
@@ -99,9 +102,9 @@ func compareTime(expected time.Time, actual time.Time, t *testing.T) {
 	assert.Equal(t, expected.Unix(), actual.Unix())
 }
 
-func TestStoreGetDeviceByIdentityData(t *testing.T) {
+func TestStoreGetDeviceByIdentityDataHash(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping TestGetDeviceByIdentityDataWithTenant in short mode.")
+		t.Skip("skipping TestGetDeviceByIdentityDataHash in short mode.")
 	}
 
 	// set this to get reliable time.Time serialization
@@ -154,7 +157,7 @@ func TestStoreGetDeviceByIdentityData(t *testing.T) {
 				})
 			}
 
-			dev, err := d.GetDeviceByIdentityData(ctx, tc.idData)
+			dev, err := d.GetDeviceByIdentityDataHash(ctx, getIdDataHash(tc.idData))
 			if tc.expectedDev != nil {
 				assert.NoError(t, err, "failed to get devices")
 				if assert.NotNil(t, dev) {
@@ -186,11 +189,12 @@ func TestStoreAddDevice(t *testing.T) {
 
 	//setup
 	dev := &model.Device{
-		PubKey:    "pubkey",
-		IdData:    "iddata",
-		Status:    "pending",
-		CreatedTs: time.Now(),
-		UpdatedTs: time.Now(),
+		PubKey:       "pubkey",
+		IdData:       "iddata",
+		IdDataSha256: getIdDataHash("iddata"),
+		Status:       "pending",
+		CreatedTs:    time.Now(),
+		UpdatedTs:    time.Now(),
 	}
 
 	ctx := identity.WithContext(context.Background(), &identity.Identity{
@@ -202,7 +206,7 @@ func TestStoreAddDevice(t *testing.T) {
 	err := d.AddDevice(ctx, *dev)
 	assert.NoError(t, err, "failed to add device")
 
-	found, err := d.GetDeviceByIdentityData(ctx, "iddata")
+	found, err := d.GetDeviceByIdentityDataHash(ctx, dev.IdDataSha256)
 	assert.NoError(t, err)
 	assert.NotNil(t, found)
 
@@ -2395,4 +2399,10 @@ func TestMongoGetAuthSets(t *testing.T) {
 
 		})
 	}
+}
+
+func getIdDataHash(idData string) []byte {
+	hash := sha256.New()
+	hash.Write([]byte(idData))
+	return hash.Sum(nil)
 }

@@ -169,7 +169,7 @@ func (d *DevAuth) getDeviceFromAuthRequest(ctx context.Context, r *model.AuthReq
 
 	// either the device was added or it was already present, in any case,
 	// pull it from DB
-	dev, err = d.db.GetDeviceByIdentityData(ctx, r.IdData)
+	dev, err = d.db.GetDeviceByIdentityDataHash(ctx, idDataSha256)
 	if err != nil {
 		l.Error("failed to find device but could not add either")
 		return nil, errors.New("failed to locate device")

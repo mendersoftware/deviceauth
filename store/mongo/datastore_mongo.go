@@ -174,13 +174,13 @@ func (db *DataStoreMongo) GetDeviceById(ctx context.Context, id string) (*model.
 	return &res, nil
 }
 
-func (db *DataStoreMongo) GetDeviceByIdentityData(ctx context.Context, idata string) (*model.Device, error) {
+func (db *DataStoreMongo) GetDeviceByIdentityDataHash(ctx context.Context, idataHash []byte) (*model.Device, error) {
 	s := db.session.Copy()
 	defer s.Close()
 
 	c := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
 
-	filter := bson.M{"id_data": idata}
+	filter := bson.M{"id_data_sha256": idataHash}
 	res := model.Device{}
 
 	err := c.Find(filter).One(&res)

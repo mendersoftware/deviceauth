@@ -285,13 +285,13 @@ func (_m *DataStore) GetDeviceById(ctx context.Context, id string) (*model.Devic
 	return r0, r1
 }
 
-// GetDeviceByIdentityData provides a mock function with given fields: ctx, idata
-func (_m *DataStore) GetDeviceByIdentityData(ctx context.Context, idata string) (*model.Device, error) {
-	ret := _m.Called(ctx, idata)
+// GetDeviceByIdentityDataHash provides a mock function with given fields: ctx, idataHash
+func (_m *DataStore) GetDeviceByIdentityDataHash(ctx context.Context, idataHash []byte) (*model.Device, error) {
+	ret := _m.Called(ctx, idataHash)
 
 	var r0 *model.Device
-	if rf, ok := ret.Get(0).(func(context.Context, string) *model.Device); ok {
-		r0 = rf(ctx, idata)
+	if rf, ok := ret.Get(0).(func(context.Context, []byte) *model.Device); ok {
+		r0 = rf(ctx, idataHash)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*model.Device)
@@ -299,8 +299,8 @@ func (_m *DataStore) GetDeviceByIdentityData(ctx context.Context, idata string) 
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, idata)
+	if rf, ok := ret.Get(1).(func(context.Context, []byte) error); ok {
+		r1 = rf(ctx, idataHash)
 	} else {
 		r1 = ret.Error(1)
 	}

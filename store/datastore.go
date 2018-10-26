@@ -56,7 +56,7 @@ type DataStore interface {
 
 	// retrieve device by its identity data
 	// returns ErrDevNotFound if device not found
-	GetDeviceByIdentityData(ctx context.Context, idata string) (*model.Device, error)
+	GetDeviceByIdentityDataHash(ctx context.Context, idataHash []byte) (*model.Device, error)
 
 	// list devices
 	GetDevices(ctx context.Context, skip, limit uint, filter DeviceFilter) ([]model.Device, error)

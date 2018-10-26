@@ -46,6 +46,9 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 	devId := "dummy_devid"
 	authId := "dummy_aid"
 
+	_, idDataHash, err := parseIdData(idData)
+	assert.NoError(t, err)
+
 	req := model.AuthReq{
 		IdData:      idData,
 		TenantToken: "tenant",
@@ -322,15 +325,15 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 						return d.IdData == idData
 					})).Return(tc.addDeviceErr)
 
-			db.On("GetDeviceByIdentityData",
+			db.On("GetDeviceByIdentityDataHash",
 				ctxMatcher,
-				idData).Return(
-				func(ctx context.Context, idata string) *model.Device {
+				idDataHash).Return(
+				func(ctx context.Context, idDataHash []byte) *model.Device {
 					if tc.getDevByIdErr == nil {
 						return &model.Device{
-							PubKey: tc.getDevByIdKey,
-							IdData: idata,
-							Id:     devId,
+							PubKey:       tc.getDevByIdKey,
+							IdDataSha256: idDataHash,
+							Id:           devId,
 						}
 					}
 					return nil
