@@ -964,23 +964,24 @@ func TestStoreAuthSet(t *testing.T) {
 	defer db.session.Close()
 
 	asin := model.AuthSet{
-		IdData:    "foobar",
-		PubKey:    "pubkey-1",
-		DeviceId:  "1",
-		Timestamp: uto.TimePtr(time.Now()),
+		IdData:       "foobar",
+		IdDataSha256: getIdDataHash("foobar"),
+		PubKey:       "pubkey-1",
+		DeviceId:     "1",
+		Timestamp:    uto.TimePtr(time.Now()),
 	}
 	err := db.AddAuthSet(ctx, asin)
 	assert.NoError(t, err)
 
 	// try to get something that does not exist
-	as, err := db.GetAuthSetByDataKey(ctx, "foobar-2", "pubkey-3")
+	as, err := db.GetAuthSetByIdDataHashKey(ctx, getIdDataHash("foobar-2"), "pubkey-3")
 	assert.Error(t, err)
 
 	// no tenant
-	as, err = db.GetAuthSetByDataKey(context.Background(), "foobar", "pubkey-1")
+	as, err = db.GetAuthSetByIdDataHashKey(context.Background(), getIdDataHash("foobar"), "pubkey-1")
 	assert.Error(t, err)
 
-	as, err = db.GetAuthSetByDataKey(ctx, "foobar", "pubkey-1")
+	as, err = db.GetAuthSetByIdDataHashKey(ctx, getIdDataHash("foobar"), "pubkey-1")
 	assert.NoError(t, err)
 	assert.NotNil(t, as)
 
@@ -989,7 +990,7 @@ func TestStoreAuthSet(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	as, err = db.GetAuthSetByDataKey(ctx, "foobar", "pubkey-1")
+	as, err = db.GetAuthSetByIdDataHashKey(ctx, getIdDataHash("foobar"), "pubkey-1")
 	assert.NoError(t, err)
 	assert.NotNil(t, as)
 	assert.WithinDuration(t, time.Now(), uto.Time(as.Timestamp), time.Second)
@@ -1002,7 +1003,7 @@ func TestStoreAuthSet(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	as, err = db.GetAuthSetByDataKey(ctx, "foobar", "pubkey-2")
+	as, err = db.GetAuthSetByIdDataHashKey(ctx, getIdDataHash("foobar"), "pubkey-2")
 	assert.NoError(t, err)
 	assert.NotNil(t, as)
 

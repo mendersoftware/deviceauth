@@ -149,29 +149,6 @@ func (_m *DataStore) DeleteTokens(ctx context.Context) error {
 	return r0
 }
 
-// GetAuthSetByDataKey provides a mock function with given fields: ctx, data, key
-func (_m *DataStore) GetAuthSetByDataKey(ctx context.Context, data string, key string) (*model.AuthSet, error) {
-	ret := _m.Called(ctx, data, key)
-
-	var r0 *model.AuthSet
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) *model.AuthSet); ok {
-		r0 = rf(ctx, data, key)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*model.AuthSet)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
-		r1 = rf(ctx, data, key)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // GetAuthSetById provides a mock function with given fields: ctx, id
 func (_m *DataStore) GetAuthSetById(ctx context.Context, id string) (*model.AuthSet, error) {
 	ret := _m.Called(ctx, id)
@@ -188,6 +165,29 @@ func (_m *DataStore) GetAuthSetById(ctx context.Context, id string) (*model.Auth
 	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
 		r1 = rf(ctx, id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetAuthSetByIdDataHashKey provides a mock function with given fields: ctx, idDataHash, key
+func (_m *DataStore) GetAuthSetByIdDataHashKey(ctx context.Context, idDataHash []byte, key string) (*model.AuthSet, error) {
+	ret := _m.Called(ctx, idDataHash, key)
+
+	var r0 *model.AuthSet
+	if rf, ok := ret.Get(0).(func(context.Context, []byte, string) *model.AuthSet); ok {
+		r0 = rf(ctx, idDataHash, key)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*model.AuthSet)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, []byte, string) error); ok {
+		r1 = rf(ctx, idDataHash, key)
 	} else {
 		r1 = ret.Error(1)
 	}

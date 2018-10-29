@@ -352,17 +352,17 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 						return m.DeviceId == devId
 					}),
 				mock.AnythingOfType("model.AuthSetUpdate")).Return(nil)
-			db.On("GetAuthSetByDataKey",
+			db.On("GetAuthSetByIdDataHashKey",
 				ctxMatcher,
-				mock.AnythingOfType("string"), pubKey).Return(
-				func(ctx context.Context, idata string, key string) *model.AuthSet {
+				idDataHash, pubKey).Return(
+				func(ctx context.Context, idDataHash []byte, key string) *model.AuthSet {
 					if tc.getAuthSetErr == nil {
 						return &model.AuthSet{
-							Id:       authId,
-							DeviceId: tc.getDevByKeyId,
-							IdData:   idData,
-							PubKey:   key,
-							Status:   tc.devStatus,
+							Id:           authId,
+							DeviceId:     tc.getDevByKeyId,
+							IdDataSha256: idDataHash,
+							PubKey:       key,
+							Status:       tc.devStatus,
 						}
 					}
 					return nil
@@ -411,10 +411,12 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 
 // still a Submit... test, but focuses on preauth
 func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
-	t.Parallel()
+	idData := "{\"mac\":\"00:00:00:01\"}"
+	_, idDataSha256, err := parseIdData(idData)
+	assert.NoError(t, err)
 
 	inReq := model.AuthReq{
-		IdData:      "foo-iddata",
+		IdData:      idData,
 		PubKey:      "foo-pubkey",
 		TenantToken: "foo-tenant",
 	}
@@ -445,10 +447,10 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 		{
 			desc: "ok: preauthorized set is auto-accepted",
 			dbGetAuthSetByDataKeyRes: &model.AuthSet{
-				IdData:   inReq.IdData,
-				DeviceId: dummyDevId,
-				PubKey:   inReq.PubKey,
-				Status:   model.DevStatusPreauth,
+				IdDataSha256: idDataSha256,
+				DeviceId:     dummyDevId,
+				PubKey:       inReq.PubKey,
+				Status:       model.DevStatusPreauth,
 			},
 			dbGetLimitRes: &model.Limit{
 				Value: 5,
@@ -461,7 +463,7 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 			res: dummyToken,
 		},
 		{
-			desc:                     "error: can't get an existing authset",
+			desc: "error: can't get an existing authset",
 			dbGetAuthSetByDataKeyErr: errors.New("db error"),
 			dev: &model.Device{
 				Id:     dummyDevId,
@@ -472,10 +474,10 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 		{
 			desc: "error: preauthorized set would exceed limit",
 			dbGetAuthSetByDataKeyRes: &model.AuthSet{
-				IdData:   inReq.IdData,
-				DeviceId: dummyDevId,
-				PubKey:   inReq.PubKey,
-				Status:   model.DevStatusPreauth,
+				IdDataSha256: idDataSha256,
+				DeviceId:     dummyDevId,
+				PubKey:       inReq.PubKey,
+				Status:       model.DevStatusPreauth,
 			},
 			dbGetLimitRes: &model.Limit{
 				Value: 5,
@@ -490,10 +492,10 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 		{
 			desc: "error: can't get device limit",
 			dbGetAuthSetByDataKeyRes: &model.AuthSet{
-				IdData:   inReq.IdData,
-				DeviceId: dummyDevId,
-				PubKey:   inReq.PubKey,
-				Status:   model.DevStatusPreauth,
+				IdDataSha256: idDataSha256,
+				DeviceId:     dummyDevId,
+				PubKey:       inReq.PubKey,
+				Status:       model.DevStatusPreauth,
 			},
 			dbGetLimitErr: errors.New("db error"),
 			dev: &model.Device{
@@ -505,10 +507,10 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 		{
 			desc: "error: failed to submit job to conductor",
 			dbGetAuthSetByDataKeyRes: &model.AuthSet{
-				IdData:   inReq.IdData,
-				DeviceId: dummyDevId,
-				PubKey:   inReq.PubKey,
-				Status:   model.DevStatusPreauth,
+				IdDataSha256: idDataSha256,
+				DeviceId:     dummyDevId,
+				PubKey:       inReq.PubKey,
+				Status:       model.DevStatusPreauth,
 			},
 			dbGetLimitRes: &model.Limit{
 				Value: 5,
@@ -519,15 +521,15 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 				Status: model.DevStatusPending,
 			},
 			coSubmitProvisionDeviceJobErr: errors.New("conductor failed"),
-			err:                           errors.New("submit device provisioning job error: conductor failed"),
+			err: errors.New("submit device provisioning job error: conductor failed"),
 		},
 		{
 			desc: "ok: preauthorized set is auto-accepted, device was already accepted",
 			dbGetAuthSetByDataKeyRes: &model.AuthSet{
-				IdData:   inReq.IdData,
-				DeviceId: dummyDevId,
-				PubKey:   inReq.PubKey,
-				Status:   model.DevStatusPreauth,
+				IdDataSha256: idDataSha256,
+				DeviceId:     dummyDevId,
+				PubKey:       inReq.PubKey,
+				Status:       model.DevStatusPreauth,
 			},
 			dbGetLimitRes: &model.Limit{
 				Value: 5,
@@ -538,15 +540,15 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 				Status: model.DevStatusAccepted,
 			},
 			coSubmitProvisionDeviceJobErr: errors.New("conductor shouldn't be called"),
-			res:                           dummyToken,
+			res: dummyToken,
 		},
 		{
 			desc: "error: cannot get device status",
 			dbGetAuthSetByDataKeyRes: &model.AuthSet{
-				IdData:   inReq.IdData,
-				DeviceId: dummyDevId,
-				PubKey:   inReq.PubKey,
-				Status:   model.DevStatusPreauth,
+				IdDataSha256: idDataSha256,
+				DeviceId:     dummyDevId,
+				PubKey:       inReq.PubKey,
+				Status:       model.DevStatusPreauth,
 			},
 			dbGetLimitRes: &model.Limit{
 				Value: 5,
@@ -568,9 +570,9 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 			db := mstore.DataStore{}
 
 			// get the auth set to check if preauthorized
-			db.On("GetAuthSetByDataKey",
+			db.On("GetAuthSetByIdDataHashKey",
 				ctx,
-				inReq.IdData,
+				idDataSha256,
 				inReq.PubKey,
 			).Return(
 				tc.dbGetAuthSetByDataKeyRes,
@@ -838,8 +840,8 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 				Status: model.DevStatusPending,
 			},
 			coSubmitProvisionDeviceJobErr: errors.New("conductor shouldn't be called"),
-			dbLimit:                       &model.Limit{Value: 5},
-			dbCount:                       4,
+			dbLimit: &model.Limit{Value: 5},
+			dbCount: 4,
 		},
 		{
 			aset: &model.AuthSet{
@@ -852,8 +854,8 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 				Status: model.DevStatusAccepted,
 			},
 			coSubmitProvisionDeviceJobErr: errors.New("conductor shouldn't be called"),
-			dbLimit:                       &model.Limit{Value: 5},
-			dbCount:                       4,
+			dbLimit: &model.Limit{Value: 5},
+			dbCount: 4,
 		},
 		{
 			aset: &model.AuthSet{
@@ -936,7 +938,7 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 				Status: model.DevStatusPending,
 			},
 			coSubmitProvisionDeviceJobErr: errors.New("conductor failed"),
-			outErr:                        "submit device provisioning job error: conductor failed",
+			outErr: "submit device provisioning job error: conductor failed",
 		},
 		{
 			dbLimit: &model.Limit{Value: 0},
@@ -961,7 +963,7 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 				Status: model.DevStatusPending,
 			},
 			dbUpdateRevokeAuthSetsErr: errors.New("foobar"),
-			outErr:                    "failed to reject auth sets: foobar",
+			outErr: "failed to reject auth sets: foobar",
 		},
 		{
 			aset: &model.AuthSet{
@@ -1395,12 +1397,12 @@ func TestDevAuthDecommissionDevice(t *testing.T) {
 			outErr:            "UpdateDevice Error",
 		},
 		{
-			devId:                        "devId2",
+			devId: "devId2",
 			dbDeleteAuthSetsForDeviceErr: errors.New("DeleteAuthSetsForDevice Error"),
-			outErr:                       "db delete device authorization sets error: DeleteAuthSetsForDevice Error",
+			outErr: "db delete device authorization sets error: DeleteAuthSetsForDevice Error",
 		},
 		{
-			devId:                   "devId3",
+			devId: "devId3",
 			dbDeleteTokenByDevIdErr: errors.New("DeleteTokenByDevId Error"),
 			outErr:                  "db delete device tokens error: DeleteTokenByDevId Error",
 		},
@@ -1410,9 +1412,9 @@ func TestDevAuthDecommissionDevice(t *testing.T) {
 			outErr:            "DeleteDevice Error",
 		},
 		{
-			devId:                              "devId5",
+			devId: "devId5",
 			coSubmitDeviceDecommisioningJobErr: errors.New("SubmitDeviceDecommisioningJob Error"),
-			outErr:                             "submit device decommissioning job error: SubmitDeviceDecommisioningJob Error",
+			outErr: "submit device decommissioning job error: SubmitDeviceDecommisioningJob Error",
 		},
 		{
 			devId:           "devId6",
@@ -1863,10 +1865,10 @@ func TestDevAuthDeleteAuthSet(t *testing.T) {
 			dbDeleteTokenByDevIdErr: store.ErrTokenNotFound,
 		},
 		{
-			devId:                       "devId6",
-			authId:                      "authId6",
+			devId:  "devId6",
+			authId: "authId6",
 			dbDeleteAuthSetForDeviceErr: errors.New("DeleteAuthSetsForDevice Error"),
-			outErr:                      "DeleteAuthSetsForDevice Error",
+			outErr: "DeleteAuthSetsForDevice Error",
 		},
 		{
 			devId:             "devId8",

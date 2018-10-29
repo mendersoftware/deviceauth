@@ -71,7 +71,7 @@ type DataStore interface {
 
 	AddAuthSet(ctx context.Context, set model.AuthSet) error
 
-	GetAuthSetByDataKey(ctx context.Context, data string, key string) (*model.AuthSet, error)
+	GetAuthSetByIdDataHashKey(ctx context.Context, idDataHash []byte, key string) (*model.AuthSet, error)
 
 	GetAuthSetById(ctx context.Context, id string) (*model.AuthSet, error)
 

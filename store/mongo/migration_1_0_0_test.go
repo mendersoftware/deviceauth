@@ -24,6 +24,7 @@ import (
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	ctxstore "github.com/mendersoftware/go-lib-micro/store"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/mendersoftware/deviceauth/model"
@@ -144,7 +145,7 @@ func TestMigration_1_0_0(t *testing.T) {
 
 	// verify that there is an auth set for every device
 	for i, dev := range data.devices {
-		aset, err := db.GetAuthSetByDataKey(ctx, dev.IdData, dev.PubKey)
+		aset, err := db.getAuthSetByDataKey(ctx, dev.IdData, dev.PubKey)
 		assert.NoError(t, err)
 
 		// auth set ID should be the same as device ID
@@ -172,4 +173,29 @@ func TestMigration_1_0_0(t *testing.T) {
 	}
 
 	db.session.Close()
+}
+
+func (db *DataStoreMongo) getAuthSetByDataKey(ctx context.Context, idData string, key string) (*model.AuthSet, error) {
+	s := db.session.Copy()
+	defer s.Close()
+
+	c := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbAuthSetColl)
+
+	filter := model.AuthSet{
+		IdData: idData,
+		PubKey: key,
+	}
+	res := model.AuthSet{}
+
+	err := c.Find(filter).One(&res)
+
+	if err != nil {
+		if err == mgo.ErrNotFound {
+			return nil, store.ErrDevNotFound
+		} else {
+			return nil, errors.Wrap(err, "failed to fetch device")
+		}
+	}
+
+	return &res, nil
 }

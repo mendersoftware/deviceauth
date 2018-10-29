@@ -455,15 +455,15 @@ func (db *DataStoreMongo) AddAuthSet(ctx context.Context, set model.AuthSet) err
 	return nil
 }
 
-func (db *DataStoreMongo) GetAuthSetByDataKey(ctx context.Context, idata string, key string) (*model.AuthSet, error) {
+func (db *DataStoreMongo) GetAuthSetByIdDataHashKey(ctx context.Context, idDataHash []byte, key string) (*model.AuthSet, error) {
 	s := db.session.Copy()
 	defer s.Close()
 
 	c := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbAuthSetColl)
 
 	filter := model.AuthSet{
-		IdData: idata,
-		PubKey: key,
+		IdDataSha256: idDataHash,
+		PubKey:       key,
 	}
 	res := model.AuthSet{}
 
