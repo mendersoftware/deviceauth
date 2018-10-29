@@ -138,7 +138,7 @@ func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
 
 		// TODO: rest.Post(v2uriDevices, d.PostDevicesV2Handler),
 
-		// TODO: rest.Get(v2uriDevice, d.GetDeviceV2Handler),
+		rest.Get(v2uriDevice, d.GetDeviceV2Handler),
 
 		rest.Delete(v2uriDevice, d.DeleteDeviceHandler),
 
@@ -388,6 +388,26 @@ func (d *DevAuthApiHandlers) GetDeviceHandler(w rest.ResponseWriter, r *rest.Req
 		rest_utils.RestErrWithLog(w, r, l, err, http.StatusNotFound)
 	case dev != nil:
 		w.WriteJson(dev)
+	default:
+		rest_utils.RestErrWithLogInternal(w, r, l, err)
+	}
+}
+
+func (d *DevAuthApiHandlers) GetDeviceV2Handler(w rest.ResponseWriter, r *rest.Request) {
+
+	ctx := r.Context()
+
+	l := log.FromContext(ctx)
+
+	devId := r.PathParam("id")
+
+	dev, err := d.devAuth.GetDevice(ctx, devId)
+	switch {
+	case err == store.ErrDevNotFound:
+		rest_utils.RestErrWithLog(w, r, l, err, http.StatusNotFound)
+	case dev != nil:
+		apiDev, _ := deviceV2FromDbModel(dev)
+		w.WriteJson(apiDev)
 	default:
 		rest_utils.RestErrWithLogInternal(w, r, l, err)
 	}
