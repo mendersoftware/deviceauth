@@ -1,4 +1,4 @@
-# Acceptance tests
+# Acceptance tests!
 
 Acceptance tests are run in a separate container within the same network as all
 other Mender services. For this to work, acceptance tests container needs to be
