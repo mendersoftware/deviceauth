@@ -134,6 +134,7 @@ func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
 		rest.Delete(uriDevadmDevice, d.DevAdmDeleteDeviceAuthSetHandler),
 
 		// API v2
+		rest.Get(v2uriDevicesCount, d.GetDevicesCountHandler),
 		rest.Get(v2uriDevices, d.GetDevicesV2Handler),
 
 		rest.Post(v2uriDevices, d.PostDevicesV2Handler),
@@ -146,8 +147,6 @@ func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
 
 		rest.Put(v2uriDeviceAuthSetStatus, d.UpdateDeviceStatusHandler),
 		rest.Get(v2uriDeviceAuthSetStatus, d.GetAuthSetStatusHandler),
-
-		rest.Get(v2uriDevicesCount, d.GetDevicesCountHandler),
 
 		rest.Delete(v2uriToken, d.DeleteTokenHandler),
 
