@@ -996,6 +996,90 @@ func TestApiGetDevice(t *testing.T) {
 	}
 }
 
+func TestApiGetDeviceV2(t *testing.T) {
+	t.Parallel()
+
+	// enforce specific field naming in errors returned by API
+	updateRestErrorFieldName()
+
+	dev := &model.Device{
+		Id:     "foo",
+		IdData: `{"mac": "00:00:00:01"}`,
+		IdDataStruct: map[string]interface{}{
+			"mac": "00:00:00:01",
+		},
+		PubKey: "pubkey",
+		Status: model.DevStatusPending,
+		AuthSets: []model.AuthSet{
+			model.AuthSet{
+				Id:       "1",
+				DeviceId: "foo",
+				IdData:   `{"mac": "00:00:00:01"}`,
+				IdDataStruct: map[string]interface{}{
+					"mac": "00:00:00:01",
+				},
+			},
+		},
+	}
+
+	apiDev, _ := deviceV2FromDbModel(dev)
+
+	tcases := []struct {
+		req *http.Request
+
+		device *model.Device
+		err    error
+
+		code int
+		body string
+	}{
+		{
+			req: test.MakeSimpleRequest("GET",
+				"http://1.2.3.4/api/management/v2/devauth/devices/foo", nil),
+			device: dev,
+			err:    nil,
+
+			code: http.StatusOK,
+			body: string(asJSON(apiDev)),
+		},
+		{
+			req: test.MakeSimpleRequest("GET",
+				"http://1.2.3.4/api/management/v2/devauth/devices/bar", nil),
+			device: nil,
+			err:    store.ErrDevNotFound,
+
+			code: http.StatusNotFound,
+			body: RestError("device not found"),
+		},
+		{
+			req: test.MakeSimpleRequest("GET",
+				"http://1.2.3.4/api/management/v2/devauth/devices/bar", nil),
+			device: nil,
+			err:    errors.New("generic error"),
+
+			code: http.StatusInternalServerError,
+			body: RestError("internal error"),
+		},
+	}
+
+	for i := range tcases {
+		tc := tcases[i]
+
+		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			t.Parallel()
+
+			da := &mocks.App{}
+			da.On("GetDevice",
+				mtest.ContextMatcher(),
+				mock.AnythingOfType("string")).
+				Return(tc.device, tc.err)
+
+			apih := makeMockApiHandler(t, da, nil)
+			runTestRequest(t, apih, tc.req, tc.code, tc.body)
+		})
+	}
+}
+
 func TestApiGetDevicesV2(t *testing.T) {
 	t.Parallel()
 
