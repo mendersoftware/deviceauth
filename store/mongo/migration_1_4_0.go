@@ -22,6 +22,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/mendersoftware/deviceauth/model"
+	"github.com/mendersoftware/deviceauth/store"
 	uto "github.com/mendersoftware/deviceauth/utils/to"
 )
 
@@ -45,7 +46,11 @@ func (m *migration_1_4_0) Up(from migrate.Version) error {
 		status, err := m.ms.GetDeviceStatus(m.ctx, dev.Id)
 
 		if err != nil {
-			return errors.Wrap(err, "Cannot determine device status")
+			if err == store.ErrAuthSetNotFound {
+				status = model.DevStatusRejected
+			} else {
+				return errors.Wrapf(err, "Cannot determine device status for device: %s", dev.Id)
+			}
 		}
 
 		if err := m.ms.UpdateDevice(m.ctx,

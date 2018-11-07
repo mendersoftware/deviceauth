@@ -18,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/globalsign/mgo"
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	ctxstore "github.com/mendersoftware/go-lib-micro/store"
@@ -27,6 +28,7 @@ import (
 )
 
 func TestMigration_1_4_0(t *testing.T) {
+	var err error
 	pubKey := `-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAzogVU7RGDilbsoUt/DdH
 VJvcepl0A5+xzGQ50cq1VE/Dyyy8Zp0jzRXCnnu9nu395mAFSZGotZVr+sWEpO3c
@@ -59,7 +61,7 @@ UwIDAQAB
 		ms:  db,
 		ctx: ctx,
 	}
-	err := mig110.Up(migrate.MakeVersion(1, 1, 0))
+	err = mig110.Up(migrate.MakeVersion(1, 1, 0))
 	assert.NoError(t, err)
 	err = mig120.Up(migrate.MakeVersion(1, 2, 0))
 	assert.NoError(t, err)
@@ -90,6 +92,15 @@ UwIDAQAB
 			IdData:          "{\"sn\":\"0003\",\"attr\":\"foo3\",\"mac\":\"00:00:00:03\"}",
 			PubKey:          pubKey,
 			Status:          "rejected",
+			Decommissioning: false,
+			CreatedTs:       ts,
+			UpdatedTs:       ts,
+		},
+		{
+			Id:              "4",
+			IdData:          "{\"sn\":\"0004\",\"attr\":\"foo4\",\"mac\":\"00:00:00:04\"}",
+			PubKey:          pubKey,
+			Status:          "accepted",
 			Decommissioning: false,
 			CreatedTs:       ts,
 			UpdatedTs:       ts,
@@ -150,12 +161,29 @@ UwIDAQAB
 	assert.NoError(t, err)
 
 	var dev model.Device
+	var status string
+	var noAuthSets bool
 	for _, d := range devs {
 		err = s.DB(ctxstore.DbFromContext(ctx, DbName)).
 			C(DbDevicesColl).FindId(d.Id).One(&dev)
 		assert.NoError(t, err)
-		status, err := db.GetDeviceStatus(ctx, dev.Id)
-		assert.NoError(t, err)
+
+		res := []model.AuthSet{}
+		err = s.DB(ctxstore.DbFromContext(ctx, DbName)).
+			C(DbAuthSetColl).Find(model.AuthSet{DeviceId: dev.Id}).All(&res)
+		if (err != nil && err == mgo.ErrNotFound) || len(res) == 0 {
+			noAuthSets = true
+		} else {
+			noAuthSets = false
+			assert.NoError(t, err)
+		}
+
+		if noAuthSets {
+			status = model.DevStatusRejected
+		} else {
+			status, err = db.GetDeviceStatus(ctx, dev.Id)
+			assert.NoError(t, err)
+		}
 		assert.Equal(t, status, dev.Status)
 
 		d.Status = status
