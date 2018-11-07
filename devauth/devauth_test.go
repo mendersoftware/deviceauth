@@ -46,6 +46,9 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 	devId := "dummy_devid"
 	authId := "dummy_aid"
 
+	_, idDataHash, err := parseIdData(idData)
+	assert.NoError(t, err)
+
 	req := model.AuthReq{
 		IdData:      idData,
 		TenantToken: "tenant",
@@ -322,15 +325,15 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 						return d.IdData == idData
 					})).Return(tc.addDeviceErr)
 
-			db.On("GetDeviceByIdentityData",
+			db.On("GetDeviceByIdentityDataHash",
 				ctxMatcher,
-				idData).Return(
-				func(ctx context.Context, idata string) *model.Device {
+				idDataHash).Return(
+				func(ctx context.Context, idDataHash []byte) *model.Device {
 					if tc.getDevByIdErr == nil {
 						return &model.Device{
-							PubKey: tc.getDevByIdKey,
-							IdData: idata,
-							Id:     devId,
+							PubKey:       tc.getDevByIdKey,
+							IdDataSha256: idDataHash,
+							Id:           devId,
 						}
 					}
 					return nil
@@ -349,17 +352,17 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 						return m.DeviceId == devId
 					}),
 				mock.AnythingOfType("model.AuthSetUpdate")).Return(nil)
-			db.On("GetAuthSetByDataKey",
+			db.On("GetAuthSetByIdDataHashKey",
 				ctxMatcher,
-				mock.AnythingOfType("string"), pubKey).Return(
-				func(ctx context.Context, idata string, key string) *model.AuthSet {
+				idDataHash, pubKey).Return(
+				func(ctx context.Context, idDataHash []byte, key string) *model.AuthSet {
 					if tc.getAuthSetErr == nil {
 						return &model.AuthSet{
-							Id:       authId,
-							DeviceId: tc.getDevByKeyId,
-							IdData:   idData,
-							PubKey:   key,
-							Status:   tc.devStatus,
+							Id:           authId,
+							DeviceId:     tc.getDevByKeyId,
+							IdDataSha256: idDataHash,
+							PubKey:       key,
+							Status:       tc.devStatus,
 						}
 					}
 					return nil
@@ -408,10 +411,12 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 
 // still a Submit... test, but focuses on preauth
 func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
-	t.Parallel()
+	idData := "{\"mac\":\"00:00:00:01\"}"
+	_, idDataSha256, err := parseIdData(idData)
+	assert.NoError(t, err)
 
 	inReq := model.AuthReq{
-		IdData:      "foo-iddata",
+		IdData:      idData,
 		PubKey:      "foo-pubkey",
 		TenantToken: "foo-tenant",
 	}
@@ -442,10 +447,10 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 		{
 			desc: "ok: preauthorized set is auto-accepted",
 			dbGetAuthSetByDataKeyRes: &model.AuthSet{
-				IdData:   inReq.IdData,
-				DeviceId: dummyDevId,
-				PubKey:   inReq.PubKey,
-				Status:   model.DevStatusPreauth,
+				IdDataSha256: idDataSha256,
+				DeviceId:     dummyDevId,
+				PubKey:       inReq.PubKey,
+				Status:       model.DevStatusPreauth,
 			},
 			dbGetLimitRes: &model.Limit{
 				Value: 5,
@@ -469,10 +474,10 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 		{
 			desc: "error: preauthorized set would exceed limit",
 			dbGetAuthSetByDataKeyRes: &model.AuthSet{
-				IdData:   inReq.IdData,
-				DeviceId: dummyDevId,
-				PubKey:   inReq.PubKey,
-				Status:   model.DevStatusPreauth,
+				IdDataSha256: idDataSha256,
+				DeviceId:     dummyDevId,
+				PubKey:       inReq.PubKey,
+				Status:       model.DevStatusPreauth,
 			},
 			dbGetLimitRes: &model.Limit{
 				Value: 5,
@@ -487,10 +492,10 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 		{
 			desc: "error: can't get device limit",
 			dbGetAuthSetByDataKeyRes: &model.AuthSet{
-				IdData:   inReq.IdData,
-				DeviceId: dummyDevId,
-				PubKey:   inReq.PubKey,
-				Status:   model.DevStatusPreauth,
+				IdDataSha256: idDataSha256,
+				DeviceId:     dummyDevId,
+				PubKey:       inReq.PubKey,
+				Status:       model.DevStatusPreauth,
 			},
 			dbGetLimitErr: errors.New("db error"),
 			dev: &model.Device{
@@ -502,10 +507,10 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 		{
 			desc: "error: failed to submit job to conductor",
 			dbGetAuthSetByDataKeyRes: &model.AuthSet{
-				IdData:   inReq.IdData,
-				DeviceId: dummyDevId,
-				PubKey:   inReq.PubKey,
-				Status:   model.DevStatusPreauth,
+				IdDataSha256: idDataSha256,
+				DeviceId:     dummyDevId,
+				PubKey:       inReq.PubKey,
+				Status:       model.DevStatusPreauth,
 			},
 			dbGetLimitRes: &model.Limit{
 				Value: 5,
@@ -521,10 +526,10 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 		{
 			desc: "ok: preauthorized set is auto-accepted, device was already accepted",
 			dbGetAuthSetByDataKeyRes: &model.AuthSet{
-				IdData:   inReq.IdData,
-				DeviceId: dummyDevId,
-				PubKey:   inReq.PubKey,
-				Status:   model.DevStatusPreauth,
+				IdDataSha256: idDataSha256,
+				DeviceId:     dummyDevId,
+				PubKey:       inReq.PubKey,
+				Status:       model.DevStatusPreauth,
 			},
 			dbGetLimitRes: &model.Limit{
 				Value: 5,
@@ -540,10 +545,10 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 		{
 			desc: "error: cannot get device status",
 			dbGetAuthSetByDataKeyRes: &model.AuthSet{
-				IdData:   inReq.IdData,
-				DeviceId: dummyDevId,
-				PubKey:   inReq.PubKey,
-				Status:   model.DevStatusPreauth,
+				IdDataSha256: idDataSha256,
+				DeviceId:     dummyDevId,
+				PubKey:       inReq.PubKey,
+				Status:       model.DevStatusPreauth,
 			},
 			dbGetLimitRes: &model.Limit{
 				Value: 5,
@@ -565,9 +570,9 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 			db := mstore.DataStore{}
 
 			// get the auth set to check if preauthorized
-			db.On("GetAuthSetByDataKey",
+			db.On("GetAuthSetByIdDataHashKey",
 				ctx,
-				inReq.IdData,
+				idDataSha256,
 				inReq.PubKey,
 			).Return(
 				tc.dbGetAuthSetByDataKeyRes,

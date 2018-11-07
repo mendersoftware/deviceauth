@@ -457,6 +457,137 @@ func TestApiDevAuthPreauthDevice(t *testing.T) {
 	}
 }
 
+func TestApiV2DevAuthPreauthDevice(t *testing.T) {
+	t.Parallel()
+
+	// enforce specific field naming in errors returned by API
+	updateRestErrorFieldName()
+
+	pubkeyStr := mtest.LoadPubKeyStr("testdata/public.pem", t)
+
+	type brokenPreAuthReq struct {
+		IdData string `json:"identity_data"`
+		PubKey string `json:"pubkey"`
+	}
+
+	testCases := map[string]struct {
+		body interface{}
+
+		devAuthErr error
+
+		checker mt.ResponseChecker
+	}{
+		"ok": {
+			body: &preAuthReq{
+				IdData: map[string]interface{}{
+					"sn": "0001",
+				},
+				PubKey: pubkeyStr,
+			},
+			checker: mt.NewJSONResponse(
+				http.StatusCreated,
+				nil,
+				nil),
+		},
+		"invalid: id data is not json": {
+			body: &brokenPreAuthReq{
+				IdData: `"sn":"0001"`,
+				PubKey: pubkeyStr,
+			},
+			checker: mt.NewJSONResponse(
+				http.StatusBadRequest,
+				nil,
+				restError("failed to decode preauth request: json: cannot unmarshal string into Go struct field preAuthReq.identity_data of type map[string]interface {}")),
+		},
+		"invalid: no id data": {
+			body: &preAuthReq{
+				PubKey: pubkeyStr,
+			},
+			checker: mt.NewJSONResponse(
+				http.StatusBadRequest,
+				nil,
+				restError("failed to decode preauth request: id_data: non zero value required;")),
+		},
+		"invalid: no pubkey": {
+			body: &preAuthReq{
+				IdData: map[string]interface{}{
+					"sn": "0001",
+				},
+			},
+			checker: mt.NewJSONResponse(
+				http.StatusBadRequest,
+				nil,
+				restError("failed to decode preauth request: pubkey: non zero value required;")),
+		},
+		"invalid: no body": {
+			checker: mt.NewJSONResponse(
+				http.StatusBadRequest,
+				nil,
+				restError("failed to decode preauth request: EOF")),
+		},
+		"invalid public key": {
+			body: &preAuthReq{
+				IdData: map[string]interface{}{
+					"sn": "0001",
+				},
+				PubKey: "invalid",
+			},
+			devAuthErr: devauth.ErrDeviceExists,
+			checker: mt.NewJSONResponse(
+				http.StatusBadRequest,
+				nil,
+				restError("failed to decode preauth request: cannot decode public key")),
+		},
+		"devauth: device exists": {
+			body: &preAuthReq{
+				IdData: map[string]interface{}{
+					"sn": "0001",
+				},
+				PubKey: pubkeyStr,
+			},
+			devAuthErr: devauth.ErrDeviceExists,
+			checker: mt.NewJSONResponse(
+				http.StatusConflict,
+				nil,
+				restError("device already exists")),
+		},
+		"devauth: generic error": {
+			body: &preAuthReq{
+				IdData: map[string]interface{}{
+					"sn": "0001",
+				},
+				PubKey: pubkeyStr,
+			},
+			devAuthErr: errors.New("generic"),
+			checker: mt.NewJSONResponse(
+				http.StatusInternalServerError,
+				nil,
+				restError("internal error")),
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(fmt.Sprintf("tc %s", name), func(t *testing.T) {
+			da := &mocks.App{}
+			da.On("PreauthorizeDevice",
+				mtest.ContextMatcher(),
+				mock.AnythingOfType("*model.PreAuthReq")).
+				Return(tc.devAuthErr)
+
+			apih := makeMockApiHandler(t, da, nil)
+
+			//make request
+			req := makeReq("POST",
+				"http://1.2.3.4/api/management/v2/devauth/devices",
+				"",
+				tc.body)
+
+			recorded := test.RunRequest(t, apih, req)
+			mt.CheckResponse(t, tc.checker, recorded)
+		})
+	}
+}
+
 func TestApiDevAuthUpdateStatusDevice(t *testing.T) {
 	t.Parallel()
 

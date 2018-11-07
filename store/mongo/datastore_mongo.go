@@ -174,13 +174,13 @@ func (db *DataStoreMongo) GetDeviceById(ctx context.Context, id string) (*model.
 	return &res, nil
 }
 
-func (db *DataStoreMongo) GetDeviceByIdentityData(ctx context.Context, idata string) (*model.Device, error) {
+func (db *DataStoreMongo) GetDeviceByIdentityDataHash(ctx context.Context, idataHash []byte) (*model.Device, error) {
 	s := db.session.Copy()
 	defer s.Close()
 
 	c := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
 
-	filter := bson.M{"id_data": idata}
+	filter := bson.M{"id_data_sha256": idataHash}
 	res := model.Device{}
 
 	err := c.Find(filter).One(&res)
@@ -459,15 +459,15 @@ func (db *DataStoreMongo) AddAuthSet(ctx context.Context, set model.AuthSet) err
 	return nil
 }
 
-func (db *DataStoreMongo) GetAuthSetByDataKey(ctx context.Context, idata string, key string) (*model.AuthSet, error) {
+func (db *DataStoreMongo) GetAuthSetByIdDataHashKey(ctx context.Context, idDataHash []byte, key string) (*model.AuthSet, error) {
 	s := db.session.Copy()
 	defer s.Close()
 
 	c := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbAuthSetColl)
 
 	filter := model.AuthSet{
-		IdData: idata,
-		PubKey: key,
+		IdDataSha256: idDataHash,
+		PubKey:       key,
 	}
 	res := model.AuthSet{}
 

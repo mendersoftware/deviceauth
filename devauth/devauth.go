@@ -169,7 +169,7 @@ func (d *DevAuth) getDeviceFromAuthRequest(ctx context.Context, r *model.AuthReq
 
 	// either the device was added or it was already present, in any case,
 	// pull it from DB
-	dev, err = d.db.GetDeviceByIdentityData(ctx, r.IdData)
+	dev, err = d.db.GetDeviceByIdentityDataHash(ctx, idDataSha256)
 	if err != nil {
 		l.Error("failed to find device but could not add either")
 		return nil, errors.New("failed to locate device")
@@ -318,8 +318,13 @@ func (d *DevAuth) SubmitAuthRequest(ctx context.Context, r *model.AuthReq) (stri
 func (d *DevAuth) processPreAuthRequest(ctx context.Context, r *model.AuthReq) (*model.AuthSet, error) {
 	var deviceAlreadyAccepted bool
 
+	_, idDataSha256, err := parseIdData(r.IdData)
+	if err != nil {
+		return nil, MakeErrDevAuthBadRequest(err)
+	}
+
 	// authset exists?
-	aset, err := d.db.GetAuthSetByDataKey(ctx, r.IdData, r.PubKey)
+	aset, err := d.db.GetAuthSetByIdDataHashKey(ctx, idDataSha256, r.PubKey)
 	switch err {
 	case nil:
 		break
@@ -449,7 +454,7 @@ func (d *DevAuth) processAuthRequest(ctx context.Context, r *model.AuthReq) (*mo
 	}
 	// either the request was added or it was already present in the DB, get
 	// it now
-	areq, err = d.db.GetAuthSetByDataKey(ctx, r.IdData, r.PubKey)
+	areq, err = d.db.GetAuthSetByIdDataHashKey(ctx, idDataSha256, r.PubKey)
 	if err != nil {
 		l.Error("failed to find device auth set but could not add one either")
 		return nil, errors.New("failed to locate device auth set")

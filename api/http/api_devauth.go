@@ -136,7 +136,7 @@ func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
 		// API v2
 		rest.Get(v2uriDevices, d.GetDevicesV2Handler),
 
-		// TODO: rest.Post(v2uriDevices, d.PostDevicesV2Handler),
+		rest.Post(v2uriDevices, d.PostDevicesV2Handler),
 
 		rest.Get(v2uriDevice, d.GetDeviceV2Handler),
 
@@ -253,6 +253,35 @@ func (d *DevAuthApiHandlers) PreauthDeviceHandler(w rest.ResponseWriter, r *rest
 	}
 
 	err = d.devAuth.PreauthorizeDevice(ctx, req)
+	switch err {
+	case nil:
+		w.WriteHeader(http.StatusCreated)
+	case devauth.ErrDeviceExists:
+		rest_utils.RestErrWithLog(w, r, l, err, http.StatusConflict)
+	default:
+		rest_utils.RestErrWithLogInternal(w, r, l, err)
+	}
+}
+
+func (d *DevAuthApiHandlers) PostDevicesV2Handler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+
+	l := log.FromContext(ctx)
+
+	req, err := parsePreAuthReq(r.Body)
+	if err != nil {
+		err = errors.Wrap(err, "failed to decode preauth request")
+		rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		return
+	}
+
+	reqDbModel, err := req.getDbModel()
+	if err != nil {
+		rest_utils.RestErrWithLogInternal(w, r, l, err)
+		return
+	}
+
+	err = d.devAuth.PreauthorizeDevice(ctx, reqDbModel)
 	switch err {
 	case nil:
 		w.WriteHeader(http.StatusCreated)
