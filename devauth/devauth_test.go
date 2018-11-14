@@ -372,6 +372,12 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 			db.On("AddToken",
 				ctxMatcher,
 				mock.AnythingOfType("model.Token")).Return(nil)
+			db.On("GetDeviceStatus", ctxMatcher,
+				mock.AnythingOfType("string")).Return(
+				"pending", nil)
+			db.On("UpdateDevice", ctxMatcher,
+				mock.AnythingOfType("model.Device"),
+				mock.AnythingOfType("model.DeviceUpdate")).Return(nil)
 
 			jwth := mjwt.Handler{}
 			jwth.On("ToJWT",
