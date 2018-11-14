@@ -90,6 +90,16 @@ jobs:
     - stage: Tests
       name: "unit"
       script:
+        # Rename the branch we're on, so that it's not in the way for the
+        # subsequent fetch. It's ok if this fails, it just means we're not on any
+        # branch.
+        - git branch -m temp-branch || true
+        # Git trick: Fetch directly into our local branches instead of remote
+        # branches.
+        - git fetch origin 'refs/heads/*:refs/heads/*'
+        # Get last remaining tags, if any.
+        - git fetch --tags origin
+
         - go list ./... | grep -v /vendor/ | xargs -n1 -I {} -P 4 go test -v -covermode=atomic -coverprofile=../../../{}/coverage.txt {} || exit $?;
       after_success:
         - bash <(curl -s https://codecov.io/bash) -F unittests ;
