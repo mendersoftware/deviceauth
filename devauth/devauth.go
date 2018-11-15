@@ -452,6 +452,12 @@ func (d *DevAuth) processAuthRequest(ctx context.Context, r *model.AuthReq) (*mo
 	if err != nil && err != store.ErrObjectExists {
 		return nil, err
 	}
+
+	// update the device status
+	if err := d.updateDeviceStatus(ctx, dev.Id, ""); err != nil {
+		return nil, err
+	}
+
 	// either the request was added or it was already present in the DB, get
 	// it now
 	areq, err = d.db.GetAuthSetByIdDataHashKey(ctx, idDataSha256, r.PubKey)
