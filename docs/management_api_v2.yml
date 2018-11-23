@@ -4,7 +4,10 @@ info:
   title: Device authentication
   description: |
       An API for device authentication handling.
-
+      This API replaces first version of the device authentication management API and device admission management API.
+      First version of the device authentication management API and device admission management API are deprecated and will be removed with the next Mender release.
+      You can still find information about first version of the device authentication service API at
+      [https://docs.mender.io/1.6/apis/management-apis/device-authentication](https://docs.mender.io/1.6/apis/management-apis/device-authentication) and about device admission API at [https://docs.mender.io/1.6/apis/management-apis/device-admission](https://docs.mender.io/1.6/apis/management-apis/device-admission).
 basePath: '/api/management/v2/devauth/'
 host: 'mender-device-auth:8080'
 schemes:
