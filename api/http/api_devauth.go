@@ -92,43 +92,24 @@ func NewDevAuthApiHandlers(devAuth devauth.App, db store.DataStore) ApiHandler {
 func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
 	routes := []*rest.Route{
 		rest.Post(uriAuthReqs, d.SubmitAuthRequestHandler),
-
 		rest.Get(uriDevices, d.GetDevicesHandler),
-
 		rest.Post(uriDevices, d.PreauthDeviceHandler),
-
 		rest.Get(uriDevicesCount, d.GetDevicesCountHandler),
-
 		rest.Get(uriDevice, d.GetDeviceHandler),
-
 		rest.Delete(uriDevice, d.DeleteDeviceHandler),
-
 		rest.Delete(uriDeviceAuthSet, d.DeleteDeviceAuthSetHandler),
-
 		rest.Delete(uriToken, d.DeleteTokenHandler),
-
 		rest.Post(uriTokenVerify, d.VerifyTokenHandler),
-
 		rest.Delete(uriTokens, d.DeleteTokensHandler),
-
 		rest.Put(uriDeviceStatus, d.UpdateDeviceStatusHandler),
-
 		rest.Put(uriTenantLimit, d.PutTenantLimitHandler),
-
 		rest.Get(uriTenantLimit, d.GetTenantLimitHandler),
-
 		rest.Get(uriLimit, d.GetLimit),
-
 		rest.Post(uriTenants, d.ProvisionTenantHandler),
-
 		rest.Get(uriTenantDeviceStatus, d.GetTenantDeviceStatus),
-
 		rest.Put(uriDevadmAuthSetStatus, d.DevAdmUpdateAuthSetStatusHandler),
-
 		rest.Get(uriDevadmAuthSetStatus, d.DevAdmGetAuthSetStatusHandler),
-
 		rest.Get(uriDevadmDevices, d.DevAdmGetDevicesHandler),
-
 		rest.Post(uriDevadmDevices, d.PostDevicesHandler),
 		rest.Get(uriDevadmDevice, d.DevAdmGetDeviceHandler),
 		rest.Delete(uriDevadmDevice, d.DevAdmDeleteDeviceAuthSetHandler),
@@ -136,20 +117,13 @@ func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
 		// API v2
 		rest.Get(v2uriDevicesCount, d.GetDevicesCountHandler),
 		rest.Get(v2uriDevices, d.GetDevicesV2Handler),
-
 		rest.Post(v2uriDevices, d.PostDevicesV2Handler),
-
 		rest.Get(v2uriDevice, d.GetDeviceV2Handler),
-
 		rest.Delete(v2uriDevice, d.DeleteDeviceHandler),
-
 		rest.Delete(v2uriDeviceAuthSet, d.DeleteDeviceAuthSetHandler),
-
 		rest.Put(v2uriDeviceAuthSetStatus, d.UpdateDeviceStatusHandler),
 		rest.Get(v2uriDeviceAuthSetStatus, d.GetAuthSetStatusHandler),
-
 		rest.Delete(v2uriToken, d.DeleteTokenHandler),
-
 		rest.Get(v2uriDevicesLimit, d.GetLimit),
 	}
 
