@@ -1,11 +1,11 @@
 swagger: '2.0'
 info:
-  version: '2'
+  version: '1'
   title: Device authentication
   description: |
       An API for device authentication handling.
 
-basePath: '/api/management/v2/devauth/'
+basePath: '/api/management/v1/devauth/'
 host: 'mender-device-auth:8080'
 schemes:
   - http
@@ -15,7 +15,7 @@ paths:
     get:
       summary: Get a list of tenant's devices.
       description: |
-        Provides a list of tenant's devices, sorted by creation date, with optional device status filter.
+        Provides a list of tenant's devices, with optional device status filter.
       parameters:
         - name: Authorization
           in: header
@@ -23,17 +23,6 @@ paths:
           type: string
           format: Bearer [token]
           description: Contains the JWT token issued by the User Administration and Authentication Service.
-        - name: status
-          in: query
-          description: |
-            Device status filter. If not specified, all devices are listed.
-          required: false
-          type: string
-          enum:
-            - pending
-            - accepted
-            - rejected
-            - preauthorized
         - name: page
           in: query
           description: Results page number
@@ -71,9 +60,8 @@ paths:
     post:
       summary: Submit a preauthorized device.
       description: |
-          Adds a given device/authentication data set in the 'preauthorized' state. The device identity data set must not yet exist in the DB (regardless of status).
-
-          When the device requests authentication from deviceauth the next time, it will be issued a token without further user intervention.
+          Adds a given device/authentication data set in the 'preauthorized' state.
+          Designed to be called from admission, with precomputed device_id and auth_set_id.
       parameters:
         - name: Authorization
           in: header
@@ -86,7 +74,7 @@ paths:
           description: Preauthentication request.
           required: true
           schema:
-            $ref: "#/definitions/PreAuthSet"
+            $ref: "#/definitions/PreAuthRequest"
       responses:
         201:
           description: Device submitted.
@@ -95,9 +83,9 @@ paths:
           schema:
             $ref: '#/definitions/Error'
         409:
-          description: Device already exists. Response contains conflicting device.
+          description: Device already exists.
           schema:
-            $ref: '#/definitions/Device'
+            $ref: '#/definitions/Error'
         500:
           description: Unexpected error
           schema:
@@ -163,9 +151,8 @@ paths:
         Removes the device authentication set.
         Removing 'accepted' authentication set is equivalent
         to rejecting device and removing authentication set.
-        If there is only one authentication set for the device
-        and the device is 'preauthorized' then the device
-        will also be deleted.
+        If there is only one authentication set for the device,
+        the device will also be deleted.
       parameters:
         - name: Authorization
           in: header
@@ -199,11 +186,9 @@ paths:
       summary: Update the device authentication set status
       description: |
         Sets the status of a authentication data set of selected value.
-        Valid state transitions:
-        - 'pending' -> 'accepted'
-        - 'pending' -> 'rejected'
-        - 'rejected' -> 'accepted'
-        - 'accepted' -> 'rejected'
+
+        All possible transitions are valid.
+
       parameters:
         - name: Authorization
           in: header
@@ -240,44 +225,6 @@ paths:
             $ref: "#/definitions/Error"
         422:
           description: Request cannot be fulfilled e.g. due to exceeded limit on maximum accepted devices (see error message).
-          schema:
-            $ref: "#/definitions/Error"
-        500:
-          description: Internal server error.
-          schema:
-            $ref: "#/definitions/Error"
-    get:
-      summary: Get the device authentication set status
-      description: |
-        Returns the status of a particular device authentication data set.
-      parameters:
-        - name: Authorization
-          in: header
-          required: true
-          type: string
-          format: Bearer [token]
-          description: Contains the JWT token issued by the User Administration and Authentication Service.
-        - name: id
-          in: path
-          description: Device identifier.
-          required: true
-          type: string
-        - name: aid
-          in: path
-          description: Authentication data set identifier.
-          required: true
-          type: string
-      responses:
-        200:
-          description: |
-            successful response - the device's authentication set status is returned.
-          schema:
-            $ref: "#/definitions/Status"
-          examples:
-            application/json:
-              status: "accepted"
-        404:
-          description: The device was not found.
           schema:
             $ref: "#/definitions/Error"
         500:
@@ -395,30 +342,28 @@ definitions:
       id:
         type: string
         description: Mender assigned Device ID.
-      identity_data:
-        $ref: "#/definitions/IdentityData"
-      status:
+      id_data:
         type: string
-        enum:
-          - pending
-          - accepted
-          - rejected
-          - preauthorized
+        description: Vendor-specific JSON representation of device identity, encrypted
+                     with the tenant's public key.
+
+                     In reference implementation, it is a JSON structure
+                     with vendor-selected fields, such as MACs, serial numbers, etc.
       created_ts:
-        type: string
-        format: datetime
-        description: Created timestamp
+          type: string
+          format: datetime
+          description: Created timestamp
       updated_ts:
-        type: string
-        format: datetime
-        description: Updated timestamp
+          type: string
+          format: datetime
+          description: Updated timestamp
       auth_sets:
-        type: array
-        items:
-          $ref: "#/definitions/AuthSet"
+          type: array
+          items:
+              $ref: "#/definitions/AuthSet"
       decommissioning:
-        type: boolean
-        description: Devices that are part of ongoing decomissioning process will return True
+          type: boolean
+          description: Devices that are part of ongoing decomissioning process will return True
   AuthSet:
     description: Authentication data set
     type: object
@@ -429,19 +374,24 @@ definitions:
       pubkey:
         type: string
         description: The device's public key, generated by the device or pre-provisioned by the vendor.
-      identity_data:
-        $ref: "#/definitions/IdentityData"
+      id_data:
+        type: string
+        description: Vendor-specific JSON representation of device identity, encrypted
+                     with the tenant's public key.
+
+                     In reference implementation, it is a JSON structure
+                     with vendor-selected fields, such as MACs, serial numbers, etc.
       status:
-        type: string
-        enum:
-          - pending
-          - accepted
-          - rejected
-          - preauthorized
+          type: string
+          enum:
+            - pending
+            - accepted
+            - rejected
+            - preauthorized
       ts:
-        type: string
-        format: datetime
-        description: Created timestamp
+          type: string
+          format: datetime
+          description: Created timestamp
   Count:
     description: Counter type
     type: object
@@ -458,45 +408,29 @@ definitions:
       error:
         description: Description of the error
         type: string
-  PreAuthSet:
+  PreAuthRequest:
     type: object
     properties:
-      identity_data:
-        $ref: "#/definitions/IdentityData"
+      device_id:
+        type: string
+        description: Precomputed device ID.
+      auth_set_id:
+        type: string
+        description: Precomputed auth set ID.
+      id_data:
+        type: string
+        description: Vendor-specific JSON representation of the device identity data (MACs, serial numbers, etc.).
       pubkey:
         type: string
         description: The device's public key, generated by the device or pre-provisioned by the vendor.
     required:
-      - identity_data
+      - auth_set_id
+      - device_id
+      - id_data
       - pubkey
     example:
       application/json:
-        identity_data:
-          application/json:
-            mac: "00:01:02:03:04:05"
-            sku: "My Device 1"
-            sn:  "SN1234567890"
+        device_id: "f7881e82-0492-49fb-b459-795654e7188a"
+        auth_set_id: "a7881e82-0492-49fb-b459-795654e7188f"
+        id_data: "{\"mac\":\"00:01:02:03:04:05\"}"
         pubkey: "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAzogVU7RGDilbsoUt/DdH\nVJvcepl0A5+xzGQ50cq1VE/Dyyy8Zp0jzRXCnnu9nu395mAFSZGotZVr+sWEpO3c\nyC3VmXdBZmXmQdZqbdD/GuixJOYfqta2ytbIUPRXFN7/I7sgzxnXWBYXYmObYvdP\nokP0mQanY+WKxp7Q16pt1RoqoAd0kmV39g13rFl35muSHbSBoAW3GBF3gO+mF5Ty\n1ddp/XcgLOsmvNNjY+2HOD5F/RX0fs07mWnbD7x+xz7KEKjF+H7ZpkqCwmwCXaf0\niyYyh1852rti3Afw4mDxuVSD7sd9ggvYMc0QHIpQNkD4YWOhNiE1AB0zH57VbUYG\nUwIDAQAB\n-----END PUBLIC KEY-----\n"
-  IdentityData:
-    description: |
-      Device identity attributes, in the form of a JSON structure.
-
-      The attributes are completely vendor-specific, the provided ones are just an example.
-      In reference implementation structure contains vendor-selected fields,
-      such as MACs, serial numbers, etc.
-    type: object
-    properties:
-      mac:
-        description: MAC address.
-        type: string
-      sku:
-        description: Stock keeping unit.
-        type: string
-      sn:
-        description: Serial number.
-        type: string
-    example:
-      application/json:
-        mac: "00:01:02:03:04:05"
-        sku: "My Device 1"
-        sn:  "SN1234567890"
