@@ -18,6 +18,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/mendersoftware/go-lib-micro/identity"
+
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/globalsign/mgo/bson"
 	"github.com/mendersoftware/go-lib-micro/log"
@@ -48,6 +50,7 @@ const (
 	uriTokens             = "/api/internal/v1/devauth/tokens"
 	uriTenants            = "/api/internal/v1/devauth/tenants"
 	uriTenantDeviceStatus = "/api/internal/v1/devauth/tenants/:tid/devices/:did/status"
+	uriTenantDevices      = "/api/internal/v1/devauth/tenants/:tid/devices"
 
 	// migrated devadm api
 	uriDevadmAuthSetStatus = "/api/management/v1/admission/devices/:aid/status"
@@ -113,6 +116,7 @@ func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
 		rest.Post(uriDevadmDevices, d.PostDevicesHandler),
 		rest.Get(uriDevadmDevice, d.DevAdmGetDeviceHandler),
 		rest.Delete(uriDevadmDevice, d.DevAdmDeleteDeviceAuthSetHandler),
+		rest.Get(uriTenantDevices, d.GetTenantDevicesHandler),
 
 		// API v2
 		rest.Get(v2uriDevicesCount, d.GetDevicesCountHandler),
@@ -883,7 +887,6 @@ func (d *DevAuthApiHandlers) PostDevicesHandler(w rest.ResponseWriter, r *rest.R
 	default:
 		rest_utils.RestErrWithLogInternal(w, r, l, err)
 	}
-
 }
 
 func (d *DevAuthApiHandlers) ProvisionTenantHandler(w rest.ResponseWriter, r *rest.Request) {
@@ -934,6 +937,22 @@ func (d *DevAuthApiHandlers) GetTenantDeviceStatus(w rest.ResponseWriter, r *res
 	default:
 		rest_utils.RestErrWithLogInternal(w, r, l, err)
 	}
+}
+
+func (d *DevAuthApiHandlers) GetTenantDevicesHandler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+	l := log.FromContext(ctx)
+
+	tid := r.PathParam("tid")
+	if tid == "" {
+		rest_utils.RestErrWithLog(w, r, l, errors.New("tenant id (tid) cannot be empty"), http.StatusBadRequest)
+		return
+	}
+	// Inject tenant id into the request context
+	ctx = identity.WithContext(ctx, &identity.Identity{Tenant: tid})
+	r.Request = r.WithContext(ctx)
+
+	d.GetDevicesV2Handler(w, r)
 }
 
 func (d *DevAuthApiHandlers) DevAdmGetDeviceHandler(w rest.ResponseWriter, r *rest.Request) {
