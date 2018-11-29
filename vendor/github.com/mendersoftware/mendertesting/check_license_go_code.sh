@@ -22,7 +22,9 @@ lines=$(($lines + 2))
 ret=0
 for each in $(find . -type f \( ! -regex '.*/\..*' ! -path "./Godeps/*" ! -path "./vendor/*" -name '*.go' \)); do
   modified_year=$(git log -n1 --format=%ad --date=format:%Y -- $each)
-  
+  last_commit=$(git log -n1 -- $each)
+
+  echo "Last commit in $each - $last_commit"
   echo "Checking $each for correct license header; last modified in $modified_year"
 
   head -n $lines $each | tail -n +3 | diff -qu license.tmp - > /dev/null
