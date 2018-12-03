@@ -4,6 +4,7 @@ info:
   title: Device authentication
   description: |
       An API for device authentication handling.
+      This API version has been deprecated and will be removed in Mender 1.8 release.
 
 basePath: '/api/management/v1/devauth/'
 host: 'mender-device-auth:8080'
