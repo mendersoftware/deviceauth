@@ -66,7 +66,7 @@ func (r *PreAuthReq) Validate() error {
 
 	keyStruct, ok := key.(*rsa.PublicKey)
 	if !ok {
-		return errors.New("cannot decode public key")
+		return errors.New("cannot decode key as RSA public key")
 	}
 
 	serialized, err := utils.SerializePubKey(keyStruct)
