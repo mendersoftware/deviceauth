@@ -97,17 +97,20 @@ func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
 		rest.Post(uriAuthReqs, d.SubmitAuthRequestHandler),
 		rest.Get(uriDevices, d.GetDevicesHandler),
 		rest.Post(uriDevices, d.PreauthDeviceHandler),
-		rest.Get(uriDevicesCount, d.GetDevicesCountHandler),
+    rest.Get(uriDevicesCount, d.GetDevicesCountV1Handler),
 		rest.Get(uriDevice, d.GetDeviceHandler),
-		rest.Delete(uriDevice, d.DeleteDeviceHandler),
-		rest.Delete(uriDeviceAuthSet, d.DeleteDeviceAuthSetHandler),
-		rest.Delete(uriToken, d.DeleteTokenHandler),
-		rest.Post(uriTokenVerify, d.VerifyTokenHandler),
+		rest.Delete(uriDevice, d.DeleteDeviceV1Handler),
+		rest.Delete(uriDeviceAuthSet, d.DeleteDeviceAuthSetV1Handler),
+		rest.Delete(uriToken, d.DeleteTokenV1Handler),
+    rest.Post(uriTokenVerify, d.VerifyTokenHandler),
 		rest.Delete(uriTokens, d.DeleteTokensHandler),
-		rest.Put(uriDeviceStatus, d.UpdateDeviceStatusHandler),
+    rest.Put(uriDeviceStatus, d.UpdateDeviceStatusV1Handler),
+
+
 		rest.Put(uriTenantLimit, d.PutTenantLimitHandler),
 		rest.Get(uriTenantLimit, d.GetTenantLimitHandler),
-		rest.Get(uriLimit, d.GetLimit),
+		rest.Get(uriLimit, d.GetLimitV1Handler),
+
 		rest.Post(uriTenants, d.ProvisionTenantHandler),
 		rest.Get(uriTenantDeviceStatus, d.GetTenantDeviceStatus),
 		rest.Put(uriDevadmAuthSetStatus, d.DevAdmUpdateAuthSetStatusHandler),
@@ -128,7 +131,7 @@ func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
 		rest.Put(v2uriDeviceAuthSetStatus, d.UpdateDeviceStatusHandler),
 		rest.Get(v2uriDeviceAuthSetStatus, d.GetAuthSetStatusHandler),
 		rest.Delete(v2uriToken, d.DeleteTokenHandler),
-		rest.Get(v2uriDevicesLimit, d.GetLimit),
+		rest.Get(v2uriDevicesLimit, d.GetLimitHandler),
 	}
 
 	app, err := rest.MakeRouter(
@@ -221,6 +224,7 @@ func (d *DevAuthApiHandlers) PreauthDeviceHandler(w rest.ResponseWriter, r *rest
 	ctx := r.Context()
 
 	l := log.FromContext(ctx)
+	l.Warn("This endpoint has been deprecated and will be removed in a future version.")
 
 	req, err := model.ParsePreAuthReq(r.Body)
 	if err != nil {
@@ -274,6 +278,7 @@ func (d *DevAuthApiHandlers) GetDevicesHandler(w rest.ResponseWriter, r *rest.Re
 	ctx := r.Context()
 
 	l := log.FromContext(ctx)
+	l.Warn("This endpoint has been deprecated and will be removed in a future version.")
 
 	page, perPage, err := rest_utils.ParsePagination(r)
 	if err != nil {
@@ -353,6 +358,14 @@ func (d *DevAuthApiHandlers) GetDevicesV2Handler(w rest.ResponseWriter, r *rest.
 	w.WriteJson(outDevs)
 }
 
+func (d *DevAuthApiHandlers) GetDevicesCountV1Handler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+	l := log.FromContext(ctx)
+	l.Warn("This endpoint has been deprecated and will be removed in a future version.")
+
+	d.GetDevicesCountHandler(w, r)
+}
+
 func (d *DevAuthApiHandlers) GetDevicesCountHandler(w rest.ResponseWriter, r *rest.Request) {
 	ctx := r.Context()
 	l := log.FromContext(ctx)
@@ -385,6 +398,7 @@ func (d *DevAuthApiHandlers) GetDeviceHandler(w rest.ResponseWriter, r *rest.Req
 	ctx := r.Context()
 
 	l := log.FromContext(ctx)
+	l.Warn("This endpoint has been deprecated and will be removed in a future version.")
 
 	devId := r.PathParam("id")
 
@@ -419,6 +433,14 @@ func (d *DevAuthApiHandlers) GetDeviceV2Handler(w rest.ResponseWriter, r *rest.R
 	}
 }
 
+func (d *DevAuthApiHandlers) DeleteDeviceV1Handler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+	l := log.FromContext(ctx)
+	l.Warn("This endpoint has been deprecated and will be removed in a future version.")
+
+	d.DeleteDeviceHandler(w, r)
+}
+
 func (d *DevAuthApiHandlers) DeleteDeviceHandler(w rest.ResponseWriter, r *rest.Request) {
 
 	ctx := r.Context()
@@ -437,6 +459,14 @@ func (d *DevAuthApiHandlers) DeleteDeviceHandler(w rest.ResponseWriter, r *rest.
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (d *DevAuthApiHandlers) DeleteDeviceAuthSetV1Handler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+	l := log.FromContext(ctx)
+	l.Warn("This endpoint has been deprecated and will be removed in a future version.")
+
+	d.DeleteDeviceAuthSetHandler(w, r)
 }
 
 func (d *DevAuthApiHandlers) DeleteDeviceAuthSetHandler(w rest.ResponseWriter, r *rest.Request) {
@@ -465,6 +495,8 @@ func (d *DevAuthApiHandlers) DevAdmDeleteDeviceAuthSetHandler(w rest.ResponseWri
 
 	l := log.FromContext(ctx)
 
+	l.Warn("This endpoint has been deprecated and will be removed in a future version.")
+
 	authId := r.PathParam("aid")
 
 	aset, err := d.db.GetAuthSetById(ctx, authId)
@@ -490,6 +522,14 @@ func (d *DevAuthApiHandlers) DevAdmDeleteDeviceAuthSetHandler(w rest.ResponseWri
 		rest_utils.RestErrWithLogInternal(w, r, l, err)
 		return
 	}
+}
+
+func (d *DevAuthApiHandlers) DeleteTokenV1Handler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+	l := log.FromContext(ctx)
+	l.Warn("This endpoint has been deprecated and will be removed in a future version.")
+
+	d.DeleteTokenHandler(w, r)
 }
 
 func (d *DevAuthApiHandlers) DeleteTokenHandler(w rest.ResponseWriter, r *rest.Request) {
@@ -540,6 +580,14 @@ func (d *DevAuthApiHandlers) VerifyTokenHandler(w rest.ResponseWriter, r *rest.R
 	}
 
 	w.WriteHeader(code)
+}
+
+func (d *DevAuthApiHandlers) UpdateDeviceStatusV1Handler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+	l := log.FromContext(ctx)
+	l.Warn("This endpoint has been deprecated and will be removed in a future version.")
+
+	d.UpdateDeviceStatusHandler(w, r)
 }
 
 func (d *DevAuthApiHandlers) UpdateDeviceStatusHandler(w rest.ResponseWriter, r *rest.Request) {
@@ -652,7 +700,15 @@ func (d *DevAuthApiHandlers) GetTenantLimitHandler(w rest.ResponseWriter, r *res
 	w.WriteJson(LimitValue{lim.Value})
 }
 
-func (d *DevAuthApiHandlers) GetLimit(w rest.ResponseWriter, r *rest.Request) {
+func (d *DevAuthApiHandlers) GetLimitV1Handler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+	l := log.FromContext(ctx)
+	l.Warn("This endpoint has been deprecated and will be removed in a future version.")
+
+	d.GetLimitHandler(w, r)
+}
+
+func (d *DevAuthApiHandlers) GetLimitHandler(w rest.ResponseWriter, r *rest.Request) {
 	ctx := r.Context()
 
 	l := log.FromContext(ctx)
@@ -700,6 +756,8 @@ func (d *DevAuthApiHandlers) DeleteTokensHandler(w rest.ResponseWriter, r *rest.
 func (d *DevAuthApiHandlers) DevAdmUpdateAuthSetStatusHandler(w rest.ResponseWriter, r *rest.Request) {
 	ctx := r.Context()
 	l := log.FromContext(ctx)
+
+	l.Warn("This endpoint has been deprecated and will be removed in a future version.")
 
 	authid := r.PathParam("aid")
 
@@ -763,6 +821,8 @@ func (d *DevAuthApiHandlers) DevAdmGetAuthSetStatusHandler(w rest.ResponseWriter
 
 	authid := r.PathParam("aid")
 
+	l.Warn("This endpoint has been deprecated and will be removed in a future version.")
+
 	// get authset directly from store
 	aset, err := d.db.GetAuthSetById(ctx, authid)
 	switch err {
@@ -803,6 +863,8 @@ func (d *DevAuthApiHandlers) GetAuthSetStatusHandler(w rest.ResponseWriter, r *r
 func (d *DevAuthApiHandlers) DevAdmGetDevicesHandler(w rest.ResponseWriter, r *rest.Request) {
 	ctx := r.Context()
 	l := log.FromContext(ctx)
+
+	l.Warn("This endpoint has been deprecated and will be removed in a future version.")
 
 	page, perPage, err := rest_utils.ParsePagination(r)
 	if err != nil {
@@ -854,6 +916,8 @@ func (d *DevAuthApiHandlers) DevAdmGetDevicesHandler(w rest.ResponseWriter, r *r
 func (d *DevAuthApiHandlers) PostDevicesHandler(w rest.ResponseWriter, r *rest.Request) {
 	ctx := r.Context()
 	l := log.FromContext(ctx)
+
+	l.Warn("This endpoint has been deprecated and will be removed in a future version.")
 
 	// parse authenticate set
 	defer r.Body.Close()
@@ -958,6 +1022,8 @@ func (d *DevAuthApiHandlers) GetTenantDevicesHandler(w rest.ResponseWriter, r *r
 func (d *DevAuthApiHandlers) DevAdmGetDeviceHandler(w rest.ResponseWriter, r *rest.Request) {
 	ctx := r.Context()
 	l := log.FromContext(ctx)
+
+	l.Warn("This endpoint has been deprecated and will be removed in a future version.")
 
 	authid := r.PathParam("aid")
 
