@@ -440,6 +440,20 @@ func (_m *DataStore) UpdateAuthSet(ctx context.Context, filter interface{}, mod 
 	return r0
 }
 
+// UpdateAuthSetById provides a mock function with given fields: ctx, authId, mod
+func (_m *DataStore) UpdateAuthSetById(ctx context.Context, authId string, mod model.AuthSetUpdate) error {
+	ret := _m.Called(ctx, authId, mod)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, model.AuthSetUpdate) error); ok {
+		r0 = rf(ctx, authId, mod)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // UpdateDevice provides a mock function with given fields: ctx, d, up
 func (_m *DataStore) UpdateDevice(ctx context.Context, d model.Device, up model.DeviceUpdate) error {
 	ret := _m.Called(ctx, d, up)
