@@ -97,15 +97,14 @@ func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
 		rest.Post(uriAuthReqs, d.SubmitAuthRequestHandler),
 		rest.Get(uriDevices, d.GetDevicesHandler),
 		rest.Post(uriDevices, d.PreauthDeviceHandler),
-    rest.Get(uriDevicesCount, d.GetDevicesCountV1Handler),
+		rest.Get(uriDevicesCount, d.GetDevicesCountV1Handler),
 		rest.Get(uriDevice, d.GetDeviceHandler),
 		rest.Delete(uriDevice, d.DeleteDeviceV1Handler),
 		rest.Delete(uriDeviceAuthSet, d.DeleteDeviceAuthSetV1Handler),
 		rest.Delete(uriToken, d.DeleteTokenV1Handler),
-    rest.Post(uriTokenVerify, d.VerifyTokenHandler),
+		rest.Post(uriTokenVerify, d.VerifyTokenHandler),
 		rest.Delete(uriTokens, d.DeleteTokensHandler),
-    rest.Put(uriDeviceStatus, d.UpdateDeviceStatusV1Handler),
-
+		rest.Put(uriDeviceStatus, d.UpdateDeviceStatusV1Handler),
 
 		rest.Put(uriTenantLimit, d.PutTenantLimitHandler),
 		rest.Get(uriTenantLimit, d.GetTenantLimitHandler),
