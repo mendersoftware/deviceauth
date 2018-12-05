@@ -2413,6 +2413,156 @@ func TestMongoGetAuthSets(t *testing.T) {
 	}
 }
 
+func TestStoreUpdateuthSetById(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestStoreUpdateuthSetById in short mode.")
+	}
+
+	input := []interface{}{
+		model.AuthSet{
+			Id:       "1",
+			DeviceId: "1",
+			IdData:   `{"mac": "00:00:00:01", "sn":  "0001"}`,
+			IdDataStruct: map[string]interface{}{
+				"mac": "00:00:00:01",
+				"sn":  "0001",
+			},
+			IdDataSha256: []byte{1, 2, 3},
+			PubKey:       "pubkey1",
+			Status:       "pending",
+		},
+		model.AuthSet{
+			Id:       "2",
+			DeviceId: "2",
+			IdData:   `{"mac": "00:00:00:02", "sn":  "0002"}`,
+			IdDataStruct: map[string]interface{}{
+				"mac": "00:00:00:02",
+				"sn":  "0002",
+			},
+			IdDataSha256: []byte{4, 5, 6},
+			PubKey:       "pubkey2",
+			Status:       "accepted",
+		},
+		model.AuthSet{
+			Id:       "3",
+			DeviceId: "2",
+			IdData:   `{"mac": "00:00:00:03", "sn":  "0003"}`,
+			IdDataStruct: map[string]interface{}{
+				"mac": "00:00:00:03",
+				"sn":  "0003",
+			},
+			IdDataSha256: []byte{7, 8, 9},
+			PubKey:       "pubkey3",
+			Status:       "pending",
+		},
+	}
+
+	testCases := []struct {
+		aid    string
+		update model.AuthSetUpdate
+		tenant string
+
+		out *model.AuthSet
+		err error
+	}{
+		{
+			aid: "1",
+			update: model.AuthSetUpdate{
+				Status: "accepted",
+			},
+			out: &model.AuthSet{
+				Id:       "1",
+				DeviceId: "1",
+				IdData:   `{"mac": "00:00:00:01", "sn":  "0001"}`,
+				IdDataStruct: map[string]interface{}{
+					"mac": "00:00:00:01",
+					"sn":  "0001",
+				},
+				IdDataSha256: []byte{1, 2, 3},
+				PubKey:       "pubkey1",
+				Status:       "accepted",
+			},
+		},
+		{
+			aid:    "1",
+			tenant: "foo",
+			update: model.AuthSetUpdate{
+				Status: "rejected",
+			},
+			out: &model.AuthSet{
+				Id:       "1",
+				DeviceId: "1",
+				IdData:   `{"mac": "00:00:00:01", "sn":  "0001"}`,
+				IdDataStruct: map[string]interface{}{
+					"mac": "00:00:00:01",
+					"sn":  "0001",
+				},
+				IdDataSha256: []byte{1, 2, 3},
+				PubKey:       "pubkey1",
+				Status:       "rejected",
+			},
+		},
+		{
+			aid: "2",
+			update: model.AuthSetUpdate{
+				Status: "rejected",
+			},
+			out: &model.AuthSet{
+				Id:       "2",
+				DeviceId: "2",
+				IdData:   `{"mac": "00:00:00:02", "sn":  "0002"}`,
+				IdDataStruct: map[string]interface{}{
+					"mac": "00:00:00:02",
+					"sn":  "0002",
+				},
+				IdDataSha256: []byte{4, 5, 6},
+				PubKey:       "pubkey2",
+				Status:       "rejected",
+			},
+		},
+		{
+			aid: "notfound",
+			update: model.AuthSetUpdate{
+				Status: "rejected",
+			},
+			err: store.ErrAuthSetNotFound,
+		},
+	}
+
+	for i, tc := range testCases {
+		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+
+			ctx := context.Background()
+			if tc.tenant != "" {
+				ctx = identity.WithContext(ctx, &identity.Identity{
+					Tenant: tc.tenant,
+				})
+			}
+			db := getDb(ctx)
+			defer db.session.Close()
+
+			err := db.session.DB(ctxstore.DbFromContext(ctx, DbName)).
+				C(DbAuthSetColl).Insert(input...)
+			assert.NoError(t, err, "failed to setup input data")
+
+			err = db.UpdateAuthSetById(ctx, tc.aid, tc.update)
+
+			if tc.err != nil {
+				assert.EqualError(t, tc.err, err.Error())
+			} else {
+				assert.NoError(t, err)
+
+				var found model.AuthSet
+				coll := db.session.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbAuthSetColl)
+				err = coll.FindId(tc.aid).One(&found)
+				assert.NoError(t, err)
+
+				compareAuthSet(tc.out, &found, t)
+			}
+		})
+	}
+}
+
 func getIdDataHash(idData string) []byte {
 	hash := sha256.New()
 	hash.Write([]byte(idData))
