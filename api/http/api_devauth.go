@@ -18,6 +18,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/mendersoftware/go-lib-micro/identity"
+
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/globalsign/mgo/bson"
 	"github.com/mendersoftware/go-lib-micro/log"
@@ -48,6 +50,7 @@ const (
 	uriTokens             = "/api/internal/v1/devauth/tokens"
 	uriTenants            = "/api/internal/v1/devauth/tenants"
 	uriTenantDeviceStatus = "/api/internal/v1/devauth/tenants/:tid/devices/:did/status"
+	uriTenantDevices      = "/api/internal/v1/devauth/tenants/:tid/devices"
 
 	// migrated devadm api
 	uriDevadmAuthSetStatus = "/api/management/v1/admission/devices/:aid/status"
@@ -92,64 +95,41 @@ func NewDevAuthApiHandlers(devAuth devauth.App, db store.DataStore) ApiHandler {
 func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
 	routes := []*rest.Route{
 		rest.Post(uriAuthReqs, d.SubmitAuthRequestHandler),
-
 		rest.Get(uriDevices, d.GetDevicesHandler),
-
 		rest.Post(uriDevices, d.PreauthDeviceHandler),
-
 		rest.Get(uriDevicesCount, d.GetDevicesCountV1Handler),
-
 		rest.Get(uriDevice, d.GetDeviceHandler),
-
 		rest.Delete(uriDevice, d.DeleteDeviceV1Handler),
-
 		rest.Delete(uriDeviceAuthSet, d.DeleteDeviceAuthSetV1Handler),
-
 		rest.Delete(uriToken, d.DeleteTokenV1Handler),
-
 		rest.Post(uriTokenVerify, d.VerifyTokenHandler),
-
 		rest.Delete(uriTokens, d.DeleteTokensHandler),
-
 		rest.Put(uriDeviceStatus, d.UpdateDeviceStatusV1Handler),
 
 		rest.Put(uriTenantLimit, d.PutTenantLimitHandler),
-
 		rest.Get(uriTenantLimit, d.GetTenantLimitHandler),
-
 		rest.Get(uriLimit, d.GetLimitV1Handler),
 
 		rest.Post(uriTenants, d.ProvisionTenantHandler),
-
 		rest.Get(uriTenantDeviceStatus, d.GetTenantDeviceStatus),
-
 		rest.Put(uriDevadmAuthSetStatus, d.DevAdmUpdateAuthSetStatusHandler),
-
 		rest.Get(uriDevadmAuthSetStatus, d.DevAdmGetAuthSetStatusHandler),
-
 		rest.Get(uriDevadmDevices, d.DevAdmGetDevicesHandler),
-
 		rest.Post(uriDevadmDevices, d.PostDevicesHandler),
 		rest.Get(uriDevadmDevice, d.DevAdmGetDeviceHandler),
 		rest.Delete(uriDevadmDevice, d.DevAdmDeleteDeviceAuthSetHandler),
+		rest.Get(uriTenantDevices, d.GetTenantDevicesHandler),
 
 		// API v2
 		rest.Get(v2uriDevicesCount, d.GetDevicesCountHandler),
 		rest.Get(v2uriDevices, d.GetDevicesV2Handler),
-
 		rest.Post(v2uriDevices, d.PostDevicesV2Handler),
-
 		rest.Get(v2uriDevice, d.GetDeviceV2Handler),
-
 		rest.Delete(v2uriDevice, d.DeleteDeviceHandler),
-
 		rest.Delete(v2uriDeviceAuthSet, d.DeleteDeviceAuthSetHandler),
-
 		rest.Put(v2uriDeviceAuthSetStatus, d.UpdateDeviceStatusHandler),
 		rest.Get(v2uriDeviceAuthSetStatus, d.GetAuthSetStatusHandler),
-
 		rest.Delete(v2uriToken, d.DeleteTokenHandler),
-
 		rest.Get(v2uriDevicesLimit, d.GetLimitHandler),
 	}
 
@@ -970,7 +950,6 @@ func (d *DevAuthApiHandlers) PostDevicesHandler(w rest.ResponseWriter, r *rest.R
 	default:
 		rest_utils.RestErrWithLogInternal(w, r, l, err)
 	}
-
 }
 
 func (d *DevAuthApiHandlers) ProvisionTenantHandler(w rest.ResponseWriter, r *rest.Request) {
@@ -1021,6 +1000,22 @@ func (d *DevAuthApiHandlers) GetTenantDeviceStatus(w rest.ResponseWriter, r *res
 	default:
 		rest_utils.RestErrWithLogInternal(w, r, l, err)
 	}
+}
+
+func (d *DevAuthApiHandlers) GetTenantDevicesHandler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+	l := log.FromContext(ctx)
+
+	tid := r.PathParam("tid")
+	if tid == "" {
+		rest_utils.RestErrWithLog(w, r, l, errors.New("tenant id (tid) cannot be empty"), http.StatusBadRequest)
+		return
+	}
+	// Inject tenant id into the request context
+	ctx = identity.WithContext(ctx, &identity.Identity{Tenant: tid})
+	r.Request = r.WithContext(ctx)
+
+	d.GetDevicesV2Handler(w, r)
 }
 
 func (d *DevAuthApiHandlers) DevAdmGetDeviceHandler(w rest.ResponseWriter, r *rest.Request) {
