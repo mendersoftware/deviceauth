@@ -345,12 +345,9 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 					func(m model.AuthSet) bool {
 						return m.DeviceId == devId
 					})).Return(tc.addAuthSetErr)
-			db.On("UpdateAuthSet",
+			db.On("UpdateAuthSetById",
 				ctxMatcher,
-				mock.MatchedBy(
-					func(m model.AuthSet) bool {
-						return m.DeviceId == devId
-					}),
+				mock.AnythingOfType("string"),
 				mock.AnythingOfType("model.AuthSetUpdate")).Return(nil)
 			db.On("GetAuthSetByIdDataHashKey",
 				ctxMatcher,
@@ -605,13 +602,9 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 
 			// at the end of processing, updates the preauthorized set to 'accepted'
 			// just happy path, errors tested elsewhere
-			db.On("UpdateAuthSet",
+			db.On("UpdateAuthSetById",
 				ctx,
-				mock.MatchedBy(
-					func(m *model.AuthSet) bool {
-						return m.DeviceId == dummyDevId
-
-					}),
+				mock.AnythingOfType("string"),
 				mock.MatchedBy(
 					func(u model.AuthSetUpdate) bool {
 						return u.Status == model.DevStatusAccepted
@@ -1013,8 +1006,8 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 						Status: model.DevStatusRejected,
 					}).Return(tc.dbUpdateRevokeAuthSetsErr)
 				// for accepting a single one
-				db.On("UpdateAuthSet", context.Background(),
-					*tc.aset,
+				db.On("UpdateAuthSetById", context.Background(),
+					tc.aset.Id,
 					model.AuthSetUpdate{
 						Status: model.DevStatusAccepted,
 					}).Return(tc.dbUpdateErr)
@@ -1088,7 +1081,7 @@ func TestDevAuthRejectDevice(t *testing.T) {
 			db := mstore.DataStore{}
 			db.On("GetAuthSetById", context.Background(), "dummy_aid").Return(tc.aset, tc.dbErr)
 			if tc.aset != nil {
-				db.On("UpdateAuthSet", context.Background(), *tc.aset,
+				db.On("UpdateAuthSetById", context.Background(), tc.aset.Id,
 					model.AuthSetUpdate{Status: model.DevStatusRejected}).Return(nil)
 			}
 			db.On("DeleteTokenByDevId", context.Background(), "dummy_devid").Return(
@@ -1163,7 +1156,7 @@ func TestDevAuthResetDevice(t *testing.T) {
 			db := mstore.DataStore{}
 			db.On("GetAuthSetById", context.Background(), "dummy_aid").Return(tc.aset, tc.dbErr)
 			if tc.aset != nil {
-				db.On("UpdateAuthSet", context.Background(), *tc.aset,
+				db.On("UpdateAuthSetById", context.Background(), tc.aset.Id,
 					model.AuthSetUpdate{Status: model.DevStatusPending}).Return(nil)
 			}
 			db.On("DeleteTokenByDevId", context.Background(), "dummy_devid").Return(

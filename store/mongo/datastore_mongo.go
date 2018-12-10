@@ -541,6 +541,25 @@ func (db *DataStoreMongo) UpdateAuthSet(ctx context.Context, filter interface{},
 	return nil
 }
 
+func (db *DataStoreMongo) UpdateAuthSetById(ctx context.Context, id string, mod model.AuthSetUpdate) error {
+	s := db.session.Copy()
+	defer s.Close()
+
+	c := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbAuthSetColl)
+
+	err := c.UpdateId(id, bson.M{"$set": mod})
+
+	if err != nil {
+		if err == mgo.ErrNotFound {
+			return store.ErrAuthSetNotFound
+		} else {
+			return errors.Wrap(err, "failed to update auth set")
+		}
+	}
+
+	return nil
+}
+
 func (db *DataStoreMongo) DeleteAuthSetsForDevice(ctx context.Context, devid string) error {
 	s := db.session.Copy()
 	defer s.Close()

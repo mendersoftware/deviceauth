@@ -379,7 +379,7 @@ func (d *DevAuth) processPreAuthRequest(ctx context.Context, r *model.AuthReq) (
 	}
 
 	// persist the 'accepted' status in both auth set, and device
-	if err := d.db.UpdateAuthSet(ctx, aset, model.AuthSetUpdate{
+	if err := d.db.UpdateAuthSetById(ctx, aset.Id, model.AuthSetUpdate{
 		Status: model.DevStatusAccepted,
 	}); err != nil {
 		return nil, errors.Wrap(err, "failed to update auth set status")
@@ -692,7 +692,7 @@ func (d *DevAuth) setAuthSetStatus(ctx context.Context, device_id string, auth_i
 		}
 	}
 
-	if err := d.db.UpdateAuthSet(ctx, *aset, model.AuthSetUpdate{
+	if err := d.db.UpdateAuthSetById(ctx, aset.Id, model.AuthSetUpdate{
 		Status: status,
 	}); err != nil {
 		return errors.Wrap(err, "db update device auth set error")

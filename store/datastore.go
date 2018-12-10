@@ -80,6 +80,8 @@ type DataStore interface {
 	// update matching AuthSets and set their fields to values in AuthSetUpdate
 	UpdateAuthSet(ctx context.Context, filter interface{}, mod model.AuthSetUpdate) error
 
+	UpdateAuthSetById(ctx context.Context, authId string, mod model.AuthSetUpdate) error
+
 	// deletes all auth sets for device
 	DeleteAuthSetsForDevice(ctx context.Context, devid string) error
 
