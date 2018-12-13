@@ -61,7 +61,6 @@ paths:
       summary: Submit a preauthorized device.
       description: |
           Adds a given device/authentication data set in the 'preauthorized' state.
-          Designed to be called from admission, with precomputed device_id and auth_set_id.
       parameters:
         - name: Authorization
           in: header
