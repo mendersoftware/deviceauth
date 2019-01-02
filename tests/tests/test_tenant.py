@@ -24,7 +24,6 @@ from common import Device, DevAuthorizer, \
     get_fake_tenantadm_addr
 
 import mockserver
-import deviceadm
 
 
 class TestMultiTenant:
@@ -81,9 +80,8 @@ class TestMultiTenant:
         ]
         with mockserver.run_fake(get_fake_tenantadm_addr(),
                                 handlers=handlers) as fake:
-            with deviceadm.run_fake_for_device(d) as fakedevadm:
-                rsp = device_auth_req(url, da, d)
-                assert rsp.status_code == 401
+            rsp = device_auth_req(url, da, d)
+            assert rsp.status_code == 401
 
         # device should be appear in devices listing
         TestMultiTenant.verify_tenant_dev_present(management_api_v1, d.identity, tenant_foobar,

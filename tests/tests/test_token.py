@@ -7,15 +7,13 @@ from common import Device, DevAuthorizer, device_auth_req, \
     clean_migrated_db, clean_db, mongo, cli, \
     management_api_v1, internal_api, device_api
 
-import deviceadm
 import orchestrator
 
 
 def request_token(device, dev_auth, url):
     # device is accepted, we should get a token now
-    with deviceadm.run_fake_for_device(device) as server:
-        rsp = device_auth_req(url, dev_auth, device)
-        assert rsp.status_code == 200
+    rsp = device_auth_req(url, dev_auth, device)
+    assert rsp.status_code == 200
 
     dev_auth.parse_rsp_payload(device, rsp.text)
     return device.token
@@ -30,9 +28,8 @@ def accepted_device(device_api, management_api_v1, clean_migrated_db):
     url = device_api.auth_requests_url
 
     # poke devauth so that device appears
-    with deviceadm.run_fake_for_device(d) as server:
-        rsp = device_auth_req(url, da, d)
-        assert rsp.status_code == 401
+    rsp = device_auth_req(url, da, d)
+    assert rsp.status_code == 401
 
     # try to find our devices in all devices listing
     dev = management_api_v1.find_device_by_identity(d.identity)

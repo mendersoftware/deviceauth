@@ -288,7 +288,7 @@ class AdmissionClient(SwaggerApiClient):
 
     def make_user_auth(self, user_id, tenant_id=None):
         """
-            Prepare an almost-valid JWT auth header, suitable for consumption by deviceadm.
+            Prepare an almost-valid JWT auth header, suitable for consumption by deviceadm API.
         """
         jwt = common.make_id_jwt(user_id, tenant_id)
         return {"Authorization": "Bearer " + jwt}

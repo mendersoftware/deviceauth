@@ -11,7 +11,6 @@ from common import Device, DevAuthorizer, device_auth_req, \
 
 from cryptutil import compare_keys
 
-import deviceadm
 import orchestrator
 import mockserver
 
@@ -26,9 +25,8 @@ def request_token(device, dev_auth, url):
     ]
     with mockserver.run_fake(get_fake_tenantadm_addr(),
                             handlers=handlers) as fake:
-        with deviceadm.run_fake_for_device(device) as server:
-            rsp = device_auth_req(url, dev_auth, device)
-            assert rsp.status_code == 200
+        rsp = device_auth_req(url, dev_auth, device)
+        assert rsp.status_code == 200
     dev_auth.parse_rsp_payload(device, rsp.text)
     return device.token
 
@@ -71,9 +69,8 @@ def accepted_tenants_devices(device_api, management_api_v1, clean_migrated_db, c
                 ]
                 with mockserver.run_fake(get_fake_tenantadm_addr(),
                                         handlers=handlers) as fake:
-                    with deviceadm.run_fake_for_device(d) as fakedevadm:
-                        rsp = device_auth_req(url, da, d)
-                        assert rsp.status_code == 401
+                    rsp = device_auth_req(url, da, d)
+                    assert rsp.status_code == 401
 
                 # try to find our devices in all devices listing
                 dev = management_api_v1.find_device_by_identity(d.identity,

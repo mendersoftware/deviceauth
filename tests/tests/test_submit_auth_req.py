@@ -22,7 +22,6 @@ from common import clean_db, mongo, \
 
 from contextlib import contextmanager
 
-import deviceadm
 import mockserver
 import pytest
 import json
@@ -89,20 +88,6 @@ def do_make_devices(management_api_v1, device_api, tenant_token=""):
     assert len(devs) == cnt + 1
 
 @contextmanager
-def devadm_fake_status_update(authset_id):
-    def fake_status_update(request, aid):
-        assert aid == authset_id
-        return (200, {}, '')
-
-    handlers= [
-        ('PUT', '/api/internal/v1/admission/devices/(.*)/status', fake_status_update),
-    ]
-
-    with mockserver.run_fake(deviceadm.get_fake_deviceadm_addr(),
-                             handlers=handlers) as server:
-        yield server
-
-@contextmanager
 def tenantadm_fake_tenant_verify():
     handlers = [
         ('POST', '/api/internal/v1/tenantadm/tenants/verify',
@@ -129,8 +114,7 @@ class TestDevicesSubmitAuthRequestBase:
         dev = management_api_v1.find_device_by_identity(d.identity, **auth)
         assert dev
 
-        with devadm_fake_status_update(AID), \
-             orchestrator.run_fake_for_device_id(DEVID):
+        with orchestrator.run_fake_for_device_id(DEVID):
             rsp = device_auth_req(device_api.auth_requests_url, da, d)
             assert rsp.status_code == 200
 
