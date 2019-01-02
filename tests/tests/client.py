@@ -102,7 +102,7 @@ class SimpleInternalClient(InternalClient):
 class ManagementClient(SwaggerApiClient):
     log = logging.getLogger('client.ManagementClient')
 
-    spec_option = 'management_spec'
+    spec_option = 'management_v1_spec'
 
     def setup(self):
         self.setup_swagger()
