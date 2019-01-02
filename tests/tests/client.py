@@ -99,8 +99,8 @@ class SimpleInternalClient(InternalClient):
         self.setup_swagger()
 
 
-class ManagementClient(SwaggerApiClient):
-    log = logging.getLogger('client.ManagementClient')
+class ManagementV1Client(SwaggerApiClient):
+    log = logging.getLogger('client.ManagementV1Client')
 
     spec_option = 'management_v1_spec'
 
@@ -156,9 +156,9 @@ class ManagementClient(SwaggerApiClient):
         return {'Authorization': 'Bearer ' + tenant_token}
 
 
-class SimpleManagementClient(ManagementClient):
-    """Management API client. Cannot be used as pytest base class"""
-    log = logging.getLogger('client.SimpleManagementClient')
+class SimpleManagementV1Client(ManagementV1Client):
+    """Management API v1 client. Cannot be used as pytest base class"""
+    log = logging.getLogger('client.SimpleManagementV1Client')
 
     def __init__(self):
         self.setup_swagger()

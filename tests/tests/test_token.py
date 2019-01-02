@@ -5,7 +5,7 @@ import requests
 from common import Device, DevAuthorizer, device_auth_req, \
     explode_jwt, \
     clean_migrated_db, clean_db, mongo, cli, \
-    management_api, internal_api, device_api
+    management_api_v1, internal_api, device_api
 
 import deviceadm
 import orchestrator
@@ -22,7 +22,7 @@ def request_token(device, dev_auth, url):
 
 
 @pytest.yield_fixture(scope='function')
-def accepted_device(device_api, management_api, clean_migrated_db):
+def accepted_device(device_api, management_api_v1, clean_migrated_db):
     """Fixture that sets up an accepted device. Yields a tuple:
        (device ID, instance of Device, instance of DevAuthorizer)"""
     d = Device()
@@ -35,7 +35,7 @@ def accepted_device(device_api, management_api, clean_migrated_db):
         assert rsp.status_code == 401
 
     # try to find our devices in all devices listing
-    dev = management_api.find_device_by_identity(d.identity)
+    dev = management_api_v1.find_device_by_identity(d.identity)
 
     print('found matching device with ID', dev.id)
     devid = dev.id
@@ -44,7 +44,7 @@ def accepted_device(device_api, management_api, clean_migrated_db):
 
     try:
         with orchestrator.run_fake_for_device_id(devid) as server:
-            management_api.accept_device(devid, aid)
+            management_api_v1.accept_device(devid, aid)
     except bravado.exception.HTTPError as e:
         assert e.response.status_code == 204
 
@@ -68,7 +68,7 @@ def token_verify_url(internal_api):
 
 
 class TestToken:
-    def test_token_claims(self, accepted_device, management_api, device_api):
+    def test_token_claims(self, accepted_device, management_api_v1, device_api):
         devid, d, da = accepted_device
 
         token = request_token(d, da, device_api.auth_requests_url)
@@ -114,13 +114,13 @@ class TestToken:
                             headers={'Authorization': auth_hdr + "==foo"})
         assert rsp.status_code == 401
 
-    def test_token_delete(self, device_token, token_verify_url, management_api):
+    def test_token_delete(self, device_token, token_verify_url, management_api_v1):
         _, tclaims, _ = explode_jwt(device_token)
 
         # bravado cannot handle DELETE requests either
         #   self.client.tokens.delete_tokens_id(id=tclaims['jti'])
         # use requests instead
-        rsp = requests.delete(management_api.make_api_url('/tokens/{}'.format(tclaims['jti'])))
+        rsp = requests.delete(management_api_v1.make_api_url('/tokens/{}'.format(tclaims['jti'])))
         assert rsp.status_code == 204
 
         auth_hdr = 'Bearer {}'.format(device_token)
