@@ -216,6 +216,83 @@ class SimpleManagementV1Client(ManagementV1Client):
             'pubkey': pubkey
         }
 
+class ManagementClient(SwaggerApiClient):
+    api_url = "http://%s/api/management/v2/devauth/" % \
+              pytest.config.getoption("host")
+
+    log = logging.getLogger('client.ManagementClient')
+
+    spec_option = 'management_spec'
+
+    def setup(self):
+        self.setup_swagger()
+
+    def accept_device(self, devid, aid, **kwargs):
+        return self.put_device_status(devid, aid, 'accepted', **kwargs)
+
+    def reject_device(self, devid, aid, **kwargs):
+        return self.put_device_status(devid, aid, 'rejected', **kwargs)
+
+    def put_device_status(self, devid, aid, status, **kwargs):
+        if 'Authorization' not in kwargs:
+            self.log.debug('appending default authorization header')
+            kwargs['Authorization'] = 'Bearer foo'
+
+        self.log.info("definitions: %s", self.client.swagger_spec.definitions)
+        Status = self.client.get_model('Status')
+        st = Status(status=status)
+        return self.client.devices.put_devices_id_auth_aid_status(id=devid,
+                                                                  aid=aid,
+                                                                  status=st,
+                                                                  **kwargs).result()
+
+    def delete_device(self, devid, headers={}):
+        if 'Authorization' not in headers:
+            self.log.debug('appending default authorization header')
+            headers['Authorization'] = 'Bearer foo'
+        # bravado for some reason doesn't issue DELETEs properly (silent failure)
+        # fall back to 'requests'
+        #   return self.client.devices.delete_devices_id(id=devid, **kwargs)
+        rsp = requests.delete(self.make_api_url('/devices/{}'.format(devid)), headers = headers)
+        return rsp
+
+    def count_devices(self, status=None, **kwargs):
+        if 'Authorization' not in kwargs:
+            self.log.debug('appending default authorization header')
+            kwargs['Authorization'] = 'Bearer foo'
+        count = self.client.devices.get_devices_count(status=status, **kwargs).result()[0]
+        return count.count
+
+    def make_auth(self, tenant_token):
+        return {'Authorization': 'Bearer ' + tenant_token}
+
+
+class SimpleManagementClient(ManagementClient):
+    """Management API client. Cannot be used as pytest base class"""
+    log = logging.getLogger('client.SimpleManagementClient')
+
+    def __init__(self):
+        self.setup_swagger()
+
+    def list_devices(self, **kwargs):
+        if 'Authorization' not in kwargs:
+            self.log.debug('appending default authorization header')
+            kwargs['Authorization'] = 'Bearer foo'
+        return self.client.devices.get_devices(**kwargs).result()[0]
+
+    def get_device(self, **kwargs):
+        if 'Authorization' not in kwargs:
+            self.log.debug('appending default authorization header')
+            kwargs['Authorization'] = 'Bearer foo'
+        return self.client.devices.get_devices_id(**kwargs).result()[0]
+
+    def get_single_device(self, **kwargs):
+        page = 1
+        per_page = 100
+
+        devs = self.list_devices(page=page, per_page=per_page, **kwargs)
+        return devs[0]
+
 class AdmissionClient(SwaggerApiClient):
     api_url = "http://%s/api/management/v1/admission/" % \
               pytest.config.getoption("host")
