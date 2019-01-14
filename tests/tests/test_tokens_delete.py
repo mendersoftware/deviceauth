@@ -6,12 +6,11 @@ import json
 from common import Device, DevAuthorizer, device_auth_req, \
     explode_jwt, \
     clean_migrated_db, clean_db, mongo, cli, \
-    management_api, internal_api, device_api, \
+    management_api_v1, internal_api, device_api, \
     get_fake_tenantadm_addr, make_fake_tenant_token
 
 from cryptutil import compare_keys
 
-import deviceadm
 import orchestrator
 import mockserver
 
@@ -26,9 +25,8 @@ def request_token(device, dev_auth, url):
     ]
     with mockserver.run_fake(get_fake_tenantadm_addr(),
                             handlers=handlers) as fake:
-        with deviceadm.run_fake_for_device(device) as server:
-            rsp = device_auth_req(url, dev_auth, device)
-            assert rsp.status_code == 200
+        rsp = device_auth_req(url, dev_auth, device)
+        assert rsp.status_code == 200
     dev_auth.parse_rsp_payload(device, rsp.text)
     return device.token
 
@@ -39,7 +37,7 @@ def verify_token(token, status_code, url):
     assert rsp.status_code == status_code
 
 @pytest.yield_fixture(scope='function')
-def accepted_tenants_devices(device_api, management_api, clean_migrated_db, cli, request):
+def accepted_tenants_devices(device_api, management_api_v1, clean_migrated_db, cli, request):
     """Fixture that sets up an accepted devices for tenants. The fixture can
        be parametrized with a tenants, number of devices and number of authentication sets.
        Yields a dict:
@@ -71,12 +69,11 @@ def accepted_tenants_devices(device_api, management_api, clean_migrated_db, cli,
                 ]
                 with mockserver.run_fake(get_fake_tenantadm_addr(),
                                         handlers=handlers) as fake:
-                    with deviceadm.run_fake_for_device(d) as fakedevadm:
-                        rsp = device_auth_req(url, da, d)
-                        assert rsp.status_code == 401
+                    rsp = device_auth_req(url, da, d)
+                    assert rsp.status_code == 401
 
                 # try to find our devices in all devices listing
-                dev = management_api.find_device_by_identity(d.identity,
+                dev = management_api_v1.find_device_by_identity(d.identity,
                         Authorization='Bearer '+tenant_token)
 
                 devid = dev.id
@@ -87,7 +84,7 @@ def accepted_tenants_devices(device_api, management_api, clean_migrated_db, cli,
 
                 try:
                     with orchestrator.run_fake_for_device_id(devid) as server:
-                        management_api.accept_device(devid, aid, Authorization='Bearer '+ tenant_token)
+                        management_api_v1.accept_device(devid, aid, Authorization='Bearer '+ tenant_token)
                 except bravado.exception.HTTPError as e:
                     assert e.response.status_code == 204
 
@@ -103,7 +100,7 @@ def accepted_tenants_devices(device_api, management_api, clean_migrated_db, cli,
 
 class TestMultiTenantDeleteTokens:
     @pytest.mark.parametrize('accepted_tenants_devices', [[('foo', 2, 2), ('bar', 1, 3)]], indirect=True)
-    def test_delete_tokens_by_device_ok(self, accepted_tenants_devices, internal_api, management_api, device_api):
+    def test_delete_tokens_by_device_ok(self, accepted_tenants_devices, internal_api, management_api_v1, device_api):
         td = accepted_tenants_devices
 
         tenant_foo_token = make_fake_tenant_token('foo')
@@ -126,7 +123,7 @@ class TestMultiTenantDeleteTokens:
         verify_token(token2, 200, verify_url)
         verify_token(token3, 200, verify_url)
 
-        dev1 = management_api.find_device_by_identity(d1_foo.identity,
+        dev1 = management_api_v1.find_device_by_identity(d1_foo.identity,
                 Authorization='Bearer '+ tenant_foo_token)
         payload = {'device_id': dev1.id, 'tenant_id': 'foo'}
         rsp = requests.delete(internal_api.make_api_url("/tokens"), params=payload)
@@ -137,7 +134,7 @@ class TestMultiTenantDeleteTokens:
         verify_token(token3, 200, verify_url)
 
     @pytest.mark.parametrize('accepted_tenants_devices', [[('foo', 2, 2), ('bar', 1, 3)]], indirect=True)
-    def test_delete_tokens_by_non_existent_device_ok(self, accepted_tenants_devices, internal_api, management_api, device_api):
+    def test_delete_tokens_by_non_existent_device_ok(self, accepted_tenants_devices, internal_api, management_api_v1, device_api):
         td = accepted_tenants_devices
 
         tenant_foo_token = make_fake_tenant_token('foo')
@@ -169,7 +166,7 @@ class TestMultiTenantDeleteTokens:
         verify_token(token3, 200, verify_url)
 
     @pytest.mark.parametrize('accepted_tenants_devices', [[('foo', 2, 2), ('bar', 1, 3)]], indirect=True)
-    def test_delete_tokens_by_tenant_ok(self, accepted_tenants_devices, internal_api, management_api, device_api):
+    def test_delete_tokens_by_tenant_ok(self, accepted_tenants_devices, internal_api, management_api_v1, device_api):
         td = accepted_tenants_devices
 
         tenant_foo_token = make_fake_tenant_token('foo')
@@ -192,7 +189,7 @@ class TestMultiTenantDeleteTokens:
         verify_token(token2, 200, verify_url)
         verify_token(token3, 200, verify_url)
 
-        dev1 = management_api.find_device_by_identity(d1_foo.identity,
+        dev1 = management_api_v1.find_device_by_identity(d1_foo.identity,
                 Authorization='Bearer '+ tenant_foo_token)
         payload = {'tenant_id': 'foo'}
         rsp = requests.delete(internal_api.make_api_url("/tokens"), params=payload)
@@ -203,7 +200,7 @@ class TestMultiTenantDeleteTokens:
         verify_token(token3, 200, verify_url)
 
     @pytest.mark.parametrize('accepted_tenants_devices', [[('foo', 2, 2), ('bar', 1, 3)]], indirect=True)
-    def test_delete_tokens_by_non_existent_tenant_ok(self, accepted_tenants_devices, internal_api, management_api, device_api):
+    def test_delete_tokens_by_non_existent_tenant_ok(self, accepted_tenants_devices, internal_api, management_api_v1, device_api):
         td = accepted_tenants_devices
 
         tenant_foo_token = make_fake_tenant_token('foo')
@@ -226,7 +223,7 @@ class TestMultiTenantDeleteTokens:
         verify_token(token2, 200, verify_url)
         verify_token(token3, 200, verify_url)
 
-        dev1 = management_api.find_device_by_identity(d1_foo.identity,
+        dev1 = management_api_v1.find_device_by_identity(d1_foo.identity,
                 Authorization='Bearer '+ tenant_foo_token)
         payload = {'tenant_id': 'baz'}
         rsp = requests.delete(internal_api.make_api_url("/tokens"), params=payload)

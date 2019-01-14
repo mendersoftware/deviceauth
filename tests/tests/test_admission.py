@@ -5,7 +5,7 @@ import pytest
 from common import Device, DevAuthorizer, \
     device_auth_req, make_devices, devices, \
     clean_migrated_db, clean_db, mongo, cli, \
-    management_api, admission_api, internal_api, device_api, \
+    management_api_v1, admission_api, internal_api, device_api, \
     tenant_foobar, tenant_foobar_devices, tenant_foobar_clean_migrated_db,\
     get_keypair
 
@@ -25,16 +25,16 @@ class TestAdmission(AdmissionClient):
             pytest.fail("Error code 404 not returned")
 
     @pytest.mark.parametrize('devices', ['5'], indirect=True)
-    def test_get_device(self, management_api, devices):
+    def test_get_device(self, management_api_v1, devices):
         dev, _ = devices[0]
-        ourdev = management_api.find_device_by_identity(dev.identity)
+        ourdev = management_api_v1.find_device_by_identity(dev.identity)
         authset, _ = self.client.devices.get_devices_id(id=ourdev.auth_sets[0].id, _request_options={"headers": self.uauth}).result()
         assert authset.id == ourdev.auth_sets[0].id
 
     @pytest.mark.parametrize('devices', ['5'], indirect=True)
-    def test_delete_device(self, management_api, devices):
+    def test_delete_device(self, management_api_v1, devices):
         dev, _ = devices[0]
-        ourdev = management_api.find_device_by_identity(dev.identity)
+        ourdev = management_api_v1.find_device_by_identity(dev.identity)
         rsp = self.delete_device_mgmt(ourdev.auth_sets[0].id)
         assert rsp.status_code == 204
 
@@ -47,7 +47,7 @@ class TestAdmission(AdmissionClient):
             pytest.fail("Error code 404 not returned")
 
     @pytest.mark.parametrize('devices', ['5'], indirect=True)
-    def test_delete_non_existent_device(self, management_api, devices):
+    def test_delete_non_existent_device(self, management_api_v1, devices):
         rsp = self.delete_device_mgmt("nonexistent")
         assert rsp.status_code == 204
 
@@ -230,10 +230,10 @@ class TestAdmissionMultiTenant(AdmissionClient):
         assert len(devs) == expected
 
     @pytest.mark.parametrize('tenant_foobar_devices', ['5'], indirect=True)
-    def test_delete_device(self, management_api, tenant_foobar_devices, tenant_foobar):
+    def test_delete_device(self, management_api_v1, tenant_foobar_devices, tenant_foobar):
         auth = {"Authorization": "Bearer " + tenant_foobar}
         dev, _ = tenant_foobar_devices[0]
-        ourdev = management_api.find_device_by_identity(dev.identity, Authorization="Bearer " + tenant_foobar)
+        ourdev = management_api_v1.find_device_by_identity(dev.identity, Authorization="Bearer " + tenant_foobar)
         rsp = self.delete_device_mgmt(ourdev.auth_sets[0].id, auth=auth)
         assert rsp.status_code == 204
 

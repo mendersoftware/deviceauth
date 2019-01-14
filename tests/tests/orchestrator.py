@@ -36,7 +36,7 @@ def provision_device_handler(device_id=None, status=200):
 
     return _provision_device
 
-def decommission_device_handler(device_id=None):
+def decommission_device_handler(device_id=None, status=200):
     log = logging.getLogger('orchestartor.decommision_device')
 
     def _decommission_device(request):
@@ -48,7 +48,7 @@ def decommission_device_handler(device_id=None):
         assert dreq.get('request_id', None) == 'delete_device'
         # test is enforcing particular request ID
         assert dreq.get('authorization', None) == 'Bearer foobar'
-        return (200, {}, '')
+        return (status, {}, '')
 
     return _decommission_device
 
@@ -58,11 +58,18 @@ def get_fake_orchestrator_addr():
 ANY_DEVICE = None
 
 @contextmanager
-def run_fake_for_device_id(devid):
-    handlers = [
-        ('POST', '/api/workflow/provision_device', provision_device_handler(devid)),
-        ('POST', '/api/workflow/decommission_device', decommission_device_handler(devid)),
-    ]
+def run_fake_for_device_id(devid, status=None):
+    if status is None:
+        handlers = [
+                ('POST', '/api/workflow/provision_device', provision_device_handler(devid)),
+                ('POST', '/api/workflow/decommission_device', decommission_device_handler(devid)),
+                ]
+    else:
+        handlers = [
+                ('POST', '/api/workflow/provision_device', provision_device_handler(devid, status)),
+                ('POST', '/api/workflow/decommission_device', decommission_device_handler(devid, status)),
+                ]
+
     with mockserver.run_fake(get_fake_orchestrator_addr(),
                              handlers=handlers) as server:
         yield server
