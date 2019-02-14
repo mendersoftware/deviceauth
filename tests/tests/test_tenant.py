@@ -19,7 +19,7 @@ import pytest
 from common import Device, DevAuthorizer, \
     device_auth_req, \
     clean_migrated_db, clean_db, mongo, cli, \
-    management_api_v1, device_api, \
+    management_api, device_api, \
     tenant_foobar, tenant_foobar_clean_migrated_db, \
     get_fake_tenantadm_addr
 
@@ -28,7 +28,7 @@ import mockserver
 
 class TestMultiTenant:
 
-    def test_auth_req_no_tenantadm(self, management_api_v1, device_api, tenant_foobar):
+    def test_auth_req_no_tenantadm(self, management_api, device_api, tenant_foobar):
         d = Device()
         da = DevAuthorizer(tenant_token=tenant_foobar)
         url = device_api.auth_requests_url
@@ -39,10 +39,10 @@ class TestMultiTenant:
         assert rsp.status_code == 500
 
         # request failed, so device should not even be listed as known
-        TestMultiTenant.verify_tenant_dev_present(management_api_v1, d.identity, tenant_foobar,
+        TestMultiTenant.verify_tenant_dev_present(management_api, d.identity, tenant_foobar,
                                                   present=False)
 
-    def test_auth_req_fake_tenantadm_invalid_tenant_token(self, management_api_v1, device_api,
+    def test_auth_req_fake_tenantadm_invalid_tenant_token(self, management_api, device_api,
                                                           clean_migrated_db):
         d = Device()
         da = DevAuthorizer(tenant_token="bad-token")
@@ -62,10 +62,10 @@ class TestMultiTenant:
 
         # request failed, so device should not even be listed as known for the
         # default tenant
-        TestMultiTenant.verify_tenant_dev_present(management_api_v1, d.identity, '',
+        TestMultiTenant.verify_tenant_dev_present(management_api, d.identity, '',
                                                   present=False)
 
-    def test_auth_req_fake_tenantadm_valid_tenant_token(self, management_api_v1, device_api,
+    def test_auth_req_fake_tenantadm_valid_tenant_token(self, management_api, device_api,
                                                         tenant_foobar):
         d = Device()
         da = DevAuthorizer(tenant_token=tenant_foobar)
@@ -84,10 +84,10 @@ class TestMultiTenant:
             assert rsp.status_code == 401
 
         # device should be appear in devices listing
-        TestMultiTenant.verify_tenant_dev_present(management_api_v1, d.identity, tenant_foobar,
+        TestMultiTenant.verify_tenant_dev_present(management_api, d.identity, tenant_foobar,
                                                   present=True)
 
-    def test_auth_req_fake_tenantadm_no_tenant_token(self, management_api_v1, device_api,
+    def test_auth_req_fake_tenantadm_no_tenant_token(self, management_api, device_api,
                                                      clean_migrated_db):
         d = Device()
         # use empty tenant token
@@ -97,10 +97,10 @@ class TestMultiTenant:
         rsp = device_auth_req(url, da, d)
         assert rsp.status_code == 401
 
-        TestMultiTenant.verify_tenant_dev_present(management_api_v1, d.identity, '',
+        TestMultiTenant.verify_tenant_dev_present(management_api, d.identity, '',
                                                   present=False)
 
-    def test_auth_req_fake_tenantadm_tenant_suspended(self, management_api_v1, device_api,
+    def test_auth_req_fake_tenantadm_tenant_suspended(self, management_api, device_api,
                                                           tenant_foobar, clean_migrated_db):
         d = Device()
         da = DevAuthorizer(tenant_token=tenant_foobar)
@@ -121,22 +121,22 @@ class TestMultiTenant:
 
         # request failed, so device should not even be listed as known for the
         # default tenant
-        TestMultiTenant.verify_tenant_dev_present(management_api_v1, d.identity, '',
+        TestMultiTenant.verify_tenant_dev_present(management_api, d.identity, '',
                                                   present=False)
 
     @staticmethod
-    def get_device(management_api_v1, identity, token):
+    def get_device(management_api, identity, token):
         if token:
-            dev = management_api_v1.find_device_by_identity(identity,
+            dev = management_api.find_device_by_identity(identity,
                                                          Authorization='Bearer '+token)
         else:
             # use default auth
-            dev = management_api_v1.find_device_by_identity(identity)
+            dev = management_api.find_device_by_identity(identity)
         return dev
 
     @staticmethod
-    def verify_tenant_dev_present(management_api_v1, identity, token, present=False):
-        dev = TestMultiTenant.get_device(management_api_v1, identity, token)
+    def verify_tenant_dev_present(management_api, identity, token, present=False):
+        dev = TestMultiTenant.get_device(management_api, identity, token)
         if present:
             assert dev
         else:

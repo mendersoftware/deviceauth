@@ -98,11 +98,13 @@ class SimpleInternalClient(InternalClient):
     def __init__(self):
         self.setup_swagger()
 
+class ManagementClient(SwaggerApiClient):
+    api_url = "http://%s/api/management/v2/devauth/" % \
+              pytest.config.getoption("host")
 
-class ManagementV1Client(SwaggerApiClient):
-    log = logging.getLogger('client.ManagementV1Client')
+    log = logging.getLogger('client.ManagementClient')
 
-    spec_option = 'management_v1_spec'
+    spec_option = 'management_spec'
 
     def setup(self):
         self.setup_swagger()
@@ -156,9 +158,9 @@ class ManagementV1Client(SwaggerApiClient):
         return {'Authorization': 'Bearer ' + tenant_token}
 
 
-class SimpleManagementV1Client(ManagementV1Client):
-    """Management API v1 client. Cannot be used as pytest base class"""
-    log = logging.getLogger('client.SimpleManagementV1Client')
+class SimpleManagementClient(ManagementClient):
+    """Management API client. Cannot be used as pytest base class"""
+    log = logging.getLogger('client.SimpleManagementClient')
 
     def __init__(self):
         self.setup_swagger()
@@ -181,6 +183,13 @@ class SimpleManagementV1Client(ManagementV1Client):
             kwargs['Authorization'] = 'Bearer foo'
         return self.client.devices.get_devices_id(**kwargs).result()[0]
 
+    def get_single_device(self, **kwargs):
+        page = 1
+        per_page = 100
+
+        devs = self.list_devices(page=page, per_page=per_page, **kwargs)
+        return devs[0]
+
     def find_device_by_identity(self, identity, **kwargs):
         page = 1
         per_page = 100
@@ -190,7 +199,7 @@ class SimpleManagementV1Client(ManagementV1Client):
             self.log.debug('trying page %d', page)
             devs = self.list_devices(page=page, per_page=per_page, **kwargs)
             for dev in devs:
-                if dev.id_data == identity:
+                if json.dumps({"mac":dev.identity_data.mac}, separators=(",", ":")) == identity:
                     # found
                     return dev
             # try another page
@@ -199,183 +208,6 @@ class SimpleManagementV1Client(ManagementV1Client):
             page += 1
 
         return None
-
-    def preauthorize(self, req, **kwargs):
-        if 'Authorization' not in kwargs:
-            self.log.debug('appending default authorization header')
-            kwargs['Authorization'] = 'Bearer foo'
-
-        return self.client.devices.post_devices(pre_auth_request=req, **kwargs).result()
-
-    @staticmethod
-    def make_preauth_req(auth_set_id, device_id, id_data, pubkey):
-        return {
-            'auth_set_id': auth_set_id,
-            'device_id': device_id,
-            'id_data': id_data,
-            'pubkey': pubkey
-        }
-
-class ManagementClient(SwaggerApiClient):
-    api_url = "http://%s/api/management/v2/devauth/" % \
-              pytest.config.getoption("host")
-
-    log = logging.getLogger('client.ManagementClient')
-
-    spec_option = 'management_spec'
-
-    def setup(self):
-        self.setup_swagger()
-
-    def accept_device(self, devid, aid, **kwargs):
-        return self.put_device_status(devid, aid, 'accepted', **kwargs)
-
-    def reject_device(self, devid, aid, **kwargs):
-        return self.put_device_status(devid, aid, 'rejected', **kwargs)
-
-    def put_device_status(self, devid, aid, status, **kwargs):
-        if 'Authorization' not in kwargs:
-            self.log.debug('appending default authorization header')
-            kwargs['Authorization'] = 'Bearer foo'
-
-        self.log.info("definitions: %s", self.client.swagger_spec.definitions)
-        Status = self.client.get_model('Status')
-        st = Status(status=status)
-        return self.client.devices.put_devices_id_auth_aid_status(id=devid,
-                                                                  aid=aid,
-                                                                  status=st,
-                                                                  **kwargs).result()
-
-    def delete_device(self, devid, headers={}):
-        if 'Authorization' not in headers:
-            self.log.debug('appending default authorization header')
-            headers['Authorization'] = 'Bearer foo'
-        # bravado for some reason doesn't issue DELETEs properly (silent failure)
-        # fall back to 'requests'
-        #   return self.client.devices.delete_devices_id(id=devid, **kwargs)
-        rsp = requests.delete(self.make_api_url('/devices/{}'.format(devid)), headers = headers)
-        return rsp
-
-    def count_devices(self, status=None, **kwargs):
-        if 'Authorization' not in kwargs:
-            self.log.debug('appending default authorization header')
-            kwargs['Authorization'] = 'Bearer foo'
-        count = self.client.devices.get_devices_count(status=status, **kwargs).result()[0]
-        return count.count
-
-    def make_auth(self, tenant_token):
-        return {'Authorization': 'Bearer ' + tenant_token}
-
-
-class SimpleManagementClient(ManagementClient):
-    """Management API client. Cannot be used as pytest base class"""
-    log = logging.getLogger('client.SimpleManagementClient')
-
-    def __init__(self):
-        self.setup_swagger()
-
-    def list_devices(self, **kwargs):
-        if 'Authorization' not in kwargs:
-            self.log.debug('appending default authorization header')
-            kwargs['Authorization'] = 'Bearer foo'
-        return self.client.devices.get_devices(**kwargs).result()[0]
-
-    def get_device(self, **kwargs):
-        if 'Authorization' not in kwargs:
-            self.log.debug('appending default authorization header')
-            kwargs['Authorization'] = 'Bearer foo'
-        return self.client.devices.get_devices_id(**kwargs).result()[0]
-
-    def get_single_device(self, **kwargs):
-        page = 1
-        per_page = 100
-
-        devs = self.list_devices(page=page, per_page=per_page, **kwargs)
-        return devs[0]
-
-class AdmissionClient(SwaggerApiClient):
-    api_url = "http://%s/api/management/v1/admission/" % \
-              pytest.config.getoption("host")
-
-    log = logging.getLogger('client.AdmissionClient')
-
-    spec_option = 'admission_spec'
-    api_type = "admission"
-
-    # default user auth - single user, single tenant
-    uauth = {"Authorization": "Bearer foobarbaz"}
-
-    def setup(self):
-        self.setup_swagger()
-
-    def get_devices(self, page=1, status=None, auth=None):
-        if auth is None:
-            auth=self.uauth
-        r, h = self.client.devices.get_devices(page=page, status=status, _request_options={"headers": auth}).result()
-        for i in parse_header_links(h.headers["link"]):
-            if i["rel"] == "next":
-                page = int(dict(urlparse.parse_qs(urlparse.urlsplit(i["url"]).query))["page"][0])
-                return r + self.get_devices(page=page, auth=auth)
-        else:
-            return r
-
-    def change_status(self, authset_id, status, auth=None):
-        if auth is None:
-            auth = self.uauth
-
-        Status = self.client.get_model('Status')
-        s = Status(status=status)
-
-        self.client.devices.put_devices_id_status(id=authset_id, status=s, _request_options={"headers": auth}).result()
-
-    def preauthorize(self, identity, key, auth=None):
-        """
-            Add a preauthorized device.
-        """
-        if auth is None:
-            auth = self.uauth
-
-        AuthSet = self.client.get_model('AuthSet')
-        authset = AuthSet(
-                device_identity=identity,
-                key=key)
-
-        self.client.devices.post_devices(auth_set=authset, _request_options={"headers": auth}).result()
-
-    def put_device(self, id, devid, key, device_identity, auth=None):
-        if auth is None:
-            auth = self.uauth
-
-        NewDevice = self.client.get_model('NewDevice')
-        new_device = NewDevice(
-                device_id=devid,
-                key=key,
-                device_identity=device_identity)
-        self.client.devices.put_devices_id(id=id, device=new_device, _request_options={"headers": auth}).result()
-
-    def delete_device_mgmt(self, id, auth=None):
-        """
-           Remove device (auth set) via management API.
-        """
-        if auth is None:
-            auth = self.uauth
-
-        print(self.make_api_url('/devices/{}'.format(id)))
-        return requests.delete(self.make_api_url('/devices/{}'.format(id)), headers=auth)
-
-    def make_user_auth(self, user_id, tenant_id=None):
-        """
-            Prepare an almost-valid JWT auth header, suitable for consumption by deviceadm API.
-        """
-        jwt = common.make_id_jwt(user_id, tenant_id)
-        return {"Authorization": "Bearer " + jwt}
-
-
-class SimpleAdmissionClient(AdmissionClient):
-    log = logging.getLogger('client.AdmissionClientSimple')
-
-    def __init__(self):
-        self.setup_swagger()
 
 class CliClient:
     cmd = '/testing/deviceauth'
