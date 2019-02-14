@@ -7,7 +7,7 @@ import pytest
 from common import Device, DevAuthorizer, \
     device_auth_req, make_devices, devices, \
     clean_migrated_db, clean_db, mongo, cli, \
-    management_api_v1, internal_api, device_api, \
+    management_api, internal_api, device_api, \
     tenant_foobar, tenant_foobar_devices, tenant_foobar_clean_migrated_db
 
 from cryptutil import compare_keys
@@ -18,14 +18,14 @@ import orchestrator
 
 class TestDevice:
 
-    def test_device_new(self, device_api, management_api_v1, clean_migrated_db):
+    def test_device_new(self, device_api, management_api, clean_migrated_db):
         d = Device()
         da = DevAuthorizer()
 
         rsp = device_auth_req(device_api.auth_requests_url, da, d)
         assert rsp.status_code == 401
 
-        devs = management_api_v1.list_devices()
+        devs = management_api.list_devices()
 
         assert len(devs)==1
         dev = devs[0]
@@ -36,7 +36,7 @@ class TestDevice:
         assert compare_keys(aset.pubkey, d.public_key)
 
 
-    def test_auth_req_bad_key(self, device_api, management_api_v1, clean_migrated_db):
+    def test_auth_req_bad_key(self, device_api, management_api, clean_migrated_db):
         d = Device()
         da = DevAuthorizer()
 
@@ -47,23 +47,23 @@ class TestDevice:
         assert rsp.status_code == 400
         assert rsp.json()['error'] == 'invalid auth request: cannot decode public key'
 
-    def test_device_accept_nonexistent(self, management_api_v1):
+    def test_device_accept_nonexistent(self, management_api):
         try:
-            management_api_v1.accept_device('funnyid', 'funnyid')
+            management_api.accept_device('funnyid', 'funnyid')
         except bravado.exception.HTTPError as e:
             assert e.response.status_code == 404
 
-    def test_device_reject_nonexistent(self, management_api_v1):
+    def test_device_reject_nonexistent(self, management_api):
         try:
-            management_api_v1.reject_device('funnyid', 'funnyid')
+            management_api.reject_device('funnyid', 'funnyid')
         except bravado.exception.HTTPError as e:
             assert e.response.status_code == 404
 
-    def test_device_accept_reject_cycle(self, devices, device_api, management_api_v1):
+    def test_device_accept_reject_cycle(self, devices, device_api, management_api):
         d, da = devices[0]
         url = device_api.auth_requests_url
 
-        dev = management_api_v1.find_device_by_identity(d.identity)
+        dev = management_api.find_device_by_identity(d.identity)
 
         assert dev
         devid = dev.id
@@ -73,7 +73,7 @@ class TestDevice:
 
         try:
             with orchestrator.run_fake_for_device_id(devid) as server:
-                management_api_v1.accept_device(devid, aid)
+                management_api.accept_device(devid, aid)
         except bravado.exception.HTTPError as e:
             assert e.response.status_code == 204
 
@@ -87,7 +87,7 @@ class TestDevice:
 
         # reject it now
         try:
-            management_api_v1.reject_device(devid, aid)
+            management_api.reject_device(devid, aid)
         except bravado.exception.HTTPError as e:
             assert e.response.status_code == 204
 
@@ -96,58 +96,58 @@ class TestDevice:
         assert rsp.status_code == 401
 
     @pytest.mark.parametrize('devices', ['50'], indirect=True)
-    def test_get_devices(self, management_api_v1, devices):
+    def test_get_devices(self, management_api, devices):
         devcount = 50
-        devs = management_api_v1.list_devices()
+        devs = management_api.list_devices()
 
         # try to get a maximum number of devices
-        devs = management_api_v1.list_devices(page=1, per_page=500)
+        devs = management_api.list_devices(page=1, per_page=500)
         print('got', len(devs), 'devices')
         assert 500 >= len(devs) >= devcount
 
         # we have added at least `devcount` devices, so listing some lower
         # number of device should return exactly that number of entries
         plimit = devcount // 2
-        devs = management_api_v1.list_devices(page=1, per_page=plimit)
+        devs = management_api.list_devices(page=1, per_page=plimit)
         assert len(devs) == plimit
 
-    def test_get_device_limit(self, management_api_v1):
-        limit = management_api_v1.get_device_limit()
+    def test_get_device_limit(self, management_api):
+        limit = management_api.get_device_limit()
         print('limit:', limit)
         assert limit.limit == 0
 
-    def test_get_single_device_none(self, management_api_v1):
+    def test_get_single_device_none(self, management_api):
         try:
-            management_api_v1.get_device(id='some-devid-foo')
+            management_api.get_device(id='some-devid-foo')
         except bravado.exception.HTTPError as e:
             assert e.response.status_code == 404
 
-    def test_get_device_single(self, management_api_v1, devices):
+    def test_get_device_single(self, management_api, devices):
         dev, _ = devices[0]
 
         # try to find our devices in all devices listing
-        ourdev = management_api_v1.find_device_by_identity(dev.identity)
+        ourdev = management_api.find_device_by_identity(dev.identity)
 
-        authdev = management_api_v1.get_device(id=ourdev.id)
+        authdev = management_api.get_device(id=ourdev.id)
         assert authdev == ourdev
 
-    def test_delete_device_nonexistent(self, management_api_v1):
+    def test_delete_device_nonexistent(self, management_api):
         # try delete a nonexistent device
         try:
-            management_api_v1.delete_device('some-devid-foo')
+            management_api.delete_device('some-devid-foo')
         except bravado.exception.HTTPError as e:
             assert e.response.status_code == 404
 
-    def test_delete_device(self, management_api_v1, devices):
+    def test_delete_device(self, management_api, devices):
         # try delete an existing device, verify decommissioning workflow was started
         # setup single device and poke devauth
         dev, _ = devices[0]
-        ourdev = management_api_v1.find_device_by_identity(dev.identity)
+        ourdev = management_api.find_device_by_identity(dev.identity)
         assert ourdev
 
         try:
             with orchestrator.run_fake_for_device_id(ourdev.id) as server:
-                rsp = management_api_v1.delete_device(ourdev.id, {
+                rsp = management_api.delete_device(ourdev.id, {
                     'X-MEN-RequestID':'delete_device',
                     'Authorization': 'Bearer foobar',
                     })
@@ -156,23 +156,23 @@ class TestDevice:
         except bravado.exception.HTTPError as e:
             assert e.response.status_code == 204
 
-        found = management_api_v1.find_device_by_identity(dev.identity)
+        found = management_api.find_device_by_identity(dev.identity)
         assert not found
 
     @pytest.mark.parametrize('devices', ['15'], indirect=True)
-    def test_device_count_simple(self, devices, management_api_v1):
+    def test_device_count_simple(self, devices, management_api):
         """We have 15 devices, each with a single auth set, verify that
         accepting/rejecting affects the count"""
-        count = management_api_v1.count_devices()
+        count = management_api.count_devices()
 
         assert count == 15
 
-        pending_count = management_api_v1.count_devices(status='pending')
+        pending_count = management_api.count_devices(status='pending')
         assert pending_count == 15
 
         # accept device[0] and reject device[1]
         for idx, (d, da) in enumerate(devices[0:2]):
-            dev = management_api_v1.find_device_by_identity(d.identity)
+            dev = management_api.find_device_by_identity(d.identity)
 
             assert dev
             devid = dev.id
@@ -183,23 +183,23 @@ class TestDevice:
             try:
                 with orchestrator.run_fake_for_device_id(devid) as server:
                     if idx == 0:
-                        management_api_v1.accept_device(devid, aid)
+                        management_api.accept_device(devid, aid)
                     elif idx == 1:
-                        management_api_v1.reject_device(devid, aid)
+                        management_api.reject_device(devid, aid)
             except bravado.exception.HTTPError as e:
                 assert e.response.status_code == 204
 
-        TestDevice.verify_device_count(management_api_v1, 'pending', 13)
-        TestDevice.verify_device_count(management_api_v1, 'accepted', 1)
-        TestDevice.verify_device_count(management_api_v1, 'rejected', 1)
+        TestDevice.verify_device_count(management_api, 'pending', 13)
+        TestDevice.verify_device_count(management_api, 'accepted', 1)
+        TestDevice.verify_device_count(management_api, 'rejected', 1)
 
     @staticmethod
-    def verify_device_count(management_api_v1, status, expected_count):
-        count = management_api_v1.count_devices(status=status)
+    def verify_device_count(management_api, status, expected_count):
+        count = management_api.count_devices(status=status)
         assert count == expected_count
 
     @pytest.mark.parametrize('devices', ['5'], indirect=True)
-    def test_device_count_multiple_auth_sets(self, devices, management_api_v1, device_api):
+    def test_device_count_multiple_auth_sets(self, devices, management_api, device_api):
         """"Verify that auth sets are properly counted. Take a device, make sure it has
         2 auth sets, switch each auth sets between accepted/rejected/pending
         states
@@ -212,87 +212,44 @@ class TestDevice:
         device_auth_req(device_api.auth_requests_url, dauth, dev)
 
         # should have 2 auth sets now
-        found_dev = management_api_v1.find_device_by_identity(dev.identity)
+        found_dev = management_api.find_device_by_identity(dev.identity)
         assert len(found_dev.auth_sets) == 2
 
         first_aid, second_aid = found_dev.auth_sets[0].id, found_dev.auth_sets[1].id
 
         # device [0] has 2 auth sets, but still counts as 1 device
-        TestDevice.verify_device_count(management_api_v1, 'pending', 5)
+        TestDevice.verify_device_count(management_api, 'pending', 5)
 
         devid = found_dev.id
         with orchestrator.run_fake_for_device_id(orchestrator.ANY_DEVICE) as server:
             # accept first auth set
-            management_api_v1.accept_device(devid, first_aid)
+            management_api.accept_device(devid, first_aid)
 
-            TestDevice.verify_device_count(management_api_v1, 'pending', 4)
-            TestDevice.verify_device_count(management_api_v1, 'accepted', 1)
-            TestDevice.verify_device_count(management_api_v1, 'rejected', 0)
+            TestDevice.verify_device_count(management_api, 'pending', 4)
+            TestDevice.verify_device_count(management_api, 'accepted', 1)
+            TestDevice.verify_device_count(management_api, 'rejected', 0)
 
             # reject the other
-            management_api_v1.reject_device(devid, second_aid)
-            TestDevice.verify_device_count(management_api_v1, 'pending', 4)
-            TestDevice.verify_device_count(management_api_v1, 'accepted', 1)
-            TestDevice.verify_device_count(management_api_v1, 'rejected', 0)
+            management_api.reject_device(devid, second_aid)
+            TestDevice.verify_device_count(management_api, 'pending', 4)
+            TestDevice.verify_device_count(management_api, 'accepted', 1)
+            TestDevice.verify_device_count(management_api, 'rejected', 0)
 
             # reject both
-            management_api_v1.reject_device(devid, first_aid)
-            TestDevice.verify_device_count(management_api_v1, 'pending', 4)
-            TestDevice.verify_device_count(management_api_v1, 'accepted', 0)
-            TestDevice.verify_device_count(management_api_v1, 'rejected', 1)
+            management_api.reject_device(devid, first_aid)
+            TestDevice.verify_device_count(management_api, 'pending', 4)
+            TestDevice.verify_device_count(management_api, 'accepted', 0)
+            TestDevice.verify_device_count(management_api, 'rejected', 1)
 
             # switch the first back to pending, 2nd remains rejected
-            management_api_v1.put_device_status(devid, first_aid, 'pending')
-            TestDevice.verify_device_count(management_api_v1, 'pending', 5)
-            TestDevice.verify_device_count(management_api_v1, 'accepted', 0)
-            TestDevice.verify_device_count(management_api_v1, 'rejected', 0)
-
-    def test_id_data_formatting(self, device_api, management_api_v1, clean_migrated_db):
-        reference_id_data = [
-                '{"attribute_foo":"foo"}',
-                '{"attribute_bar":2, "attribute_foo":1}',
-                '{"attribute_foo":"foo","mac": "00:00:00:01","sn": "0001"}',
-        ]
-
-        reformatted_id_data = [
-                '{"attribute_foo": "foo"}',
-                ' { "attribute_foo": "foo" }',
-                '{"attribute_foo":1, "attribute_bar":2}',
-                '{ "attribute_foo":1, "attribute_bar":2}',
-                '{"sn": "0001","mac": "00:00:00:01","attribute_foo":"foo"}',
-        ]
-
-        # submit first auth req with 'reference data', second with 'reformatted' data
-        # must result in only 3 devices
-        for reference in reference_id_data:
-            dev = Device(reference)
-            da = DevAuthorizer()
-            rsp = device_auth_req(device_api.auth_requests_url, da, dev)
-            assert rsp.status_code == 401
-
-        devs = management_api_v1.list_devices()
-        assert len(devs) == 3
-
-        for reformatted in reformatted_id_data:
-            dev = Device(reformatted)
-            da = DevAuthorizer()
-            rsp = device_auth_req(device_api.auth_requests_url, da, dev)
-            assert rsp.status_code == 401
-
-        devs = management_api_v1.list_devices()
-        assert len(devs) == 3
-
-        # verify we have the correct id data
-        json_reference_id_data = [json.loads(i) for i in reference_id_data]
-        for d in devs:
-            api_id_data=json.loads(d.id_data)
-            found_in_reference = [x for x in json_reference_id_data if x == api_id_data]
-            assert len(found_in_reference) == 1
-
+            management_api.put_device_status(devid, first_aid, 'pending')
+            TestDevice.verify_device_count(management_api, 'pending', 5)
+            TestDevice.verify_device_count(management_api, 'accepted', 0)
+            TestDevice.verify_device_count(management_api, 'rejected', 0)
 
 class TestDeviceMultiTenant:
     @pytest.mark.parametrize('tenant_foobar_devices', ['5'], indirect=True)
-    def test_device_limit_applied(self, management_api_v1, internal_api,
+    def test_device_limit_applied(self, management_api, internal_api,
                                   tenant_foobar_devices, tenant_foobar):
         """Verify that max accepted devices limit is indeed applied. Since device
         limits can only be set on per-tenant basis, use fixtures that setup
@@ -306,10 +263,10 @@ class TestDeviceMultiTenant:
             with orchestrator.run_fake_for_device_id(orchestrator.ANY_DEVICE):
                 for dev, dev_auth in tenant_foobar_devices:
                     auth = 'Bearer ' + tenant_foobar
-                    fdev = management_api_v1.find_device_by_identity(dev.identity,
+                    fdev = management_api.find_device_by_identity(dev.identity,
                                                                   Authorization=auth)
                     aid = fdev.auth_sets[0].id
-                    management_api_v1.accept_device(fdev.id, aid,
+                    management_api.accept_device(fdev.id, aid,
                                                  Authorization=auth)
                     accepted += 1
         except bravado.exception.HTTPError as e:
@@ -324,114 +281,63 @@ def get_fake_orchestrator_addr():
 
 class TestDeleteAuthsetBase:
 
-    def _test_delete_authset_OK(self, management_api_v1, devices, **kwargs):
+    def _test_delete_authset_OK(self, management_api, devices, **kwargs):
         d, da = devices[0]
 
-        dev = management_api_v1.find_device_by_identity(d.identity, **kwargs)
+        dev = management_api.find_device_by_identity(d.identity, **kwargs)
         assert dev
 
         print('found matching device with ID:', dev.id)
         aid = dev.auth_sets[0].id
 
-        rsp = management_api_v1.delete_authset(dev.id, aid, **kwargs)
+        rsp = management_api.delete_authset(dev.id, aid, **kwargs)
         assert rsp.status_code == 204
 
-        found = management_api_v1.get_device(id=dev.id, **kwargs)
+        found = management_api.get_device(id=dev.id, **kwargs)
         assert found
 
         assert len(found.auth_sets) == 0
 
-    def _test_delete_authset_preauth_OK(self, management_api_v1, devices, **kwargs):
-        # preauthorize a device
-        aid = 'aid-preauth'
-        device_id = 'id-preauth'
-        iddata = json.dumps({'mac': 'mac-preauth'})
-        key = '''-----BEGIN PUBLIC KEY-----
-MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAzogVU7RGDilbsoUt/DdH
-VJvcepl0A5+xzGQ50cq1VE/Dyyy8Zp0jzRXCnnu9nu395mAFSZGotZVr+sWEpO3c
-yC3VmXdBZmXmQdZqbdD/GuixJOYfqta2ytbIUPRXFN7/I7sgzxnXWBYXYmObYvdP
-okP0mQanY+WKxp7Q16pt1RoqoAd0kmV39g13rFl35muSHbSBoAW3GBF3gO+mF5Ty
-1ddp/XcgLOsmvNNjY+2HOD5F/RX0fs07mWnbD7x+xz7KEKjF+H7ZpkqCwmwCXaf0
-iyYyh1852rti3Afw4mDxuVSD7sd9ggvYMc0QHIpQNkD4YWOhNiE1AB0zH57VbUYG
-UwIDAQAB
------END PUBLIC KEY-----
-'''
-
-        req = management_api_v1.make_preauth_req(aid, device_id, iddata, key)
-        _, rsp = management_api_v1.preauthorize(req, **kwargs)
-
-        assert rsp.status_code == 201
-
-        # check device created
-        dev = management_api_v1.get_device(id=device_id, **kwargs)
-        assert dev
-        assert len(dev.auth_sets) == 1
-        assert dev.auth_sets[0].status == 'preauthorized'
-        assert dev.auth_sets[0].id == aid
-
-        # delete auth set, check device deleted
-        rsp = management_api_v1.delete_authset(dev.id, aid, **kwargs)
-        assert rsp.status_code == 204
-
-        found = None
-        try:
-            found = management_api_v1.get_device(id=device_id, **kwargs)
-        except bravado.exception.HTTPError as e:
-            assert e.response.status_code == 404
-
-        assert not found
-
-        # check all other devices intact
-        after_devs = management_api_v1.list_devices(**kwargs)
-        assert len(after_devs) == len(devices)
-
-    def _test_delete_authset_error_device_not_found(self, management_api_v1, devices, **kwargs):
-        rsp = management_api_v1.delete_authset("foo", "bar")
+    def _test_delete_authset_error_device_not_found(self, management_api, devices, **kwargs):
+        rsp = management_api.delete_authset("foo", "bar")
         assert rsp.status_code == 404
 
-    def _test_delete_authset_error_authset_not_found(self, management_api_v1, devices, **kwargs):
+    def _test_delete_authset_error_authset_not_found(self, management_api, devices, **kwargs):
         d, da = devices[0]
 
-        dev = management_api_v1.find_device_by_identity(d.identity, **kwargs)
+        dev = management_api.find_device_by_identity(d.identity, **kwargs)
 
         assert dev
         devid = dev.id
 
         print('found matching device with ID:', dev.id)
 
-        rsp = management_api_v1.delete_authset(devid, "foobar")
+        rsp = management_api.delete_authset(devid, "foobar")
         assert rsp.status_code == 404
 
 
 class TestDeleteAuthset(TestDeleteAuthsetBase):
 
-    def test_delete_authset_OK(self, management_api_v1, devices):
-        self._test_delete_authset_OK(management_api_v1, devices)
+    def test_delete_authset_OK(self, management_api, devices):
+        self._test_delete_authset_OK(management_api, devices)
 
-    def test_delete_authset_preauth_OK(self, management_api_v1, devices):
-        self._test_delete_authset_preauth_OK(management_api_v1, devices)
+    def test_delete_authset_error_device_not_found(self, management_api, devices):
+        self._test_delete_authset_error_device_not_found(management_api, devices)
 
-    def test_delete_authset_error_device_not_found(self, management_api_v1, devices):
-        self._test_delete_authset_error_device_not_found(management_api_v1, devices)
-
-    def test_delete_authset_error_authset_not_found(self, management_api_v1, devices):
-        self._test_delete_authset_error_authset_not_found(management_api_v1, devices)
+    def test_delete_authset_error_authset_not_found(self, management_api, devices):
+        self._test_delete_authset_error_authset_not_found(management_api, devices)
 
 
 class TestDeleteAuthsetMultiTenant(TestDeleteAuthsetBase):
 
-    def test_delete_authset_OK(self, management_api_v1, tenant_foobar_devices, tenant_foobar):
+    def test_delete_authset_OK(self, management_api, tenant_foobar_devices, tenant_foobar):
         auth = 'Bearer ' + tenant_foobar
-        self._test_delete_authset_OK(management_api_v1, tenant_foobar_devices, Authorization=auth)
+        self._test_delete_authset_OK(management_api, tenant_foobar_devices, Authorization=auth)
 
-    def test_delete_authset_preauth_OK(self, management_api_v1, tenant_foobar_devices, tenant_foobar):
+    def test_delete_authset_error_device_not_found(self, management_api, tenant_foobar_devices, tenant_foobar):
         auth = 'Bearer ' + tenant_foobar
-        self._test_delete_authset_preauth_OK(management_api_v1, tenant_foobar_devices, Authorization=auth)
+        self._test_delete_authset_error_device_not_found(management_api, tenant_foobar_devices, Authorization=auth)
 
-    def test_delete_authset_error_device_not_found(self, management_api_v1, tenant_foobar_devices, tenant_foobar):
+    def test_delete_authset_error_authset_not_found(self, management_api, tenant_foobar_devices, tenant_foobar):
         auth = 'Bearer ' + tenant_foobar
-        self._test_delete_authset_error_device_not_found(management_api_v1, tenant_foobar_devices, Authorization=auth)
-
-    def test_delete_authset_error_authset_not_found(self, management_api_v1, tenant_foobar_devices, tenant_foobar):
-        auth = 'Bearer ' + tenant_foobar
-        self._test_delete_authset_error_authset_not_found(management_api_v1, tenant_foobar_devices, Authorization=auth)
+        self._test_delete_authset_error_authset_not_found(management_api, tenant_foobar_devices, Authorization=auth)

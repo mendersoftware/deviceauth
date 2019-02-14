@@ -1,4 +1,4 @@
-from client import AdmissionClient, ManagementClient
+from client import ManagementClient
 import bravado
 import json
 import pytest

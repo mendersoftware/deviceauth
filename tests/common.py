@@ -29,8 +29,8 @@ from Crypto.PublicKey import RSA
 from Crypto.Signature import PKCS1_v1_5
 from Crypto.Hash import SHA256
 
-from client import SimpleInternalClient, SimpleManagementV1Client, \
-    SimpleManagementClient, BaseDevicesApiClient, SimpleAdmissionClient
+from client import SimpleInternalClient, SimpleManagementClient, \
+    BaseDevicesApiClient
 
 import mockserver
 import os
@@ -168,10 +168,6 @@ def tenant_foobar_clean_migrated_db(clean_db, cli):
     yield clean_db
 
 @pytest.yield_fixture(scope='session')
-def management_api_v1():
-    yield SimpleManagementV1Client()
-
-@pytest.yield_fixture(scope='session')
 def management_api():
     yield SimpleManagementClient()
 
@@ -183,12 +179,6 @@ def internal_api():
 @pytest.yield_fixture(scope='session')
 def device_api():
     yield BaseDevicesApiClient()
-
-
-@pytest.yield_fixture(scope='session')
-def admission_api():
-    yield SimpleAdmissionClient()
-
 
 def make_fake_tenant_token(tenant):
     """make_fake_tenant_token will generate a JWT-like tenant token which looks
@@ -245,7 +235,7 @@ def devices(device_api, clean_migrated_db, request):
     yield make_devices(device_api, devcount)
 
 @pytest.yield_fixture(scope='function')
-def tenant_foobar_devices(device_api, management_api_v1, tenant_foobar, request):
+def tenant_foobar_devices(device_api, management_api, tenant_foobar, request):
     """Make unauthorized devices owned by tenant with ID 'foobar'. The fixture can
     be parametrized a number of devices to make. Yields a list of tuples:
     (instance of Device, instance of DevAuthorizer)
