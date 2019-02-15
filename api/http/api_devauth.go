@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -21,7 +21,6 @@ import (
 	"github.com/mendersoftware/go-lib-micro/identity"
 
 	"github.com/ant0ine/go-json-rest/rest"
-	"github.com/globalsign/mgo/bson"
 	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/mendersoftware/go-lib-micro/rest_utils"
 	"github.com/pkg/errors"
@@ -36,14 +35,6 @@ import (
 const (
 	uriAuthReqs = "/api/devices/v1/authentication/auth_requests"
 
-	uriDevices       = "/api/management/v1/devauth/devices"
-	uriDevicesCount  = "/api/management/v1/devauth/devices/count"
-	uriDevice        = "/api/management/v1/devauth/devices/:id"
-	uriToken         = "/api/management/v1/devauth/tokens/:id"
-	uriDeviceAuthSet = "/api/management/v1/devauth/devices/:id/auth/:aid"
-	uriDeviceStatus  = "/api/management/v1/devauth/devices/:id/auth/:aid/status"
-	uriLimit         = "/api/management/v1/devauth/limits/:name"
-
 	// internal API
 	uriTokenVerify        = "/api/internal/v1/devauth/tokens/verify"
 	uriTenantLimit        = "/api/internal/v1/devauth/tenant/:id/limits/:name"
@@ -51,11 +42,6 @@ const (
 	uriTenants            = "/api/internal/v1/devauth/tenants"
 	uriTenantDeviceStatus = "/api/internal/v1/devauth/tenants/:tid/devices/:did/status"
 	uriTenantDevices      = "/api/internal/v1/devauth/tenants/:tid/devices"
-
-	// migrated devadm api
-	uriDevadmAuthSetStatus = "/api/management/v1/admission/devices/:aid/status"
-	uriDevadmDevices       = "/api/management/v1/admission/devices"
-	uriDevadmDevice        = "/api/management/v1/admission/devices/:aid"
 
 	// management API v2
 	v2uriDevices             = "/api/management/v2/devauth/devices"
@@ -95,29 +81,14 @@ func NewDevAuthApiHandlers(devAuth devauth.App, db store.DataStore) ApiHandler {
 func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
 	routes := []*rest.Route{
 		rest.Post(uriAuthReqs, d.SubmitAuthRequestHandler),
-		rest.Get(uriDevices, d.GetDevicesHandler),
-		rest.Post(uriDevices, d.PreauthDeviceHandler),
-		rest.Get(uriDevicesCount, d.GetDevicesCountV1Handler),
-		rest.Get(uriDevice, d.GetDeviceHandler),
-		rest.Delete(uriDevice, d.DeleteDeviceV1Handler),
-		rest.Delete(uriDeviceAuthSet, d.DeleteDeviceAuthSetV1Handler),
-		rest.Delete(uriToken, d.DeleteTokenV1Handler),
 		rest.Post(uriTokenVerify, d.VerifyTokenHandler),
 		rest.Delete(uriTokens, d.DeleteTokensHandler),
-		rest.Put(uriDeviceStatus, d.UpdateDeviceStatusV1Handler),
 
 		rest.Put(uriTenantLimit, d.PutTenantLimitHandler),
 		rest.Get(uriTenantLimit, d.GetTenantLimitHandler),
-		rest.Get(uriLimit, d.GetLimitV1Handler),
 
 		rest.Post(uriTenants, d.ProvisionTenantHandler),
 		rest.Get(uriTenantDeviceStatus, d.GetTenantDeviceStatus),
-		rest.Put(uriDevadmAuthSetStatus, d.DevAdmUpdateAuthSetStatusHandler),
-		rest.Get(uriDevadmAuthSetStatus, d.DevAdmGetAuthSetStatusHandler),
-		rest.Get(uriDevadmDevices, d.DevAdmGetDevicesHandler),
-		rest.Post(uriDevadmDevices, d.PostDevicesHandler),
-		rest.Get(uriDevadmDevice, d.DevAdmGetDeviceHandler),
-		rest.Delete(uriDevadmDevice, d.DevAdmDeleteDeviceAuthSetHandler),
 		rest.Get(uriTenantDevices, d.GetTenantDevicesHandler),
 
 		// API v2
@@ -219,30 +190,6 @@ func (d *DevAuthApiHandlers) SubmitAuthRequestHandler(w rest.ResponseWriter, r *
 	}
 }
 
-func (d *DevAuthApiHandlers) PreauthDeviceHandler(w rest.ResponseWriter, r *rest.Request) {
-	ctx := r.Context()
-
-	l := log.FromContext(ctx)
-	l.Warn("This endpoint has been deprecated and will be removed in a future version.")
-
-	req, err := model.ParsePreAuthReq(r.Body)
-	if err != nil {
-		err = errors.Wrap(err, "failed to decode preauth request")
-		rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
-		return
-	}
-
-	err = d.devAuth.PreauthorizeDevice(ctx, req)
-	switch err {
-	case nil:
-		w.WriteHeader(http.StatusCreated)
-	case devauth.ErrDeviceExists:
-		rest_utils.RestErrWithLog(w, r, l, err, http.StatusConflict)
-	default:
-		rest_utils.RestErrWithLogInternal(w, r, l, err)
-	}
-}
-
 func (d *DevAuthApiHandlers) PostDevicesV2Handler(w rest.ResponseWriter, r *rest.Request) {
 	ctx := r.Context()
 
@@ -270,42 +217,6 @@ func (d *DevAuthApiHandlers) PostDevicesV2Handler(w rest.ResponseWriter, r *rest
 	default:
 		rest_utils.RestErrWithLogInternal(w, r, l, err)
 	}
-}
-
-func (d *DevAuthApiHandlers) GetDevicesHandler(w rest.ResponseWriter, r *rest.Request) {
-
-	ctx := r.Context()
-
-	l := log.FromContext(ctx)
-	l.Warn("This endpoint has been deprecated and will be removed in a future version.")
-
-	page, perPage, err := rest_utils.ParsePagination(r)
-	if err != nil {
-		rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
-		return
-	}
-
-	skip := (page - 1) * perPage
-	limit := perPage + 1
-	devs, err := d.devAuth.GetDevices(ctx, uint(skip), uint(limit), store.DeviceFilter{})
-	if err != nil {
-		rest_utils.RestErrWithLogInternal(w, r, l, err)
-		return
-	}
-
-	len := len(devs)
-	hasNext := false
-	if uint64(len) > perPage {
-		hasNext = true
-		len = int(perPage)
-	}
-
-	links := rest_utils.MakePageLinkHdrs(r, page, perPage, hasNext)
-
-	for _, l := range links {
-		w.Header().Add("Link", l)
-	}
-	w.WriteJson(devs[:len])
 }
 
 func (d *DevAuthApiHandlers) GetDevicesV2Handler(w rest.ResponseWriter, r *rest.Request) {
@@ -357,14 +268,6 @@ func (d *DevAuthApiHandlers) GetDevicesV2Handler(w rest.ResponseWriter, r *rest.
 	w.WriteJson(outDevs)
 }
 
-func (d *DevAuthApiHandlers) GetDevicesCountV1Handler(w rest.ResponseWriter, r *rest.Request) {
-	ctx := r.Context()
-	l := log.FromContext(ctx)
-	l.Warn("This endpoint has been deprecated and will be removed in a future version.")
-
-	d.GetDevicesCountHandler(w, r)
-}
-
 func (d *DevAuthApiHandlers) GetDevicesCountHandler(w rest.ResponseWriter, r *rest.Request) {
 	ctx := r.Context()
 	l := log.FromContext(ctx)
@@ -392,26 +295,6 @@ func (d *DevAuthApiHandlers) GetDevicesCountHandler(w rest.ResponseWriter, r *re
 	w.WriteJson(model.Count{Count: count})
 }
 
-func (d *DevAuthApiHandlers) GetDeviceHandler(w rest.ResponseWriter, r *rest.Request) {
-
-	ctx := r.Context()
-
-	l := log.FromContext(ctx)
-	l.Warn("This endpoint has been deprecated and will be removed in a future version.")
-
-	devId := r.PathParam("id")
-
-	dev, err := d.devAuth.GetDevice(ctx, devId)
-	switch {
-	case err == store.ErrDevNotFound:
-		rest_utils.RestErrWithLog(w, r, l, err, http.StatusNotFound)
-	case dev != nil:
-		w.WriteJson(dev)
-	default:
-		rest_utils.RestErrWithLogInternal(w, r, l, err)
-	}
-}
-
 func (d *DevAuthApiHandlers) GetDeviceV2Handler(w rest.ResponseWriter, r *rest.Request) {
 
 	ctx := r.Context()
@@ -430,14 +313,6 @@ func (d *DevAuthApiHandlers) GetDeviceV2Handler(w rest.ResponseWriter, r *rest.R
 	default:
 		rest_utils.RestErrWithLogInternal(w, r, l, err)
 	}
-}
-
-func (d *DevAuthApiHandlers) DeleteDeviceV1Handler(w rest.ResponseWriter, r *rest.Request) {
-	ctx := r.Context()
-	l := log.FromContext(ctx)
-	l.Warn("This endpoint has been deprecated and will be removed in a future version.")
-
-	d.DeleteDeviceHandler(w, r)
 }
 
 func (d *DevAuthApiHandlers) DeleteDeviceHandler(w rest.ResponseWriter, r *rest.Request) {
@@ -460,14 +335,6 @@ func (d *DevAuthApiHandlers) DeleteDeviceHandler(w rest.ResponseWriter, r *rest.
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (d *DevAuthApiHandlers) DeleteDeviceAuthSetV1Handler(w rest.ResponseWriter, r *rest.Request) {
-	ctx := r.Context()
-	l := log.FromContext(ctx)
-	l.Warn("This endpoint has been deprecated and will be removed in a future version.")
-
-	d.DeleteDeviceAuthSetHandler(w, r)
-}
-
 func (d *DevAuthApiHandlers) DeleteDeviceAuthSetHandler(w rest.ResponseWriter, r *rest.Request) {
 
 	ctx := r.Context()
@@ -487,48 +354,6 @@ func (d *DevAuthApiHandlers) DeleteDeviceAuthSetHandler(w rest.ResponseWriter, r
 	}
 
 	w.WriteHeader(http.StatusNoContent)
-}
-
-func (d *DevAuthApiHandlers) DevAdmDeleteDeviceAuthSetHandler(w rest.ResponseWriter, r *rest.Request) {
-	ctx := r.Context()
-
-	l := log.FromContext(ctx)
-
-	l.Warn("This endpoint has been deprecated and will be removed in a future version.")
-
-	authId := r.PathParam("aid")
-
-	aset, err := d.db.GetAuthSetById(ctx, authId)
-	switch err {
-	case nil:
-		break
-	case store.ErrDevNotFound:
-		w.WriteHeader(http.StatusNoContent)
-		return
-	default:
-		rest_utils.RestErrWithLogInternal(w, r, l, err)
-		return
-	}
-
-	err = d.devAuth.DeleteAuthSet(ctx, aset.DeviceId, authId)
-	switch err {
-	case nil:
-		w.WriteHeader(http.StatusNoContent)
-	case store.ErrDevNotFound:
-		w.WriteHeader(http.StatusNoContent)
-		return
-	default:
-		rest_utils.RestErrWithLogInternal(w, r, l, err)
-		return
-	}
-}
-
-func (d *DevAuthApiHandlers) DeleteTokenV1Handler(w rest.ResponseWriter, r *rest.Request) {
-	ctx := r.Context()
-	l := log.FromContext(ctx)
-	l.Warn("This endpoint has been deprecated and will be removed in a future version.")
-
-	d.DeleteTokenHandler(w, r)
 }
 
 func (d *DevAuthApiHandlers) DeleteTokenHandler(w rest.ResponseWriter, r *rest.Request) {
@@ -579,14 +404,6 @@ func (d *DevAuthApiHandlers) VerifyTokenHandler(w rest.ResponseWriter, r *rest.R
 	}
 
 	w.WriteHeader(code)
-}
-
-func (d *DevAuthApiHandlers) UpdateDeviceStatusV1Handler(w rest.ResponseWriter, r *rest.Request) {
-	ctx := r.Context()
-	l := log.FromContext(ctx)
-	l.Warn("This endpoint has been deprecated and will be removed in a future version.")
-
-	d.UpdateDeviceStatusHandler(w, r)
 }
 
 func (d *DevAuthApiHandlers) UpdateDeviceStatusHandler(w rest.ResponseWriter, r *rest.Request) {
@@ -699,14 +516,6 @@ func (d *DevAuthApiHandlers) GetTenantLimitHandler(w rest.ResponseWriter, r *res
 	w.WriteJson(LimitValue{lim.Value})
 }
 
-func (d *DevAuthApiHandlers) GetLimitV1Handler(w rest.ResponseWriter, r *rest.Request) {
-	ctx := r.Context()
-	l := log.FromContext(ctx)
-	l.Warn("This endpoint has been deprecated and will be removed in a future version.")
-
-	d.GetLimitHandler(w, r)
-}
-
 func (d *DevAuthApiHandlers) GetLimitHandler(w rest.ResponseWriter, r *rest.Request) {
 	ctx := r.Context()
 
@@ -752,91 +561,6 @@ func (d *DevAuthApiHandlers) DeleteTokensHandler(w rest.ResponseWriter, r *rest.
 	}
 }
 
-func (d *DevAuthApiHandlers) DevAdmUpdateAuthSetStatusHandler(w rest.ResponseWriter, r *rest.Request) {
-	ctx := r.Context()
-	l := log.FromContext(ctx)
-
-	l.Warn("This endpoint has been deprecated and will be removed in a future version.")
-
-	authid := r.PathParam("aid")
-
-	var status model.Status
-	err := r.DecodeJsonPayload(&status)
-	if err != nil {
-		rest_utils.RestErrWithLog(w, r, l,
-			errors.Wrap(err, "failed to decode status data"),
-			http.StatusBadRequest)
-		return
-	}
-
-	// validate status
-	if status.Status != model.DevStatusAccepted &&
-		status.Status != model.DevStatusRejected {
-		rest_utils.RestErrWithLog(w, r, l,
-			errors.New("incorrect device status"),
-			http.StatusBadRequest)
-		return
-	}
-
-	// get device id with authset directly from store
-	aset, err := d.db.GetAuthSetById(ctx, authid)
-	switch err {
-	case nil:
-		break
-	case store.ErrDevNotFound:
-		rest_utils.RestErrWithLog(w, r, l, store.ErrAuthSetNotFound, http.StatusNotFound)
-		return
-	default:
-		rest_utils.RestErrWithLogInternal(w, r, l,
-			errors.Wrapf(err,
-				"failed to fetch auth set %s",
-				authid))
-		return
-	}
-
-	if status.Status == model.DevStatusAccepted {
-		err = d.devAuth.AcceptDeviceAuth(ctx, aset.DeviceId, authid)
-	} else if status.Status == model.DevStatusRejected {
-		err = d.devAuth.RejectDeviceAuth(ctx, aset.DeviceId, authid)
-	}
-
-	switch err {
-	case nil:
-		w.WriteJson(&status)
-	case store.ErrDevNotFound:
-		rest_utils.RestErrWithLog(w, r, l, store.ErrAuthSetNotFound, http.StatusNotFound)
-	case devauth.ErrMaxDeviceCountReached:
-		rest_utils.RestErrWithLog(w, r, l, err, http.StatusUnprocessableEntity)
-	default:
-		rest_utils.RestErrWithLogInternal(w, r, l,
-			errors.Wrap(err,
-				"failed to change auth set status"))
-	}
-}
-
-func (d *DevAuthApiHandlers) DevAdmGetAuthSetStatusHandler(w rest.ResponseWriter, r *rest.Request) {
-	ctx := r.Context()
-	l := log.FromContext(ctx)
-
-	authid := r.PathParam("aid")
-
-	l.Warn("This endpoint has been deprecated and will be removed in a future version.")
-
-	// get authset directly from store
-	aset, err := d.db.GetAuthSetById(ctx, authid)
-	switch err {
-	case nil:
-		w.WriteJson(&model.Status{Status: aset.Status})
-	case store.ErrDevNotFound:
-		rest_utils.RestErrWithLog(w, r, l, store.ErrAuthSetNotFound, http.StatusNotFound)
-	default:
-		rest_utils.RestErrWithLogInternal(w, r, l,
-			errors.Wrapf(err,
-				"failed to fetch auth set %s",
-				authid))
-	}
-}
-
 func (d *DevAuthApiHandlers) GetAuthSetStatusHandler(w rest.ResponseWriter, r *rest.Request) {
 	ctx := r.Context()
 	l := log.FromContext(ctx)
@@ -856,99 +580,6 @@ func (d *DevAuthApiHandlers) GetAuthSetStatusHandler(w rest.ResponseWriter, r *r
 			errors.Wrapf(err,
 				"failed to fetch auth set %s for device %s",
 				authid, devid))
-	}
-}
-
-func (d *DevAuthApiHandlers) DevAdmGetDevicesHandler(w rest.ResponseWriter, r *rest.Request) {
-	ctx := r.Context()
-	l := log.FromContext(ctx)
-
-	l.Warn("This endpoint has been deprecated and will be removed in a future version.")
-
-	page, perPage, err := rest_utils.ParsePagination(r)
-	if err != nil {
-		rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
-		return
-	}
-
-	status, err := rest_utils.ParseQueryParmStr(r, "status", false, DevStatuses)
-	if err != nil {
-		rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
-		return
-	}
-
-	deviceId, err := rest_utils.ParseQueryParmStr(r, "device_id", false, nil)
-	if err != nil {
-		rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
-		return
-	}
-
-	//get one extra device to see if there's a 'next' page
-	devs, err := d.db.GetAuthSets(ctx,
-		int((page-1)*perPage), int(perPage+1),
-		store.AuthSetFilter{
-			Status:   status,
-			DeviceID: deviceId,
-		})
-
-	if err != nil {
-		rest_utils.RestErrWithLogInternal(w, r, l, errors.Wrap(err, "failed to list devices"))
-		return
-	}
-
-	len := len(devs)
-	hasNext := false
-	if uint64(len) > perPage {
-		hasNext = true
-		len = int(perPage)
-	}
-
-	links := rest_utils.MakePageLinkHdrs(r, page, perPage, hasNext)
-
-	for _, l := range links {
-		w.Header().Add("Link", l)
-	}
-
-	w.WriteJson(devs[:len])
-}
-
-func (d *DevAuthApiHandlers) PostDevicesHandler(w rest.ResponseWriter, r *rest.Request) {
-	ctx := r.Context()
-	l := log.FromContext(ctx)
-
-	l.Warn("This endpoint has been deprecated and will be removed in a future version.")
-
-	// parse authenticate set
-	defer r.Body.Close()
-	authSet, err := model.ParseDevAdmAuthSetReq(r.Body)
-	if err != nil {
-		rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
-		return
-	}
-	// translate to devauth object
-	// id data is already sorted/normalized in ParseDevAdmAuthReqSet
-	req := &model.PreAuthReq{
-		DeviceId:  bson.NewObjectId().Hex(),
-		AuthSetId: bson.NewObjectId().Hex(),
-		IdData:    authSet.DeviceId,
-		PubKey:    authSet.Key,
-	}
-
-	err = d.devAuth.PreauthorizeDevice(ctx, req)
-
-	if err != nil && devauth.IsErrDevAuthBadRequest(err) {
-		rest_utils.RestErrWithWarningMsg(w, r, l, err,
-			http.StatusBadRequest, errors.Cause(err).Error())
-		return
-	}
-
-	switch err {
-	case nil:
-		w.WriteHeader(http.StatusCreated)
-	case devauth.ErrDeviceExists:
-		rest_utils.RestErrWithLog(w, r, l, err, http.StatusConflict)
-	default:
-		rest_utils.RestErrWithLogInternal(w, r, l, err)
 	}
 }
 
@@ -1016,35 +647,6 @@ func (d *DevAuthApiHandlers) GetTenantDevicesHandler(w rest.ResponseWriter, r *r
 	r.Request = r.WithContext(ctx)
 
 	d.GetDevicesV2Handler(w, r)
-}
-
-func (d *DevAuthApiHandlers) DevAdmGetDeviceHandler(w rest.ResponseWriter, r *rest.Request) {
-	ctx := r.Context()
-	l := log.FromContext(ctx)
-
-	l.Warn("This endpoint has been deprecated and will be removed in a future version.")
-
-	authid := r.PathParam("aid")
-
-	auth, err := d.db.GetAuthSetById(ctx, authid)
-	switch err {
-	case nil:
-		break
-	case store.ErrDevNotFound:
-		rest_utils.RestErrWithLog(w, r, l, store.ErrAuthSetNotFound, http.StatusNotFound)
-		return
-	default:
-		rest_utils.RestErrWithLogInternal(w, r, l, err)
-		return
-	}
-
-	devadm_auth, err := model.NewDevAdmAuthSet(*auth)
-	if err != nil {
-		rest_utils.RestErrWithLogInternal(w, r, l, err)
-		return
-	}
-
-	w.WriteJson(devadm_auth)
 }
 
 // Validate status.
