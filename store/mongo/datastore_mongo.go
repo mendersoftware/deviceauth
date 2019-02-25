@@ -146,7 +146,7 @@ func (db *DataStoreMongo) GetDevices(ctx context.Context, skip, limit uint, filt
 
 	res := []model.Device{}
 
-	err := c.Find(filter).Sort("_id").Skip(int(skip)).Limit(int(limit)).All(&res)
+	err := c.Find(filter).Sort("-created_ts").Skip(int(skip)).Limit(int(limit)).All(&res)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to fetch device list")
 	}
