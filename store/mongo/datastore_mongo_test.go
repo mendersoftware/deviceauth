@@ -860,12 +860,14 @@ func TestStoreGetDevices(t *testing.T) {
 
 	devs_list := make([]model.Device, 0, devCount)
 
+	now := time.Now()
 	// populate DB with a set of devices
 	for i := 0; i < devCount; i++ {
 		dev := model.Device{
 			IdData: fmt.Sprintf("foo-%04d", i),
 			PubKey: fmt.Sprintf("pubkey-%04d", i),
 			Status: randDevStatus(),
+			CreatedTs: now.Add((-1 * i) * time.Minute),
 		}
 
 		devs_list = append(devs_list, dev)
@@ -903,6 +905,13 @@ func TestStoreGetDevices(t *testing.T) {
 			expectedStartId: 0,
 			expectedEndId:   devCount - 1,
 		},
+		"limit + ordering": {
+			skip:            0,
+			limit:           devCount,
+			expectedCount:   30,
+			expectedStartId: 0,
+			expectedEndId:   30 - 1,
+		}
 		"filter acceted": {
 			skip:            0,
 			limit:           devCount,
