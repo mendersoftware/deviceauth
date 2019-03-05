@@ -830,23 +830,30 @@ func (db *DataStoreMongo) GetDeviceStatus(ctx context.Context, devId string) (st
 
 	c := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbAuthSetColl)
 
-	// get device auth sets; group by status
-
-	job := &mgo.MapReduce{
-		Map:    "function() { emit(this.status, 1) }",
-		Reduce: "function(key, values) { return Array.sum(values) }",
-	}
-
-	filter := model.AuthSet{
-		DeviceId: devId,
-	}
-
 	var result []struct {
 		Status string `bson:"_id"`
 		Value  int
 	}
 
-	_, err := c.Find(filter).MapReduce(job, &result)
+	// match the device id
+	mat := bson.M{
+		"$match": bson.M{"device_id": devId},
+	}
+
+	// group the statuses
+	grp := bson.M{
+		"$group": bson.M{
+				"_id": "$status",
+				"value": bson.M{
+						"$sum": 1,
+				},
+		},
+	}
+
+	// find the status
+	pipe := c.Pipe([]bson.M{mat,grp})
+    err := pipe.All(&result)
+
 	if err != nil {
 		if err.Error() == store.NoCollectionErrMsg {
 			return "", store.ErrAuthSetNotFound
