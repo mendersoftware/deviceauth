@@ -71,7 +71,7 @@ func (db *DataStoreMongo) GetBrokenAuthSets(dbName string) ([]string, error) {
 
 	// find the status
 	pipe := c.Pipe([]bson.M{grp})
-    err := pipe.All(&result)
+	err := pipe.All(&result)
 
 	if err != nil {
 		if err.Error() == noCollectionErrMsg {

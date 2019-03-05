@@ -852,7 +852,7 @@ func (db *DataStoreMongo) GetDeviceStatus(ctx context.Context, devId string) (st
 
 	// find the status
 	pipe := c.Pipe([]bson.M{mat,grp})
-    err := pipe.All(&result)
+	err := pipe.All(&result)
 
 	if err != nil {
 		if err.Error() == store.NoCollectionErrMsg {
