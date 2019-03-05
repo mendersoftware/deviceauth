@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -55,17 +55,24 @@ func (db *DataStoreMongo) GetBrokenAuthSets(dbName string) ([]string, error) {
 
 	// get all auth sets; group by device id
 
-	job := &mgo.MapReduce{
-		Map:    "function() { emit(this.device_id, 1) }",
-		Reduce: "function(key, values) { return Array.sum(values) }",
-	}
-
 	var result []struct {
 		DeviceId string `bson:"_id"`
 		Value    int
 	}
 
-	_, err := c.Find(nil).MapReduce(job, &result)
+	grp := bson.M{
+		"$group": bson.M{
+				"_id": "$device_id",
+				"value": bson.M{
+						"$sum": 1,
+				},
+		},
+	}
+
+	// find the status
+	pipe := c.Pipe([]bson.M{grp})
+    err := pipe.All(&result)
+
 	if err != nil {
 		if err.Error() == noCollectionErrMsg {
 			return nil, nil
