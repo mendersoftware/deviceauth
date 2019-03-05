@@ -16,6 +16,7 @@ package mongo
 
 import (
 	"github.com/globalsign/mgo"
+	"github.com/globalsign/mgo/bson"
 	"github.com/pkg/errors"
 
 	"github.com/mendersoftware/deviceauth/model"
