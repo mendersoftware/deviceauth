@@ -47,12 +47,6 @@
 			"revisionTime": "2017-06-26T11:06:00Z"
 		},
 		{
-			"checksumSHA1": "0bZ5c+J+4vgXT4gIXX7byaqOChA=",
-			"path": "github.com/Sirupsen/logrus",
-			"revision": "89742aefa4b206dcf400792f3bd35b542998eb3b",
-			"revisionTime": "2017-08-22T13:27:46Z"
-		},
-		{
 			"checksumSHA1": "qxkeLXH8kpYi1H0IBTO1FuOWRDk=",
 			"path": "github.com/ant0ine/go-json-rest/rest",
 			"revision": "4602b00d2caab423578a3094c68137dcc1eb2051",
