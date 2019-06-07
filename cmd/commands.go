@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -15,16 +15,25 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"sort"
 
 	"github.com/mendersoftware/go-lib-micro/config"
 	"github.com/mendersoftware/go-lib-micro/identity"
+	"github.com/mendersoftware/go-lib-micro/log"
 	mstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/pkg/errors"
 
+	cinv "github.com/mendersoftware/deviceauth/client/inventory"
 	dconfig "github.com/mendersoftware/deviceauth/config"
+	"github.com/mendersoftware/deviceauth/model"
+	"github.com/mendersoftware/deviceauth/store"
 	"github.com/mendersoftware/deviceauth/store/mongo"
+	"github.com/mendersoftware/deviceauth/utils"
 )
+
+var NowUnixMilis = utils.UnixMilis
 
 func makeDataStoreConfig() mongo.DataStoreMongoConfig {
 	return mongo.DataStoreMongoConfig{
@@ -195,5 +204,140 @@ func decommissioningCleanupExecute(db *mongo.DataStoreMongo, dbName string) erro
 }
 
 func PropagateInventory(db store.DataStore, c cinv.Client, tenant string, dryrun bool) error {
+	l := log.NewEmpty()
+
+	dbs, err := selectDbs(db, tenant)
+	if err != nil {
+		return errors.Wrap(err, "aborting")
+	}
+
+	for _, d := range dbs {
+		err := tryPropagateInventoryForDb(db, c, d, dryrun)
+		if err != nil {
+			l.Errorf("giving up on DB %s due to fatal error: %s", d, err.Error())
+			continue
+		}
+	}
+
+	l.Info("all DBs processed, exiting.")
 	return nil
+}
+
+func selectDbs(db store.DataStore, tenant string) ([]string, error) {
+	l := log.NewEmpty()
+
+	var dbs []string
+
+	if tenant != "" {
+		l.Infof("propagating inventory for user-specified tenant %s", tenant)
+		n := mstore.DbNameForTenant(tenant, mongo.DbName)
+		dbs = []string{n}
+	} else {
+		l.Infof("propagating inventory for all tenants")
+
+		// infer if we're in ST or MT
+		tdbs, err := db.GetTenantDbs()
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to retrieve tenant DBs")
+		}
+
+		if len(tdbs) == 0 {
+			l.Infof("no tenant DBs found - will try the default database %s", mongo.DbName)
+			dbs = []string{mongo.DbName}
+		} else {
+			dbs = tdbs
+		}
+	}
+
+	return dbs, nil
+}
+
+func tryPropagateInventoryForDb(db store.DataStore, c cinv.Client, dbname string, dryrun bool) error {
+	l := log.NewEmpty()
+
+	l.Infof("propagating inventory from DB: %s", dbname)
+
+	tenant := mstore.TenantFromDbName(dbname, mongo.DbName)
+
+	ctx := context.Background()
+	if tenant != "" {
+		ctx = identity.WithContext(ctx, &identity.Identity{
+			Tenant: tenant,
+		})
+	}
+
+	skip := 0
+	limit := 100
+	errs := false
+	for {
+		devs, err := db.GetDevices(ctx, uint(skip), uint(limit), store.DeviceFilter{})
+		if err != nil {
+			return errors.Wrap(err, "failed to get devices")
+		}
+
+		for _, d := range devs {
+			l.Infof("propagating device %s", d.Id)
+			err := propagateSingleDevice(d, c, tenant, dryrun)
+			if err != nil {
+				errs = true
+				l.Errorf("FAILED: %s", err.Error())
+				continue
+			}
+		}
+
+		if len(devs) < limit {
+			break
+		} else {
+			skip += limit
+		}
+	}
+
+	if errs {
+		l.Infof("Done with DB %s, but there were errors", dbname)
+	} else {
+		l.Infof("Done with DB %s", dbname)
+	}
+
+	return nil
+}
+
+func propagateSingleDevice(d model.Device, c cinv.Client, tenant string, dryrun bool) error {
+	attrs, err := idDataToInventoryAttrs(d.IdDataStruct)
+	if err != nil {
+		return err
+	}
+
+	if !dryrun {
+		err = c.PatchDeviceV2(context.Background(), d.Id, tenant, "deviceauth", NowUnixMilis(), attrs)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func idDataToInventoryAttrs(id map[string]interface{}) ([]cinv.Attribute, error) {
+	var out []cinv.Attribute
+
+	for k, v := range id {
+		a := cinv.Attribute{
+			Name:  k,
+			Scope: "identity",
+		}
+		venc, err := json.Marshal(v)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to encode attribute %s, value: %v", k, v)
+		}
+
+		a.Value = string(venc)
+		out = append(out, a)
+	}
+
+	// mostly for testability tbh - iteration over map = random order
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].Name < out[j].Name
+	})
+
+	return out, nil
 }
