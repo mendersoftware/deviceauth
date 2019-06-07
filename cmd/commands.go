@@ -193,3 +193,7 @@ func decommissioningCleanupExecute(db *mongo.DataStoreMongo, dbName string) erro
 
 	return nil
 }
+
+func PropagateInventory(db store.DataStore, c cinv.Client, tenant string, dryrun bool) error {
+	return nil
+}
