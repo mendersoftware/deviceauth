@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -118,6 +118,8 @@ type DataStore interface {
 	GetDeviceStatus(ctx context.Context, dev_id string) (string, error)
 
 	GetAuthSets(ctx context.Context, skip, limit int, filter AuthSetFilter) ([]model.DevAdmAuthSet, error)
+
+	GetTenantDbs() ([]string, error)
 
 	MigrateTenant(ctx context.Context, version string, tenant string) error
 	WithAutomigrate() DataStore
