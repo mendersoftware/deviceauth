@@ -15,7 +15,7 @@ HOST=${HOST="mender-device-auth:8080"}
     sleep 10
 }
 
-py.test-3 -s --tb=short --host $HOST \
+py.test -s --tb=short --host $HOST \
           --spec $DIR/internal_api.yml \
           --management-spec $DIR/management_api.yml \
           --verbose --junitxml=$DIR/results.xml \
