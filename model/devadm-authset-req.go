@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -14,7 +14,6 @@
 package model
 
 import (
-	"crypto/rsa"
 	"encoding/json"
 	"io"
 
@@ -29,6 +28,7 @@ type DeviceAuthAttributes map[string]string
 type DevAdmAuthSetReq struct {
 	DeviceId string `json:"device_identity" valid:"required"`
 	Key      string `json:"key" valid:"required"`
+	KeyType  string `json:"keytype,omitempty"`
 	//decoded, human-readable identity attribute set
 	Attributes DeviceAuthAttributes `json:"-"`
 }
@@ -47,17 +47,12 @@ func ParseDevAdmAuthSetReq(source io.Reader) (*DevAdmAuthSetReq, error) {
 	}
 
 	// validate/normalize key
-	key, err := utils.ParsePubKey(req.Key)
+	key, err := utils.ParsePubKey(req.Key, req.KeyType)
 	if err != nil {
 		return nil, err
 	}
 
-	keyStruct, ok := key.(*rsa.PublicKey)
-	if !ok {
-		return nil, errors.New("cannot decode public key")
-	}
-
-	serialized, err := utils.SerializePubKey(keyStruct)
+	serialized, err := utils.SerializePubKey(key)
 	if err != nil {
 		return nil, err
 	}

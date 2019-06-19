@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -24,6 +24,8 @@ import (
 	"encoding/base64"
 	"encoding/pem"
 
+	"golang.org/x/crypto/ed25519"
+
 	"github.com/pkg/errors"
 )
 
@@ -36,67 +38,97 @@ const (
 )
 
 func VerifyAuthReqSign(signature string, pubkey interface{}, content []byte) error {
-	hash := sha256.New()
-	_, err := bytes.NewReader(content).WriteTo(hash)
-	if err != nil {
-		return errors.Wrap(err, ErrMsgVerify)
-	}
-
 	decodedSig, err := base64.StdEncoding.DecodeString(string(signature))
 	if err != nil {
 		return errors.Wrap(err, ErrMsgVerify)
 	}
 
-	key, ok := pubkey.(*rsa.PublicKey)
-	if !ok {
-		return errors.Wrap(err, ErrMsgVerify)
-	}
+	switch key := pubkey.(type) {
+	case *rsa.PublicKey:
+		hash := sha256.New()
+		_, err := bytes.NewReader(content).WriteTo(hash)
+		if err != nil {
+			return errors.Wrap(err, ErrMsgVerify)
+		}
 
-	err = rsa.VerifyPKCS1v15(key, crypto.SHA256, hash.Sum(nil), decodedSig)
-	if err != nil {
-		return errors.Wrap(err, ErrMsgVerify)
+		err = rsa.VerifyPKCS1v15(key, crypto.SHA256, hash.Sum(nil), decodedSig)
+		if err != nil {
+			return errors.Wrap(err, ErrMsgVerify)
+		}
+
+	case *ed25519.PublicKey:
+		ok := ed25519.Verify(*key, content, decodedSig)
+		if !ok {
+			return errors.New("ed25519 signature verification failed")
+		}
+
+	default:
+		return errors.Errorf("unsupported public key")
 	}
 
 	return nil
 }
 
 //ParsePubKey
-func ParsePubKey(pubkey string) (interface{}, error) {
-	block, _ := pem.Decode([]byte(pubkey))
-	if block == nil || block.Type != PubKeyBlockType {
-		return nil, errors.New("cannot decode public key")
-	}
+func ParsePubKey(pubkey string, keytype string) (interface{}, error) {
+	switch keytype {
+	case "ed25519":
+		key, err := base64.StdEncoding.DecodeString(pubkey)
+		if err != nil {
+			return nil, errors.Wrap(err, "cannot decode public ed25519 key")
+		}
 
-	key, err := x509.ParsePKIXPublicKey(block.Bytes)
-	if err != nil {
-		return nil, errors.Wrap(err, "cannot decode public key")
-	}
+		keyStruct := ed25519.PublicKey(key)
 
-	return key, nil
+		return &keyStruct, nil
+
+	default:
+		block, _ := pem.Decode([]byte(pubkey))
+		if block == nil || block.Type != PubKeyBlockType {
+			return nil, errors.New("cannot decode public key")
+		}
+
+		key, err := x509.ParsePKIXPublicKey(block.Bytes)
+		if err != nil {
+			return nil, errors.Wrap(err, "cannot parse public x509 key")
+		}
+
+		keyStruct, ok := key.(*rsa.PublicKey)
+		if !ok {
+			return nil, errors.New("unsupported rsa key type")
+		}
+
+		return keyStruct, nil
+	}
 }
 
 func SerializePubKey(key interface{}) (string, error) {
 
-	switch key.(type) {
+	switch pubkey := key.(type) {
 	case *rsa.PublicKey, *dsa.PublicKey, *ecdsa.PublicKey:
-		break
+		asn1, err := x509.MarshalPKIXPublicKey(key)
+		if err != nil {
+			return "", err
+		}
+
+		out := pem.EncodeToMemory(&pem.Block{
+			Type:  "PUBLIC KEY",
+			Bytes: asn1,
+		})
+
+		if out == nil {
+			return "", err
+		}
+
+		return string(out), nil
+
+	case *ed25519.PublicKey:
+		b64 := make([]byte, base64.StdEncoding.EncodedLen(len(*pubkey)))
+		base64.StdEncoding.Encode(b64, *pubkey)
+
+		return string(b64), nil
+
 	default:
 		return "", errors.New("unrecognizable public key type")
 	}
-
-	asn1, err := x509.MarshalPKIXPublicKey(key)
-	if err != nil {
-		return "", err
-	}
-
-	out := pem.EncodeToMemory(&pem.Block{
-		Type:  "PUBLIC KEY",
-		Bytes: asn1,
-	})
-
-	if out == nil {
-		return "", err
-	}
-
-	return string(out), nil
 }

@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -173,10 +173,10 @@ func verify(t *testing.T, ctx context.Context, db *DataStoreMongo, devs []model.
 			C(DbAuthSetColl).FindId(a.Id).One(&set)
 		assert.NoError(t, err)
 
-		_, err = utils.ParsePubKey(set.PubKey)
+		_, err = utils.ParsePubKey(set.PubKey, set.PubKeyType)
 		assert.NoError(t, err)
 
-		newKey, err := normalizeKey(a.PubKey)
+		newKey, err := normalizeKey(a.PubKey, a.PubKeyType)
 		a.PubKey = newKey
 
 		compareAuthSet(&a, &set, t)
@@ -188,10 +188,10 @@ func verify(t *testing.T, ctx context.Context, db *DataStoreMongo, devs []model.
 			C(DbDevicesColl).FindId(d.Id).One(&dev)
 		assert.NoError(t, err)
 
-		_, err = utils.ParsePubKey(dev.PubKey)
+		_, err = utils.ParsePubKey(dev.PubKey, dev.PubKeyType)
 		assert.NoError(t, err)
 
-		newKey, err := normalizeKey(d.PubKey)
+		newKey, err := normalizeKey(d.PubKey, d.PubKeyType)
 		d.PubKey = newKey
 
 		compareDevices(&d, &dev, t)

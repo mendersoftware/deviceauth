@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -14,7 +14,6 @@
 package model
 
 import (
-	"crypto/rsa"
 	"errors"
 
 	"github.com/mendersoftware/deviceauth/utils"
@@ -26,9 +25,10 @@ type AuthReq struct {
 	IdData      string `json:"id_data" bson:"id_data"`
 	TenantToken string `json:"tenant_token" bson:"tenant_token"`
 	PubKey      string `json:"pubkey"`
+	PubKeyType  string `json:"pubkeytype"`
 
 	//helpers, not serialized
-	PubKeyStruct *rsa.PublicKey `json:"-" bson:"-"`
+	PubKeyStruct interface{} `json:"-" bson:"-"`
 }
 
 func (r *AuthReq) Validate() error {
@@ -42,18 +42,14 @@ func (r *AuthReq) Validate() error {
 
 	// normalize pubkey by parsing+serializing the key string
 	//in between, save it in a temp field because it will be useful outside of Validate()
-	key, err := utils.ParsePubKey(r.PubKey)
+	key, err := utils.ParsePubKey(r.PubKey, r.PubKeyType)
 	if err != nil {
 		return err
 	}
 
-	keyStruct, ok := key.(*rsa.PublicKey)
-	if !ok {
-		return errors.New("cannot decode public key")
-	}
-	r.PubKeyStruct = keyStruct
+	r.PubKeyStruct = key
 
-	serialized, err := utils.SerializePubKey(keyStruct)
+	serialized, err := utils.SerializePubKey(key)
 	if err != nil {
 		return err
 	}

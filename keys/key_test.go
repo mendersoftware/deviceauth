@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -26,6 +26,8 @@ import (
 func TestLoadRsaPrivateKey(t *testing.T) {
 	t.Parallel()
 
+	// TODO
+
 	testCases := []struct {
 		privKeyPath string
 		privKey     *rsa.PrivateKey
@@ -33,7 +35,7 @@ func TestLoadRsaPrivateKey(t *testing.T) {
 	}{
 		{
 			privKeyPath: "testdata/private.pem",
-			privKey:     test.LoadPrivKey("testdata/private.pem", t),
+			privKey:     test.LoadPrivKeyX509("testdata/private.pem", t),
 			err:         "",
 		},
 		{

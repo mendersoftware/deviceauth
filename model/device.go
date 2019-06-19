@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -32,6 +32,7 @@ const (
 type Device struct {
 	Id              string                 `json:"id" bson:"_id,omitempty"`
 	PubKey          string                 `json:"-" bson:",omitempty"`
+	PubKeyType      string                 `json:"-" bson:",omitempty"`
 	IdData          string                 `json:"id_data" bson:"id_data,omitempty"`
 	IdDataStruct    map[string]interface{} `bson:"id_data_struct,omitempty"`
 	IdDataSha256    []byte                 `bson:"id_data_sha256,omitempty"`

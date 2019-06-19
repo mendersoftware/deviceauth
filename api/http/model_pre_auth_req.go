@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -14,7 +14,6 @@
 package http
 
 import (
-	"crypto/rsa"
 	"encoding/json"
 	"io"
 
@@ -27,8 +26,9 @@ import (
 )
 
 type preAuthReq struct {
-	IdData map[string]interface{} `json:"identity_data" valid:"-"`
-	PubKey string                 `json:"pubkey" valid:"required"`
+	IdData     map[string]interface{} `json:"identity_data" valid:"-"`
+	PubKey     string                 `json:"pubkey" valid:"required"`
+	PubKeyType string                 `json:"pubkeytype,omitempty"`
 }
 
 func parsePreAuthReq(source io.Reader) (*preAuthReq, error) {
@@ -61,17 +61,12 @@ func (r *preAuthReq) validate() error {
 	}
 
 	//normalize key
-	key, err := utils.ParsePubKey(r.PubKey)
+	key, err := utils.ParsePubKey(r.PubKey, r.PubKeyType)
 	if err != nil {
 		return err
 	}
 
-	keyStruct, ok := key.(*rsa.PublicKey)
-	if !ok {
-		return errors.New("cannot decode public key")
-	}
-
-	serialized, err := utils.SerializePubKey(keyStruct)
+	serialized, err := utils.SerializePubKey(key)
 	if err != nil {
 		return err
 	}

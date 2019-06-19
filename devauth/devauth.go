@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -177,7 +177,7 @@ func (d *DevAuth) getDeviceFromAuthRequest(ctx context.Context, r *model.AuthReq
 
 	// check if the device is in the decommissioning state
 	if dev.Decommissioning {
-		l.Warnf("Device %s in the decommissioning state. %s", dev.Id)
+		l.Warnf("Device %s in the decommissioning state.", dev.Id)
 		return nil, ErrDevAuthUnauthorized
 	}
 

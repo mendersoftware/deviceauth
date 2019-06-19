@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import (
 const (
 	AuthSetKeyIdData       = "id_data"
 	AuthSetKeyPubKey       = "pubkey"
+	AuthSetKeyPubKeyType   = "pubkeytype"
 	AuthSetKeyDeviceId     = "device_id"
 	AuthSetKeyStatus       = "status"
 	AuthSetKeyIdDataSha256 = "id_data_sha256"
@@ -34,6 +35,7 @@ type AuthSet struct {
 	IdDataStruct map[string]interface{} `bson:"id_data_struct,omitempty"`
 	IdDataSha256 []byte                 `bson:"id_data_sha256,omitempty"`
 	PubKey       string                 `json:"pubkey" bson:"pubkey,omitempty"`
+	PubKeyType   string                 `json:"pubkeytype" bson:"pubkeytype,omitempty"`
 	DeviceId     string                 `json:"-" bson:"device_id,omitempty"`
 	Timestamp    *time.Time             `json:"ts" bson:"ts,omitempty"`
 	Status       string                 `json:"status" bson:"status,omitempty"`
@@ -44,6 +46,7 @@ type AuthSetUpdate struct {
 	IdDataStruct map[string]interface{} `bson:"id_data_struct,omitempty"`
 	IdDataSha256 []byte                 `bson:"id_data_sha256,omitempty"`
 	PubKey       string                 `bson:"pubkey,omitempty"`
+	PubKeyType   string                 `bson:"pubkeytype,omitempty"`
 	DeviceId     string                 `bson:"device_id,omitempty"`
 	Timestamp    *time.Time             `bson:"ts,omitempty"`
 	Status       string                 `bson:"status,omitempty"`

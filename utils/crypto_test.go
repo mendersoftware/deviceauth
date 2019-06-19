@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -29,6 +29,7 @@ import (
 func TestVerifyAuthReqSign(t *testing.T) {
 	t.Parallel()
 
+	// TODO
 	testCases := []struct {
 		content   string
 		pubkeyStr string
@@ -42,8 +43,8 @@ func TestVerifyAuthReqSign(t *testing.T) {
 				"tenant_token": "token"
 				"seq_no": 1
 			}`,
-			test.LoadPubKeyStr("testdata/public.pem", t),
-			test.LoadPrivKey("testdata/private.pem", t),
+			test.LoadPubKeyStrX509("testdata/public.pem", t),
+			test.LoadPrivKeyX509("testdata/private.pem", t),
 			"",
 		},
 		{
@@ -53,8 +54,8 @@ func TestVerifyAuthReqSign(t *testing.T) {
 				"tenant_token": "token"
 				"seq_no": 1
 			}`,
-			test.LoadPubKeyStr("testdata/public.pem", t),
-			test.LoadPrivKey("testdata/private_invalid.pem", t),
+			test.LoadPubKeyStrX509("testdata/public.pem", t),
+			test.LoadPrivKeyX509("testdata/private_invalid.pem", t),
 			"verification failed: crypto/rsa: verification error",
 		},
 	}
@@ -66,7 +67,7 @@ func TestVerifyAuthReqSign(t *testing.T) {
 
 			signed := test.AuthReqSign([]byte(tc.content), tc.privkey, t)
 
-			pubkey, err := ParsePubKey(tc.pubkeyStr)
+			pubkey, err := ParsePubKey(tc.pubkeyStr, "")
 			assert.NoError(t, err)
 
 			err = VerifyAuthReqSign(string(signed),
@@ -90,14 +91,14 @@ func TestParsePubKey(t *testing.T) {
 		err    error
 	}{
 		"ok": {
-			pubkey: test.LoadPubKeyStr("testdata/public.pem", t),
+			pubkey: test.LoadPubKeyStrX509("testdata/public.pem", t),
 		},
 		"error, bad pem block": {
-			pubkey: test.LoadPubKeyStr("testdata/public_bad_pem.pem", t),
+			pubkey: test.LoadPubKeyStrX509("testdata/public_bad_pem.pem", t),
 			err:    errors.New("cannot decode public key"),
 		},
 		"error, pem ok, but bad key content": {
-			pubkey: test.LoadPubKeyStr("testdata/public_bad_key_content.pem", t),
+			pubkey: test.LoadPubKeyStrX509("testdata/public_bad_key_content.pem", t),
 			err:    errors.New("cannot decode public key"),
 		},
 	}
@@ -107,7 +108,7 @@ func TestParsePubKey(t *testing.T) {
 		t.Run(fmt.Sprintf("tc %s", i), func(t *testing.T) {
 			t.Parallel()
 
-			key, err := ParsePubKey(tc.pubkey)
+			key, err := ParsePubKey(tc.pubkey, "")
 
 			if tc.err != nil {
 				assert.EqualError(t, err, tc.err.Error())
@@ -148,7 +149,7 @@ UwIDAQAB
 		t.Run(fmt.Sprintf("tc %s", i), func(t *testing.T) {
 			t.Parallel()
 
-			pubkey := test.LoadPubKeyStr(tc.keyPath, t)
+			pubkey := test.LoadPubKeyStrX509(tc.keyPath, t)
 
 			block, _ := pem.Decode([]byte(pubkey))
 			assert.NotNil(t, block)

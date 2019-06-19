@@ -462,6 +462,18 @@
 			"revisionTime": "2017-07-06T19:46:25Z"
 		},
 		{
+			"checksumSHA1": "RNxiNR+mGN2hq8CtKr2MKrT7zIQ=",
+			"path": "golang.org/x/crypto/ed25519",
+			"revision": "cbcb750295291b33242907a04be40e80801d0cfc",
+			"revisionTime": "2019-04-08T03:37:34Z"
+		},
+		{
+			"checksumSHA1": "0JTAFXPkankmWcZGQJGScLDiaN8=",
+			"path": "golang.org/x/crypto/ed25519/internal/edwards25519",
+			"revision": "cbcb750295291b33242907a04be40e80801d0cfc",
+			"revisionTime": "2019-04-08T03:37:34Z"
+		},
+		{
 			"checksumSHA1": "Csl3lrkis5iUo5In4BltnOc0hS4=",
 			"path": "golang.org/x/crypto/ssh/terminal",
 			"revision": "faadfbdc035307d901e69eea569f5dda451a3ee3",

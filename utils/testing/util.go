@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -22,32 +22,49 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/pem"
+	"errors"
 	"io/ioutil"
 	"testing"
+
+	"golang.org/x/crypto/ed25519"
 )
 
 const (
 	PrivKeyBlockType = "RSA PRIVATE KEY"
 )
 
-func AuthReqSign(data []byte, privkey *rsa.PrivateKey, t *testing.T) []byte {
-	hash := sha256.New()
-	if _, err := bytes.NewReader(data).WriteTo(hash); err != nil {
-		t.Fatal(err)
-	}
+func AuthReqSign(data []byte, privkey interface{}, t *testing.T) []byte {
+	var b64 []byte
 
-	sig, err := rsa.SignPKCS1v15(rand.Reader, privkey, crypto.SHA256, hash.Sum(nil))
-	if err != nil {
-		t.Fatal(err)
-	}
+	switch privkey := privkey.(type) {
+	case *rsa.PrivateKey:
+		hash := sha256.New()
+		if _, err := bytes.NewReader(data).WriteTo(hash); err != nil {
+			t.Fatal(err)
+		}
 
-	b64 := make([]byte, base64.StdEncoding.EncodedLen(len(sig)))
-	base64.StdEncoding.Encode(b64, sig)
+		sig, err := rsa.SignPKCS1v15(rand.Reader, privkey, crypto.SHA256, hash.Sum(nil))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		b64 = make([]byte, base64.StdEncoding.EncodedLen(len(sig)))
+		base64.StdEncoding.Encode(b64, sig)
+
+	case *ed25519.PrivateKey:
+		sig := ed25519.Sign(*privkey, data)
+
+		b64 = make([]byte, base64.StdEncoding.EncodedLen(len(sig)))
+		base64.StdEncoding.Encode(b64, sig)
+
+	default:
+		t.Fatal(errors.New("unsupported private key type"))
+	}
 
 	return b64
 }
 
-func LoadPrivKey(path string, t *testing.T) *rsa.PrivateKey {
+func LoadPrivKeyX509(path string, t *testing.T) *rsa.PrivateKey {
 	pem_data, err := ioutil.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
@@ -68,11 +85,31 @@ func LoadPrivKey(path string, t *testing.T) *rsa.PrivateKey {
 	return key
 }
 
-func LoadPubKeyStr(path string, t *testing.T) string {
+func LoadPrivKeyEd25519(path string, t *testing.T) *ed25519.PrivateKey {
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	priv := ed25519.PrivateKey(data)
+
+	return &priv
+}
+
+func LoadPubKeyStrX509(path string, t *testing.T) string {
 	pem_data, err := ioutil.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	return string(pem_data)
+}
+
+func LoadPubKeyEd25519(path string, t *testing.T) []byte {
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return data
 }

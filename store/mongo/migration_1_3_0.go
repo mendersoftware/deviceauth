@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -15,7 +15,6 @@ package mongo
 
 import (
 	"context"
-	"crypto/rsa"
 
 	"github.com/globalsign/mgo/bson"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
@@ -42,7 +41,7 @@ func (m *migration_1_3_0) Up(from migrate.Version) error {
 	var set model.AuthSet
 
 	for iter.Next(&set) {
-		newKey, err := normalizeKey(set.PubKey)
+		newKey, err := normalizeKey(set.PubKey, set.PubKeyType)
 
 		if err != nil {
 			return errors.Wrapf(err, "failed to normalize key of auth set %v: %v", set.Id, set.PubKey)
@@ -71,7 +70,7 @@ func (m *migration_1_3_0) Up(from migrate.Version) error {
 	var dev model.Device
 
 	for iter.Next(&dev) {
-		newKey, err := normalizeKey(dev.PubKey)
+		newKey, err := normalizeKey(dev.PubKey, set.PubKeyType)
 
 		if err != nil {
 			return errors.Wrapf(err, "failed to normalize key of device %v: %v", dev.Id, dev.PubKey)
@@ -101,18 +100,13 @@ func (m *migration_1_3_0) Version() migrate.Version {
 	return migrate.MakeVersion(1, 3, 0)
 }
 
-func normalizeKey(key string) (string, error) {
-	parsed, err := utils.ParsePubKey(key)
+func normalizeKey(key string, keyType string) (string, error) {
+	parsed, err := utils.ParsePubKey(key, keyType)
 	if err != nil {
 		return "", err
 	}
 
-	keyStruct, ok := parsed.(*rsa.PublicKey)
-	if !ok {
-		return "", errors.New("cannot decode public key")
-	}
-
-	serialized, err := utils.SerializePubKey(keyStruct)
+	serialized, err := utils.SerializePubKey(parsed)
 	if err != nil {
 		return "", err
 	}

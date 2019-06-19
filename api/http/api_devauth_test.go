@@ -15,7 +15,6 @@ package http
 
 import (
 	"context"
-	"crypto/rsa"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -86,7 +85,7 @@ func makeMockApiHandler(t *testing.T, da devauth.App, db store.DataStore) http.H
 // - signed with an actual key
 // - signed with a bogus test value
 // - not signed at all
-func makeAuthReq(payload interface{}, key *rsa.PrivateKey, signature string, t *testing.T) *http.Request {
+func makeAuthReq(payload interface{}, key interface{}, signature string, t *testing.T) *http.Request {
 	r := test.MakeSimpleRequest("POST",
 		"http://1.2.3.4/api/devices/v1/authentication/auth_requests",
 		payload)
@@ -112,8 +111,9 @@ func TestApiDevAuthSubmitAuthReq(t *testing.T) {
 	// enforce specific field naming in errors returned by API
 	updateRestErrorFieldName()
 
-	privkey := mtest.LoadPrivKey("testdata/private.pem", t)
-	pubkeyStr := mtest.LoadPubKeyStr("testdata/public.pem", t)
+	// TODO
+	privkey := mtest.LoadPrivKeyX509("testdata/private.pem", t)
+	pubkeyStr := mtest.LoadPubKeyStrX509("testdata/public.pem", t)
 
 	testCases := []struct {
 		req *http.Request
@@ -311,7 +311,8 @@ func TestApiV2DevAuthPreauthDevice(t *testing.T) {
 	// enforce specific field naming in errors returned by API
 	updateRestErrorFieldName()
 
-	pubkeyStr := mtest.LoadPubKeyStr("testdata/public.pem", t)
+	// TODO
+	pubkeyStr := mtest.LoadPubKeyStrX509("testdata/public.pem", t)
 
 	type brokenPreAuthReq struct {
 		IdData string `json:"identity_data"`
