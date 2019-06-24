@@ -23,6 +23,18 @@ stages:
   - build
   - publish
 
+.template_prep_tests: &test_tool_setup
+  before_script:
+    - mkdir -p /go/src/github.com/mendersoftware /go/src/_/builds
+    - cp -r $CI_PROJECT_DIR /go/src/github.com/mendersoftware/deviceauth
+    - ln -s /go/src/github.com/mendersoftware /go/src/_/builds/mendersoftware
+    - cd /go/src/github.com/mendersoftware/deviceauth
+    # Install code coverage tooling
+    - go get -u github.com/axw/gocov/gocov
+    - go get -u golang.org/x/tools/cmd/cover
+    # Install cyclomatic dependency analysis tool
+    - go get -u github.com/fzipp/gocyclo
+
 test:prepare_acceptance:
   image: docker
   stage: test_prep
@@ -66,16 +78,7 @@ test:acceptance_tests:
 
 test:static:
   stage: test
-  before_script:
-    - mkdir -p /go/src/github.com/mendersoftware /go/src/_/builds
-    - cp -r $CI_PROJECT_DIR /go/src/github.com/mendersoftware/deviceauth
-    - ln -s /go/src/github.com/mendersoftware /go/src/_/builds/mendersoftware
-    - cd /go/src/github.com/mendersoftware/deviceauth
-    # Install code coverage tooling
-    - go get -u github.com/axw/gocov/gocov
-    - go get -u golang.org/x/tools/cmd/cover
-    # Install cyclomatic dependency analysis tool
-    - go get -u github.com/fzipp/gocyclo
+  <<: *test_tool_setup
   dependencies: []
   script:
     - curl -sL https://deb.nodesource.com/setup_11.x | bash -
@@ -100,6 +103,7 @@ test:static:
 
 test:unit:
   stage: test
+  <<: *test_tool_setup
   dependencies: []
   script:
     - apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 2930ADAE8CAF5059EE73BB4B58712A2291FA4AD5
