@@ -11,7 +11,6 @@ cache:
 
 variables:
    DOCKER_HOST: tcp://docker:2375/
-   DOCKER_DRIVER: overlay2
    DOCKER_REPOSITORY: mendersoftware/deviceauth
 
 services:
@@ -48,12 +47,10 @@ test:prepare_acceptance:
 
 test:acceptance_tests:
   image: tiangolo/docker-with-compose
-  before_script: []
   services:
     - docker:dind
   stage: test
   dependencies:
-    - test:build_acceptance
     - test:prepare_acceptance
   script:
     - apk add git bash
@@ -125,7 +122,6 @@ test:unit:
 test:backend_integration:
   stage: test
   image: tiangolo/docker-with-compose
-  before_script: []
   dependencies: []
   script:
     - docker build -t mendersoftware/deviceauth:pr .
@@ -139,7 +135,6 @@ test:backend_integration:
 
 build:
   image: docker
-  before_script: []
   stage: build
   script:
     - docker build -t $DOCKER_REPOSITORY:pr .
@@ -152,14 +147,12 @@ build:
     - docker
 
 publish:docs:
-  before_script: []
   stage: publish
   script:
     - echo "publishing docs"
 
 publish:tests:
   stage: publish
-  before_script: []  
   dependencies:
     - test:acceptance_tests
     - test:unit
@@ -170,7 +163,6 @@ publish:tests:
 
 publish:build:
   image: docker
-  before_script: []
   stage: publish
   dependencies:
     - build
@@ -188,7 +180,6 @@ publish:build:
 
 publish:build:master:
   image: docker
-  before_script: []
   stage: publish
   dependencies:
     - build
