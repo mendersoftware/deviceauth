@@ -10,8 +10,8 @@ cache:
     - node_modules
 
 variables:
-   DOCKER_HOST: tcp://docker:2375/
-   DOCKER_REPOSITORY: mendersoftware/deviceauth
+  DOCKER_HOST: tcp://docker:2375/
+  DOCKER_REPOSITORY: mendersoftware/deviceauth
 
 services:
   - docker:dind
@@ -33,13 +33,8 @@ test:prepare_acceptance:
     - docker run --rm --entrypoint "/bin/sh" -v $(pwd):/binary $DOCKER_REPOSITORY:pr -c "cp /usr/bin/deviceauth /binary"
     - docker build -t testing -f tests/Dockerfile tests
     - docker save testing > acceptance_testing_image.tar
-  cache:
-    key: "$CI_COMMIT_REF_SLUG"
-    paths:
-      - /go/src/github.com/mendersoftware/deviceauth/deviceauth-test
-    policy: pull
   artifacts:
-    expire_in: 30min
+    expire_in: 2w
     paths:
       - tests_image.tar
       - acceptance_testing_image.tar
@@ -63,7 +58,7 @@ test:acceptance_tests:
     - TESTS_DIR=$(pwd)/tests $(pwd)/tests/run-test-environment acceptance $(pwd)/integration $(pwd)/tests/docker-compose.yml ;
     - TESTS_DIR=$(pwd)/tests $(pwd)/tests/run-test-environment acceptance $(pwd)/integration $(pwd)/tests/docker-compose-tenant.yml ;
   artifacts:
-    expire_in: 30min
+    expire_in: 2w
     paths:
       - tests/coverage-acceptance.txt
   tags:
@@ -115,7 +110,7 @@ test:unit:
     - mkdir -p tests/unit-coverage && find . -name 'coverage.txt' -exec cp --parents {} ./tests/unit-coverage \;
     - tar -cvf $CI_PROJECT_DIR/unit-coverage.tar tests/unit-coverage
   artifacts:
-    expire_in: 30min
+    expire_in: 2w
     paths:
       - unit-coverage.tar
 
@@ -140,7 +135,7 @@ build:
     - docker build -t $DOCKER_REPOSITORY:pr .
     - docker save $DOCKER_REPOSITORY:pr > image.tar
   artifacts:
-    expire_in: 1h
+    expire_in: 2w
     paths:
       - image.tar
   tags:
