@@ -19,39 +19,14 @@ services:
   - mongo
 
 stages:
-  - test_prep_build
   - test_prep
   - test
   - build
   - publish
 
-before_script:
-  - mkdir -p /go/src/github.com/mendersoftware /go/src/_/builds
-  - cp -r $CI_PROJECT_DIR /go/src/github.com/mendersoftware/deviceauth
-  - ln -s /go/src/github.com/mendersoftware /go/src/_/builds/mendersoftware
-  - cd /go/src/github.com/mendersoftware/deviceauth
-  # Install code coverage tooling
-  - go get -u github.com/axw/gocov/gocov
-  - go get -u golang.org/x/tools/cmd/cover
-  # Install cyclomatic dependency analysis tool
-  - go get -u github.com/fzipp/gocyclo
-
-test:build_acceptance:
-  stage: test_prep_build
-  script:
-    - CGO_ENABLED=0 go test -c -o /go/src/github.com/mendersoftware/deviceauth/deviceauth-test -coverpkg $(go list ./... | grep -v vendor | grep -v mock | grep -v test | tr  '\n' ,);
-    - cp /go/src/github.com/mendersoftware/deviceauth/deviceauth-test $CI_PROJECT_DIR
-  artifacts:
-    untracked: true
-    paths:
-      - deviceauth-test
-
 test:prepare_acceptance:
   image: docker
-  before_script: []
   stage: test_prep
-  dependencies:
-    - test:build_acceptance
   script:
     - docker build -f Dockerfile.acceptance-testing -t $DOCKER_REPOSITORY:prtest .;
     - docker save $DOCKER_REPOSITORY:prtest > tests_image.tar
@@ -99,6 +74,16 @@ test:acceptance_tests:
 
 test:static:
   stage: test
+  before_script:
+    - mkdir -p /go/src/github.com/mendersoftware /go/src/_/builds
+    - cp -r $CI_PROJECT_DIR /go/src/github.com/mendersoftware/deviceauth
+    - ln -s /go/src/github.com/mendersoftware /go/src/_/builds/mendersoftware
+    - cd /go/src/github.com/mendersoftware/deviceauth
+    # Install code coverage tooling
+    - go get -u github.com/axw/gocov/gocov
+    - go get -u golang.org/x/tools/cmd/cover
+    # Install cyclomatic dependency analysis tool
+    - go get -u github.com/fzipp/gocyclo
   dependencies: []
   script:
     - curl -sL https://deb.nodesource.com/setup_11.x | bash -
