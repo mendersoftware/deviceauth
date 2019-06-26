@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import (
 	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/urfave/cli"
 
+	cinv "github.com/mendersoftware/deviceauth/client/inventory"
 	"github.com/mendersoftware/deviceauth/cmd"
 	dconfig "github.com/mendersoftware/deviceauth/config"
 	"github.com/mendersoftware/deviceauth/store/mongo"
@@ -86,6 +87,18 @@ func doMain(args []string) {
 			Action: cmdMigrate,
 		},
 		{
+			Name:  "propagate-inventory",
+			Usage: "Push device attributes to inventory",
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:  "tenant_id",
+					Usage: "Tenant ID (optional) - propagate for just a single tenant.",
+				},
+			},
+
+			Action: cmdPropagateInventory,
+		},
+		{
 			Name:  "maintenance",
 			Usage: "Run maintenance operations and exit",
 			Flags: []cli.Flag{
@@ -138,16 +151,7 @@ func cmdServer(args *cli.Context) error {
 		config.Config.Set(dconfig.SettingMiddleware, EnvDev)
 	}
 
-	db, err := mongo.NewDataStoreMongo(
-		mongo.DataStoreMongoConfig{
-			ConnectionString: config.Config.GetString(dconfig.SettingDb),
-
-			SSL:           config.Config.GetBool(dconfig.SettingDbSSL),
-			SSLSkipVerify: config.Config.GetBool(dconfig.SettingDbSSLSkipVerify),
-
-			Username: config.Config.GetString(dconfig.SettingDbUsername),
-			Password: config.Config.GetString(dconfig.SettingDbPassword),
-		})
+	db, err := mongo.NewDataStoreMongo(makeDataStoreConfig())
 	if err != nil {
 		return cli.NewExitError(
 			fmt.Sprintf("failed to connect to db: %v", err),
@@ -195,4 +199,30 @@ func cmdMaintenance(args *cli.Context) error {
 		return cli.NewExitError(err, 6)
 	}
 	return nil
+}
+
+func cmdPropagateInventory(args *cli.Context) error {
+	db, err := mongo.NewDataStoreMongo(makeDataStoreConfig())
+
+	inv := config.Config.GetString(dconfig.SettingInventoryAddr)
+	c := cinv.NewClient(inv, false)
+
+	err = cmd.PropagateInventory(db, c, args.String("tenant_id"), args.Bool("dry-run"))
+	if err != nil {
+		return cli.NewExitError(err, 7)
+	}
+	return nil
+}
+
+func makeDataStoreConfig() mongo.DataStoreMongoConfig {
+	return mongo.DataStoreMongoConfig{
+		ConnectionString: config.Config.GetString(dconfig.SettingDb),
+
+		SSL:           config.Config.GetBool(dconfig.SettingDbSSL),
+		SSLSkipVerify: config.Config.GetBool(dconfig.SettingDbSSLSkipVerify),
+
+		Username: config.Config.GetString(dconfig.SettingDbUsername),
+		Password: config.Config.GetString(dconfig.SettingDbPassword),
+	}
+
 }
