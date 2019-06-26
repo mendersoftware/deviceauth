@@ -77,6 +77,7 @@ func (c *client) PatchDeviceV2(ctx context.Context, did, tid, src string, ts int
 
 	req.Header.Set("X-MEN-Source", src)
 	req.Header.Set("X-MEN-Msg-Timestamp", string(ts))
+	req.Header.Set("Content-Type", "application/json")
 
 	if tid != "" {
 		q := req.URL.Query()
