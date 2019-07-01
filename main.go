@@ -94,6 +94,10 @@ func doMain(args []string) {
 					Name:  "tenant_id",
 					Usage: "Tenant ID (optional) - propagate for just a single tenant.",
 				},
+				cli.BoolFlag{
+					Name:  "dry-run",
+					Usage: "Do not perform any inventory modifications, just scan and print devices.",
+				},
 			},
 
 			Action: cmdPropagateInventory,

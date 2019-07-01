@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -76,7 +77,8 @@ func (c *client) PatchDeviceV2(ctx context.Context, did, tid, src string, ts int
 	}
 
 	req.Header.Set("X-MEN-Source", src)
-	req.Header.Set("X-MEN-Msg-Timestamp", string(ts))
+	req.Header.Set("X-MEN-Msg-Timestamp", strconv.FormatUint(uint64(ts), 10))
+	req.Header.Set("Content-Type", "application/json")
 
 	if tid != "" {
 		q := req.URL.Query()

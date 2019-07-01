@@ -17,6 +17,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 
 	"io/ioutil"
 	"net/http"
@@ -110,7 +111,7 @@ func TestClientPatchDeviceV2(t *testing.T) {
 							r.URL.Path,
 							"/api/internal/v2/inventory/devices/"+tc.did)
 						assert.Equal(t, tc.src, r.Header.Get("X-MEN-Source"))
-						assert.Equal(t, string(tc.ts), r.Header.Get("X-MEN-Msg-Timestamp"))
+						assert.Equal(t, strconv.FormatUint(uint64(tc.ts), 10), r.Header.Get("X-MEN-Msg-Timestamp"))
 
 						if tc.tid != "" {
 							assert.Equal(t, tc.tid, r.URL.Query().Get("tenant_id"))
