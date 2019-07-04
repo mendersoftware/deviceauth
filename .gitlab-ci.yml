@@ -117,20 +117,6 @@ test:unit:
     paths:
       - unit-coverage.tar
 
-test:backend_integration:
-  stage: test
-  image: tiangolo/docker-with-compose
-  dependencies: []
-  script:
-    - docker build -t mendersoftware/deviceauth:pr .
-    - pip install pyyaml
-    - export SHARED_PATH="$(dirname ${CI_PROJECT_DIR})"
-    - echo $SHARED_PATH
-    - apk add bash git
-    - git clone -b master https://github.com/mendersoftware/integration.git ${SHARED_PATH}/mender-integration
-    - python ${SHARED_PATH}/mender-integration/extra/release_tool.py --set-version-of deviceauth --version pr
-    - PYTEST_ARGS="-k 'not Multitenant'" ${SHARED_PATH}/mender-integration/backend-tests/run
-
 build:
   image: docker
   stage: build
