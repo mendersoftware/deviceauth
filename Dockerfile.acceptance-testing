@@ -10,7 +10,7 @@ FROM alpine:3.4
 
 EXPOSE 8080
 
-COPY  --from=builder /go/src/github.com/mendersoftware/deviceauth/deviceauth-test /usr/bin/deviceauth-test
+COPY  --from=builder /go/src/github.com/mendersoftware/deviceauth/deviceauth-test /usr/bin/
 COPY ./config.yaml /usr/bin/
 STOPSIGNAL SIGINT
 
