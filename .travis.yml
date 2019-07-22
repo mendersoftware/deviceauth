@@ -93,6 +93,8 @@ jobs:
 
     - stage: Tests
       name: "unit"
+      env:
+        - DEVICEAUTH_MONGO: localhost
       script:
         # Rename the branch we're on, so that it's not in the way for the
         # subsequent fetch. It's ok if this fails, it just means we're not on any
