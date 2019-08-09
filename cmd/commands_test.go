@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/mendersoftware/go-lib-micro/config"
 	"github.com/mendersoftware/go-lib-micro/identity"
 	ctxstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/pkg/errors"
@@ -25,6 +26,7 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	minv "github.com/mendersoftware/deviceauth/client/inventory/mocks"
+	dconfig "github.com/mendersoftware/deviceauth/config"
 	"github.com/mendersoftware/deviceauth/model"
 	"github.com/mendersoftware/deviceauth/store"
 	mstore "github.com/mendersoftware/deviceauth/store/mocks"
@@ -35,6 +37,11 @@ func TestMaintenance(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping TestMaintenance in short mode.")
 	}
+
+	config.SetDefaults(config.Config, dconfig.Defaults)
+	// Enable setting config values by environment variables
+	config.Config.SetEnvPrefix("DEVICEAUTH")
+	config.Config.AutomaticEnv()
 
 	err := Maintenance(true, "", false)
 	assert.NoError(t, err)

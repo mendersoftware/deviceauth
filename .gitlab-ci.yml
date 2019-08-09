@@ -102,6 +102,8 @@ test:unit:
   stage: test
   <<: *test_tool_setup
   dependencies: []
+  variables:
+    DEVICEAUTH_MONGO: mongo
   script:
     - apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 2930ADAE8CAF5059EE73BB4B58712A2291FA4AD5
     - wget http://security.debian.org/debian-security/pool/updates/main/o/openssl/libssl1.0.0_1.0.1t-1+deb8u11_amd64.deb
