@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -83,6 +83,8 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 
 		tenantVerify          bool
 		tenantVerificationErr error
+
+		config Config
 
 		res string
 		err error
@@ -193,6 +195,26 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 			tenantVerificationErr: errors.New("token verification failed: account suspended"),
 		},
 		{
+			//new device - valid default tenant token present, but given tenant token verification failed
+			desc: "new device, valid default tenant token present, but given tenant token verification fail",
+
+			inReq: req,
+
+			config: Config{
+				// token with the following claims:
+				//   {
+				//      "sub": "bogusdevice",
+				//      "mender.tenant": "foobar"
+				//   }
+				DefaultTenantToken: "fake.eyJzdWIiOiJib2d1c2RldmljZSIsIm1lbmRlci50ZW5hbnQiOiJmb29iYXIifQ.fake",
+			},
+
+			err: errors.New("dev auth: unauthorized: token verification failed: account suspended"),
+
+			tenantVerify:          true,
+			tenantVerificationErr: errors.New("token verification failed: account suspended"),
+		},
+		{
 			//new device - tenant token verification failed because of other reasons
 			desc: "new device, tenant token other fail",
 
@@ -245,6 +267,30 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 				//   }
 				TenantToken: "fake.eyJzdWIiOiJib2d1c2RldmljZSIsIm1lbmRlci50ZW5hbnQiOiJmb29iYXIifQ.fake",
 				PubKey:      pubKey,
+			},
+
+			addDeviceErr:  store.ErrObjectExists,
+			addAuthSetErr: store.ErrObjectExists,
+
+			tenantVerify: true,
+			err:          ErrDevAuthUnauthorized,
+		},
+		{
+			//new device - tenant token optional, and not provided
+			desc: "new device, missing and optional tenant token",
+
+			inReq: model.AuthReq{
+				IdData: idData,
+				PubKey:      pubKey,
+			},
+
+			config: Config{
+				// token with the following claims:
+				//   {
+				//      "sub": "bogusdevice",
+				//      "mender.tenant": "foobar"
+				//   }
+				DefaultTenantToken: "fake.eyJzdWIiOiJib2d1c2RldmljZSIsIm1lbmRlci50ZW5hbnQiOiJmb29iYXIifQ.fake",
 			},
 
 			addDeviceErr:  store.ErrObjectExists,
@@ -387,13 +433,19 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 				})).
 				Return("dummytoken", nil)
 
-			devauth := NewDevAuth(&db, nil, &jwth, Config{})
+			devauth := NewDevAuth(&db, nil, &jwth, tc.config)
 
 			if tc.tenantVerify {
+				var tenantToken string
+				if tc.inReq.TenantToken != "" {
+					tenantToken = tc.inReq.TenantToken
+				} else {
+					tenantToken = tc.config.DefaultTenantToken
+				}
 				ct := mtenant.ClientRunner{}
 				ct.On("VerifyToken",
 					mtesting.ContextMatcher(),
-					tc.inReq.TenantToken,
+					tenantToken,
 					mock.AnythingOfType("*apiclient.HttpApi")).
 					Return(tc.tenantVerificationErr)
 				devauth = devauth.WithTenantVerification(&ct)

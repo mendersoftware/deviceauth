@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -132,6 +132,9 @@ type Config struct {
 	ExpirationTime int64
 	// max devices limit default
 	MaxDevicesLimitDefault uint64
+	// Default tenant token to use when the client supplies none. Can be
+	// empty
+	DefaultTenantToken string
 }
 
 func NewDevAuth(d store.DataStore, co orchestrator.ClientRunner,
@@ -243,7 +246,14 @@ func (d *DevAuth) SubmitAuthRequest(ctx context.Context, r *model.AuthReq) (stri
 	l := log.FromContext(ctx)
 
 	if d.verifyTenant {
-		tctx, err := d.verifyTenantToken(ctx, r.TenantToken)
+		var tenantToken string
+		if r.TenantToken != "" {
+			tenantToken = r.TenantToken
+		} else if d.config.DefaultTenantToken != "" {
+			l.Debug("Client did not provide tenant token, using default tenant token")
+			tenantToken = d.config.DefaultTenantToken
+		}
+		tctx, err := d.verifyTenantToken(ctx, tenantToken)
 		if err != nil {
 			return "", err
 		}
