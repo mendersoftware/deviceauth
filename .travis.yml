@@ -123,20 +123,6 @@ jobs:
       after_success:
         - bash <(curl -s https://codecov.io/bash) -F acceptance ;
 
-    - stage: Tests
-      name: "backend-integration"
-      install:
-        - sudo apt-get -qq update
-        - pip3 install -U --user PyYAML
-      script:
-        - git clone -b master https://github.com/mendersoftware/integration.git;
-
-        - CGO_ENABLED=0 go build;
-        - sudo docker build -t mendersoftware/deviceauth:pr .;
-
-        - ./integration/extra/release_tool.py --set-version-of mender-device-auth --version pr;
-        - PYTEST_ARGS="-k 'not Multitenant'" ./integration/backend-tests/run;
-
     - stage: Trigger integration
       script:
         - echo "TODO trigger jenkins integration tests"
