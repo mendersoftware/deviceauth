@@ -211,6 +211,7 @@ func (d *DevAuthApiHandlers) PostDevicesV2Handler(w rest.ResponseWriter, r *rest
 	err = d.devAuth.PreauthorizeDevice(ctx, reqDbModel)
 	switch err {
 	case nil:
+		w.Header().Set("Location", "devices/"+reqDbModel.DeviceId)
 		w.WriteHeader(http.StatusCreated)
 	case devauth.ErrDeviceExists:
 		rest_utils.RestErrWithLog(w, r, l, err, http.StatusConflict)

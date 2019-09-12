@@ -305,6 +305,29 @@ func TestApiDevAuthSubmitAuthReq(t *testing.T) {
 	}
 }
 
+// Custom checker for the Location header in a preauth response
+type DevicePreauthReturnID struct {
+	mt.JSONResponse
+}
+
+func NewJSONResponseIDChecker(status int, headers map[string]string, body interface{}) *DevicePreauthReturnID {
+	return &DevicePreauthReturnID{
+		mt.JSONResponse{
+			BaseResponse: mt.BaseResponse{
+				Status:      status,
+				ContentType: "application/json",
+				Headers:     headers,
+				Body:        body,
+			},
+		},
+	}
+}
+
+func (d *DevicePreauthReturnID) CheckHeaders(t *testing.T, recorded *test.Recorded) {
+	assert.Contains(t, recorded.Recorder.HeaderMap, "Location")
+	assert.Contains(t, recorded.Recorder.HeaderMap["Location"][0], "devices/")
+}
+
 func TestApiV2DevAuthPreauthDevice(t *testing.T) {
 	t.Parallel()
 
@@ -335,6 +358,18 @@ func TestApiV2DevAuthPreauthDevice(t *testing.T) {
 			checker: mt.NewJSONResponse(
 				http.StatusCreated,
 				nil,
+				nil),
+		},
+		"ok - verify Location header": {
+			body: &preAuthReq{
+				IdData: map[string]interface{}{
+					"sn": "0001",
+				},
+				PubKey: pubkeyStr,
+			},
+			checker: NewJSONResponseIDChecker(
+				http.StatusCreated,
+				map[string]string{"Location": "devices/somegeneratedid"},
 				nil),
 		},
 		"invalid: id data is not json": {
