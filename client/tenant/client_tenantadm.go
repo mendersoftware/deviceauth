@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -35,7 +35,8 @@ const (
 )
 
 const (
-	MsgErrTokenVerificationFailed = "token verification failed"
+	MsgErrTokenVerificationFailed = "tenant token verification failed"
+	MsgErrTokenMissing            = "tenant token missing"
 )
 
 func IsErrTokenVerificationFailed(e error) bool {
@@ -44,6 +45,10 @@ func IsErrTokenVerificationFailed(e error) bool {
 
 func MakeErrTokenVerificationFailed(apiErr error) error {
 	return errors.Wrap(apiErr, MsgErrTokenVerificationFailed)
+}
+
+func IsErrTokenMissing(e error) bool {
+	return strings.HasPrefix(e.Error(), MsgErrTokenMissing)
 }
 
 // ClientConfig conveys client configuration
