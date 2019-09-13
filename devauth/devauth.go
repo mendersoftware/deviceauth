@@ -214,15 +214,23 @@ func tenantWithContext(ctx context.Context, tenantToken string) (context.Context
 	return ctx, nil
 }
 
-func logAndReturnCorrectTenantTokenError(l *log.Logger, errToken, errDefaultToken error) error {
-	// The logic here is: If any error is nil, we return nil immediately
+// This function explicitly returns string pointer, not string, so that in the
+// event that we have made a logic error somewhere, we will get a nil-pointer
+// exception instead of a incorrect succeeded login, which would be very bad for
+// security.
+func logAndGetCorrectTenantToken(l *log.Logger, tenantToken, defaultTenantToken string,
+	errToken, errDefaultToken error) (*string, error) {
+	// The logic here is: If any error is nil, we return success immediately
 	// (authentication succeeded). If both are non-nil, we consider "missing
 	// token" errors priority 2, and all other errors priority 1. Then we
 	// log all errors at the most serious level. So "missing token" errors
 	// will not be logged if there is another more serious error present.
 
-	if errToken == nil || errDefaultToken == nil {
-		return nil
+	if errToken == nil {
+		return &tenantToken, nil
+	}
+	if errDefaultToken == nil {
+		return &defaultTenantToken, nil
 	}
 
 	var returnError error
@@ -250,9 +258,9 @@ func logAndReturnCorrectTenantTokenError(l *log.Logger, errToken, errDefaultToke
 	}
 
 	if tenant.IsErrTokenVerificationFailed(returnError) || tenant.IsErrTokenMissing(returnError) {
-		return MakeErrDevAuthUnauthorized(returnError)
+		return nil, MakeErrDevAuthUnauthorized(returnError)
 	} else {
-		return errors.Wrap(returnError, "request to verify tenant token failed")
+		return nil, errors.Wrap(returnError, "request to verify tenant token failed")
 	}
 }
 
@@ -271,12 +279,12 @@ func (d *DevAuth) verifyTenantToken(ctx context.Context, tenantToken, defaultTen
 		errDefaultToken = d.cTenant.VerifyToken(ctx, defaultTenantToken, d.clientGetter())
 	}
 
-	err := logAndReturnCorrectTenantTokenError(l, errToken, errDefaultToken)
+	chosenTenantToken, err := logAndGetCorrectTenantToken(l, tenantToken, defaultTenantToken, errToken, errDefaultToken)
 	if err != nil {
 		return ctx, err
 	}
 
-	tCtx, err := tenantWithContext(ctx, tenantToken)
+	tCtx, err := tenantWithContext(ctx, *chosenTenantToken)
 	if err != nil {
 		l.Errorf("failed to setup tenant context: %v", err)
 		return ctx, ErrDevAuthUnauthorized
