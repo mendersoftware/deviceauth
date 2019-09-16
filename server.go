@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -84,6 +84,7 @@ func RunServer(c config.Reader) error {
 			Issuer:                 c.GetString(dconfig.SettingJWTIssuer),
 			ExpirationTime:         int64(c.GetInt(dconfig.SettingJWTExpirationTimeout)),
 			MaxDevicesLimitDefault: uint64(c.GetInt(dconfig.SettingMaxDevicesLimitDefault)),
+			DefaultTenantToken:     c.GetString(dconfig.SettingDefaultTenantToken),
 		})
 
 	if tadmAddr := c.GetString(dconfig.SettingTenantAdmAddr); tadmAddr != "" {
