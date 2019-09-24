@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -466,7 +466,7 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 			res: dummyToken,
 		},
 		{
-			desc: "error: can't get an existing authset",
+			desc:                     "error: can't get an existing authset",
 			dbGetAuthSetByDataKeyErr: errors.New("db error"),
 			dev: &model.Device{
 				Id:     dummyDevId,
@@ -524,7 +524,7 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 				Status: model.DevStatusPending,
 			},
 			coSubmitProvisionDeviceJobErr: errors.New("conductor failed"),
-			err: errors.New("submit device provisioning job error: conductor failed"),
+			err:                           errors.New("submit device provisioning job error: conductor failed"),
 		},
 		{
 			desc: "ok: preauthorized set is auto-accepted, device was already accepted",
@@ -543,7 +543,7 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 				Status: model.DevStatusAccepted,
 			},
 			coSubmitProvisionDeviceJobErr: errors.New("conductor shouldn't be called"),
-			res: dummyToken,
+			res:                           dummyToken,
 		},
 		{
 			desc: "error: cannot get device status",
@@ -839,8 +839,8 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 				Status: model.DevStatusPending,
 			},
 			coSubmitProvisionDeviceJobErr: errors.New("conductor shouldn't be called"),
-			dbLimit: &model.Limit{Value: 5},
-			dbCount: 4,
+			dbLimit:                       &model.Limit{Value: 5},
+			dbCount:                       4,
 		},
 		{
 			aset: &model.AuthSet{
@@ -853,8 +853,8 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 				Status: model.DevStatusAccepted,
 			},
 			coSubmitProvisionDeviceJobErr: errors.New("conductor shouldn't be called"),
-			dbLimit: &model.Limit{Value: 5},
-			dbCount: 4,
+			dbLimit:                       &model.Limit{Value: 5},
+			dbCount:                       4,
 		},
 		{
 			aset: &model.AuthSet{
@@ -937,7 +937,7 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 				Status: model.DevStatusPending,
 			},
 			coSubmitProvisionDeviceJobErr: errors.New("conductor failed"),
-			outErr: "submit device provisioning job error: conductor failed",
+			outErr:                        "submit device provisioning job error: conductor failed",
 		},
 		{
 			dbLimit: &model.Limit{Value: 0},
@@ -962,7 +962,7 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 				Status: model.DevStatusPending,
 			},
 			dbUpdateRevokeAuthSetsErr: errors.New("foobar"),
-			outErr: "failed to reject auth sets: foobar",
+			outErr:                    "failed to reject auth sets: foobar",
 		},
 		{
 			aset: &model.AuthSet{
@@ -1396,12 +1396,12 @@ func TestDevAuthDecommissionDevice(t *testing.T) {
 			outErr:            "UpdateDevice Error",
 		},
 		{
-			devId: "devId2",
+			devId:                        "devId2",
 			dbDeleteAuthSetsForDeviceErr: errors.New("DeleteAuthSetsForDevice Error"),
-			outErr: "db delete device authorization sets error: DeleteAuthSetsForDevice Error",
+			outErr:                       "db delete device authorization sets error: DeleteAuthSetsForDevice Error",
 		},
 		{
-			devId: "devId3",
+			devId:                   "devId3",
 			dbDeleteTokenByDevIdErr: errors.New("DeleteTokenByDevId Error"),
 			outErr:                  "db delete device tokens error: DeleteTokenByDevId Error",
 		},
@@ -1411,9 +1411,9 @@ func TestDevAuthDecommissionDevice(t *testing.T) {
 			outErr:            "DeleteDevice Error",
 		},
 		{
-			devId: "devId5",
+			devId:                              "devId5",
 			coSubmitDeviceDecommisioningJobErr: errors.New("SubmitDeviceDecommisioningJob Error"),
-			outErr: "submit device decommissioning job error: SubmitDeviceDecommisioningJob Error",
+			outErr:                             "submit device decommissioning job error: SubmitDeviceDecommisioningJob Error",
 		},
 		{
 			devId:           "devId6",
@@ -1792,9 +1792,9 @@ func TestDevAuthProvisionTenant(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(fmt.Sprintf("test case: %s", name), func(t *testing.T) {
 			ctx := context.Background()
-
+			ctxMatcher := mtesting.ContextMatcher()
 			db := mstore.DataStore{}
-			db.On("MigrateTenant", ctx,
+			db.On("MigrateTenant", ctxMatcher,
 				mock.AnythingOfType("string"),
 				"1.5.0",
 			).Return(tc.datastoreError)
@@ -1864,10 +1864,10 @@ func TestDevAuthDeleteAuthSet(t *testing.T) {
 			dbDeleteTokenByDevIdErr: store.ErrTokenNotFound,
 		},
 		{
-			devId:  "devId6",
-			authId: "authId6",
+			devId:                       "devId6",
+			authId:                      "authId6",
 			dbDeleteAuthSetForDeviceErr: errors.New("DeleteAuthSetsForDevice Error"),
-			outErr: "DeleteAuthSetsForDevice Error",
+			outErr:                      "DeleteAuthSetsForDevice Error",
 		},
 		{
 			devId:             "devId8",
