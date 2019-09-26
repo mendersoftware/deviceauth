@@ -1036,13 +1036,13 @@ func (d *DevAuth) DeleteTokens(ctx context.Context, tenant_id, device_id string)
 }
 
 func (d *DevAuth) ProvisionTenant(ctx context.Context, tenant_id string) error {
-	tenantCtx := identity.WithContext(context.Background(), &identity.Identity{
+	tenantCtx := identity.WithContext(ctx, &identity.Identity{
 		Tenant: tenant_id,
 	})
 
 	dbname := mstore.DbFromContext(tenantCtx, mongo.DbName)
 
-	return d.db.WithAutomigrate().MigrateTenant(ctx, dbname, mongo.DbVersion)
+	return d.db.WithAutomigrate().MigrateTenant(tenantCtx, dbname, mongo.DbVersion)
 }
 
 func (d *DevAuth) GetTenantDeviceStatus(ctx context.Context, tenantId, deviceId string) (*model.Status, error) {
