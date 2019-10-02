@@ -132,6 +132,9 @@ type Config struct {
 	ExpirationTime int64
 	// max devices limit default
 	MaxDevicesLimitDefault uint64
+	// Default tenant token to use when the client supplies none. Can be
+	// empty
+	DefaultTenantToken string
 }
 
 func NewDevAuth(d store.DataStore, co orchestrator.ClientRunner,
@@ -211,25 +214,77 @@ func tenantWithContext(ctx context.Context, tenantToken string) (context.Context
 	return ctx, nil
 }
 
-func (d *DevAuth) verifyTenantToken(ctx context.Context, tenantToken string) (context.Context, error) {
-	l := log.FromContext(ctx)
-	if tenantToken == "" {
-		l.Errorf("request is missing tenant token")
-		return ctx, ErrDevAuthUnauthorized
+// This function explicitly returns string pointer, not string, so that in the
+// event that we have made a logic error somewhere, we will get a nil-pointer
+// exception instead of a incorrect succeeded login, which would be very bad for
+// security.
+func logAndGetCorrectTenantToken(l *log.Logger, tenantToken, defaultTenantToken string,
+	errToken, errDefaultToken error) (*string, error) {
+	// The logic here is: If any error is nil, we return success immediately
+	// (authentication succeeded). If both are non-nil, we consider "missing
+	// token" errors priority 2, and all other errors priority 1. Then we
+	// log all errors at the most serious level. So "missing token" errors
+	// will not be logged if there is another more serious error present.
+
+	if errToken == nil {
+		return &tenantToken, nil
+	}
+	if errDefaultToken == nil {
+		return &defaultTenantToken, nil
 	}
 
-	// verify tenant token with tenant administration
-	err := d.cTenant.VerifyToken(ctx, tenantToken, d.clientGetter())
-	if err != nil {
-		if tenant.IsErrTokenVerificationFailed(err) {
-			l.Errorf("failed to verify tenant token")
-			return ctx, MakeErrDevAuthUnauthorized(err)
+	var returnError error
+
+	if errToken != nil && !tenant.IsErrTokenMissing(errToken) {
+		l.Errorf("Failed to verify supplied tenant token: %s", errToken.Error())
+		returnError = errToken
+	}
+	if errDefaultToken != nil && !tenant.IsErrTokenMissing(errDefaultToken) {
+		l.Errorf("Failed to verify default tenant token: %s", errDefaultToken.Error())
+		if returnError == nil {
+			returnError = errDefaultToken
 		}
-
-		return ctx, errors.New("request to verify tenant token failed")
 	}
 
-	tCtx, err := tenantWithContext(ctx, tenantToken)
+	if returnError == nil {
+		if errToken != nil {
+			l.Errorf("Failed to verify supplied tenant token: %s", errToken.Error())
+			returnError = errToken
+		}
+		if errDefaultToken != nil {
+			l.Errorf("Failed to verify default tenant token: %s", errDefaultToken.Error())
+			returnError = errDefaultToken
+		}
+	}
+
+	if tenant.IsErrTokenVerificationFailed(returnError) || tenant.IsErrTokenMissing(returnError) {
+		return nil, MakeErrDevAuthUnauthorized(returnError)
+	} else {
+		return nil, errors.Wrap(returnError, "request to verify tenant token failed")
+	}
+}
+
+func (d *DevAuth) verifyTenantToken(ctx context.Context, tenantToken, defaultTenantToken string) (context.Context, error) {
+	l := log.FromContext(ctx)
+
+	errToken := errors.New(tenant.MsgErrTokenMissing)
+	errDefaultToken := errToken
+
+	// verify tenant token with tenant administration, and fall back to
+	// verifying default tenant token if that fails.
+	if tenantToken != "" {
+		errToken = d.cTenant.VerifyToken(ctx, tenantToken, d.clientGetter())
+	}
+	if errToken != nil && defaultTenantToken != "" {
+		errDefaultToken = d.cTenant.VerifyToken(ctx, defaultTenantToken, d.clientGetter())
+	}
+
+	chosenTenantToken, err := logAndGetCorrectTenantToken(l, tenantToken, defaultTenantToken, errToken, errDefaultToken)
+	if err != nil {
+		return ctx, err
+	}
+
+	tCtx, err := tenantWithContext(ctx, *chosenTenantToken)
 	if err != nil {
 		l.Errorf("failed to setup tenant context: %v", err)
 		return ctx, ErrDevAuthUnauthorized
@@ -243,7 +298,7 @@ func (d *DevAuth) SubmitAuthRequest(ctx context.Context, r *model.AuthReq) (stri
 	l := log.FromContext(ctx)
 
 	if d.verifyTenant {
-		tctx, err := d.verifyTenantToken(ctx, r.TenantToken)
+		tctx, err := d.verifyTenantToken(ctx, r.TenantToken, d.config.DefaultTenantToken)
 		if err != nil {
 			return "", err
 		}

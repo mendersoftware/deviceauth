@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -48,6 +48,9 @@ const (
 	SettingTenantAdmAddr        = "tenantadm_addr"
 	SettingTenantAdmAddrDefault = ""
 
+	SettingDefaultTenantToken        = "default_tenant_token"
+	SettingDefaultTenantTokenDefault = ""
+
 	SettingServerPrivKeyPath        = "server_priv_key_path"
 	SettingServerPrivKeyPathDefault = "/etc/deviceauth/rsa/private.pem"
 
@@ -72,6 +75,7 @@ var (
 		{Key: SettingInventoryAddr, Value: SettingInventoryAddrDefault},
 		{Key: SettingOrchestratorAddr, Value: SettingOrchestratorAddrDefault},
 		{Key: SettingTenantAdmAddr, Value: SettingTenantAdmAddrDefault},
+		{Key: SettingDefaultTenantToken, Value: SettingDefaultTenantTokenDefault},
 		{Key: SettingServerPrivKeyPath, Value: SettingServerPrivKeyPathDefault},
 		{Key: SettingJWTIssuer, Value: SettingJWTIssuerDefault},
 		{Key: SettingJWTExpirationTimeout, Value: SettingJWTExpirationTimeoutDefault},
