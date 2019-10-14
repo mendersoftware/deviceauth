@@ -138,11 +138,6 @@ build:
   tags:
     - docker
 
-publish:docs:
-  stage: publish
-  script:
-    - echo "publishing docs"
-
 publish:tests:
   image: alpine
   stage: publish
