@@ -11,7 +11,6 @@ cache:
 
 variables:
   DOCKER_HOST: tcp://docker:2375/
-  DOCKER_REPOSITORY: mendersoftware/deviceauth
 
 services:
   - docker:dind
@@ -22,6 +21,12 @@ stages:
   - test
   - build
   - publish
+
+before_script:
+  - export DOCKER_REPOSITORY="mendersoftware/deviceauth"
+  - export DOCKER_TAG=${CI_COMMIT_REF_SLUG:-master}
+  - export SERVICE_IMAGE=$DOCKER_REPOSITORY:$DOCKER_TAG
+  - export COMMIT_TAG="$CI_COMMIT_REF_SLUG"_"$CI_COMMIT_SHA"
 
 .template_prep_tests: &test_tool_setup
   before_script:
@@ -123,8 +128,9 @@ build:
   image: docker
   stage: build
   script:
-    - docker build -t $DOCKER_REPOSITORY:pr .
-    - docker save $DOCKER_REPOSITORY:pr > image.tar
+    - echo "building deviceauth for ${SERVICE_IMAGE}"
+    - docker build -t $SERVICE_IMAGE .
+    - docker save $SERVICE_IMAGE > image.tar
   artifacts:
     expire_in: 2w
     paths:
@@ -151,34 +157,20 @@ publish:tests:
     - bash -c "bash <(curl -s https://codecov.io/bash) -Z -F acceptance -f ./tests/coverage-acceptance.txt"
 
 publish:build:
-  image: docker
+  image: docker:git
   stage: publish
+  services:
+    - docker:dind
   dependencies:
     - build
   script:
-    - echo "publishing image to docker hub"
-    # - docker load -i image.tar
-    # - if [ ! -z "$CI_COMMIT_TAG" ]; then export IMAGE_TAG=$CI_COMMIT_TAG; else export IMAGE_TAG=$CI_COMMIT_REF_NAME; fi ;
-    # - docker tag $DOCKER_REPOSITORY:pr $DOCKER_REPOSITORY:$IMAGE_TAG ;
-    # - docker login --username=$DOCKER_HUB_USERNAME --password=$DOCKER_HUB_PASSWORD ;
-    # - docker push $DOCKER_REPOSITORY:$IMAGE_TAG ;
-  except:
-    - master
-  tags:
-    - docker
-
-publish:build:master:
-  image: docker
-  stage: publish
-  dependencies:
-    - build
-  script:
-    - echo "publishing image to docker hub"
-    # - docker load -i image.tar
-    # - export COMMIT_TAG="$CI_COMMIT_REF_NAME"_"$CI_COMMIT_SHA";
-    # - docker tag $DOCKER_REPOSITORY:pr $DOCKER_REPOSITORY:$COMMIT_TAG;
-    # - docker push $DOCKER_REPOSITORY:$COMMIT_TAG;
+    - docker load -i image.tar
+    - docker tag $SERVICE_IMAGE $DOCKER_REPOSITORY:$COMMIT_TAG
+    - docker tag $SERVICE_IMAGE $DOCKER_REPOSITORY:$CI_COMMIT_REF_SLUG
+    - echo -n $DOCKER_HUB_PASSWORD | docker login -u $DOCKER_HUB_USERNAME --password-stdin
+    - docker push $DOCKER_REPOSITORY:$COMMIT_TAG
+    - docker push $SERVICE_IMAGE
   only:
-    - master
+    - /^(master|[0-9]+\.[0-9]+\.x)$/
   tags:
     - docker
