@@ -90,6 +90,10 @@ paths:
       responses:
         201:
           description: Device submitted.
+          headers:
+            Location:
+              description: URL of the newly created user-ID.
+              type: string
         400:
           description: Missing/malformed request params.
           schema:
