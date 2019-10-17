@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@ import (
 )
 
 const (
-	DbVersion     = "1.5.0"
+	DbVersion     = "1.6.0"
 	DbName        = "deviceauth"
 	DbDevicesColl = "devices"
 	DbAuthSetColl = "auth_sets"
@@ -45,6 +45,7 @@ const (
 	indexDevices_IdentityData                       = "devices:IdentityData"
 	indexAuthSet_DeviceId_IdentityData_PubKey       = "auth_sets:DeviceId:IdData:PubKey"
 	indexAuthSet_DeviceId_IdentityDataSha256_PubKey = "auth_sets:IdDataSha256:PubKey"
+	indexAuthSet_IdentityDataSha256_PubKey          = "auth_sets:NoDeviceId:IdDataSha256:PubKey"
 )
 
 var (
@@ -418,6 +419,10 @@ func (db *DataStoreMongo) MigrateTenant(ctx context.Context, database, version s
 			ctx: ctx,
 		},
 		&migration_1_5_0{
+			ms:  db,
+			ctx: ctx,
+		},
+		&migration_1_6_0{
 			ms:  db,
 			ctx: ctx,
 		},

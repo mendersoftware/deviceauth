@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -727,7 +727,7 @@ func TestStoreMigrate(t *testing.T) {
 		DbVersion + " no automigrate": {
 			automigrate: false,
 			version:     DbVersion,
-			err:         "failed to apply migrations: db needs migration: deviceauth has version 0.0.0, needs version 1.5.0",
+			err:         "failed to apply migrations: db needs migration: deviceauth has version 0.0.0, needs version 1.6.0",
 		},
 		DbVersion + " multitenant": {
 			automigrate: true,
@@ -739,7 +739,7 @@ func TestStoreMigrate(t *testing.T) {
 			automigrate: false,
 			tenantDbs:   []string{"deviceauth-tenant1id", "deviceauth-tenant2id"},
 			version:     DbVersion,
-			err:         "failed to apply migrations: db needs migration: deviceauth-tenant1id has version 0.0.0, needs version 1.5.0",
+			err:         "failed to apply migrations: db needs migration: deviceauth-tenant1id has version 0.0.0, needs version 1.6.0",
 		},
 		"0.1 error": {
 			automigrate: true,
@@ -817,6 +817,15 @@ func TestStoreMigrate(t *testing.T) {
 										model.AuthSetKeyPubKey,
 									},
 									Name:       indexAuthSet_DeviceId_IdentityDataSha256_PubKey,
+									Background: false,
+								},
+								{
+									Unique: true,
+									Key: []string{
+										model.AuthSetKeyIdDataSha256,
+										model.AuthSetKeyPubKey,
+									},
+									Name:       indexAuthSet_IdentityDataSha256_PubKey,
 									Background: false,
 								},
 							})
