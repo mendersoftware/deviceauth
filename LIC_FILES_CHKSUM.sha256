@@ -2,9 +2,12 @@
 # Apache-2.0
 beb140be4cd64599bedc691a55b2729c9cc611a4b9d6ec44e01270105daf18a2  LICENSE
 98ed35b5a138f58164b5c0dbccd9d7f01ef4d84b9dba01e896f0a3241c50c0f7  vendor/github.com/mendersoftware/mendertesting/LICENSE
-9e015a4328bd336835c9969e38b1fc338a40bdea18d4d1f33b2cd12808238dd7  vendor/github.com/mendersoftware/go-lib-micro/LICENSE
+c1452ea0feb52f2e6e6aaba33ae0d558626ba8c69ad7cb6866f2d4fbb7a711dc  vendor/github.com/mendersoftware/go-lib-micro/LICENSE
 f7a4d9fa675c9347d97d6cb7b3142f733a828e8884eef461f30601f797f8248a  vendor/github.com/Azure/go-autorest/LICENSE
 5e3400b93bbb099e83e52bab885e7441750673c21f97988ca3f1240639b63283  vendor/github.com/spf13/afero/LICENSE.txt
+09e8a9bcec8067104652c168685ab0931e7868f9c8284b66f5ae6edae5f1130b  vendor/github.com/xdg/scram/LICENSE
+09e8a9bcec8067104652c168685ab0931e7868f9c8284b66f5ae6edae5f1130b  vendor/github.com/xdg/stringprep/LICENSE
+c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4  vendor/go.mongodb.org/mongo-driver/LICENSE
 #
 # BSD-2-Clause
 1e0222fa00c5a5356489185f78758e8ce8352c44e992486136b605f8ef7ee657  vendor/github.com/magiconair/properties/LICENSE
@@ -12,7 +15,8 @@ f7a4d9fa675c9347d97d6cb7b3142f733a828e8884eef461f30601f797f8248a  vendor/github.
 fe60e0cc90e88f12c814adb7dc88df6791c6ec6798d8c856b7d5ad1b805b4f10  vendor/github.com/globalsign/mgo/LICENSE
 86258a47c5340187ef120b9c20e5427a84d3040ecab3243315692862e07dedae  vendor/github.com/globalsign/mgo/bson/LICENSE
 69ce77f2b1c9c608d27f2d749b0e7d0c13960ed3b0dc07b973ac940e362e5d9c  vendor/gopkg.in/check.v1/LICENSE
-dd26a7abddd02e2d0aba97805b31f248ef7835d9e10da289b22e3b8ab78b324d  vendor/github.com/globalsign/mgo/internal/json/LICENSE
+79d57737a077fa42d2017297e74c5ad0f1f6597db0747799f2e1c0f698bc85ea  vendor/github.com/DataDog/zstd/LICENSE
+fe60e0cc90e88f12c814adb7dc88df6791c6ec6798d8c856b7d5ad1b805b4f10  vendor/github.com/mendersoftware/go-lib-micro/mongo/dbtest/LICENSE
 #
 # BSD-3-Clause
 b8514c577c1c4b46cee454d5a882b15fa411e72c5bd7f801f241591789fce61a  vendor/github.com/spf13/pflag/LICENSE
@@ -23,6 +27,9 @@ c8001d18c3dda64c7e72146f1b23d73619fcf426aed6778f447599f5ac8e600a  vendor/gopkg.i
 8407b13e462f755c06db3db3a034dc1fdc9157af19c6ea8986e7d5aecf4126b3  vendor/gopkg.in/tomb.v2/LICENSE
 2d36597f7117c38b006835ae7f537487207d8ec407aa9d9980794b2030cbc067  vendor/golang.org/x/text/LICENSE
 c8001d18c3dda64c7e72146f1b23d73619fcf426aed6778f447599f5ac8e600a  vendor/github.com/fsnotify/fsnotify/LICENSE
+f69f157b0be75da373605dbc8bbf142e8924ee82d8f44f11bcaf351335bf98cf  vendor/github.com/golang/snappy/LICENSE
+17b5d209ba8f9684257ecfcff87df6ceda6194143a8fbd074f29727cff6f0c40  vendor/github.com/google/go-cmp/LICENSE
+2d36597f7117c38b006835ae7f537487207d8ec407aa9d9980794b2030cbc067  vendor/golang.org/x/sync/LICENSE
 #
 # MIT
 012d0f6caf604aedba723982c0d8a28f664ecd957de5131bc22c87a0d36b7115  vendor/github.com/asaskevich/govalidator/LICENSE
@@ -42,6 +49,8 @@ fde7d610b9b95fc5a6304055c4dae951025b630aaa42a24e95ebf76675ae832c  vendor/github.
 da277af11b85227490377fbcac6afccc68be560c4fff36ac05ca62de55345fd7  vendor/github.com/urfave/cli/LICENSE
 a2e6011b982212228008c4386616a4818eb5fdf9ea5805b7a90500e6ce895aaf  vendor/github.com/pelletier/go-toml/LICENSE
 d21cb1c60785d6d3a84a7059323ccafc45c645b1bbda281c76a62d66ad2d7dc3  vendor/github.com/BurntSushi/toml/COPYING
+9e203bd56d54ad11a8106e63e7a738363634f23ac91e14bddb2e35c5e7545a72  vendor/github.com/go-stack/stack/LICENSE.md
+0ca70311227fe097c662dece3f359e3317fa7f9d41f8d29eb45fc5135e216139  vendor/github.com/tidwall/pretty/LICENSE
 #
 # LGPL3 with static linking exception.
 b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1  vendor/gopkg.in/yaml.v2/LICENSE
@@ -50,5 +59,6 @@ a94710b55e03b5285f77d048c5ba61bb9d6ee04a06c0eb90e68821e11b0c707a  vendor/gopkg.i
 #
 # MPL 2.0
 bef1747eda88b9ed46e94830b0d978c3499dad5dfe38d364971760881901dadd  vendor/github.com/hashicorp/hcl/LICENSE
+79d57737a077fa42d2017297e74c5ad0f1f6597db0747799f2e1c0f698bc85ea  vendor/github.com/DataDog/zstd/LICENSE
 # ISC
 6a6ae99c69879233ddb1095938f7f3ea651fd91d82d46988fb0be6489c7a1bb6  vendor/github.com/davecgh/go-spew/LICENSE

@@ -1,4 +1,4 @@
-// Copyright 2017 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import (
 
 	. "github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate/mocks"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 func TestSimpleMigratorApply(t *testing.T) {
@@ -181,15 +182,16 @@ func TestSimpleMigratorApply(t *testing.T) {
 
 			//setup
 			db.Wipe()
-			session := db.Session()
+			client := db.Client()
 			for i := range tc.InputMigrations {
-				err := session.DB("test").C(DbMigrationsColl).
-					Insert(tc.InputMigrations[i])
+				_, err := client.Database("test").
+					Collection(DbMigrationsColl).
+					InsertOne(db.CTX(), tc.InputMigrations[i])
 				assert.NoError(t, err)
 			}
 
 			//test
-			m := &SimpleMigrator{Session: session, Db: "test", Automigrate: tc.Automigrate}
+			m := &SimpleMigrator{Client: client, Db: "test", Automigrate: tc.Automigrate}
 			err := m.Apply(context.Background(), tc.InputVersion, tc.Migrators)
 			if tc.OutputError != nil {
 				assert.Error(t, err)
@@ -200,14 +202,27 @@ func TestSimpleMigratorApply(t *testing.T) {
 
 			//verify
 			var out []MigrationEntry
-			session.DB("test").C(DbMigrationsColl).Find(nil).All(&out)
+			cursor, _ := client.Database("test").
+				Collection(DbMigrationsColl).
+				Find(db.CTX(), bson.M{})
+
+			count := 0
+			for cursor.Next(db.CTX()) {
+				var res MigrationEntry
+				count++
+				elem := &bson.D{}
+				err = cursor.Decode(elem)
+				bsonBytes, _ := bson.Marshal(elem)
+				bson.Unmarshal(bsonBytes, &res)
+				out = append(out, res)
+			}
+
 			// sort applied migrations
 			sort.Slice(out, func(i int, j int) bool {
 				return VersionIsLess(out[i].Version, out[j].Version)
 			})
 			// applied migration should be last
 			assert.Equal(t, tc.OutputVersion, out[len(out)-1].Version)
-			session.Close()
 		})
 	}
 }
