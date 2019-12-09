@@ -12,8 +12,6 @@ c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4  vendor/go.mong
 # BSD-2-Clause
 1e0222fa00c5a5356489185f78758e8ce8352c44e992486136b605f8ef7ee657  vendor/github.com/magiconair/properties/LICENSE
 8d427fd87bc9579ea368fde3d49f9ca22eac857f91a9dec7e3004bdfab7dee86  vendor/github.com/pkg/errors/LICENSE
-fe60e0cc90e88f12c814adb7dc88df6791c6ec6798d8c856b7d5ad1b805b4f10  vendor/github.com/globalsign/mgo/LICENSE
-86258a47c5340187ef120b9c20e5427a84d3040ecab3243315692862e07dedae  vendor/github.com/globalsign/mgo/bson/LICENSE
 69ce77f2b1c9c608d27f2d749b0e7d0c13960ed3b0dc07b973ac940e362e5d9c  vendor/gopkg.in/check.v1/LICENSE
 79d57737a077fa42d2017297e74c5ad0f1f6597db0747799f2e1c0f698bc85ea  vendor/github.com/DataDog/zstd/LICENSE
 fe60e0cc90e88f12c814adb7dc88df6791c6ec6798d8c856b7d5ad1b805b4f10  vendor/github.com/mendersoftware/go-lib-micro/mongo/dbtest/LICENSE

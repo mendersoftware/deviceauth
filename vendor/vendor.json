@@ -113,42 +113,6 @@
 			"revisionTime": "2017-03-29T04:21:07Z"
 		},
 		{
-			"checksumSHA1": "hoCX7WyTA5tXMil5k70UeT1pMWg=",
-			"path": "github.com/globalsign/mgo",
-			"revision": "113d3961e7311526535a1ef7042196563d442761",
-			"revisionTime": "2018-06-15T13:49:36Z"
-		},
-		{
-			"checksumSHA1": "eyGqv5tDAutaH0wGYLti1G5gg4E=",
-			"path": "github.com/globalsign/mgo/bson",
-			"revision": "113d3961e7311526535a1ef7042196563d442761",
-			"revisionTime": "2018-06-15T13:49:36Z"
-		},
-		{
-			"checksumSHA1": "NQ57QV6leakSeRyFWoXZYt4WRTU=",
-			"path": "github.com/globalsign/mgo/dbtest",
-			"revision": "113d3961e7311526535a1ef7042196563d442761",
-			"revisionTime": "2018-06-15T13:49:36Z"
-		},
-		{
-			"checksumSHA1": "v+vkHey6KrivVjjvBSG3FTK98hk=",
-			"path": "github.com/globalsign/mgo/internal/json",
-			"revision": "113d3961e7311526535a1ef7042196563d442761",
-			"revisionTime": "2018-06-15T13:49:36Z"
-		},
-		{
-			"checksumSHA1": "loubUcDO2QAStKIlVd7DqSeoEaw=",
-			"path": "github.com/globalsign/mgo/internal/sasl",
-			"revision": "113d3961e7311526535a1ef7042196563d442761",
-			"revisionTime": "2018-06-15T13:49:36Z"
-		},
-		{
-			"checksumSHA1": "0sp392bVkHVh1xaSLCpFmjCJKgs=",
-			"path": "github.com/globalsign/mgo/internal/scram",
-			"revision": "113d3961e7311526535a1ef7042196563d442761",
-			"revisionTime": "2018-06-15T13:49:36Z"
-		},
-		{
 			"checksumSHA1": "zELlitdI3OUGxjbFS1sCI/KqPDA=",
 			"path": "github.com/go-stack/stack",
 			"revision": "2fee6af1a9795aafbe0253a0cfbdf668e1fb8a9a",
