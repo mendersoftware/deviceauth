@@ -16,10 +16,12 @@ package mongo
 import (
 	"context"
 
-	"github.com/globalsign/mgo"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	ctxstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/pkg/errors"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/mendersoftware/deviceauth/model"
 )
@@ -30,21 +32,22 @@ type migration_1_6_0 struct {
 }
 
 func (m *migration_1_6_0) Up(from migrate.Version) error {
-	s := m.ms.session.Copy()
-
-	defer s.Close()
-
-	err := s.DB(ctxstore.DbFromContext(m.ctx, DbName)).
-		C(DbAuthSetColl).EnsureIndex(mgo.Index{
-		Unique: true,
-		Key: []string{
-			model.AuthSetKeyIdDataSha256,
-			model.AuthSetKeyPubKey,
+	_false := false
+	_true := true
+	authSetUniqueIndex := mongo.IndexModel{
+		Keys: bson.D{
+			{Key: model.AuthSetKeyIdDataSha256, Value: 1},
+			{Key: model.AuthSetKeyPubKey, Value: 1},
 		},
-		Name:       indexAuthSet_IdentityDataSha256_PubKey,
-		Background: false,
-	})
-
+		Options: &options.IndexOptions{
+			Background: &_false,
+			Name:       &indexAuthSet_IdentityDataSha256_PubKey,
+			Unique:     &_true,
+		},
+	}
+	cAuthSets := m.ms.client.Database(ctxstore.DbFromContext(m.ctx, DbName)).Collection(DbAuthSetColl)
+	authSetIndexes := cAuthSets.Indexes()
+	_, err := authSetIndexes.CreateOne(m.ctx, authSetUniqueIndex)
 	if err != nil {
 		return errors.Wrap(err, "failed to create index containing IdDataSha256 and PubKey on auth sets")
 	}

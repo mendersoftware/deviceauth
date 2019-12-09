@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -17,10 +17,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/globalsign/mgo/bson"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	ctxstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/pkg/errors"
+	"go.mongodb.org/mongo-driver/bson"
 
 	"github.com/mendersoftware/deviceauth/model"
 )
@@ -47,20 +47,25 @@ type token_0_1_0 struct {
 }
 
 func (m *migration_1_1_0) Up(from migrate.Version) error {
-	s := m.ms.session.Copy()
+	devColl := m.ms.client.Database(ctxstore.DbFromContext(m.ctx, DbName)).Collection(DbDevicesColl)
+	asColl := m.ms.client.Database(ctxstore.DbFromContext(m.ctx, DbName)).Collection(DbAuthSetColl)
+	tColl := m.ms.client.Database(ctxstore.DbFromContext(m.ctx, DbName)).Collection(DbTokensColl)
 
-	if err := m.ms.EnsureIndexes(m.ctx, s); err != nil {
+	if err := m.ms.EnsureIndexes(m.ctx); err != nil {
 		return errors.Wrap(err, "database indexing failed")
 	}
 
-	defer s.Close()
-
-	iter := s.DB(ctxstore.DbFromContext(m.ctx, DbName)).
-		C(DbDevicesColl).Find(nil).Iter()
+	cursor, err := devColl.Find(m.ctx, bson.M{})
+	if err != nil {
+		return err
+	}
 
 	var olddev device_0_1_0
 
-	for iter.Next(&olddev) {
+	for cursor.Next(m.ctx) {
+		if err = cursor.Decode(&olddev); err != nil {
+			continue
+		}
 		// first prepare an auth set
 
 		// reuse device ID as auth set ID
@@ -75,30 +80,30 @@ func (m *migration_1_1_0) Up(from migrate.Version) error {
 			Timestamp: &olddev.UpdatedTs,
 		}
 
-		if err := s.DB(ctxstore.DbFromContext(m.ctx, DbName)).
-			C(DbAuthSetColl).Insert(aset); err != nil {
+		if _, err := asColl.InsertOne(m.ctx, aset); err != nil {
 			return errors.Wrapf(err, "failed to insert auth set for device %v",
 				olddev.Id)
 		}
 
 		// update tokens
-		_, err := s.DB(ctxstore.DbFromContext(m.ctx, DbName)).
-			C(DbTokensColl).UpdateAll(
-			token_0_1_0{
-				DevId: olddev.Id,
+
+		filter := token_0_1_0{
+			DevId: olddev.Id,
+		}
+
+		update := bson.M{
+			"$set": bson.M{
+				// see model.Token for field naming
+				"auth_id": asetId,
 			},
-			bson.M{
-				"$set": bson.M{
-					// see model.Token for field naming
-					"auth_id": asetId,
-				},
-			})
-		if err != nil {
+		}
+
+		if _, err = tColl.UpdateMany(m.ctx, filter, update); err != nil {
 			return errors.Wrapf(err, "failed to update tokens of device %v", olddev.Id)
 		}
 	}
 
-	if err := iter.Close(); err != nil {
+	if err := cursor.Close(m.ctx); err != nil {
 		return errors.Wrap(err, "failed to close DB iterator")
 	}
 

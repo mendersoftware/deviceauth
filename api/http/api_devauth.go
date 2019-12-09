@@ -346,7 +346,7 @@ func (d *DevAuthApiHandlers) DeleteDeviceAuthSetHandler(w rest.ResponseWriter, r
 	authId := r.PathParam("aid")
 
 	if err := d.devAuth.DeleteAuthSet(ctx, devId, authId); err != nil {
-		if err == store.ErrDevNotFound {
+		if err == store.ErrAuthSetNotFound {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
@@ -437,7 +437,7 @@ func (d *DevAuthApiHandlers) UpdateDeviceStatusHandler(w rest.ResponseWriter, r 
 	}
 	if err != nil {
 		switch err {
-		case store.ErrDevNotFound:
+		case store.ErrDevNotFound, store.ErrAuthSetNotFound:
 			rest_utils.RestErrWithLog(w, r, l, err, http.StatusNotFound)
 		case devauth.ErrDevIdAuthIdMismatch:
 			rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
@@ -574,7 +574,7 @@ func (d *DevAuthApiHandlers) GetAuthSetStatusHandler(w rest.ResponseWriter, r *r
 	switch err {
 	case nil:
 		w.WriteJson(&model.Status{Status: aset.Status})
-	case store.ErrDevNotFound:
+	case store.ErrDevNotFound, store.ErrAuthSetNotFound:
 		rest_utils.RestErrWithLog(w, r, l, store.ErrAuthSetNotFound, http.StatusNotFound)
 	default:
 		rest_utils.RestErrWithLogInternal(w, r, l,
