@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import (
 	ctxstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
+	"go.mongodb.org/mongo-driver/bson"
 
 	"github.com/mendersoftware/deviceauth/model"
 	"github.com/mendersoftware/deviceauth/utils"
@@ -110,8 +111,7 @@ UwIDAQAB
 			})
 
 			db.Wipe()
-			db := NewDataStoreMongoWithSession(db.Session())
-			defer db.session.Close()
+			db := NewDataStoreMongoWithClient(db.Client())
 
 			prep_1_2_0(t, ctx, db)
 
@@ -163,14 +163,10 @@ func prep_1_2_0(t *testing.T, ctx context.Context, db *DataStoreMongo) {
 }
 
 func verify(t *testing.T, ctx context.Context, db *DataStoreMongo, devs []model.Device, sets []model.AuthSet) {
-	s := db.session.Copy()
-
-	defer s.Close()
-
 	var set model.AuthSet
+	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
 	for _, a := range sets {
-		err := s.DB(ctxstore.DbFromContext(ctx, DbName)).
-			C(DbAuthSetColl).FindId(a.Id).One(&set)
+		err := c.FindOne(ctx, bson.M{"_id": a.Id}).Decode(&set)
 		assert.NoError(t, err)
 
 		_, err = utils.ParsePubKey(set.PubKey)
@@ -183,9 +179,9 @@ func verify(t *testing.T, ctx context.Context, db *DataStoreMongo, devs []model.
 	}
 
 	var dev model.Device
+	c = db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
 	for _, d := range devs {
-		err := s.DB(ctxstore.DbFromContext(ctx, DbName)).
-			C(DbDevicesColl).FindId(d.Id).One(&dev)
+		err := c.FindOne(ctx, bson.M{"_id": d.Id}).Decode(&dev)
 		assert.NoError(t, err)
 
 		_, err = utils.ParsePubKey(dev.PubKey)

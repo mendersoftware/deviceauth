@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import (
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	ctxstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/stretchr/testify/assert"
+	"go.mongodb.org/mongo-driver/bson"
 
 	"github.com/mendersoftware/deviceauth/model"
 )
@@ -44,8 +45,7 @@ UwIDAQAB
 		Tenant: "foo",
 	})
 	db.Wipe()
-	db := NewDataStoreMongoWithSession(db.Session())
-	s := db.session
+	db := NewDataStoreMongoWithClient(db.Client())
 
 	// prep base version
 	mig110 := migration_1_1_0{
@@ -157,9 +157,9 @@ UwIDAQAB
 	assert.NoError(t, err)
 
 	var dev model.Device
+	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
 	for _, d := range devs {
-		err = s.DB(ctxstore.DbFromContext(ctx, DbName)).
-			C(DbDevicesColl).FindId(d.Id).One(&dev)
+		err := c.FindOne(ctx, bson.M{"_id": d.Id}).Decode(&dev)
 
 		assert.NoError(t, err)
 
@@ -183,9 +183,9 @@ UwIDAQAB
 	}
 
 	var set model.AuthSet
+	c = db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
 	for _, as := range asets {
-		err = s.DB(ctxstore.DbFromContext(ctx, DbName)).
-			C(DbAuthSetColl).FindId(as.Id).One(&set)
+		err := c.FindOne(ctx, bson.M{"_id": as.Id}).Decode(&set)
 		assert.NoError(t, err)
 
 		as.Timestamp = set.Timestamp
@@ -200,6 +200,4 @@ UwIDAQAB
 
 		compareAuthSet(&as, &set, t)
 	}
-
-	db.session.Close()
 }

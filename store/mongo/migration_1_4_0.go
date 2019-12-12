@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import (
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	ctxstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/pkg/errors"
+	"go.mongodb.org/mongo-driver/bson"
 
 	"github.com/mendersoftware/deviceauth/model"
 	"github.com/mendersoftware/deviceauth/store"
@@ -32,16 +33,19 @@ type migration_1_4_0 struct {
 }
 
 func (m *migration_1_4_0) Up(from migrate.Version) error {
-	s := m.ms.session.Copy()
+	devColl := m.ms.client.Database(ctxstore.DbFromContext(m.ctx, DbName)).Collection(DbDevicesColl)
 
-	defer s.Close()
-
-	iter := s.DB(ctxstore.DbFromContext(m.ctx, DbName)).
-		C(DbDevicesColl).Find(nil).Iter()
+	cursor, err := devColl.Find(m.ctx, bson.M{})
+	if err != nil {
+		return err
+	}
 
 	var dev model.Device
 
-	for iter.Next(&dev) {
+	for cursor.Next(m.ctx) {
+		if err = cursor.Decode(&dev); err != nil {
+			continue
+		}
 
 		status, err := m.ms.GetDeviceStatus(m.ctx, dev.Id)
 
@@ -53,20 +57,19 @@ func (m *migration_1_4_0) Up(from migrate.Version) error {
 			}
 		}
 
-		if err := m.ms.UpdateDevice(m.ctx,
-			model.Device{
-				Id: dev.Id,
-			},
-			model.DeviceUpdate{
-				Status:    status,
-				UpdatedTs: uto.TimePtr(time.Now().UTC()),
-			}); err != nil {
+		update := model.DeviceUpdate{
+			Status:    status,
+			UpdatedTs: uto.TimePtr(time.Now().UTC()),
+		}
+
+		_, err = devColl.UpdateOne(m.ctx, bson.M{"_id": dev.Id}, bson.M{"$set": update})
+		if err != nil {
 			return errors.Wrap(err, "failed to update device status")
 		}
 
 	}
 
-	if err := iter.Close(); err != nil {
+	if err := cursor.Close(m.ctx); err != nil {
 		return errors.Wrap(err, "failed to close DB iterator")
 	}
 

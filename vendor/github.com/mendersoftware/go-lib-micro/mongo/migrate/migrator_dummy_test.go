@@ -1,4 +1,4 @@
-// Copyright 2017 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	. "github.com/mendersoftware/go-lib-micro/mongo/migrate"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 func TestDummyMigratorApply(t *testing.T) {
@@ -84,25 +85,40 @@ func TestDummyMigratorApply(t *testing.T) {
 
 		//setup
 		db.Wipe()
-		session := db.Session()
+		client := db.Client()
 		for _, m := range tc.InputMigrations {
-			err := session.DB("test").C(DbMigrationsColl).Insert(m)
+			_, err := client.Database("test").
+				Collection(DbMigrationsColl).
+				InsertOne(db.CTX(), m)
 			assert.NoError(t, err)
 		}
 
 		//test
-		m := &DummyMigrator{Session: session, Db: "test", Automigrate: tc.Automigrate}
+		m := &DummyMigrator{Client: client, Db: "test", Automigrate: tc.Automigrate}
 		m.Apply(context.Background(), tc.InputVersion, nil)
 
 		//verify
 		var out []MigrationEntry
-		session.DB("test").C(DbMigrationsColl).Find(nil).All(&out)
+		cursor, _ := client.Database("test").
+			Collection(DbMigrationsColl).
+			Find(db.CTX(), bson.M{})
+
+		count := 0
+		for cursor.Next(db.CTX()) {
+			var res MigrationEntry
+			count++
+			elem := &bson.D{}
+			_ = cursor.Decode(elem)
+			bsonBytes, _ := bson.Marshal(elem)
+			bson.Unmarshal(bsonBytes, &res)
+			out = append(out, res)
+		}
+
 		if tc.Automigrate {
 			assert.Len(t, out, 1)
 			assert.Equal(t, tc.OutputVersion, out[0].Version)
 		} else {
 			assert.Len(t, out, len(tc.InputMigrations))
 		}
-		session.Close()
 	}
 }

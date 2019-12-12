@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -16,8 +16,8 @@ package migrate_test
 import (
 	"testing"
 
-	"github.com/globalsign/mgo/bson"
 	"github.com/stretchr/testify/assert"
+	"go.mongodb.org/mongo-driver/bson"
 
 	. "github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	"github.com/mendersoftware/go-lib-micro/store"
@@ -52,19 +52,19 @@ func TestGetTenantDbs(t *testing.T) {
 		tc := testCases[name]
 		t.Run(name, func(t *testing.T) {
 			db.Wipe()
-			session := db.Session()
+			client := db.Client()
 
 			// dummy insert on test dbs to create them
-			for _, db := range tc.dbs {
-				err := session.DB(db).C("foo").Insert(bson.M{"foo": "bar"})
+			for _, dbname := range tc.dbs {
+				_, err := client.Database(dbname).
+					Collection("foo").
+					InsertOne(db.CTX(), bson.M{"foo": "bar"})
 				assert.NoError(t, err)
 			}
 
-			res, err := GetTenantDbs(session, store.IsTenantDb(baseDb))
+			res, err := GetTenantDbs(db.CTX(), client, store.IsTenantDb(baseDb))
 			assert.NoError(t, err)
 			assert.Equal(t, tc.dbs, res)
-
-			session.Close()
 		})
 	}
 }

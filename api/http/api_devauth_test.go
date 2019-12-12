@@ -1426,15 +1426,8 @@ func TestApiV2DevAuthDeleteDeviceAuthSet(t *testing.T) {
 		{
 			req: test.MakeSimpleRequest("DELETE",
 				"http://1.2.3.4/api/management/v2/devauth/devices/foo/auth/bar", nil),
-			code: http.StatusInternalServerError,
-			body: RestError("internal error"),
-			err:  store.ErrAuthSetNotFound,
-		},
-		{
-			req: test.MakeSimpleRequest("DELETE",
-				"http://1.2.3.4/api/management/v2/devauth/devices/foo/auth/bar", nil),
 			code: http.StatusNotFound,
-			err:  store.ErrDevNotFound,
+			err:  store.ErrAuthSetNotFound,
 		},
 		{
 			req: test.MakeSimpleRequest("DELETE",

@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -20,12 +20,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/globalsign/mgo"
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	ctxstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 
 	"github.com/mendersoftware/deviceauth/model"
 	"github.com/mendersoftware/deviceauth/store"
@@ -53,7 +54,7 @@ func (m *migration_1_0_0_TestData) GetToken(didx int, tidx int) *token_0_1_0 {
 
 // populateDevices creates `count` devices, each with randomized number of
 // tokens <0, maxTokensPerDev), returns test data it generated
-func populateDevices(t *testing.T, s *mgo.Session, count int, maxTokensPerDev int) migration_1_0_0_TestData {
+func populateDevices(t *testing.T, client *mongo.Client, count int, maxTokensPerDev int) migration_1_0_0_TestData {
 
 	td := migration_1_0_0_TestData{
 		devices: map[int]*device_0_1_0{},
@@ -75,7 +76,8 @@ func populateDevices(t *testing.T, s *mgo.Session, count int, maxTokensPerDev in
 		ctx := identity.WithContext(context.Background(), &identity.Identity{
 			Tenant: tenant,
 		})
-		err := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbDevicesColl).Insert(dev)
+		c := client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
+		_, err := c.InsertOne(ctx, dev)
 		assert.NoError(t, err)
 
 		td.devices[i] = &dev
@@ -83,6 +85,7 @@ func populateDevices(t *testing.T, s *mgo.Session, count int, maxTokensPerDev in
 		// generate random numbers of tokens for each device
 		tokens := rand.Int() % maxTokensPerDev
 
+		c = client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbTokensColl)
 		for j := 0; j < tokens; j++ {
 			tok := token_0_1_0{
 				Id:    fmt.Sprintf("jti-0.1.0-%d-%d", i, j),
@@ -91,7 +94,7 @@ func populateDevices(t *testing.T, s *mgo.Session, count int, maxTokensPerDev in
 			}
 			td.tokens[i<<16+j] = &tok
 
-			err := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbTokensColl).Insert(tok)
+			_, err := c.InsertOne(ctx, tok)
 			assert.NoError(t, err)
 		}
 	}
@@ -103,13 +106,12 @@ func TestMigration_1_0_0(t *testing.T) {
 		Tenant: tenant,
 	})
 	db.Wipe()
-	db := NewDataStoreMongoWithSession(db.Session())
+	db := NewDataStoreMongoWithClient(db.Client())
 
-	s := db.session
 	devCount := 100
 	toksPerDev := 5
 
-	data := populateDevices(t, s, devCount, toksPerDev)
+	data := populateDevices(t, db.client, devCount, toksPerDev)
 
 	mig := migration_1_1_0{
 		ms:  db,
@@ -120,14 +122,18 @@ func TestMigration_1_0_0(t *testing.T) {
 	assert.NoError(t, err)
 
 	// there should be devCount devices
-	cnt, err := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbDevicesColl).Count()
+	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
+	cnt, err := c.CountDocuments(ctx, bson.D{})
 	assert.NoError(t, err)
-	assert.Equal(t, devCount, cnt)
+	count := int(cnt)
+	assert.Equal(t, devCount, count)
 
 	// there should be an auth set for each device
-	cnt, err = s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbAuthSetColl).Count()
+	c = db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
+	cnt, err = c.CountDocuments(ctx, bson.D{})
+	count = int(cnt)
 	assert.NoError(t, err)
-	assert.Equal(t, devCount, cnt)
+	assert.Equal(t, devCount, count)
 
 	// trying to add a device with same identity data should raise conflict
 	err = db.AddDevice(ctx, model.Device{
@@ -171,15 +177,10 @@ func TestMigration_1_0_0(t *testing.T) {
 			assert.Equal(t, aset.Id, tok.AuthSetId)
 		}
 	}
-
-	db.session.Close()
 }
 
 func (db *DataStoreMongo) getAuthSetByDataKey(ctx context.Context, idData string, key string) (*model.AuthSet, error) {
-	s := db.session.Copy()
-	defer s.Close()
-
-	c := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbAuthSetColl)
+	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
 
 	filter := model.AuthSet{
 		IdData: idData,
@@ -187,10 +188,10 @@ func (db *DataStoreMongo) getAuthSetByDataKey(ctx context.Context, idData string
 	}
 	res := model.AuthSet{}
 
-	err := c.Find(filter).One(&res)
+	err := c.FindOne(ctx, filter).Decode(&res)
 
 	if err != nil {
-		if err == mgo.ErrNotFound {
+		if err == mongo.ErrNoDocuments {
 			return nil, store.ErrDevNotFound
 		} else {
 			return nil, errors.Wrap(err, "failed to fetch device")

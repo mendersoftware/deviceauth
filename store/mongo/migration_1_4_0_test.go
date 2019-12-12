@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -18,11 +18,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/globalsign/mgo"
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	ctxstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/stretchr/testify/assert"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 
 	"github.com/mendersoftware/deviceauth/model"
 )
@@ -45,8 +46,7 @@ UwIDAQAB
 		Tenant: "foo",
 	})
 	db.Wipe()
-	db := NewDataStoreMongoWithSession(db.Session())
-	s := db.session
+	db := NewDataStoreMongoWithClient(db.Client())
 
 	// prep base version
 	mig110 := migration_1_1_0{
@@ -163,15 +163,17 @@ UwIDAQAB
 	var dev model.Device
 	var status string
 	var noAuthSets bool
+	dColl := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
+	asColl := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
 	for _, d := range devs {
-		err = s.DB(ctxstore.DbFromContext(ctx, DbName)).
-			C(DbDevicesColl).FindId(d.Id).One(&dev)
+		err := dColl.FindOne(ctx, bson.M{"_id": d.Id}).Decode(&dev)
 		assert.NoError(t, err)
 
 		res := []model.AuthSet{}
-		err = s.DB(ctxstore.DbFromContext(ctx, DbName)).
-			C(DbAuthSetColl).Find(model.AuthSet{DeviceId: dev.Id}).All(&res)
-		if (err != nil && err == mgo.ErrNotFound) || len(res) == 0 {
+		cursor, err := asColl.Find(ctx, model.AuthSet{DeviceId: dev.Id})
+		assert.NoError(t, err)
+		err = cursor.All(ctx, &res)
+		if (err != nil && err == mongo.ErrNoDocuments) || len(res) == 0 {
 			noAuthSets = true
 		} else {
 			noAuthSets = false
@@ -191,6 +193,4 @@ UwIDAQAB
 
 		compareDevices(&d, &dev, t)
 	}
-
-	db.session.Close()
 }

@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -19,11 +19,12 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/globalsign/mgo"
-	"github.com/globalsign/mgo/bson"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	ctxstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/pkg/errors"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/mendersoftware/deviceauth/model"
 	uto "github.com/mendersoftware/deviceauth/utils/to"
@@ -35,16 +36,21 @@ type migration_1_5_0 struct {
 }
 
 func (m *migration_1_5_0) Up(from migrate.Version) error {
-	s := m.ms.session.Copy()
+	devColl := m.ms.client.Database(ctxstore.DbFromContext(m.ctx, DbName)).Collection(DbDevicesColl)
+	asColl := m.ms.client.Database(ctxstore.DbFromContext(m.ctx, DbName)).Collection(DbAuthSetColl)
 
-	defer s.Close()
-
-	iter := s.DB(ctxstore.DbFromContext(m.ctx, DbName)).
-		C(DbAuthSetColl).Find(nil).Iter()
+	cursor, err := asColl.Find(m.ctx, bson.M{})
+	if err != nil {
+		return err
+	}
 
 	var set model.AuthSet
 
-	for iter.Next(&set) {
+	for cursor.Next(m.ctx) {
+		if err = cursor.Decode(&set); err != nil {
+			continue
+		}
+
 		idDataStruct, err := decode(set.IdData)
 
 		if err != nil {
@@ -62,39 +68,49 @@ func (m *migration_1_5_0) Up(from migrate.Version) error {
 			},
 		}
 
-		if err := s.DB(ctxstore.DbFromContext(m.ctx, DbName)).
-			C(DbAuthSetColl).UpdateId(set.Id, update); err != nil {
+		_, err = asColl.UpdateOne(m.ctx, bson.M{"_id": set.Id}, update)
+		if err != nil {
 			return errors.Wrapf(err, "failed to update auth set %v", set.Id)
 		}
 
 	}
 
-	if err := iter.Close(); err != nil {
+	if err := cursor.Close(m.ctx); err != nil {
 		return errors.Wrap(err, "failed to close DB iterator")
 	}
 
-	err := s.DB(ctxstore.DbFromContext(m.ctx, DbName)).
-		C(DbAuthSetColl).EnsureIndex(mgo.Index{
-		Unique: true,
-		Key: []string{
-			model.AuthSetKeyDeviceId,
-			model.AuthSetKeyIdDataSha256,
-			model.AuthSetKeyPubKey,
+	_false := false
+	_true := true
+	index := mongo.IndexModel{
+		Keys: bson.D{
+			{Key: model.AuthSetKeyDeviceId, Value: 1},
+			{Key: model.AuthSetKeyIdDataSha256, Value: 1},
+			{Key: model.AuthSetKeyPubKey, Value: 1},
 		},
-		Name:       indexAuthSet_DeviceId_IdentityDataSha256_PubKey,
-		Background: false,
-	})
+		Options: &options.IndexOptions{
+			Background: &_false,
+			Name:       &indexAuthSet_DeviceId_IdentityDataSha256_PubKey,
+			Unique:     &_true,
+		},
+	}
 
+	asIndexes := asColl.Indexes()
+	_, err = asIndexes.CreateOne(m.ctx, index)
 	if err != nil {
 		return errors.Wrap(err, "failed to create index on auth sets")
 	}
 
-	iter = s.DB(ctxstore.DbFromContext(m.ctx, DbName)).
-		C(DbDevicesColl).Find(nil).Iter()
+	cursor, err = devColl.Find(m.ctx, bson.M{})
+	if err != nil {
+		return err
+	}
 
 	var dev model.Device
 
-	for iter.Next(&dev) {
+	for cursor.Next(m.ctx) {
+		if err = cursor.Decode(&dev); err != nil {
+			continue
+		}
 
 		idDataStruct, err := decode(dev.IdData)
 
@@ -113,14 +129,14 @@ func (m *migration_1_5_0) Up(from migrate.Version) error {
 			},
 		}
 
-		if err := s.DB(ctxstore.DbFromContext(m.ctx, DbName)).
-			C(DbDevicesColl).UpdateId(dev.Id, update); err != nil {
+		_, err = devColl.UpdateOne(m.ctx, bson.M{"_id": dev.Id}, update)
+		if err != nil {
 			return errors.Wrapf(err, "failed to update device %v", dev.Id)
 		}
 
 	}
 
-	if err := iter.Close(); err != nil {
+	if err := cursor.Close(m.ctx); err != nil {
 		return errors.Wrap(err, "failed to close DB iterator")
 	}
 

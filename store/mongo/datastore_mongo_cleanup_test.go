@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import (
 	"github.com/mendersoftware/go-lib-micro/identity"
 	ctxstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/stretchr/testify/assert"
+	"go.mongodb.org/mongo-driver/bson"
 
 	"github.com/mendersoftware/deviceauth/model"
 	"github.com/mendersoftware/deviceauth/store"
@@ -32,12 +33,12 @@ func TestGetDevicesBeingDecommissioned(t *testing.T) {
 	}
 
 	testCases := []struct {
-		inDevices  []interface{}
+		inDevices  bson.A
 		outDevices []model.Device
 		tenant     string
 	}{
 		{
-			inDevices: []interface{}{
+			inDevices: bson.A{
 				model.Device{
 					Id:              "001",
 					IdData:          "001",
@@ -64,7 +65,7 @@ func TestGetDevicesBeingDecommissioned(t *testing.T) {
 			},
 		},
 		{
-			inDevices: []interface{}{
+			inDevices: bson.A{
 				model.Device{
 					Id:              "001",
 					IdData:          "001",
@@ -104,12 +105,10 @@ func TestGetDevicesBeingDecommissioned(t *testing.T) {
 			}
 
 			db := getDb(ctx)
-			defer db.session.Close()
-			s := db.session.Copy()
-			defer s.Close()
 
-			coll := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
-			assert.NoError(t, coll.Insert(tc.inDevices...))
+			coll := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
+			_, err := coll.InsertMany(ctx, tc.inDevices)
+			assert.NoError(t, err)
 
 			brokenDevices, err := db.GetDevicesBeingDecommissioned(testDbName)
 			assert.NoError(t, err)
@@ -124,11 +123,11 @@ func TestDeleteDevicesBeingDecommissioned(t *testing.T) {
 	}
 
 	testCases := []struct {
-		inDevices []interface{}
+		inDevices bson.A
 		tenant    string
 	}{
 		{
-			inDevices: []interface{}{
+			inDevices: bson.A{
 				model.Device{
 					Id:              "001",
 					IdData:          "001",
@@ -146,7 +145,7 @@ func TestDeleteDevicesBeingDecommissioned(t *testing.T) {
 			},
 		},
 		{
-			inDevices: []interface{}{
+			inDevices: bson.A{
 				model.Device{
 					Id:              "001",
 					IdData:          "001",
@@ -181,14 +180,12 @@ func TestDeleteDevicesBeingDecommissioned(t *testing.T) {
 			}
 
 			db := getDb(ctx)
-			defer db.session.Close()
-			s := db.session.Copy()
-			defer s.Close()
 
-			coll := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
-			assert.NoError(t, coll.Insert(tc.inDevices...))
+			coll := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
+			_, err := coll.InsertMany(ctx, tc.inDevices)
+			assert.NoError(t, err)
 
-			err := db.DeleteDevicesBeingDecommissioned(testDbName)
+			err = db.DeleteDevicesBeingDecommissioned(testDbName)
 			assert.NoError(t, err)
 
 			dbDevs, err := db.GetDevices(ctx, 0, 5, store.DeviceFilter{})
@@ -206,14 +203,14 @@ func TestGetBrokenAuthSets(t *testing.T) {
 	}
 
 	testCases := []struct {
-		inAuthSets     []interface{}
-		inDevices      []interface{}
+		inAuthSets     bson.A
+		inDevices      bson.A
 		outAuthSetsIds []string
 		tenant         string
 		err            string
 	}{
 		{
-			inAuthSets: []interface{}{
+			inAuthSets: bson.A{
 				model.AuthSet{
 					Id:       "001",
 					DeviceId: "001",
@@ -227,7 +224,7 @@ func TestGetBrokenAuthSets(t *testing.T) {
 					PubKey:   "002",
 				},
 			},
-			inDevices: []interface{}{
+			inDevices: bson.A{
 				model.Device{
 					Id:              "001",
 					IdData:          "001",
@@ -247,7 +244,7 @@ func TestGetBrokenAuthSets(t *testing.T) {
 			err:            "",
 		},
 		{
-			inAuthSets: []interface{}{
+			inAuthSets: bson.A{
 				model.AuthSet{
 					Id:       "001",
 					DeviceId: "001",
@@ -261,7 +258,7 @@ func TestGetBrokenAuthSets(t *testing.T) {
 					PubKey:   "002",
 				},
 			},
-			inDevices: []interface{}{
+			inDevices: bson.A{
 				model.Device{
 					Id:              "001",
 					IdData:          "001",
@@ -282,7 +279,7 @@ func TestGetBrokenAuthSets(t *testing.T) {
 			err:            "",
 		},
 		{
-			inAuthSets: []interface{}{
+			inAuthSets: bson.A{
 				model.AuthSet{
 					Id:       "001",
 					DeviceId: "001",
@@ -296,7 +293,7 @@ func TestGetBrokenAuthSets(t *testing.T) {
 					PubKey:   "002",
 				},
 			},
-			inDevices: []interface{}{
+			inDevices: bson.A{
 				model.Device{
 					Id:              "001",
 					IdData:          "001",
@@ -333,15 +330,14 @@ func TestGetBrokenAuthSets(t *testing.T) {
 			}
 
 			db := getDb(ctx)
-			defer db.session.Close()
-			s := db.session.Copy()
-			defer s.Close()
 
-			coll := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbAuthSetColl)
-			assert.NoError(t, coll.Insert(tc.inAuthSets...))
+			coll := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
+			_, err := coll.InsertMany(ctx, tc.inAuthSets)
+			assert.NoError(t, err)
 
-			coll = s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
-			assert.NoError(t, coll.Insert(tc.inDevices...))
+			coll = db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
+			_, err = coll.InsertMany(ctx, tc.inDevices)
+			assert.NoError(t, err)
 
 			brokenAuthSetsIds, err := db.GetBrokenAuthSets(testDbName)
 			if tc.err != "" {
@@ -360,12 +356,12 @@ func TestDeleteBrokenAuthSets(t *testing.T) {
 	}
 
 	testCases := []struct {
-		inAuthSets []interface{}
-		inDevices  []interface{}
+		inAuthSets bson.A
+		inDevices  bson.A
 		tenant     string
 	}{
 		{
-			inAuthSets: []interface{}{
+			inAuthSets: bson.A{
 				model.AuthSet{
 					Id:       "001",
 					DeviceId: "001",
@@ -379,7 +375,7 @@ func TestDeleteBrokenAuthSets(t *testing.T) {
 					PubKey:   "002",
 				},
 			},
-			inDevices: []interface{}{
+			inDevices: bson.A{
 				model.Device{
 					Id:              "001",
 					IdData:          "001",
@@ -397,7 +393,7 @@ func TestDeleteBrokenAuthSets(t *testing.T) {
 			},
 		},
 		{
-			inAuthSets: []interface{}{
+			inAuthSets: bson.A{
 				model.AuthSet{
 					Id:       "001",
 					DeviceId: "001",
@@ -411,7 +407,7 @@ func TestDeleteBrokenAuthSets(t *testing.T) {
 					PubKey:   "002",
 				},
 			},
-			inDevices: []interface{}{
+			inDevices: bson.A{
 				model.Device{
 					Id:              "001",
 					IdData:          "001",
@@ -430,7 +426,7 @@ func TestDeleteBrokenAuthSets(t *testing.T) {
 			tenant: tenant,
 		},
 		{
-			inAuthSets: []interface{}{
+			inAuthSets: bson.A{
 				model.AuthSet{
 					Id:       "001",
 					DeviceId: "001",
@@ -444,7 +440,7 @@ func TestDeleteBrokenAuthSets(t *testing.T) {
 					PubKey:   "002",
 				},
 			},
-			inDevices: []interface{}{
+			inDevices: bson.A{
 				model.Device{
 					Id:              "001",
 					IdData:          "001",
@@ -479,17 +475,16 @@ func TestDeleteBrokenAuthSets(t *testing.T) {
 			}
 
 			db := getDb(ctx)
-			defer db.session.Close()
-			s := db.session.Copy()
-			defer s.Close()
 
-			coll := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbAuthSetColl)
-			assert.NoError(t, coll.Insert(tc.inAuthSets...))
+			coll := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
+			_, err := coll.InsertMany(ctx, tc.inAuthSets)
+			assert.NoError(t, err)
 
-			coll = s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
-			assert.NoError(t, coll.Insert(tc.inDevices...))
+			coll = db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
+			_, err = coll.InsertMany(ctx, tc.inDevices)
+			assert.NoError(t, err)
 
-			err := db.DeleteBrokenAuthSets(testDbName)
+			err = db.DeleteBrokenAuthSets(testDbName)
 			assert.NoError(t, err)
 
 			brokenAuthSetsIds, err := db.GetBrokenAuthSets(testDbName)
@@ -501,17 +496,17 @@ func TestDeleteBrokenAuthSets(t *testing.T) {
 
 func TestGetBrokenTokens(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping TestGetBrokenAuthSets in short mode.")
+		t.Skip("skipping TestGetBrokenTokens in short mode.")
 	}
 
 	testCases := []struct {
-		inTokens     []interface{}
-		inDevices    []interface{}
+		inTokens     bson.A
+		inDevices    bson.A
 		outTokensIds []string
 		tenant       string
 	}{
 		{
-			inTokens: []interface{}{
+			inTokens: bson.A{
 				model.Token{
 					Id:        "001",
 					DevId:     "001",
@@ -525,7 +520,7 @@ func TestGetBrokenTokens(t *testing.T) {
 					Token:     "bar",
 				},
 			},
-			inDevices: []interface{}{
+			inDevices: bson.A{
 				model.Device{
 					Id:              "001",
 					IdData:          "001",
@@ -544,7 +539,7 @@ func TestGetBrokenTokens(t *testing.T) {
 			outTokensIds: []string{"002"},
 		},
 		{
-			inTokens: []interface{}{
+			inTokens: bson.A{
 				model.Token{
 					Id:    "001",
 					DevId: "001",
@@ -556,7 +551,7 @@ func TestGetBrokenTokens(t *testing.T) {
 					Token: "bar",
 				},
 			},
-			inDevices: []interface{}{
+			inDevices: bson.A{
 				model.Device{
 					Id:              "001",
 					IdData:          "001",
@@ -576,7 +571,7 @@ func TestGetBrokenTokens(t *testing.T) {
 			outTokensIds: []string{"002"},
 		},
 		{
-			inTokens: []interface{}{
+			inTokens: bson.A{
 				model.Token{
 					Id:    "001",
 					DevId: "001",
@@ -588,7 +583,7 @@ func TestGetBrokenTokens(t *testing.T) {
 					Token: "bar",
 				},
 			},
-			inDevices: []interface{}{
+			inDevices: bson.A{
 				model.Device{
 					Id:              "001",
 					IdData:          "001",
@@ -624,15 +619,14 @@ func TestGetBrokenTokens(t *testing.T) {
 			}
 
 			db := getDb(ctx)
-			defer db.session.Close()
-			s := db.session.Copy()
-			defer s.Close()
 
-			coll := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbTokensColl)
-			assert.NoError(t, coll.Insert(tc.inTokens...))
+			coll := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbTokensColl)
+			_, err := coll.InsertMany(ctx, tc.inTokens)
+			assert.NoError(t, err)
 
-			coll = s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
-			assert.NoError(t, coll.Insert(tc.inDevices...))
+			coll = db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
+			_, err = coll.InsertMany(ctx, tc.inDevices)
+			assert.NoError(t, err)
 
 			brokenTokensIds, err := db.GetBrokenTokens(testDbName)
 			assert.NoError(t, err)
@@ -647,12 +641,12 @@ func TestDeleteBrokenTokens(t *testing.T) {
 	}
 
 	testCases := []struct {
-		inTokens  []interface{}
-		inDevices []interface{}
+		inTokens  bson.A
+		inDevices bson.A
 		tenant    string
 	}{
 		{
-			inTokens: []interface{}{
+			inTokens: bson.A{
 				model.Token{
 					Id:        "001",
 					DevId:     "001",
@@ -666,7 +660,7 @@ func TestDeleteBrokenTokens(t *testing.T) {
 					Token:     "bar",
 				},
 			},
-			inDevices: []interface{}{
+			inDevices: bson.A{
 				model.Device{
 					Id:              "001",
 					IdData:          "001",
@@ -684,7 +678,7 @@ func TestDeleteBrokenTokens(t *testing.T) {
 			},
 		},
 		{
-			inTokens: []interface{}{
+			inTokens: bson.A{
 				model.Token{
 					Id:    "001",
 					DevId: "001",
@@ -696,7 +690,7 @@ func TestDeleteBrokenTokens(t *testing.T) {
 					Token: "bar",
 				},
 			},
-			inDevices: []interface{}{
+			inDevices: bson.A{
 				model.Device{
 					Id:              "001",
 					IdData:          "001",
@@ -715,7 +709,7 @@ func TestDeleteBrokenTokens(t *testing.T) {
 			tenant: tenant,
 		},
 		{
-			inTokens: []interface{}{
+			inTokens: bson.A{
 				model.Token{
 					Id:    "001",
 					DevId: "001",
@@ -727,7 +721,7 @@ func TestDeleteBrokenTokens(t *testing.T) {
 					Token: "bar",
 				},
 			},
-			inDevices: []interface{}{
+			inDevices: bson.A{
 				model.Device{
 					Id:              "001",
 					IdData:          "001",
@@ -762,17 +756,16 @@ func TestDeleteBrokenTokens(t *testing.T) {
 			}
 
 			db := getDb(ctx)
-			defer db.session.Close()
-			s := db.session.Copy()
-			defer s.Close()
 
-			coll := s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbTokensColl)
-			assert.NoError(t, coll.Insert(tc.inTokens...))
+			coll := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbTokensColl)
+			_, err := coll.InsertMany(ctx, tc.inTokens)
+			assert.NoError(t, err)
 
-			coll = s.DB(ctxstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
-			assert.NoError(t, coll.Insert(tc.inDevices...))
+			coll = db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
+			_, err = coll.InsertMany(ctx, tc.inDevices)
+			assert.NoError(t, err)
 
-			err := db.DeleteBrokenTokens(testDbName)
+			err = db.DeleteBrokenTokens(testDbName)
 			assert.NoError(t, err)
 
 			brokenTokensIds, err := db.GetBrokenTokens(testDbName)

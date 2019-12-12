@@ -142,7 +142,7 @@ def mongo():
 
 def mongo_cleanup(mongo):
     dbs = mongo.database_names()
-    dbs = [d for d in dbs if d not in ['local', 'admin']]
+    dbs = [d for d in dbs if d not in ['local', 'admin', 'config']]
     for d in dbs:
         mongo.drop_database(d)
 

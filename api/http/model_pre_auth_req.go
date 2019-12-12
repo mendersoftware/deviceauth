@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -19,8 +19,8 @@ import (
 	"io"
 
 	"github.com/asaskevich/govalidator"
-	"github.com/globalsign/mgo/bson"
 	"github.com/pkg/errors"
+	"github.com/satori/go.uuid"
 
 	"github.com/mendersoftware/deviceauth/model"
 	"github.com/mendersoftware/deviceauth/utils"
@@ -87,9 +87,19 @@ func (r *preAuthReq) getDbModel() (*model.PreAuthReq, error) {
 		return nil, err
 	}
 
+	dId, err := uuid.NewV4()
+	if err != nil {
+		return nil, err
+	}
+
+	asId, err := uuid.NewV4()
+	if err != nil {
+		return nil, err
+	}
+
 	return &model.PreAuthReq{
-		DeviceId:  bson.NewObjectId().Hex(),
-		AuthSetId: bson.NewObjectId().Hex(),
+		DeviceId:  dId.String(),
+		AuthSetId: asId.String(),
 		IdData:    string(enc),
 		PubKey:    r.PubKey,
 	}, nil

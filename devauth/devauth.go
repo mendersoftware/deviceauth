@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/Azure/go-autorest/autorest/to"
-	"github.com/globalsign/mgo/bson"
 	"github.com/mendersoftware/go-lib-micro/apiclient"
 	ctxhttpheader "github.com/mendersoftware/go-lib-micro/context/httpheader"
 	"github.com/mendersoftware/go-lib-micro/identity"
@@ -32,6 +31,7 @@ import (
 	mstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/pkg/errors"
 	"github.com/satori/go.uuid"
+	"go.mongodb.org/mongo-driver/bson"
 
 	"github.com/mendersoftware/deviceauth/client/orchestrator"
 	"github.com/mendersoftware/deviceauth/client/tenant"
@@ -383,7 +383,7 @@ func (d *DevAuth) processPreAuthRequest(ctx context.Context, r *model.AuthReq) (
 	switch err {
 	case nil:
 		break
-	case store.ErrDevNotFound:
+	case store.ErrAuthSetNotFound:
 		return nil, nil
 	default:
 		return nil, errors.Wrap(err, "failed to fetch auth set")
@@ -532,7 +532,7 @@ func (d *DevAuth) GetDevices(ctx context.Context, skip, limit uint, filter store
 
 	for i := range devs {
 		devs[i].AuthSets, err = d.db.GetAuthSetsForDevice(ctx, devs[i].Id)
-		if err != nil && err != store.ErrDevNotFound {
+		if err != nil && err != store.ErrAuthSetNotFound {
 			return nil, errors.Wrap(err, "db get auth sets error")
 		}
 	}
@@ -550,10 +550,10 @@ func (d *DevAuth) GetDevice(ctx context.Context, devId string) (*model.Device, e
 
 	dev.AuthSets, err = d.db.GetAuthSetsForDevice(ctx, dev.Id)
 	if err != nil {
-		if err != store.ErrDevNotFound {
+		if err != store.ErrAuthSetNotFound {
 			return nil, errors.Wrap(err, "db get auth sets error")
 		}
-		return nil, err
+		return dev, nil
 	}
 	return dev, err
 }
@@ -610,7 +610,7 @@ func (d *DevAuth) DeleteAuthSet(ctx context.Context, devId string, authId string
 	// retrieve device authentication set to check its status
 	authSet, err := d.db.GetAuthSetById(ctx, authId)
 	if err != nil {
-		if err == store.ErrDevNotFound {
+		if err == store.ErrAuthSetNotFound {
 			return err
 		}
 		return errors.Wrap(err, "db get auth set error")
@@ -644,7 +644,7 @@ func (d *DevAuth) AcceptDeviceAuth(ctx context.Context, device_id string, auth_i
 
 	aset, err := d.db.GetAuthSetById(ctx, auth_id)
 	if err != nil {
-		if err == store.ErrDevNotFound {
+		if err == store.ErrAuthSetNotFound {
 			return err
 		}
 		return errors.Wrap(err, "db get auth set error")
@@ -707,7 +707,7 @@ func (d *DevAuth) AcceptDeviceAuth(ctx context.Context, device_id string, auth_i
 func (d *DevAuth) setAuthSetStatus(ctx context.Context, device_id string, auth_id string, status string) error {
 	aset, err := d.db.GetAuthSetById(ctx, auth_id)
 	if err != nil {
-		if err == store.ErrDevNotFound {
+		if err == store.ErrAuthSetNotFound {
 			return err
 		}
 		return errors.Wrap(err, "db get auth set error")
@@ -911,7 +911,7 @@ func (d *DevAuth) VerifyToken(ctx context.Context, raw string) error {
 
 	auth, err := d.db.GetAuthSetById(ctx, tok.AuthSetId)
 	if err != nil {
-		if err == store.ErrTokenNotFound {
+		if err == store.ErrAuthSetNotFound {
 			l.Errorf("Token %s auth set %s not found",
 				jti, tok.AuthSetId)
 			return err
