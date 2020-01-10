@@ -1,4 +1,4 @@
-image: golang:1.10
+image: golang:1.11
 
 cache:
   paths:
@@ -111,11 +111,8 @@ test:unit:
     DEVICEAUTH_MONGO: mongo
   script:
     - apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 2930ADAE8CAF5059EE73BB4B58712A2291FA4AD5
-    - wget http://security.debian.org/debian-security/pool/updates/main/o/openssl/libssl1.0.0_1.0.1t-1+deb8u12_amd64.deb
-    - dpkg -i libssl1.0.0_1.0.1t-1+deb8u12_amd64.deb
-    - echo "deb http://repo.mongodb.org/apt/debian jessie/mongodb-org/3.4 main" | tee /etc/apt/sources.list.d/mongodb-org-3.4.list
-    - apt-get -qq update
-    - apt-get install -qy --allow-unauthenticated mongodb-org-server=3.4.6 liblzma-dev
+    - echo "deb http://repo.mongodb.org/apt/debian stretch/mongodb-org/3.6 main" | tee /etc/apt/sources.list.d/mongodb-org-3.6.list
+    - apt-get -qq update && apt-get install -qy --allow-unauthenticated mongodb-org-server=3.6.11  liblzma-dev
     - go list ./... | grep -v vendor | xargs -n1 -I {} -P 4 go test -v -covermode=atomic -coverprofile=../../../{}/coverage.txt {} || exit $? ;
     - mkdir -p tests/unit-coverage && find . -name 'coverage.txt' -exec cp --parents {} ./tests/unit-coverage \;
     - tar -cvf $CI_PROJECT_DIR/unit-coverage.tar tests/unit-coverage
