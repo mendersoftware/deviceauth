@@ -28,7 +28,7 @@ import (
 	"github.com/satori/go.uuid"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	mopts "go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/mendersoftware/deviceauth/model"
 	"github.com/mendersoftware/deviceauth/store"
@@ -80,10 +80,10 @@ func NewDataStoreMongo(config DataStoreMongoConfig) (*DataStoreMongo, error) {
 	if !strings.Contains(config.ConnectionString, "://") {
 		config.ConnectionString = "mongodb://" + config.ConnectionString
 	}
-	clientOptions := options.Client().ApplyURI(config.ConnectionString)
+	clientOptions := mopts.Client().ApplyURI(config.ConnectionString)
 
 	if config.Username != "" {
-		clientOptions.SetAuth(options.Credential{
+		clientOptions.SetAuth(mopts.Credential{
 			Username: config.Username,
 			Password: config.Password,
 		})
@@ -557,7 +557,7 @@ func (db *DataStoreMongo) EnsureIndexes(ctx context.Context) error {
 		Keys: bson.D{
 			{Key: model.DevKeyIdData, Value: 1},
 		},
-		Options: &options.IndexOptions{
+		Options: &mopts.IndexOptions{
 			Background: &_false,
 			Name:       &indexDevices_IdentityData,
 			Unique:     &_true,
@@ -570,7 +570,7 @@ func (db *DataStoreMongo) EnsureIndexes(ctx context.Context) error {
 			{Key: model.AuthSetKeyIdData, Value: 1},
 			{Key: model.AuthSetKeyPubKey, Value: 1},
 		},
-		Options: &options.IndexOptions{
+		Options: &mopts.IndexOptions{
 			Background: &_false,
 			Name:       &indexAuthSet_DeviceId_IdentityData_PubKey,
 			Unique:     &_true,
@@ -600,7 +600,7 @@ func (db *DataStoreMongo) PutLimit(ctx context.Context, lim model.Limit) error {
 
 	query := bson.M{"_id": lim.Name}
 
-	updateOptions := options.Update()
+	updateOptions := mopts.Update()
 	updateOptions.SetUpsert(true)
 	if _, err := c.UpdateOne(
 		ctx, query, bson.M{"$set": lim}, updateOptions); err != nil {
