@@ -448,7 +448,7 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 				},
 				tc.getAuthSetErr)
 
-			db.On("AddToken",
+			db.On("UpsertToken",
 				ctxMatcher,
 				mock.AnythingOfType("model.Token")).Return(nil)
 			db.On("GetDeviceStatus", ctxMatcher,
@@ -718,7 +718,7 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 
 			// at the end of processing, saves the issued token
 			// only happy path, errors tested elsewhere
-			db.On("AddToken",
+			db.On("UpsertToken",
 				ctx,
 				mock.AnythingOfType("model.Token"),
 			).Return(nil)

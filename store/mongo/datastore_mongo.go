@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -237,14 +237,18 @@ func (db *DataStoreMongo) DeleteDevice(ctx context.Context, id string) error {
 	return nil
 }
 
-func (db *DataStoreMongo) AddToken(ctx context.Context, t model.Token) error {
+func (db *DataStoreMongo) UpsertToken(ctx context.Context, t model.Token) error {
 
-	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbTokensColl)
+	database := db.client.Database(ctxstore.DbFromContext(ctx, DbName))
+	collTkns := database.Collection(DbTokensColl)
 
-	if _, err := c.InsertOne(ctx, t); err != nil {
+	uOpts := mopts.Update()
+	uOpts.SetUpsert(true)
+	update := bson.M{"$set": t}
+
+	if _, err := collTkns.UpdateOne(ctx, bson.M{"_id": t.Id}, update, uOpts); err != nil {
 		return errors.Wrap(err, "failed to store token")
 	}
-
 	return nil
 }
 

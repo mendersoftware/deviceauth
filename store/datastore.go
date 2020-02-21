@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -89,7 +89,7 @@ type DataStore interface {
 	DeleteAuthSetForDevice(ctx context.Context, devId string, authId string) error
 
 	// adds JWT to database
-	AddToken(ctx context.Context, t model.Token) error
+	UpsertToken(ctx context.Context, t model.Token) error
 
 	// retrieves JWT from database using JWT Id and device Id
 	// returns ErrTokenNotFound if token not found
