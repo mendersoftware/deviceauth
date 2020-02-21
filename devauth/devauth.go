@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -30,7 +30,6 @@ import (
 	"github.com/mendersoftware/go-lib-micro/requestid"
 	mstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/pkg/errors"
-	"github.com/satori/go.uuid"
 	"go.mongodb.org/mongo-driver/bson"
 
 	"github.com/mendersoftware/deviceauth/client/orchestrator"
@@ -321,17 +320,11 @@ func (d *DevAuth) SubmitAuthRequest(ctx context.Context, r *model.AuthReq) (stri
 		}
 	}
 
-	uid, err := uuid.NewV4()
-	if err != nil {
-		l.Errorf("failed to assign uuid: %v", err)
-		return "", err
-	}
-
 	// request was already present in DB, check its status
 	if authSet.Status == model.DevStatusAccepted {
 		rawJwt := &jwt.Token{
 			Claims: jwt.Claims{
-				ID:        uid.String(),
+				ID:        authSet.Id,
 				Issuer:    d.config.Issuer,
 				ExpiresAt: time.Now().Unix() + d.config.ExpirationTime,
 				Subject:   authSet.DeviceId,
@@ -356,7 +349,7 @@ func (d *DevAuth) SubmitAuthRequest(ctx context.Context, r *model.AuthReq) (stri
 		token := model.NewToken(rawJwt.Claims.ID, authSet.DeviceId, string(raw))
 		token = token.WithAuthSet(authSet)
 
-		if err := d.db.AddToken(ctx, *token); err != nil {
+		if err := d.db.UpsertToken(ctx, *token); err != nil {
 			return "", errors.Wrap(err, "add token error")
 		}
 

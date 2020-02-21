@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -339,9 +339,9 @@ func TestStoreUpdateDevice(t *testing.T) {
 	}
 }
 
-func TestStoreAddToken(t *testing.T) {
+func TestStoreUpsertToken(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping TestAddToken in short mode.")
+		t.Skip("skipping TestUpsertToken in short mode.")
 	}
 
 	//setup
@@ -356,7 +356,7 @@ func TestStoreAddToken(t *testing.T) {
 	})
 	d := getDb(ctx)
 
-	err := d.AddToken(ctx, token)
+	err := d.UpsertToken(ctx, token)
 	assert.NoError(t, err, "failed to add token")
 
 	//verify

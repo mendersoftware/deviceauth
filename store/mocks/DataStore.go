@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -52,8 +52,8 @@ func (_m *DataStore) AddDevice(ctx context.Context, d model.Device) error {
 	return r0
 }
 
-// AddToken provides a mock function with given fields: ctx, t
-func (_m *DataStore) AddToken(ctx context.Context, t model.Token) error {
+// UpsertToken provides a mock function with given fields: ctx, t
+func (_m *DataStore) UpsertToken(ctx context.Context, t model.Token) error {
 	ret := _m.Called(ctx, t)
 
 	var r0 error
