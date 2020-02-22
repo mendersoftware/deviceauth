@@ -26,7 +26,7 @@ from common import Device, DevAuthorizer, \
 import mockserver
 
 
-class TestMultiTenant:
+class TestEnterprise:
 
     def test_auth_req_no_tenantadm(self, management_api, device_api, tenant_foobar):
         d = Device()
@@ -39,7 +39,7 @@ class TestMultiTenant:
         assert rsp.status_code == 500
 
         # request failed, so device should not even be listed as known
-        TestMultiTenant.verify_tenant_dev_present(management_api, d.identity, tenant_foobar,
+        TestEnterprise.verify_tenant_dev_present(management_api, d.identity, tenant_foobar,
                                                   present=False)
 
     def test_auth_req_fake_tenantadm_invalid_tenant_token(self, management_api, device_api,
@@ -62,7 +62,7 @@ class TestMultiTenant:
 
         # request failed, so device should not even be listed as known for the
         # default tenant
-        TestMultiTenant.verify_tenant_dev_present(management_api, d.identity, '',
+        TestEnterprise.verify_tenant_dev_present(management_api, d.identity, '',
                                                   present=False)
 
     def test_auth_req_fake_tenantadm_valid_tenant_token(self, management_api, device_api,
@@ -84,7 +84,7 @@ class TestMultiTenant:
             assert rsp.status_code == 401
 
         # device should be appear in devices listing
-        TestMultiTenant.verify_tenant_dev_present(management_api, d.identity, tenant_foobar,
+        TestEnterprise.verify_tenant_dev_present(management_api, d.identity, tenant_foobar,
                                                   present=True)
 
     def test_auth_req_fake_tenantadm_no_tenant_token(self, management_api, device_api,
@@ -97,7 +97,7 @@ class TestMultiTenant:
         rsp = device_auth_req(url, da, d)
         assert rsp.status_code == 401
 
-        TestMultiTenant.verify_tenant_dev_present(management_api, d.identity, '',
+        TestEnterprise.verify_tenant_dev_present(management_api, d.identity, '',
                                                   present=False)
 
     def test_auth_req_fake_tenantadm_tenant_suspended(self, management_api, device_api,
@@ -121,7 +121,7 @@ class TestMultiTenant:
 
         # request failed, so device should not even be listed as known for the
         # default tenant
-        TestMultiTenant.verify_tenant_dev_present(management_api, d.identity, '',
+        TestEnterprise.verify_tenant_dev_present(management_api, d.identity, '',
                                                   present=False)
 
     @staticmethod
@@ -136,7 +136,7 @@ class TestMultiTenant:
 
     @staticmethod
     def verify_tenant_dev_present(management_api, identity, token, present=False):
-        dev = TestMultiTenant.get_device(management_api, identity, token)
+        dev = TestEnterprise.get_device(management_api, identity, token)
         if present:
             assert dev
         else:
