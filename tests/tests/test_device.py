@@ -247,7 +247,7 @@ class TestDevice:
             TestDevice.verify_device_count(management_api, 'accepted', 0)
             TestDevice.verify_device_count(management_api, 'rejected', 0)
 
-class TestDeviceMultiTenant:
+class TestDeviceEnterprise:
     @pytest.mark.parametrize('tenant_foobar_devices', ['5'], indirect=True)
     def test_device_limit_applied(self, management_api, internal_api,
                                   tenant_foobar_devices, tenant_foobar):
@@ -328,7 +328,7 @@ class TestDeleteAuthset(TestDeleteAuthsetBase):
         self._test_delete_authset_error_authset_not_found(management_api, devices)
 
 
-class TestDeleteAuthsetMultiTenant(TestDeleteAuthsetBase):
+class TestDeleteAuthsetEnterprise(TestDeleteAuthsetBase):
 
     def test_delete_authset_OK(self, management_api, tenant_foobar_devices, tenant_foobar):
         auth = 'Bearer ' + tenant_foobar
