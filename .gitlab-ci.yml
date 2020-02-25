@@ -1,5 +1,9 @@
 variables:
-  DOCKER_REPOSITORY: mendersoftware/deviceauth
+  DOCKER_HOST: tcp://docker:2375/
+
+services:
+  - docker:19.03.5-dind
+  - mongo
 
 stages:
   - test_prep
