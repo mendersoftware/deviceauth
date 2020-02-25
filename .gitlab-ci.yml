@@ -13,7 +13,7 @@ variables:
   DOCKER_HOST: tcp://docker:2375/
 
 services:
-  - docker:19.03-dind
+  - docker:19.03.5-dind
   - mongo
 
 stages:
