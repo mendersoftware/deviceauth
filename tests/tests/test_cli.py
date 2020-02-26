@@ -130,7 +130,7 @@ class TestCliMigrate:
 
 
 @pytest.mark.last
-class TestCliMigrateMultiTenant:
+class TestCliMigrateEnterprise:
     @pytest.mark.parametrize('tenant_id',
             list(MIGRATED_TENANT_DBS) + ['tenant-new-1','tenant-new-2']
             )

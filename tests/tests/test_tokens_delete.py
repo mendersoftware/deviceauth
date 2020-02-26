@@ -98,7 +98,7 @@ def accepted_tenants_devices(device_api, management_api, clean_migrated_db, cli,
     yield tenants_devices
 
 
-class TestMultiTenantDeleteTokens:
+class TestEnterpriseDeleteTokens:
     @pytest.mark.parametrize('accepted_tenants_devices', [[('foo', 2, 2), ('bar', 1, 3)]], indirect=True)
     def test_delete_tokens_by_device_ok(self, accepted_tenants_devices, internal_api, management_api, device_api):
         td = accepted_tenants_devices
