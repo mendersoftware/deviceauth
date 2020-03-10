@@ -30,8 +30,8 @@ import (
 
 const (
 	// orchestrator endpoint
-	DeviceDecommissioningOrchestratorUri = "/api/workflow/decommission_device"
-	ProvisionDeviceOrchestratorUri       = "/api/workflow/provision_device"
+	DeviceDecommissioningOrchestratorUri = "/api/v1/workflow/decommission_device"
+	ProvisionDeviceOrchestratorUri       = "/api/v1/workflow/provision_device"
 	// default request timeout, 10s?
 	defaultReqTimeout = time.Duration(10) * time.Second
 )
