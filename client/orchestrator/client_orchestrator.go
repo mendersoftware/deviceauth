@@ -112,7 +112,7 @@ func (co *Client) SubmitDeviceDecommisioningJob(ctx context.Context, decommissio
 	}
 	defer rsp.Body.Close()
 
-	if rsp.StatusCode != http.StatusOK {
+	if rsp.StatusCode != http.StatusOK && rsp.StatusCode != http.StatusCreated {
 		body, err := ioutil.ReadAll(rsp.Body)
 		if err != nil {
 			body = []byte("<failed to read>")
@@ -160,7 +160,7 @@ func (co *Client) SubmitProvisionDeviceJob(ctx context.Context, provisionDeviceR
 	}
 	defer rsp.Body.Close()
 
-	if rsp.StatusCode != http.StatusOK {
+	if rsp.StatusCode != http.StatusOK && rsp.StatusCode != http.StatusCreated {
 		body, err := ioutil.ReadAll(rsp.Body)
 		if err != nil {
 			body = []byte("<failed to read>")
