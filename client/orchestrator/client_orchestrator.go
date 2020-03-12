@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -30,8 +30,8 @@ import (
 
 const (
 	// orchestrator endpoint
-	DeviceDecommissioningOrchestratorUri = "/api/workflow/decommission_device"
-	ProvisionDeviceOrchestratorUri       = "/api/workflow/provision_device"
+	DeviceDecommissioningOrchestratorUri = "/api/v1/workflow/decommission_device"
+	ProvisionDeviceOrchestratorUri       = "/api/v1/workflow/provision_device"
 	// default request timeout, 10s?
 	defaultReqTimeout = time.Duration(10) * time.Second
 )
@@ -112,7 +112,7 @@ func (co *Client) SubmitDeviceDecommisioningJob(ctx context.Context, decommissio
 	}
 	defer rsp.Body.Close()
 
-	if rsp.StatusCode != http.StatusOK {
+	if rsp.StatusCode != http.StatusOK && rsp.StatusCode != http.StatusCreated {
 		body, err := ioutil.ReadAll(rsp.Body)
 		if err != nil {
 			body = []byte("<failed to read>")
@@ -160,7 +160,7 @@ func (co *Client) SubmitProvisionDeviceJob(ctx context.Context, provisionDeviceR
 	}
 	defer rsp.Body.Close()
 
-	if rsp.StatusCode != http.StatusOK {
+	if rsp.StatusCode != http.StatusOK && rsp.StatusCode != http.StatusCreated {
 		body, err := ioutil.ReadAll(rsp.Body)
 		if err != nil {
 			body = []byte("<failed to read>")

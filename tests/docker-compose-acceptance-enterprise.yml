@@ -24,6 +24,6 @@ services:
                 # acceptance container will be running mocks for a couple of
                 # services, direct deviceauth there
                 DEVICEAUTH_TENANTADM_ADDR: "http://acceptance:9999/"
-                DEVICEAUTH_DEVICE_AUTH_ORCHESTRATOR: "http://acceptance:9998/"
+                DEVICEAUTH_ORCHESTRATOR_ADDR: "http://acceptance:9998/"
                 DEVICEAUTH_DEVADM_ADDR: "http://acceptance:9997/"
                 TESTING_LOGS: "1"

@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -42,8 +42,8 @@ const (
 	SettingInventoryAddr        = "inventory_addr"
 	SettingInventoryAddrDefault = "http://mender-inventory:8080/"
 
-	SettingOrchestratorAddr        = "device_auth_orchestrator"
-	SettingOrchestratorAddrDefault = "http://mender-conductor:8080/"
+	SettingOrchestratorAddr        = "orchestrator_addr"
+	SettingOrchestratorAddrDefault = "http://mender-workflows-server:8080/"
 
 	SettingTenantAdmAddr        = "tenantadm_addr"
 	SettingTenantAdmAddrDefault = ""

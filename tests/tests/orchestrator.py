@@ -61,13 +61,13 @@ ANY_DEVICE = None
 def run_fake_for_device_id(devid, status=None):
     if status is None:
         handlers = [
-                ('POST', '/api/workflow/provision_device', provision_device_handler(devid)),
-                ('POST', '/api/workflow/decommission_device', decommission_device_handler(devid)),
+                ('POST', '/api/v1/workflow/provision_device', provision_device_handler(devid)),
+                ('POST', '/api/v1/workflow/decommission_device', decommission_device_handler(devid)),
                 ]
     else:
         handlers = [
-                ('POST', '/api/workflow/provision_device', provision_device_handler(devid, status)),
-                ('POST', '/api/workflow/decommission_device', decommission_device_handler(devid, status)),
+                ('POST', '/api/v1/workflow/provision_device', provision_device_handler(devid, status)),
+                ('POST', '/api/v1/workflow/decommission_device', decommission_device_handler(devid, status)),
                 ]
 
     with mockserver.run_fake(get_fake_orchestrator_addr(),

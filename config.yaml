@@ -48,11 +48,11 @@
 
 # mongo_password: secret
 
-# Conductor service address
-# Defaults to: http://mender-conductor:8080
-# Overwrite with environment variable: DEVICEAUTH_DEVICE_AUTH_ORCHESTRATOR
+# Workflows service address
+# Defaults to: http://mender-workflows-server:8080
+# Overwrite with environment variable: DEVICEAUTH_ORCHESTRATOR_ADDR
 
-# device_auth_orchestrator:  http://mender-conductor:8080
+# orchestrator_addr:  http://mender-workflows-server:8080
 
 # Tenant administration service address (optional)
 # Defaults to: none
