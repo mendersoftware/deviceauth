@@ -14,20 +14,39 @@
 package jwt
 
 import (
+	"encoding/json"
 	"time"
 )
 
 type Claims struct {
-	Audience  string `json:"aud,omitempty"`
-	ExpiresAt int64  `json:"exp,omitempty"`
-	ID        string `json:"jti,omitempty"`
-	IssuedAt  int64  `json:"iat,omitempty"`
-	Issuer    string `json:"iss,omitempty"`
-	NotBefore int64  `json:"nbf,omitempty"`
-	Subject   string `json:"sub,omitempty"`
-	Scope     string `json:"scp,omitempty"`
-	Tenant    string `json:"mender.tenant,omitempty"`
-	Device    bool   `json:"mender.device,omitempty"`
+	ID        string `json:"jti" bson:"_id"`
+	ExpiresAt *Time  `json:"exp" bson:"exp"`
+	Audience  string `json:"aud" bson:"device_id"`
+	IssuedAt  *Time  `json:"iat,omitempty" bson:"iat,omitempty"`
+	Issuer    string `json:"iss,omitempty" bson:"iss,omitempty"`
+	NotBefore int64  `json:"nbf,omitempty" bson:"nbf,omitempty"`
+	Subject   string `json:"sub,omitempty" bson:"sub,omitempty"`
+	Scope     string `json:"scp,omitempty" bson:"scp,omitempty"`
+	Tenant    string `json:"mender.tenant,omitempty" bson:"mender.tenant,omitempty"`
+	Device    bool   `json:"mender.device,omitempty" bson:"mender.device"`
+}
+
+type Time struct {
+	time.Time `bson:"time"`
+}
+
+func (e *Time) MarshalJSON() ([]byte, error) {
+	return json.Marshal(e.Unix())
+}
+
+func (e *Time) UnmarshalJSON(b []byte) error {
+	var unixTime int64
+	err := json.Unmarshal(b, &unixTime)
+	if err != nil {
+		return err
+	}
+	e.Time = time.Unix(unixTime, 0)
+	return nil
 }
 
 // Valid checks if claims are valid. Returns error if validation fails.
@@ -36,19 +55,17 @@ type Claims struct {
 // level, where this info is available.
 func (c *Claims) Valid() error {
 	if c.Issuer == "" ||
-		c.ExpiresAt == 0 ||
-		c.Subject == "" {
+		c.Subject == "" ||
+		c.ExpiresAt == nil ||
+		c.ID == "" ||
+		c.Audience == "" {
 		return ErrTokenInvalid
 	}
 
-	if !verifyExp(c.ExpiresAt) {
+	now := time.Now()
+	if now.After(c.ExpiresAt.Time) {
 		return ErrTokenExpired
 	}
 
 	return nil
-}
-
-func verifyExp(exp int64) bool {
-	now := time.Now().Unix()
-	return now <= exp
 }

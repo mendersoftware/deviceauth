@@ -71,12 +71,6 @@ func MakeErrDevAuthBadRequest(e error) error {
 	return errors.Wrap(e, MsgErrDevAuthBadRequest)
 }
 
-// Expiration Timeout should be moved to database
-// Do we need Expiration Timeout per device?
-const (
-	defaultExpirationTimeout = 3600
-)
-
 // helper for obtaining API clients
 type ApiClientGetter func() apiclient.HttpRunner
 
@@ -96,7 +90,7 @@ type App interface {
 	RejectDeviceAuth(ctx context.Context, dev_id string, auth_id string) error
 	ResetDeviceAuth(ctx context.Context, dev_id string, auth_id string) error
 	PreauthorizeDevice(ctx context.Context, req *model.PreAuthReq) error
-	GetDeviceToken(ctx context.Context, dev_id string) (*model.Token, error)
+	GetDeviceToken(ctx context.Context, dev_id string) (*jwt.Token, error)
 
 	RevokeToken(ctx context.Context, token_id string) error
 	VerifyToken(ctx context.Context, token string) error
@@ -322,13 +316,22 @@ func (d *DevAuth) SubmitAuthRequest(ctx context.Context, r *model.AuthReq) (stri
 
 	// request was already present in DB, check its status
 	if authSet.Status == model.DevStatusAccepted {
+		now := time.Now()
 		rawJwt := &jwt.Token{
 			Claims: jwt.Claims{
-				ID:        authSet.Id,
-				Issuer:    d.config.Issuer,
-				ExpiresAt: time.Now().Unix() + d.config.ExpirationTime,
-				Subject:   authSet.DeviceId,
-				Device:    true,
+				ID:       authSet.Id,
+				Audience: authSet.DeviceId,
+				Issuer:   d.config.Issuer,
+				ExpiresAt: &jwt.Time{
+					Time: now.Add(time.Second *
+						time.Duration(d.config.
+							ExpirationTime)),
+				},
+				IssuedAt: &jwt.Time{
+					Time: now,
+				},
+				Subject: authSet.DeviceId,
+				Device:  true,
 			},
 		}
 
@@ -346,16 +349,14 @@ func (d *DevAuth) SubmitAuthRequest(ctx context.Context, r *model.AuthReq) (stri
 			return "", errors.Wrap(err, "generate token error")
 		}
 
-		token := model.NewToken(rawJwt.Claims.ID, authSet.DeviceId, string(raw))
-		token = token.WithAuthSet(authSet)
-
-		if err := d.db.UpsertToken(ctx, *token); err != nil {
+		if err := d.db.UpsertToken(ctx, rawJwt); err != nil {
 			return "", errors.Wrap(err, "add token error")
 		}
 
+		token := string(raw)
 		l.Infof("Token %v assigned to device %v auth set %v",
-			token.Id, authSet.DeviceId, authSet.Id)
-		return token.Token, nil
+			token, authSet.DeviceId, authSet.Id)
+		return token, nil
 	}
 
 	// no token, return device unauthorized
@@ -828,7 +829,7 @@ func (d *DevAuth) PreauthorizeDevice(ctx context.Context, req *model.PreAuthReq)
 	}
 }
 
-func (*DevAuth) GetDeviceToken(ctx context.Context, dev_id string) (*model.Token, error) {
+func (*DevAuth) GetDeviceToken(ctx context.Context, dev_id string) (*jwt.Token, error) {
 	return nil, errors.New("not implemented")
 }
 
@@ -902,11 +903,11 @@ func (d *DevAuth) VerifyToken(ctx context.Context, raw string) error {
 		return errors.Wrapf(err, "Cannot get token with id: %s from database: %s", jti, err)
 	}
 
-	auth, err := d.db.GetAuthSetById(ctx, tok.AuthSetId)
+	auth, err := d.db.GetAuthSetById(ctx, tok.ID)
 	if err != nil {
 		if err == store.ErrAuthSetNotFound {
 			l.Errorf("Token %s auth set %s not found",
-				jti, tok.AuthSetId)
+				jti, tok.ID)
 			return err
 		}
 		return err

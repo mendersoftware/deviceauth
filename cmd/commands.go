@@ -167,19 +167,6 @@ func decommissioningCleanupDryRun(db *mongo.DataStoreMongo, dbName string) error
 		}
 	}
 
-	//tokens
-	tokenIds, err := db.GetBrokenTokens(dbName)
-	if err != nil {
-		return err
-	}
-
-	if len(tokenIds) > 0 {
-		fmt.Println("tokens to be removed:")
-		for _, tokenId := range tokenIds {
-			fmt.Println(tokenId)
-		}
-	}
-
 	return nil
 }
 
@@ -192,11 +179,8 @@ func decommissioningCleanupExecute(db *mongo.DataStoreMongo, dbName string) erro
 		return err
 	}
 
+	// Deletes broken auth sets and associated JWT tokens.
 	if err := db.DeleteBrokenAuthSets(dbName); err != nil {
-		return err
-	}
-
-	if err := db.DeleteBrokenTokens(dbName); err != nil {
 		return err
 	}
 

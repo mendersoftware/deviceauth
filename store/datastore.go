@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/mendersoftware/deviceauth/jwt"
 	"github.com/mendersoftware/deviceauth/model"
 )
 
@@ -89,11 +90,11 @@ type DataStore interface {
 	DeleteAuthSetForDevice(ctx context.Context, devId string, authId string) error
 
 	// adds JWT to database
-	UpsertToken(ctx context.Context, t model.Token) error
+	UpsertToken(ctx context.Context, t *jwt.Token) error
 
 	// retrieves JWT from database using JWT Id and device Id
 	// returns ErrTokenNotFound if token not found
-	GetToken(ctx context.Context, jti string) (*model.Token, error)
+	GetToken(ctx context.Context, jti string) (*jwt.Token, error)
 
 	// deletes token
 	DeleteToken(ctx context.Context, jti string) error

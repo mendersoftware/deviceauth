@@ -30,18 +30,24 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	mopts "go.mongodb.org/mongo-driver/mongo/options"
 
+	"github.com/mendersoftware/deviceauth/jwt"
 	"github.com/mendersoftware/deviceauth/model"
 	"github.com/mendersoftware/deviceauth/store"
 	uto "github.com/mendersoftware/deviceauth/utils/to"
 )
 
 const (
-	DbVersion     = "1.6.0"
+	DbVersion     = "1.7.0"
 	DbName        = "deviceauth"
 	DbDevicesColl = "devices"
 	DbAuthSetColl = "auth_sets"
 	DbTokensColl  = "tokens"
 	DbLimitsColl  = "limits"
+
+	tokenKeyID        = "_id"
+	tokenKeyExpiresAt = "exp.time"
+	tokenKeyIssuedAt  = "iat.time"
+	tokenKeyDeviceID  = "device_id"
 )
 
 var (
@@ -237,28 +243,33 @@ func (db *DataStoreMongo) DeleteDevice(ctx context.Context, id string) error {
 	return nil
 }
 
-func (db *DataStoreMongo) UpsertToken(ctx context.Context, t model.Token) error {
+func (db *DataStoreMongo) UpsertToken(ctx context.Context, t *jwt.Token) error {
 
 	database := db.client.Database(ctxstore.DbFromContext(ctx, DbName))
 	collTkns := database.Collection(DbTokensColl)
 
 	uOpts := mopts.Update()
 	uOpts.SetUpsert(true)
-	update := bson.M{"$set": t}
+	update := bson.M{"$set": t.Claims}
 
-	if _, err := collTkns.UpdateOne(ctx, bson.M{"_id": t.Id}, update, uOpts); err != nil {
+	if _, err := collTkns.UpdateOne(
+		ctx,
+		bson.M{"_id": t.Claims.ID},
+		update,
+		uOpts,
+	); err != nil {
 		return errors.Wrap(err, "failed to store token")
 	}
 	return nil
 }
 
-func (db *DataStoreMongo) GetToken(ctx context.Context, jti string) (*model.Token, error) {
+func (db *DataStoreMongo) GetToken(ctx context.Context, jti string) (*jwt.Token, error) {
 
 	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbTokensColl)
 
-	res := model.Token{}
+	var token jwt.Token
 
-	err := c.FindOne(ctx, bson.M{"_id": jti}).Decode(&res)
+	err := c.FindOne(ctx, bson.M{"_id": jti}).Decode(&token.Claims)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			return nil, store.ErrTokenNotFound
@@ -267,7 +278,7 @@ func (db *DataStoreMongo) GetToken(ctx context.Context, jti string) (*model.Toke
 		}
 	}
 
-	return &res, nil
+	return &token, nil
 }
 
 func (db *DataStoreMongo) DeleteToken(ctx context.Context, jti string) error {
@@ -389,6 +400,10 @@ func (db *DataStoreMongo) MigrateTenant(ctx context.Context, database, version s
 			ctx: ctx,
 		},
 		&migration_1_6_0{
+			ms:  db,
+			ctx: ctx,
+		},
+		&migration_1_7_0{
 			ms:  db,
 			ctx: ctx,
 		},
