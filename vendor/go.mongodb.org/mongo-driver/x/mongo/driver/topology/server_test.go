@@ -205,7 +205,7 @@ func TestServer(t *testing.T) {
 		s.connectionstate = connected
 		s.pool.connected = connected
 
-		wce := driver.WriteConcernError{"", 10107, "not master", []byte{}}
+		wce := driver.WriteConcernError{"", 10107, "not master", []byte{}, []string{}}
 		s.ProcessError(wce)
 
 		// should set ServerDescription to Unknown
@@ -289,6 +289,14 @@ func TestServer(t *testing.T) {
 		if includesMetadata(t, wm) {
 			t.Fatal("client metadata not expected in heartbeat but found")
 		}
+	})
+	t.Run("WithServerAppName", func(t *testing.T) {
+		name := "test"
+
+		s, err := NewServer(address.Address("localhost"),
+			WithServerAppName(func(string) string { return name }))
+		require.Nil(t, err, "error from NewServer: %v", err)
+		require.Equal(t, name, s.cfg.appname, "expected appname to be: %v, got: %v", name, s.cfg.appname)
 	})
 }
 
