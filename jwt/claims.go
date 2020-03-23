@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -16,19 +16,21 @@ package jwt
 import (
 	"encoding/json"
 	"time"
+
+	"github.com/mendersoftware/go-lib-micro/mongo/uuid"
 )
 
 type Claims struct {
-	ID        string `json:"jti" bson:"_id"`
-	ExpiresAt *Time  `json:"exp" bson:"exp"`
-	Audience  string `json:"aud" bson:"device_id"`
-	IssuedAt  *Time  `json:"iat,omitempty" bson:"iat,omitempty"`
-	Issuer    string `json:"iss,omitempty" bson:"iss,omitempty"`
-	NotBefore int64  `json:"nbf,omitempty" bson:"nbf,omitempty"`
-	Subject   string `json:"sub,omitempty" bson:"sub,omitempty"`
-	Scope     string `json:"scp,omitempty" bson:"scp,omitempty"`
-	Tenant    string `json:"mender.tenant,omitempty" bson:"mender.tenant,omitempty"`
-	Device    bool   `json:"mender.device,omitempty" bson:"mender.device"`
+	ID        *uuid.UUID `json:"jti" bson:"_id"`
+	Subject   *uuid.UUID `json:"sub" bson:"dev_id"`
+	ExpiresAt *Time      `json:"exp" bson:"exp"`
+	IssuedAt  *Time      `json:"iat" bson:"iat"`
+	Issuer    string     `json:"iss" bson:"iss"`
+	Audience  string     `json:"aud,omitempty" bson:"aud,omitempty"`
+	NotBefore int64      `json:"nbf,omitempty" bson:"nbf,omitempty"`
+	Scope     string     `json:"scp,omitempty" bson:"scp,omitempty"`
+	Tenant    string     `json:"mender.tenant,omitempty" bson:"mender.tenant,omitempty"`
+	Device    bool       `json:"mender.device,omitempty" bson:"mender.device"`
 }
 
 type Time struct {
@@ -55,10 +57,10 @@ func (e *Time) UnmarshalJSON(b []byte) error {
 // level, where this info is available.
 func (c *Claims) Valid() error {
 	if c.Issuer == "" ||
-		c.Subject == "" ||
+		c.Subject == nil ||
+		c.IssuedAt == nil ||
 		c.ExpiresAt == nil ||
-		c.ID == "" ||
-		c.Audience == "" {
+		c.ID == nil {
 		return ErrTokenInvalid
 	}
 

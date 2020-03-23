@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -24,6 +24,8 @@ import (
 
 	"github.com/mendersoftware/deviceauth/model"
 	"github.com/mendersoftware/deviceauth/store"
+	"github.com/mendersoftware/go-lib-micro/log"
+	"github.com/mendersoftware/go-lib-micro/mongo/uuid"
 )
 
 const noCollectionErrMsg = "ns doesn't exist"
@@ -58,7 +60,6 @@ func (db *DataStoreMongo) GetBrokenAuthSets(dbName string) ([]string, error) {
 	ctx := context.Background()
 
 	// get all auth sets; group by device id
-
 	project := bson.D{
 		{Key: "_id", Value: 0},
 		{Key: "device_id", Value: 1},
@@ -66,7 +67,7 @@ func (db *DataStoreMongo) GetBrokenAuthSets(dbName string) ([]string, error) {
 	var result []struct {
 		DeviceID string `bson:"device_id"`
 	}
-	findOpts := mopts.Find()
+	findOpts := mopts.Find().SetProjection(project)
 	findOpts.SetProjection(project)
 
 	cursor, err := c.Find(ctx, bson.M{}, findOpts)
@@ -89,26 +90,26 @@ func (db *DataStoreMongo) GetBrokenAuthSets(dbName string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	brokenAuthSets = make([]string, 0, len(nonexistentDevices))
 
 	// fetch auth sets for non exisitent devices
-	for _, dev := range nonexistentDevices {
-
-		authSets := []model.AuthSet{}
-
-		cursor, err := c.Find(ctx, bson.M{"device_id": dev})
-		if err != nil {
+	query := bson.M{"device_id": bson.M{"$in": nonexistentDevices}}
+	findOpts = mopts.Find().SetProjection(bson.M{"_id": 1})
+	cursor, err = c.Find(ctx, query, findOpts)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to fetch authentication sets")
+	}
+	var doc struct {
+		ID string `bson:"_id"`
+	}
+	brokenAuthSets = make([]string, 0, len(nonexistentDevices))
+	for cursor.Next(ctx) {
+		err := cursor.Decode(&doc)
+		if err == mongo.ErrNoDocuments {
+			return brokenAuthSets, nil
+		} else if err != nil {
 			return nil, errors.Wrap(err, "failed to fetch authentication sets")
 		}
-		if err = cursor.All(ctx, &authSets); err != nil {
-			if err != mongo.ErrNoDocuments {
-				return nil, errors.Wrap(err, "failed to fetch authentication sets")
-			}
-		}
-
-		for _, authSet := range authSets {
-			brokenAuthSets = append(brokenAuthSets, authSet.Id)
-		}
+		brokenAuthSets = append(brokenAuthSets, doc.ID)
 	}
 
 	return brokenAuthSets, nil
@@ -129,8 +130,10 @@ func (db *DataStoreMongo) DeleteDevicesBeingDecommissioned(dbName string) error 
 // Deletes auth sets owned by devices that are in decommissioning state and auth sets not
 // owned by any device.
 func (db *DataStoreMongo) DeleteBrokenAuthSets(dbName string) error {
-	collAuthSets := db.client.Database(dbName).Collection(DbAuthSetColl)
-	collTokens := db.client.Database(dbName).Collection(DbTokensColl)
+	database := db.client.Database(dbName)
+	collAuthSets := database.Collection(DbAuthSetColl)
+	collTokens := database.Collection(DbTokensColl)
+	l := log.NewEmpty()
 
 	authSets, err := db.GetBrokenAuthSets(dbName)
 	if err != nil {
@@ -141,11 +144,14 @@ func (db *DataStoreMongo) DeleteBrokenAuthSets(dbName string) error {
 	for _, as := range authSets {
 		_, err := collAuthSets.DeleteOne(nil, bson.M{"_id": as})
 		if err != nil {
-			return errors.Wrapf(err, "database %s, failed to delete authentication sets", dbName)
+			return errors.Wrapf(err, "database %s, failed to "+
+				"delete authentication sets", dbName)
 		}
-		_, err = collTokens.DeleteOne(nil, bson.M{"_id": as})
+		authSetUUID, _ := uuid.FromString(as)
+		_, err = collTokens.DeleteOne(nil, bson.M{"_id": authSetUUID})
 		if err != nil {
-			return errors.Wrapf(err, "database %s, failed to clear JWT token", dbName)
+			l.Warnf("Error deleting token associated with authset "+
+				"%s: %s", as, err.Error())
 		}
 	}
 
@@ -159,26 +165,35 @@ func (db *DataStoreMongo) filterNonExistentDevices(
 	dbName string,
 	devIds []string,
 ) ([]string, error) {
+	var res model.Device
 	c := db.client.Database(dbName).Collection(DbDevicesColl)
 
 	nonexistentDevices := []string{}
-	query := bson.M{
-		"_id": bson.M{"$nin": devIds},
-	}
 
-	cur, err := c.Find(ctx, query)
-	if err != nil {
-		return nil, err
-	}
-	var doc struct {
-		ID string `bson:_id`
-	}
-	for cur.Next(ctx) {
-		err := cur.Decode(&doc)
+	// We only need to know if the device is in decomissioning state
+	findOpts := mopts.FindOne()
+	findOpts.SetProjection(bson.M{"decommissioning": 1})
+
+	//check if device exists
+	for _, devId := range devIds {
+		err := c.FindOne(ctx, bson.M{"_id": devId}, findOpts).
+			Decode(&res)
+
 		if err != nil {
-			return nil, err
+			if err == mongo.ErrNoDocuments {
+				nonexistentDevices = append(
+					nonexistentDevices,
+					devId,
+				)
+			} else {
+				return nil, errors.Wrapf(err,
+					"db %s, failed to fetch device", dbName)
+			}
 		}
-		nonexistentDevices = append(nonexistentDevices, doc.ID)
+
+		if res.Decommissioning {
+			nonexistentDevices = append(nonexistentDevices, devId)
+		}
 	}
 
 	return nonexistentDevices, nil

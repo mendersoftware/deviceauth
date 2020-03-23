@@ -51,7 +51,11 @@ func (u *UUID) UnmarshalBSONValue(t bsontype.Type, b []byte) error {
 	if l != uuid.Size {
 		return errors.Errorf("illegal uuid length: %d", l)
 	}
-	u.UUID, err = uuid.FromBytes(b[4 : 4+uuid.Size])
+	if b[4] != bsontype.BinaryUUID {
+		return errors.Errorf("illegal bson sub-type: %d, expected: %d",
+			b[4], bsontype.BinaryUUID)
+	}
+	u.UUID, err = uuid.FromBytes(b[5:])
 	return err
 }
 

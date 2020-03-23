@@ -23,9 +23,9 @@ import (
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
+	"github.com/mendersoftware/go-lib-micro/mongo/uuid"
 	ctxstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/pkg/errors"
-	"github.com/satori/go.uuid"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	mopts "go.mongodb.org/mongo-driver/mongo/options"
@@ -192,7 +192,7 @@ func (db *DataStoreMongo) GetDeviceByIdentityDataHash(ctx context.Context, idata
 func (db *DataStoreMongo) AddDevice(ctx context.Context, d model.Device) error {
 
 	if d.Id == "" {
-		uid, err := uuid.NewV4()
+		uid, err := uuid.NewUUID()
 		if err != nil {
 			return err
 		}
@@ -263,7 +263,7 @@ func (db *DataStoreMongo) UpsertToken(ctx context.Context, t *jwt.Token) error {
 	return nil
 }
 
-func (db *DataStoreMongo) GetToken(ctx context.Context, jti string) (*jwt.Token, error) {
+func (db *DataStoreMongo) GetToken(ctx context.Context, jti *uuid.UUID) (*jwt.Token, error) {
 
 	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbTokensColl)
 
@@ -281,7 +281,7 @@ func (db *DataStoreMongo) GetToken(ctx context.Context, jti string) (*jwt.Token,
 	return &token, nil
 }
 
-func (db *DataStoreMongo) DeleteToken(ctx context.Context, jti string) error {
+func (db *DataStoreMongo) DeleteToken(ctx context.Context, jti *uuid.UUID) error {
 
 	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbTokensColl)
 
@@ -303,7 +303,7 @@ func (db *DataStoreMongo) DeleteTokens(ctx context.Context) error {
 	return err
 }
 
-func (db *DataStoreMongo) DeleteTokenByDevId(ctx context.Context, devId string) error {
+func (db *DataStoreMongo) DeleteTokenByDevId(ctx context.Context, devId *uuid.UUID) error {
 	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbTokensColl)
 	ci, err := c.DeleteMany(ctx, bson.M{"dev_id": devId})
 
@@ -426,7 +426,7 @@ func (db *DataStoreMongo) AddAuthSet(ctx context.Context, set model.AuthSet) err
 	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
 
 	if set.Id == "" {
-		uid, err := uuid.NewV4()
+		uid, err := uuid.NewUUID()
 		if err != nil {
 			return err
 		}
