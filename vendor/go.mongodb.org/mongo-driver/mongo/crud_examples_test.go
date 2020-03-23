@@ -10,12 +10,14 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/readconcern"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
@@ -450,4 +452,301 @@ func ExampleCollection_Watch() {
 	for changeStream.Next(context.TODO()) {
 		fmt.Println(changeStream.Current)
 	}
+}
+
+// Session examples
+
+func ExampleWithSession() {
+	var client *mongo.Client // assume client is configured with write concern majority and read preference primary
+
+	// Specify the DefaultReadConcern option so any transactions started through the session will have read concern
+	// majority.
+	// The DefaultReadPreference and DefaultWriteConcern options aren't specified so they will be inheritied from client
+	// and be set to primary and majority, respectively.
+	opts := options.Session().SetDefaultReadConcern(readconcern.Majority())
+	sess, err := client.StartSession(opts)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer sess.EndSession(context.TODO())
+
+	// Call WithSession to use the new Session to insert a document and find it.
+	err = mongo.WithSession(context.TODO(), sess, func(sessCtx mongo.SessionContext) error {
+		// Use sessCtx as the Context parameter for InsertOne and FindOne so both operations are run under the new
+		// Session.
+
+		coll := client.Database("db").Collection("coll")
+		res, err := coll.InsertOne(sessCtx, bson.D{{"x", 1}})
+		if err != nil {
+			return err
+		}
+
+		var result bson.M
+		if err = coll.FindOne(sessCtx, bson.D{{"_id", res.InsertedID}}).Decode(result); err != nil {
+			return err
+		}
+		fmt.Println(result)
+		return nil
+	})
+}
+
+func ExampleClient_UseSessionWithOptions() {
+	var client *mongo.Client
+
+	// Specify the DefaultReadConcern option so any transactions started through the session will have read concern
+	// majority.
+	// The DefaultReadPreference and DefaultWriteConcern options aren't specified so they will be inheritied from client
+	// and be set to primary and majority, respectively.
+	opts := options.Session().SetDefaultReadConcern(readconcern.Majority())
+	err := client.UseSessionWithOptions(context.TODO(), opts, func(sessCtx mongo.SessionContext) error {
+		// Use sessCtx as the Context parameter for InsertOne and FindOne so both operations are run under the new
+		// Session.
+
+		coll := client.Database("db").Collection("coll")
+		res, err := coll.InsertOne(sessCtx, bson.D{{"x", 1}})
+		if err != nil {
+			return err
+		}
+
+		var result bson.M
+		if err = coll.FindOne(sessCtx, bson.D{{"_id", res.InsertedID}}).Decode(result); err != nil {
+			return err
+		}
+		fmt.Println(result)
+		return nil
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func ExampleClient_StartSession_withTransaction() {
+	var client *mongo.Client // assume client is configured with write concern majority and read preference primary
+
+	// Specify the DefaultReadConcern option so any transactions started through the session will have read concern
+	// majority.
+	// The DefaultReadPreference and DefaultWriteConcern options aren't specified so they will be inheritied from client
+	// and be set to primary and majority, respectively.
+	opts := options.Session().SetDefaultReadConcern(readconcern.Majority())
+	sess, err := client.StartSession(opts)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer sess.EndSession(context.TODO())
+
+	// Specify the ReadPreference option to set the read preference to primary preferred for this transaction.
+	txnOpts := options.Transaction().SetReadPreference(readpref.PrimaryPreferred())
+	result, err := sess.WithTransaction(context.TODO(), func(sessCtx mongo.SessionContext) (interface{}, error) {
+		// Use sessCtx as the Context parameter for InsertOne and FindOne so both operations are run in a
+		// transaction.
+
+		coll := client.Database("db").Collection("coll")
+		res, err := coll.InsertOne(sessCtx, bson.D{{"x", 1}})
+		if err != nil {
+			return nil, err
+		}
+
+		var result bson.M
+		if err = coll.FindOne(sessCtx, bson.D{{"_id", res.InsertedID}}).Decode(result); err != nil {
+			return nil, err
+		}
+		return result, err
+	}, txnOpts)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("result: %v\n", result)
+}
+
+// Cursor examples
+
+func ExampleCursor_All() {
+	var cursor *mongo.Cursor
+
+	var results []bson.M
+	if err := cursor.All(context.TODO(), &results); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(results)
+}
+
+func ExampleCursor_Next() {
+	var cursor *mongo.Cursor
+	defer cursor.Close(context.TODO())
+
+	// Iterate the cursor and print out each document until the cursor is exhausted or there is an error getting the
+	// next document.
+	for cursor.Next(context.TODO()) {
+		// A new result variable should be declared for each document.
+		var result bson.M
+		if err := cursor.Decode(&result); err != nil {
+			log.Fatal(err)
+		}
+		fmt.Println(result)
+	}
+	if err := cursor.Err(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func ExampleCursor_TryNext() {
+	var cursor *mongo.Cursor
+	defer cursor.Close(context.TODO())
+
+	// Iterate the cursor and print out each document until the cursor is exhausted or there is an error getting the
+	// next document.
+	for {
+		if cursor.TryNext(context.TODO()) {
+			// A new result variable should be declared for each document.
+			var result bson.M
+			if err := cursor.Decode(&result); err != nil {
+				log.Fatal(err)
+			}
+			fmt.Println(result)
+			continue
+		}
+
+		// If TryNext returns false, the next document is not yet available, the cursor was exhausted and was closed, or
+		// an error occured. TryNext should only be called again for the empty batch case.
+		if err := cursor.Err(); err != nil {
+			log.Fatal(err)
+		}
+		if cursor.ID() == 0 {
+			break
+		}
+	}
+}
+
+// ChangeStream examples
+
+func ExampleChangeStream_Next() {
+	var stream *mongo.ChangeStream
+	defer stream.Close(context.TODO())
+
+	// Iterate the change stream and print out each event.
+	// Because the Next call blocks until an event is available, another way to iterate the change stream is to call
+	// Next in a goroutine and pass in a context that can be cancelled to abort the call.
+
+	for stream.Next(context.TODO()) {
+		// A new event variable should be declared for each event.
+		var event bson.M
+		if err := stream.Decode(&event); err != nil {
+			log.Fatal(err)
+		}
+		fmt.Println(event)
+	}
+	if err := stream.Err(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func ExampleChangeStream_TryNext() {
+	var stream *mongo.ChangeStream
+	defer stream.Close(context.TODO())
+
+	// Iterate the change stream and print out each event until the change stream is closed by the server or there is an
+	// error getting the next event.
+	for {
+		if stream.TryNext(context.TODO()) {
+			// A new event variable should be declared for each event.
+			var event bson.M
+			if err := stream.Decode(&event); err != nil {
+				log.Fatal(err)
+			}
+			fmt.Println(event)
+			continue
+		}
+
+		// If TryNext returns false, the next change is not yet available, the change stream was closed by the server,
+		// or an error occurred. TryNext should only be called again for the empty batch case.
+		if err := stream.Err(); err != nil {
+			log.Fatal(err)
+		}
+		if stream.ID() == 0 {
+			break
+		}
+	}
+}
+
+func ExampleChangeStream_ResumeToken() {
+	var client *mongo.Client
+	var stream *mongo.ChangeStream // assume stream was created via client.Watch()
+
+	cancelCtx, cancel := context.WithCancel(context.TODO())
+	defer cancel()
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	// Run a goroutine to process events.
+	go func() {
+		for stream.Next(cancelCtx) {
+			fmt.Println(stream.Current)
+		}
+		wg.Done()
+	}()
+
+	// Assume client needs to be disconnected. Cancel the context being used by the goroutine to abort any
+	// in-progres Next calls and wait for the goroutine to exit.
+	cancel()
+	wg.Wait()
+
+	// Before disconnecting the client, store the last seen resume token for the change stream.
+	resumeToken := stream.ResumeToken()
+	_ = client.Disconnect(context.TODO())
+
+	// Once a new client is created, the change stream can be re-created. Specify resumeToken as the ResumeAfter option
+	// so only events that occurred after resumeToken will be returned.
+	var newClient *mongo.Client
+	opts := options.ChangeStream().SetResumeAfter(resumeToken)
+	newStream, err := newClient.Watch(context.TODO(), mongo.Pipeline{}, opts)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer newStream.Close(context.TODO())
+}
+
+// IndexView examples
+
+func ExampleIndexView_CreateMany() {
+	var indexView *mongo.IndexView
+
+	// Create two indexes: {name: 1, email: 1} and {name: 1, age: 1}
+	// For the first index, specify no options. The name will be generated as "name_1_email_1" by the driver.
+	// For the second index, specify the Name option to explicitly set the name to "nameAge".
+	models := []mongo.IndexModel{
+		{
+			Keys: bson.D{{"name", 1}, {"email", 1}},
+		},
+		{
+			Keys:    bson.D{{"name", 1}, {"age", 1}},
+			Options: options.Index().SetName("nameAge"),
+		},
+	}
+
+	// Specify the MaxTime option to limit the amount of time the operation can run on the server
+	opts := options.CreateIndexes().SetMaxTime(2 * time.Second)
+	names, err := indexView.CreateMany(context.TODO(), models, opts)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Printf("created indexes %v\n", names)
+}
+
+func ExampleIndexView_List() {
+	var indexView *mongo.IndexView
+
+	// Specify the MaxTime option to limit the amount of time the operation can run on the server
+	opts := options.ListIndexes().SetMaxTime(2 * time.Second)
+	cursor, err := indexView.List(context.TODO(), opts)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Get a slice of all indexes returned and print them out.
+	var results []bson.M
+	if err = cursor.All(context.TODO(), &results); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(results)
 }

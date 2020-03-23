@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/url"
 	"reflect"
 	"testing"
@@ -21,7 +22,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson/bsontype"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/x/bsonx/bsoncore"
-	"math"
 )
 
 type myInterface interface {
@@ -59,6 +59,13 @@ func TestDefaultValueEncoders(t *testing.T) {
 	pjsnum := new(json.Number)
 	*pjsnum = json.Number("3.14159")
 	d128 := primitive.NewDecimal128(12345, 67890)
+	var nilValueMarshaler *testValueMarshaler
+	var nilMarshaler *testMarshaler
+	var nilProxy *testProxy
+
+	vmStruct := struct{ V testValueMarshalPtr }{testValueMarshalPtr{t: bsontype.String, buf: []byte{0x04, 0x00, 0x00, 0x00, 'f', 'o', 'o', 0x00}}}
+	mStruct := struct{ V testMarshalPtr }{testMarshalPtr{buf: bsoncore.BuildDocument(nil, bsoncore.AppendDoubleElement(nil, "pi", 3.14159))}}
+	pStruct := struct{ V testProxyPtr }{testProxyPtr{ret: int64(1234567890)}}
 
 	type subtest struct {
 		name   string
@@ -136,7 +143,7 @@ func TestDefaultValueEncoders(t *testing.T) {
 		},
 		{
 			"UintEncodeValue",
-			ValueEncoderFunc(dve.UintEncodeValue),
+			defaultUIntCodec,
 			[]subtest{
 				{
 					"wrong type",
@@ -202,7 +209,7 @@ func TestDefaultValueEncoders(t *testing.T) {
 		},
 		{
 			"TimeEncodeValue",
-			ValueEncoderFunc(dve.TimeEncodeValue),
+			defaultTimeCodec,
 			[]subtest{
 				{
 					"wrong type",
@@ -217,7 +224,7 @@ func TestDefaultValueEncoders(t *testing.T) {
 		},
 		{
 			"MapEncodeValue",
-			ValueEncoderFunc(dve.MapEncodeValue),
+			defaultMapCodec,
 			[]subtest{
 				{
 					"wrong kind",
@@ -226,18 +233,6 @@ func TestDefaultValueEncoders(t *testing.T) {
 					nil,
 					bsonrwtest.Nothing,
 					ValueEncoderError{Name: "MapEncodeValue", Kinds: []reflect.Kind{reflect.Map}, Received: reflect.ValueOf(wrong)},
-				},
-				{
-					"wrong kind (non-string key)",
-					map[int]interface{}{},
-					nil,
-					nil,
-					bsonrwtest.Nothing,
-					ValueEncoderError{
-						Name:     "MapEncodeValue",
-						Kinds:    []reflect.Kind{reflect.Map},
-						Received: reflect.ValueOf(map[int]interface{}{}),
-					},
 				},
 				{
 					"WriteDocument Error",
@@ -249,11 +244,11 @@ func TestDefaultValueEncoders(t *testing.T) {
 				},
 				{
 					"Lookup Error",
-					map[string]interface{}{"foo": nil},
+					map[string]int{"foo": 1},
 					&EncodeContext{Registry: NewRegistryBuilder().Build()},
 					&bsonrwtest.ValueReaderWriter{},
 					bsonrwtest.WriteDocument,
-					fmt.Errorf("cannot encode invalid element"),
+					fmt.Errorf("no encoder found for int"),
 				},
 				{
 					"WriteDocumentElement Error",
@@ -287,6 +282,24 @@ func TestDefaultValueEncoders(t *testing.T) {
 					bsonrwtest.WriteDocumentEnd,
 					nil,
 				},
+				{
+					"with interface/nil/success",
+					map[string]myInterface{"foo": nil},
+					&EncodeContext{Registry: buildDefaultRegistry()},
+					nil,
+					bsonrwtest.WriteDocumentEnd,
+					nil,
+				},
+				{
+					"non-string key success",
+					map[int]interface{}{
+						1: "foobar",
+					},
+					&EncodeContext{Registry: buildDefaultRegistry()},
+					&bsonrwtest.ValueReaderWriter{},
+					bsonrwtest.WriteDocumentEnd,
+					nil,
+				},
 			},
 		},
 		{
@@ -311,11 +324,11 @@ func TestDefaultValueEncoders(t *testing.T) {
 				},
 				{
 					"Lookup Error",
-					[1]interface{}{},
+					[1]int{1},
 					&EncodeContext{Registry: NewRegistryBuilder().Build()},
 					&bsonrwtest.ValueReaderWriter{},
 					bsonrwtest.WriteArray,
-					fmt.Errorf("cannot encode invalid element"),
+					fmt.Errorf("no encoder found for int"),
 				},
 				{
 					"WriteArrayElement Error",
@@ -357,11 +370,19 @@ func TestDefaultValueEncoders(t *testing.T) {
 					bsonrwtest.WriteArrayEnd,
 					nil,
 				},
+				{
+					"[1]interface/nil/success",
+					[1]myInterface{nil},
+					&EncodeContext{Registry: buildDefaultRegistry()},
+					nil,
+					bsonrwtest.WriteArrayEnd,
+					nil,
+				},
 			},
 		},
 		{
 			"SliceEncodeValue",
-			ValueEncoderFunc(dve.SliceEncodeValue),
+			defaultSliceCodec,
 			[]subtest{
 				{
 					"wrong kind",
@@ -381,11 +402,11 @@ func TestDefaultValueEncoders(t *testing.T) {
 				},
 				{
 					"Lookup Error",
-					[]interface{}{nil},
+					[]int{1},
 					&EncodeContext{Registry: NewRegistryBuilder().Build()},
 					&bsonrwtest.ValueReaderWriter{},
 					bsonrwtest.WriteArray,
-					fmt.Errorf("cannot encode invalid element"),
+					fmt.Errorf("no encoder found for int"),
 				},
 				{
 					"WriteArrayElement Error",
@@ -430,6 +451,14 @@ func TestDefaultValueEncoders(t *testing.T) {
 				{
 					"interface/success",
 					[]myInterface{myStruct{1}},
+					&EncodeContext{Registry: buildDefaultRegistry()},
+					nil,
+					bsonrwtest.WriteArrayEnd,
+					nil,
+				},
+				{
+					"interface/success",
+					[]myInterface{nil},
 					&EncodeContext{Registry: buildDefaultRegistry()},
 					nil,
 					bsonrwtest.WriteArrayEnd,
@@ -517,7 +546,7 @@ func TestDefaultValueEncoders(t *testing.T) {
 		},
 		{
 			"ByteSliceEncodeValue",
-			ValueEncoderFunc(dve.ByteSliceEncodeValue),
+			defaultByteSliceCodec,
 			[]subtest{
 				{
 					"wrong type",
@@ -533,7 +562,7 @@ func TestDefaultValueEncoders(t *testing.T) {
 		},
 		{
 			"EmptyInterfaceEncodeValue",
-			ValueEncoderFunc(dve.EmptyInterfaceEncodeValue),
+			defaultEmptyInterfaceCodec,
 			[]subtest{
 				{
 					"wrong type",
@@ -578,12 +607,48 @@ func TestDefaultValueEncoders(t *testing.T) {
 					fmt.Errorf("Cannot copy unknown BSON type %s", bsontype.Type(0)),
 				},
 				{
-					"success",
+					"success struct implementation",
 					testValueMarshaler{t: bsontype.String, buf: []byte{0x04, 0x00, 0x00, 0x00, 'f', 'o', 'o', 0x00}},
 					nil,
 					nil,
 					bsonrwtest.WriteString,
 					nil,
+				},
+				{
+					"success ptr to struct implementation",
+					&testValueMarshaler{t: bsontype.String, buf: []byte{0x04, 0x00, 0x00, 0x00, 'f', 'o', 'o', 0x00}},
+					nil,
+					nil,
+					bsonrwtest.WriteString,
+					nil,
+				},
+				{
+					"success nil ptr to struct implementation",
+					nilValueMarshaler,
+					nil,
+					nil,
+					bsonrwtest.WriteNull,
+					nil,
+				},
+				{
+					"success ptr to ptr implementation",
+					&testValueMarshalPtr{t: bsontype.String, buf: []byte{0x04, 0x00, 0x00, 0x00, 'f', 'o', 'o', 0x00}},
+					nil,
+					nil,
+					bsonrwtest.WriteString,
+					nil,
+				},
+				{
+					"unaddressable ptr implementation",
+					testValueMarshalPtr{t: bsontype.String, buf: []byte{0x04, 0x00, 0x00, 0x00, 'f', 'o', 'o', 0x00}},
+					nil,
+					nil,
+					bsonrwtest.Nothing,
+					ValueEncoderError{
+						Name:     "ValueMarshalerEncodeValue",
+						Types:    []reflect.Type{tValueMarshaler},
+						Received: reflect.ValueOf(testValueMarshalPtr{}),
+					},
 				},
 			},
 		},
@@ -608,12 +673,44 @@ func TestDefaultValueEncoders(t *testing.T) {
 					errors.New("mbson error"),
 				},
 				{
-					"success",
+					"success struct implementation",
 					testMarshaler{buf: bsoncore.BuildDocument(nil, bsoncore.AppendDoubleElement(nil, "pi", 3.14159))},
 					nil,
 					nil,
 					bsonrwtest.WriteDocumentEnd,
 					nil,
+				},
+				{
+					"success ptr to struct implementation",
+					&testMarshaler{buf: bsoncore.BuildDocument(nil, bsoncore.AppendDoubleElement(nil, "pi", 3.14159))},
+					nil,
+					nil,
+					bsonrwtest.WriteDocumentEnd,
+					nil,
+				},
+				{
+					"success nil ptr to struct implementation",
+					nilMarshaler,
+					nil,
+					nil,
+					bsonrwtest.WriteNull,
+					nil,
+				},
+				{
+					"success ptr to ptr implementation",
+					&testMarshalPtr{buf: bsoncore.BuildDocument(nil, bsoncore.AppendDoubleElement(nil, "pi", 3.14159))},
+					nil,
+					nil,
+					bsonrwtest.WriteDocumentEnd,
+					nil,
+				},
+				{
+					"unaddressable ptr implementation",
+					testMarshalPtr{buf: bsoncore.BuildDocument(nil, bsoncore.AppendDoubleElement(nil, "pi", 3.14159))},
+					nil,
+					nil,
+					bsonrwtest.Nothing,
+					ValueEncoderError{Name: "MarshalerEncodeValue", Types: []reflect.Type{tMarshaler}, Received: reflect.ValueOf(testMarshalPtr{})},
 				},
 			},
 		},
@@ -646,12 +743,44 @@ func TestDefaultValueEncoders(t *testing.T) {
 					ErrNoEncoder{Type: nil},
 				},
 				{
-					"success",
+					"success struct implementation",
 					testProxy{ret: int64(1234567890)},
 					&EncodeContext{Registry: buildDefaultRegistry()},
 					nil,
 					bsonrwtest.WriteInt64,
 					nil,
+				},
+				{
+					"success ptr to struct implementation",
+					&testProxy{ret: int64(1234567890)},
+					&EncodeContext{Registry: buildDefaultRegistry()},
+					nil,
+					bsonrwtest.WriteInt64,
+					nil,
+				},
+				{
+					"success nil ptr to struct implementation",
+					nilProxy,
+					nil,
+					nil,
+					bsonrwtest.WriteNull,
+					nil,
+				},
+				{
+					"success ptr to ptr implementation",
+					&testProxyPtr{ret: int64(1234567890)},
+					&EncodeContext{Registry: buildDefaultRegistry()},
+					nil,
+					bsonrwtest.WriteInt64,
+					nil,
+				},
+				{
+					"unaddressable ptr implementation",
+					testProxyPtr{ret: int64(1234567890)},
+					nil,
+					nil,
+					bsonrwtest.Nothing,
+					ValueEncoderError{Name: "ProxyEncodeValue", Types: []reflect.Type{tProxy}, Received: reflect.ValueOf(testProxyPtr{})},
 				},
 			},
 		},
@@ -690,6 +819,36 @@ func TestDefaultValueEncoders(t *testing.T) {
 					nil,
 					bsonrwtest.Nothing,
 					ErrNoEncoder{Type: reflect.TypeOf(wrong)},
+				},
+			},
+		},
+		{
+			"pointer implementation addressable interface",
+			NewPointerCodec(),
+			[]subtest{
+				{
+					"ValueMarshaler",
+					&vmStruct,
+					&EncodeContext{Registry: buildDefaultRegistry()},
+					nil,
+					bsonrwtest.WriteDocumentEnd,
+					nil,
+				},
+				{
+					"Marshaler",
+					&mStruct,
+					&EncodeContext{Registry: buildDefaultRegistry()},
+					nil,
+					bsonrwtest.WriteDocumentEnd,
+					nil,
+				},
+				{
+					"Proxy",
+					&pStruct,
+					&EncodeContext{Registry: buildDefaultRegistry()},
+					nil,
+					bsonrwtest.WriteDocumentEnd,
+					nil,
 				},
 			},
 		},
@@ -930,6 +1089,14 @@ func TestDefaultValueEncoders(t *testing.T) {
 				{
 					"interface value",
 					struct{ Foo myInterface }{Foo: myStruct{1}},
+					&EncodeContext{Registry: buildDefaultRegistry()},
+					nil,
+					bsonrwtest.WriteDocumentEnd,
+					nil,
+				},
+				{
+					"nil interface value",
+					struct{ Foo myInterface }{Foo: nil},
 					&EncodeContext{Registry: buildDefaultRegistry()},
 					nil,
 					bsonrwtest.WriteDocumentEnd,
@@ -1541,6 +1708,16 @@ func (tvm testValueMarshaler) MarshalBSONValue() (bsontype.Type, []byte, error) 
 	return tvm.t, tvm.buf, tvm.err
 }
 
+type testValueMarshalPtr struct {
+	t   bsontype.Type
+	buf []byte
+	err error
+}
+
+func (tvm *testValueMarshalPtr) MarshalBSONValue() (bsontype.Type, []byte, error) {
+	return tvm.t, tvm.buf, tvm.err
+}
+
 type testMarshaler struct {
 	buf []byte
 	err error
@@ -1550,9 +1727,25 @@ func (tvm testMarshaler) MarshalBSON() ([]byte, error) {
 	return tvm.buf, tvm.err
 }
 
+type testMarshalPtr struct {
+	buf []byte
+	err error
+}
+
+func (tvm *testMarshalPtr) MarshalBSON() ([]byte, error) {
+	return tvm.buf, tvm.err
+}
+
 type testProxy struct {
 	ret interface{}
 	err error
 }
 
 func (tp testProxy) ProxyBSON() (interface{}, error) { return tp.ret, tp.err }
+
+type testProxyPtr struct {
+	ret interface{}
+	err error
+}
+
+func (tp *testProxyPtr) ProxyBSON() (interface{}, error) { return tp.ret, tp.err }
