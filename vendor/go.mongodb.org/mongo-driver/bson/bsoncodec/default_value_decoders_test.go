@@ -43,6 +43,7 @@ func TestDefaultValueDecoders(t *testing.T) {
 	type myfloat32 float32
 	type myfloat64 float64
 	type mystring string
+	type mystruct struct{}
 
 	const cansetreflectiontest = "cansetreflectiontest"
 	const cansettest = "cansettest"
@@ -117,6 +118,14 @@ func TestDefaultValueDecoders(t *testing.T) {
 					&bsonrwtest.ValueReaderWriter{BSONType: bsontype.Boolean},
 					bsonrwtest.Nothing,
 					ValueDecoderError{Name: "BooleanDecodeValue", Kinds: []reflect.Kind{reflect.Bool}},
+				},
+				{
+					"decode null",
+					mybool(false),
+					nil,
+					&bsonrwtest.ValueReaderWriter{BSONType: bsontype.Null},
+					bsonrwtest.ReadNull,
+					nil,
 				},
 			},
 		},
@@ -334,11 +343,19 @@ func TestDefaultValueDecoders(t *testing.T) {
 						Kinds: []reflect.Kind{reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Int},
 					},
 				},
+				{
+					"decode null",
+					myint(0),
+					nil,
+					&bsonrwtest.ValueReaderWriter{BSONType: bsontype.Null},
+					bsonrwtest.ReadNull,
+					nil,
+				},
 			},
 		},
 		{
-			"UintDecodeValue",
-			ValueDecoderFunc(dvd.UintDecodeValue),
+			"defaultUIntCodec.DecodeValue",
+			defaultUIntCodec,
 			[]subtest{
 				{
 					"wrong type",
@@ -702,15 +719,15 @@ func TestDefaultValueDecoders(t *testing.T) {
 			},
 		},
 		{
-			"TimeDecodeValue",
-			ValueDecoderFunc(dvd.TimeDecodeValue),
+			"defaultTimeCodec.DecodeValue",
+			defaultTimeCodec,
 			[]subtest{
 				{
 					"wrong type",
 					wrong,
 					nil,
 					&bsonrwtest.ValueReaderWriter{BSONType: bsontype.DateTime, Return: int64(0)},
-					bsonrwtest.ReadDateTime,
+					bsonrwtest.Nothing,
 					ValueDecoderError{Name: "TimeDecodeValue", Types: []reflect.Type{tTime}, Received: reflect.ValueOf(wrong)},
 				},
 				{
@@ -737,11 +754,19 @@ func TestDefaultValueDecoders(t *testing.T) {
 					bsonrwtest.Nothing,
 					ValueDecoderError{Name: "TimeDecodeValue", Types: []reflect.Type{tTime}},
 				},
+				{
+					"decode null",
+					time.Time{},
+					nil,
+					&bsonrwtest.ValueReaderWriter{BSONType: bsontype.Null},
+					bsonrwtest.ReadNull,
+					nil,
+				},
 			},
 		},
 		{
-			"MapDecodeValue",
-			ValueDecoderFunc(dvd.MapDecodeValue),
+			"defaultMapCodec.DecodeValue",
+			defaultMapCodec,
 			[]subtest{
 				{
 					"wrong kind",
@@ -753,15 +778,11 @@ func TestDefaultValueDecoders(t *testing.T) {
 				},
 				{
 					"wrong kind (non-string key)",
-					map[int]interface{}{},
-					nil,
+					map[bool]interface{}{},
+					&DecodeContext{Registry: buildDefaultRegistry()},
 					&bsonrwtest.ValueReaderWriter{},
-					bsonrwtest.Nothing,
-					ValueDecoderError{
-						Name:     "MapDecodeValue",
-						Kinds:    []reflect.Kind{reflect.Map},
-						Received: reflect.ValueOf(map[int]interface{}{}),
-					},
+					bsonrwtest.ReadElement,
+					fmt.Errorf("BSON map must have string or decimal keys. Got:%v", reflect.ValueOf(map[bool]interface{}{}).Type()),
 				},
 				{
 					"ReadDocument Error",
@@ -802,6 +823,14 @@ func TestDefaultValueDecoders(t *testing.T) {
 					&bsonrwtest.ValueReaderWriter{BSONType: bsontype.String},
 					bsonrwtest.Nothing,
 					errors.New("cannot decode string into a map[string]interface {}"),
+				},
+				{
+					"decode null",
+					(map[string]interface{})(nil),
+					nil,
+					&bsonrwtest.ValueReaderWriter{BSONType: bsontype.Null},
+					bsonrwtest.ReadNull,
+					nil,
 				},
 			},
 		},
@@ -881,11 +910,19 @@ func TestDefaultValueDecoders(t *testing.T) {
 					bsonrwtest.Nothing,
 					errors.New("cannot decode document into [1]string"),
 				},
+				{
+					"decode null",
+					[1]string{},
+					nil,
+					&bsonrwtest.ValueReaderWriter{BSONType: bsontype.Null},
+					bsonrwtest.ReadNull,
+					nil,
+				},
 			},
 		},
 		{
-			"SliceDecodeValue",
-			ValueDecoderFunc(dvd.SliceDecodeValue),
+			"defaultSliceCodec.DecodeValue",
+			defaultSliceCodec,
 			[]subtest{
 				{
 					"wrong kind",
@@ -907,9 +944,9 @@ func TestDefaultValueDecoders(t *testing.T) {
 					"Not Type Array",
 					[]interface{}{},
 					nil,
-					&bsonrwtest.ValueReaderWriter{BSONType: bsontype.String},
+					&bsonrwtest.ValueReaderWriter{BSONType: bsontype.Int32},
 					bsonrwtest.Nothing,
-					errors.New("cannot decode string into a slice"),
+					errors.New("cannot decode 32-bit integer into a slice"),
 				},
 				{
 					"ReadArray Error",
@@ -959,6 +996,14 @@ func TestDefaultValueDecoders(t *testing.T) {
 					bsonrwtest.Nothing,
 					errors.New("cannot decode document into []string"),
 				},
+				{
+					"decode null",
+					([]string)(nil),
+					nil,
+					&bsonrwtest.ValueReaderWriter{BSONType: bsontype.Null},
+					bsonrwtest.ReadNull,
+					nil,
+				},
 			},
 		},
 		{
@@ -977,9 +1022,9 @@ func TestDefaultValueDecoders(t *testing.T) {
 					"type not objectID",
 					primitive.ObjectID{},
 					nil,
-					&bsonrwtest.ValueReaderWriter{BSONType: bsontype.String},
+					&bsonrwtest.ValueReaderWriter{BSONType: bsontype.Int32},
 					bsonrwtest.Nothing,
-					fmt.Errorf("cannot decode %v into an ObjectID", bsontype.String),
+					fmt.Errorf("cannot decode %v into an ObjectID", bsontype.Int32),
 				},
 				{
 					"ReadObjectID Error",
@@ -1006,6 +1051,25 @@ func TestDefaultValueDecoders(t *testing.T) {
 						Return:   primitive.ObjectID{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C},
 					},
 					bsonrwtest.ReadObjectID,
+					nil,
+				},
+				{
+					"success/string",
+					primitive.ObjectID{0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x61, 0x62},
+					nil,
+					&bsonrwtest.ValueReaderWriter{
+						BSONType: bsontype.String,
+						Return:   "0123456789ab",
+					},
+					bsonrwtest.ReadString,
+					nil,
+				},
+				{
+					"decode null",
+					primitive.ObjectID{},
+					nil,
+					&bsonrwtest.ValueReaderWriter{BSONType: bsontype.Null},
+					bsonrwtest.ReadNull,
 					nil,
 				},
 			},
@@ -1052,6 +1116,14 @@ func TestDefaultValueDecoders(t *testing.T) {
 					nil,
 					&bsonrwtest.ValueReaderWriter{BSONType: bsontype.Decimal128, Return: d128},
 					bsonrwtest.ReadDecimal128,
+					nil,
+				},
+				{
+					"decode null",
+					primitive.Decimal128{},
+					nil,
+					&bsonrwtest.ValueReaderWriter{BSONType: bsontype.Null},
+					bsonrwtest.ReadNull,
 					nil,
 				},
 			},
@@ -1132,6 +1204,14 @@ func TestDefaultValueDecoders(t *testing.T) {
 					bsonrwtest.ReadInt64,
 					nil,
 				},
+				{
+					"decode null",
+					json.Number(""),
+					nil,
+					&bsonrwtest.ValueReaderWriter{BSONType: bsontype.Null},
+					bsonrwtest.ReadNull,
+					nil,
+				},
 			},
 		},
 		{
@@ -1140,7 +1220,7 @@ func TestDefaultValueDecoders(t *testing.T) {
 			[]subtest{
 				{
 					"wrong type",
-					wrong,
+					url.URL{},
 					nil,
 					&bsonrwtest.ValueReaderWriter{BSONType: bsontype.Int32},
 					bsonrwtest.Nothing,
@@ -1151,7 +1231,7 @@ func TestDefaultValueDecoders(t *testing.T) {
 					int64(0),
 					nil,
 					&bsonrwtest.ValueReaderWriter{BSONType: bsontype.String, Return: string("http://example.com")},
-					bsonrwtest.ReadString,
+					bsonrwtest.Nothing,
 					ValueDecoderError{Name: "URLDecodeValue", Types: []reflect.Type{tURL}, Received: reflect.ValueOf(int64(0))},
 				},
 				{
@@ -1186,15 +1266,23 @@ func TestDefaultValueDecoders(t *testing.T) {
 					bsonrwtest.ReadString,
 					nil,
 				},
+				{
+					"decode null",
+					url.URL{},
+					nil,
+					&bsonrwtest.ValueReaderWriter{BSONType: bsontype.Null},
+					bsonrwtest.ReadNull,
+					nil,
+				},
 			},
 		},
 		{
-			"ByteSliceDecodeValue",
-			ValueDecoderFunc(dvd.ByteSliceDecodeValue),
+			"defaultByteSliceCodec.DecodeValue",
+			defaultByteSliceCodec,
 			[]subtest{
 				{
 					"wrong type",
-					wrong,
+					[]byte{},
 					nil,
 					&bsonrwtest.ValueReaderWriter{BSONType: bsontype.Int32},
 					bsonrwtest.Nothing,
@@ -1228,7 +1316,7 @@ func TestDefaultValueDecoders(t *testing.T) {
 						},
 					},
 					bsonrwtest.ReadBinary,
-					fmt.Errorf("ByteSliceDecodeValue can only be used to decode subtype 0x00 for %s, got %v", bsontype.Binary, byte(0xFF)),
+					fmt.Errorf("ByteSliceDecodeValue can only be used to decode subtype 0x00 or 0x02 for %s, got %v", bsontype.Binary, byte(0xFF)),
 				},
 				{
 					"can set false",
@@ -1238,10 +1326,18 @@ func TestDefaultValueDecoders(t *testing.T) {
 					bsonrwtest.Nothing,
 					ValueDecoderError{Name: "ByteSliceDecodeValue", Types: []reflect.Type{tByteSlice}},
 				},
+				{
+					"decode null",
+					([]byte)(nil),
+					nil,
+					&bsonrwtest.ValueReaderWriter{BSONType: bsontype.Null},
+					bsonrwtest.ReadNull,
+					nil,
+				},
 			},
 		},
 		{
-			"StringDecodeValue",
+			"defaultStringCodec.DecodeValue",
 			defaultStringCodec,
 			[]subtest{
 				{
@@ -1250,6 +1346,14 @@ func TestDefaultValueDecoders(t *testing.T) {
 					nil,
 					&bsonrwtest.ValueReaderWriter{BSONType: bsontype.Symbol, Return: "var hello = 'world';"},
 					bsonrwtest.ReadSymbol,
+					nil,
+				},
+				{
+					"decode null",
+					"",
+					nil,
+					&bsonrwtest.ValueReaderWriter{BSONType: bsontype.Null},
+					bsonrwtest.ReadNull,
 					nil,
 				},
 			},
@@ -1334,6 +1438,14 @@ func TestDefaultValueDecoders(t *testing.T) {
 					"No Decoder", &wrong, &DecodeContext{Registry: buildDefaultRegistry()}, nil, bsonrwtest.Nothing,
 					ErrNoDecoder{Type: reflect.TypeOf(wrong)},
 				},
+				{
+					"decode null",
+					(*mystruct)(nil),
+					nil,
+					&bsonrwtest.ValueReaderWriter{BSONType: bsontype.Null},
+					bsonrwtest.ReadNull,
+					nil,
+				},
 			},
 		},
 		{
@@ -1378,6 +1490,14 @@ func TestDefaultValueDecoders(t *testing.T) {
 					bsonrwtest.ReadBinary,
 					nil,
 				},
+				{
+					"decode null",
+					primitive.Binary{},
+					nil,
+					&bsonrwtest.ValueReaderWriter{BSONType: bsontype.Null},
+					bsonrwtest.ReadNull,
+					nil,
+				},
 			},
 		},
 		{
@@ -1416,6 +1536,14 @@ func TestDefaultValueDecoders(t *testing.T) {
 					bsonrwtest.ReadUndefined,
 					nil,
 				},
+				{
+					"decode null",
+					primitive.Undefined{},
+					nil,
+					&bsonrwtest.ValueReaderWriter{BSONType: bsontype.Null},
+					bsonrwtest.ReadNull,
+					nil,
+				},
 			},
 		},
 		{
@@ -1452,6 +1580,14 @@ func TestDefaultValueDecoders(t *testing.T) {
 					nil,
 					&bsonrwtest.ValueReaderWriter{BSONType: bsontype.DateTime, Return: int64(1234567890)},
 					bsonrwtest.ReadDateTime,
+					nil,
+				},
+				{
+					"decode null",
+					primitive.DateTime(0),
+					nil,
+					&bsonrwtest.ValueReaderWriter{BSONType: bsontype.Null},
+					bsonrwtest.ReadNull,
 					nil,
 				},
 			},
@@ -1536,6 +1672,14 @@ func TestDefaultValueDecoders(t *testing.T) {
 					bsonrwtest.ReadRegex,
 					nil,
 				},
+				{
+					"decode null",
+					primitive.Regex{},
+					nil,
+					&bsonrwtest.ValueReaderWriter{BSONType: bsontype.Null},
+					bsonrwtest.ReadNull,
+					nil,
+				},
 			},
 		},
 		{
@@ -1585,6 +1729,14 @@ func TestDefaultValueDecoders(t *testing.T) {
 					bsonrwtest.ReadDBPointer,
 					nil,
 				},
+				{
+					"decode null",
+					primitive.DBPointer{},
+					nil,
+					&bsonrwtest.ValueReaderWriter{BSONType: bsontype.Null},
+					bsonrwtest.ReadNull,
+					nil,
+				},
 			},
 		},
 		{
@@ -1629,6 +1781,14 @@ func TestDefaultValueDecoders(t *testing.T) {
 					bsonrwtest.ReadTimestamp,
 					nil,
 				},
+				{
+					"decode null",
+					primitive.Timestamp{},
+					nil,
+					&bsonrwtest.ValueReaderWriter{BSONType: bsontype.Null},
+					bsonrwtest.ReadNull,
+					nil,
+				},
 			},
 		},
 		{
@@ -1665,6 +1825,14 @@ func TestDefaultValueDecoders(t *testing.T) {
 					nil,
 					&bsonrwtest.ValueReaderWriter{BSONType: bsontype.MinKey},
 					bsonrwtest.ReadMinKey,
+					nil,
+				},
+				{
+					"decode null",
+					primitive.MinKey{},
+					nil,
+					&bsonrwtest.ValueReaderWriter{BSONType: bsontype.Null},
+					bsonrwtest.ReadNull,
 					nil,
 				},
 			},
@@ -1705,6 +1873,14 @@ func TestDefaultValueDecoders(t *testing.T) {
 					bsonrwtest.ReadMaxKey,
 					nil,
 				},
+				{
+					"decode null",
+					primitive.MaxKey{},
+					nil,
+					&bsonrwtest.ValueReaderWriter{BSONType: bsontype.Null},
+					bsonrwtest.ReadNull,
+					nil,
+				},
 			},
 		},
 		{
@@ -1717,7 +1893,7 @@ func TestDefaultValueDecoders(t *testing.T) {
 					nil,
 					&bsonrwtest.ValueReaderWriter{BSONType: bsontype.JavaScript, Return: ""},
 					bsonrwtest.Nothing,
-					ValueDecoderError{Name: "BinaryDecodeValue", Types: []reflect.Type{tJavaScript}, Received: reflect.ValueOf(wrong)},
+					ValueDecoderError{Name: "JavaScriptDecodeValue", Types: []reflect.Type{tJavaScript}, Received: reflect.ValueOf(wrong)},
 				},
 				{
 					"type not Javascript",
@@ -1743,6 +1919,14 @@ func TestDefaultValueDecoders(t *testing.T) {
 					bsonrwtest.ReadJavascript,
 					nil,
 				},
+				{
+					"decode null",
+					primitive.JavaScript(""),
+					nil,
+					&bsonrwtest.ValueReaderWriter{BSONType: bsontype.Null},
+					bsonrwtest.ReadNull,
+					nil,
+				},
 			},
 		},
 		{
@@ -1755,15 +1939,15 @@ func TestDefaultValueDecoders(t *testing.T) {
 					nil,
 					&bsonrwtest.ValueReaderWriter{BSONType: bsontype.Symbol, Return: ""},
 					bsonrwtest.Nothing,
-					ValueDecoderError{Name: "BinaryDecodeValue", Types: []reflect.Type{tSymbol}, Received: reflect.ValueOf(wrong)},
+					ValueDecoderError{Name: "SymbolDecodeValue", Types: []reflect.Type{tSymbol}, Received: reflect.ValueOf(wrong)},
 				},
 				{
 					"type not Symbol",
 					primitive.Symbol(""),
 					nil,
-					&bsonrwtest.ValueReaderWriter{BSONType: bsontype.String},
+					&bsonrwtest.ValueReaderWriter{BSONType: bsontype.Int32},
 					bsonrwtest.Nothing,
-					fmt.Errorf("cannot decode %v into a primitive.Symbol", bsontype.String),
+					fmt.Errorf("cannot decode %v into a primitive.Symbol", bsontype.Int32),
 				},
 				{
 					"ReadSymbol Error",
@@ -1779,6 +1963,14 @@ func TestDefaultValueDecoders(t *testing.T) {
 					nil,
 					&bsonrwtest.ValueReaderWriter{BSONType: bsontype.Symbol, Return: "var hello = 'world';"},
 					bsonrwtest.ReadSymbol,
+					nil,
+				},
+				{
+					"decode null",
+					primitive.Symbol(""),
+					nil,
+					&bsonrwtest.ValueReaderWriter{BSONType: bsontype.Null},
+					bsonrwtest.ReadNull,
 					nil,
 				},
 			},
@@ -1833,6 +2025,14 @@ func TestDefaultValueDecoders(t *testing.T) {
 					bsonrwtest.Nothing,
 					errors.New("cannot decode string into a struct { Foo string }"),
 				},
+				{
+					"decode null",
+					reflect.New(reflect.TypeOf(struct{ Foo string }{})).Elem().Interface(),
+					nil,
+					&bsonrwtest.ValueReaderWriter{BSONType: bsontype.Null},
+					bsonrwtest.ReadNull,
+					nil,
+				},
 			},
 		},
 		{
@@ -1877,6 +2077,14 @@ func TestDefaultValueDecoders(t *testing.T) {
 					&bsonrwtest.ValueReaderWriter{BSONType: bsontype.CodeWithScope, Err: errors.New("dd error"), ErrAfter: bsonrwtest.ReadElement},
 					bsonrwtest.ReadElement,
 					errors.New("dd error"),
+				},
+				{
+					"decode null",
+					primitive.CodeWithScope{},
+					nil,
+					&bsonrwtest.ValueReaderWriter{BSONType: bsontype.Null},
+					bsonrwtest.ReadNull,
+					nil,
 				},
 			},
 		},
@@ -2035,7 +2243,7 @@ func TestDefaultValueDecoders(t *testing.T) {
 		_, vr, err := dr.ReadElement()
 		noerr(t, err)
 		var val [1]string
-		want := fmt.Errorf("more elements returned in array than can fit inside %T", val)
+		want := fmt.Errorf("more elements returned in array than can fit inside %T, got 2 elements", val)
 
 		dc := DecodeContext{Registry: buildDefaultRegistry()}
 		got := dvd.ArrayDecodeValue(dc, vr, reflect.ValueOf(val))
@@ -2653,7 +2861,7 @@ func TestDefaultValueDecoders(t *testing.T) {
 		})
 	})
 
-	t.Run("EmptyInterfaceDecodeValue", func(t *testing.T) {
+	t.Run("defaultEmptyInterfaceCodec.DecodeValue", func(t *testing.T) {
 		t.Run("DecodeValue", func(t *testing.T) {
 			testCases := []struct {
 				name     string
@@ -2770,7 +2978,7 @@ func TestDefaultValueDecoders(t *testing.T) {
 						val := reflect.New(tEmpty).Elem()
 						dc := DecodeContext{Registry: NewRegistryBuilder().Build()}
 						want := ErrNoTypeMapEntry{Type: tc.bsontype}
-						got := dvd.EmptyInterfaceDecodeValue(dc, llvr, val)
+						got := defaultEmptyInterfaceCodec.DecodeValue(dc, llvr, val)
 						if !compareErrors(got, want) {
 							t.Errorf("Errors are not equal. got %v; want %v", got, want)
 						}
@@ -2787,7 +2995,7 @@ func TestDefaultValueDecoders(t *testing.T) {
 								Build(),
 						}
 						want := ErrNoDecoder{Type: reflect.TypeOf(tc.val)}
-						got := dvd.EmptyInterfaceDecodeValue(dc, llvr, val)
+						got := defaultEmptyInterfaceCodec.DecodeValue(dc, llvr, val)
 						if !compareErrors(got, want) {
 							t.Errorf("Errors are not equal. got %v; want %v", got, want)
 						}
@@ -2801,11 +3009,11 @@ func TestDefaultValueDecoders(t *testing.T) {
 						llc := &llCodec{t: t, err: want}
 						dc := DecodeContext{
 							Registry: NewRegistryBuilder().
-								RegisterDecoder(reflect.TypeOf(tc.val), llc).
+								RegisterTypeDecoder(reflect.TypeOf(tc.val), llc).
 								RegisterTypeMapEntry(tc.bsontype, reflect.TypeOf(tc.val)).
 								Build(),
 						}
-						got := dvd.EmptyInterfaceDecodeValue(dc, llvr, reflect.New(tEmpty).Elem())
+						got := defaultEmptyInterfaceCodec.DecodeValue(dc, llvr, reflect.New(tEmpty).Elem())
 						if !compareErrors(got, want) {
 							t.Errorf("Errors are not equal. got %v; want %v", got, want)
 						}
@@ -2816,12 +3024,12 @@ func TestDefaultValueDecoders(t *testing.T) {
 						llc := &llCodec{t: t, decodeval: tc.val}
 						dc := DecodeContext{
 							Registry: NewRegistryBuilder().
-								RegisterDecoder(reflect.TypeOf(tc.val), llc).
+								RegisterTypeDecoder(reflect.TypeOf(tc.val), llc).
 								RegisterTypeMapEntry(tc.bsontype, reflect.TypeOf(tc.val)).
 								Build(),
 						}
 						got := reflect.New(tEmpty).Elem()
-						err := dvd.EmptyInterfaceDecodeValue(dc, llvr, got)
+						err := defaultEmptyInterfaceCodec.DecodeValue(dc, llvr, got)
 						noerr(t, err)
 						if !cmp.Equal(got.Interface(), want, cmp.Comparer(compareDecimal128)) {
 							t.Errorf("Did not receive expected value. got %v; want %v", got.Interface(), want)
@@ -2834,7 +3042,7 @@ func TestDefaultValueDecoders(t *testing.T) {
 		t.Run("non-interface{}", func(t *testing.T) {
 			val := uint64(1234567890)
 			want := ValueDecoderError{Name: "EmptyInterfaceDecodeValue", Types: []reflect.Type{tEmpty}, Received: reflect.ValueOf(val)}
-			got := dvd.EmptyInterfaceDecodeValue(DecodeContext{}, nil, reflect.ValueOf(val))
+			got := defaultEmptyInterfaceCodec.DecodeValue(DecodeContext{}, nil, reflect.ValueOf(val))
 			if !compareErrors(got, want) {
 				t.Errorf("Errors are not equal. got %v; want %v", got, want)
 			}
@@ -2843,7 +3051,7 @@ func TestDefaultValueDecoders(t *testing.T) {
 		t.Run("nil *interface{}", func(t *testing.T) {
 			var val interface{}
 			want := ValueDecoderError{Name: "EmptyInterfaceDecodeValue", Types: []reflect.Type{tEmpty}, Received: reflect.ValueOf(val)}
-			got := dvd.EmptyInterfaceDecodeValue(DecodeContext{}, nil, reflect.ValueOf(val))
+			got := defaultEmptyInterfaceCodec.DecodeValue(DecodeContext{}, nil, reflect.ValueOf(val))
 			if !compareErrors(got, want) {
 				t.Errorf("Errors are not equal. got %v; want %v", got, want)
 			}
@@ -2853,7 +3061,7 @@ func TestDefaultValueDecoders(t *testing.T) {
 			llvr := &bsonrwtest.ValueReaderWriter{BSONType: bsontype.Double}
 			want := ErrNoTypeMapEntry{Type: bsontype.Double}
 			val := reflect.New(tEmpty).Elem()
-			got := dvd.EmptyInterfaceDecodeValue(DecodeContext{Registry: NewRegistryBuilder().Build()}, llvr, val)
+			got := defaultEmptyInterfaceCodec.DecodeValue(DecodeContext{Registry: NewRegistryBuilder().Build()}, llvr, val)
 			if !compareErrors(got, want) {
 				t.Errorf("Errors are not equal. got %v; want %v", got, want)
 			}
@@ -2864,10 +3072,92 @@ func TestDefaultValueDecoders(t *testing.T) {
 			want := primitive.D{{"pi", 3.14159}}
 			var got interface{}
 			val := reflect.ValueOf(&got).Elem()
-			err := dvd.EmptyInterfaceDecodeValue(DecodeContext{Registry: buildDefaultRegistry()}, vr, val)
+			err := defaultEmptyInterfaceCodec.DecodeValue(DecodeContext{Registry: buildDefaultRegistry()}, vr, val)
 			noerr(t, err)
 			if !cmp.Equal(got, want) {
 				t.Errorf("Did not get correct result. got %v; want %v", got, want)
+			}
+		})
+		t.Run("custom type map entry", func(t *testing.T) {
+			// registering a custom type map entry for both bsontype.Type(0) anad bsontype.EmbeddedDocument should cause
+			// both top-level and embedded documents to decode to registered type when unmarshalling to interface{}
+
+			topLevelRb := NewRegistryBuilder()
+			defaultValueEncoders.RegisterDefaultEncoders(topLevelRb)
+			defaultValueDecoders.RegisterDefaultDecoders(topLevelRb)
+			topLevelRb.RegisterTypeMapEntry(bsontype.Type(0), reflect.TypeOf(primitive.M{}))
+
+			embeddedRb := NewRegistryBuilder()
+			defaultValueEncoders.RegisterDefaultEncoders(embeddedRb)
+			defaultValueDecoders.RegisterDefaultDecoders(embeddedRb)
+			embeddedRb.RegisterTypeMapEntry(bsontype.Type(0), reflect.TypeOf(primitive.M{}))
+
+			// create doc {"nested": {"foo": 1}}
+			innerDoc := bsoncore.BuildDocument(
+				nil,
+				bsoncore.AppendInt32Element(nil, "foo", 1),
+			)
+			doc := bsoncore.BuildDocument(
+				nil,
+				bsoncore.AppendDocumentElement(nil, "nested", innerDoc),
+			)
+			want := primitive.M{
+				"nested": primitive.M{
+					"foo": int32(1),
+				},
+			}
+
+			testCases := []struct {
+				name     string
+				registry *Registry
+			}{
+				{"top level", topLevelRb.Build()},
+				{"embedded", embeddedRb.Build()},
+			}
+			for _, tc := range testCases {
+				var got interface{}
+				vr := bsonrw.NewBSONDocumentReader(doc)
+				val := reflect.ValueOf(&got).Elem()
+
+				err := defaultEmptyInterfaceCodec.DecodeValue(DecodeContext{Registry: tc.registry}, vr, val)
+				noerr(t, err)
+				if !cmp.Equal(got, want) {
+					t.Fatalf("got %v, want %v", got, want)
+				}
+			}
+		})
+		t.Run("ancestor info is used over custom type map entry", func(t *testing.T) {
+			// If a type map entry is registered for bsontype.EmbeddedDocument, the decoder should use ancestor
+			// information if available instead of the registered entry.
+
+			rb := NewRegistryBuilder()
+			defaultValueEncoders.RegisterDefaultEncoders(rb)
+			defaultValueDecoders.RegisterDefaultDecoders(rb)
+			rb.RegisterTypeMapEntry(bsontype.EmbeddedDocument, reflect.TypeOf(primitive.M{}))
+			reg := rb.Build()
+
+			// build document {"nested": {"foo": 10}}
+			inner := bsoncore.BuildDocument(
+				nil,
+				bsoncore.AppendInt32Element(nil, "foo", 10),
+			)
+			doc := bsoncore.BuildDocument(
+				nil,
+				bsoncore.AppendDocumentElement(nil, "nested", inner),
+			)
+			want := primitive.D{
+				{"nested", primitive.D{
+					{"foo", int32(10)},
+				}},
+			}
+
+			var got primitive.D
+			vr := bsonrw.NewBSONDocumentReader(doc)
+			val := reflect.ValueOf(&got).Elem()
+			err := defaultSliceCodec.DecodeValue(DecodeContext{Registry: reg}, vr, val)
+			noerr(t, err)
+			if !cmp.Equal(got, want) {
+				t.Fatalf("got %v, want %v", got, want)
 			}
 		})
 	})
