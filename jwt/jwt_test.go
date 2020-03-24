@@ -16,12 +16,14 @@ package jwt
 import (
 	"crypto/rsa"
 	"testing"
+	"time"
 
 	jwtgo "github.com/dgrijalva/jwt-go"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/mendersoftware/deviceauth/keys"
+	"github.com/mendersoftware/go-lib-micro/mongo/uuid"
 )
 
 func TestNewJWTHandlerRS256(t *testing.T) {
@@ -40,17 +42,23 @@ func TestJWTHandlerRS256GenerateToken(t *testing.T) {
 		"ok": {
 			privKey: loadPrivKey("./testdata/private.pem", t),
 			claims: Claims{
-				Issuer:  "Mender",
-				Subject: "foo",
+				ID: uuid.Must(uuid.FromString(
+					"00000000-0000-4000-8000-000000000000")),
+				Subject: uuid.Must(uuid.FromString(
+					"00000000-0000-4000-8000-000000000001")),
+				Issuer: "Mender",
 			},
 			expiresInSec: 3600,
 		},
 		"ok, with tenant": {
 			privKey: loadPrivKey("./testdata/private.pem", t),
 			claims: Claims{
-				Issuer:  "Mender",
-				Subject: "foo",
-				Tenant:  "foobar",
+				ID: uuid.Must(uuid.FromString(
+					"00000000-0000-4000-8000-000000000000")),
+				Subject: uuid.Must(uuid.FromString(
+					"00000000-0000-4000-8000-000000000001")),
+				Issuer: "Mender",
+				Tenant: "foobar",
 			},
 			expiresInSec: 3600,
 		},
@@ -69,7 +77,7 @@ func TestJWTHandlerRS256GenerateToken(t *testing.T) {
 		if assert.NotNil(t, parsed) {
 			mc := parsed.Claims.(jwtgo.MapClaims)
 			assert.Equal(t, tc.claims.Issuer, mc["iss"])
-			assert.Equal(t, tc.claims.Subject, mc["sub"])
+			assert.Equal(t, tc.claims.Subject.String(), mc["sub"])
 			if tc.claims.Tenant != "" {
 				assert.Equal(t, tc.claims.Tenant, mc["mender.tenant"])
 			} else {
@@ -94,56 +102,70 @@ func TestJWTHandlerRS256FromJWT(t *testing.T) {
 		"ok (all claims)": {
 			privKey: key,
 
-			inToken: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9." +
-				"eyJhdWQiOiJNZW5kZXIiLCJleHAiOjIxNDc0ODM2NDcsImp" +
-				"0aSI6InNvbWVpZCIsImlhdCI6MTIzNDU2NywiaXNzIjoiTW" +
-				"VuZGVyIiwibmJmIjoxMjM0NTY3OCwic3ViIjoiZm9vIiwic" +
-				"2NwIjoibWVuZGVyLioifQ.TqIWTOA6VE0dEGkjX3ilv0vhK" +
-				"YdSDvnK5E9qKL8uDyheVOvDRXse4OnDhyaEuAQVfQhh2DMW" +
-				"S-B3bGfWP8-tKvrbmGxHw1-B6vz_QePBmEq4RPGYPxUFxN2" +
-				"69blmAV9_56FhKa1Tl1CyqA9riHAtxFXYZW5RvpaQd7Q5Ja" +
-				"SvN_csRsEWFwD8ZC_kzUfBosfiVJLll0KH0EGlpezzBYilT" +
-				"wB8C92CAY9s916kIfXHWn9lPsESGW5uURL7Fbj9-G5OT7WO" +
-				"DDU0bYwLpBbtdw5hNUi9ExnX2SfW3HpD7wuxM3J_q_aEu6Q" +
-				"efs-sTDG1iKG4KFCszfmEV8p0HqPNC3VpEw",
-
+			inToken: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdW" +
+				"QiOiJNZW5kZXIiLCJqdGkiOiIwMDAwMDAwMC0wMDAwLT" +
+				"QwMDAtODAwMC0wMDAwMDAwMDAwMDAiLCJzdWIiOiIwMD" +
+				"AwMDAwMC0wMDAwLTQwMDAtODAwMC0wMDAwMDAwMDAwMD" +
+				"EiLCJpc3MiOiJNZW5kZXIiLCJleHAiOjQyOTQ5NjcyOT" +
+				"UsImlhdCI6MTUxNjIzOTAyMiwic2NwIjoibWVuZGVyLi" +
+				"oifQ.wmdoYM-DT0wMhOfMBAn1G5nOyp1ilt77NvZ-1Ct" +
+				"-J1Mh4LvVP_7LFRRVqWkDcww_uIFGP_eFswRX2WUTi63" +
+				"swHmtuKcWhsM8p5odnk9eOS4eXQf1dW13cNVBkXI-bsq" +
+				"xcMI3WlA1x9Vuzs0ngwRNs-tcGKLUe-5TbTkEII42H9K" +
+				"KRMn17Lb1dgPWVS5Nfea5zfzDD9P8XsKsKh3qWDFjrQz" +
+				"o6GTlmsClAERvPlNB08vgVT1gWFYB5A8iweDhii6tUH1" +
+				"S9NmhnySSECgMttQbEg42P0MmLS1tRkLuhdEyLg8IiKt" +
+				"LdSNVA596ILymHni1-34Ya5weVteKJ5N3IBjwxA",
 			outToken: Token{
 				Claims: Claims{
-					Audience:  "Mender",
-					ExpiresAt: 2147483647,
-					ID:        "someid",
-					IssuedAt:  1234567,
-					Issuer:    "Mender",
-					NotBefore: 12345678,
-					Subject:   "foo",
-					Scope:     "mender.*",
+					ID: uuid.Must(uuid.FromString(
+						"00000000-0000-4000-8000-000000000000")),
+					Subject: uuid.Must(uuid.FromString(
+						"00000000-0000-4000-8000-000000000001")),
+					Audience: "Mender",
+					ExpiresAt: &Time{
+						Time: time.Unix(4294967295, 0),
+					},
+					IssuedAt: &Time{
+						Time: time.Unix(1516239022, 0),
+					},
+					Issuer: "Mender",
+					Scope:  "mender.*",
 				},
 			},
 		},
 		"ok (some claims)": {
 			privKey: key,
 
-			inToken: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJle" +
-				"HAiOjIxNDc0ODM2NDcsImp0aSI6InNvbWVpZCIsIml" +
-				"hdCI6MTIzNDU2NywiaXNzIjoiTWVuZGVyIiwic3ViI" +
-				"joiZm9vIiwic2NwIjoibWVuZGVyLnVzZXJzLmluaXR" +
-				"pYWwuY3JlYXRlIn0.xkcfTeUui66Cib1c0bO27I_LD" +
-				"C60WlxzB8v6PuH8EGqgCeU3RG6nW5tf-YcS9w17-Qt" +
-				"1jWs-RSpQip3VWQqncSbfzUjmwKuTgrMRllILb5hMP" +
-				"8trVSl4r035WxPd1Gk8chtbZra9dh7Wf9LsOCjamrX" +
-				"baSE-w64iFFShHrgW_e9TqRcnb8c37XLeHnxRHSYkL" +
-				"QGwPWm6jaxr08mR6-vYxgEIFpTUxVbxe1AN8hMZq43" +
-				"x-KQb3su4EoGMT6KM_ku3P8Tmk8l3yewZdgEuZc-T7" +
-				"tsSlEMgLwcrQSF2jyfHewBsc40iHIxmO3ibNFITzw_CwaDidlHSLkSMk3EMCis1gA",
+			inToken: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdG" +
+				"kiOiIwMDAwMDAwMC0wMDAwLTQwMDAtODAwMC0wMDAwMD" +
+				"AwMDAwMDAiLCJzdWIiOiIwMDAwMDAwMC0wMDAwLTQwMD" +
+				"AtODAwMC0wMDAwMDAwMDAwMDEiLCJpc3MiOiJNZW5kZX" +
+				"IiLCJleHAiOjQyOTQ5NjcyOTUsImlhdCI6MTUxNjIzOT" +
+				"AyMiwic2NwIjoibWVuZGVyLnVzZXJzLmluaXRpYWwuY3" +
+				"JlYXRlIn0.XbNL4t6lE2MwQrA1N8n6LSYLRr9NwuO-13" +
+				"QVlegli2C2WujsW5jo4iUV-NqzuhKQ5IiZnnt4b-nmS7" +
+				"j6HqmLXRaN8HXJ45zySKZQCY2462EjCB2AtcNYIVXF_l" +
+				"fOiczBayqFFDebFzP3yXt0HOerAQ_APgVUy2zVGuNK5L" +
+				"z5ieWeWBobAar63Pe1m6oupm7BN4dbzW1dke9oa3pTym" +
+				"0kIh8C-OqrqymhLRh3YY7UOhan-HArGbqhtKZbPNZfxP" +
+				"1TAXrD9fUZ2Gl9tOc8uZvT_-xTtV2HR5fpEr24W_LNRN" +
+				"91gB7jBv1b6jonezanF-t2NDjTqBn3DWm_VgOEB6o3lQ",
 
 			outToken: Token{
 				Claims: Claims{
-					ExpiresAt: 2147483647,
-					ID:        "someid",
-					IssuedAt:  1234567,
-					Issuer:    "Mender",
-					Subject:   "foo",
-					Scope:     "mender.users.initial.create",
+					ID: uuid.Must(uuid.FromString(
+						"00000000-0000-4000-8000-000000000000")),
+					Subject: uuid.Must(uuid.FromString(
+						"00000000-0000-4000-8000-000000000001")),
+					ExpiresAt: &Time{
+						Time: time.Unix(4294967295, 0),
+					},
+					IssuedAt: &Time{
+						Time: time.Unix(1516239022, 0),
+					},
+					Issuer: "Mender",
+					Scope:  "mender.users.initial.create",
 				},
 			},
 		},

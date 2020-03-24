@@ -16,6 +16,7 @@ package jwt
 import (
 	"testing"
 
+	"github.com/mendersoftware/go-lib-micro/mongo/uuid"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 )
@@ -23,8 +24,10 @@ import (
 func TestTokenMarshal(t *testing.T) {
 	tok := &Token{
 		Claims: Claims{
-			ID:      "foo",
-			Subject: "valid-subject",
+			ID: uuid.Must(uuid.FromString(
+				"00000000-0000-4000-8000-000000000000")),
+			Subject: uuid.Must(uuid.FromString(
+				"00000000-0000-4000-8000-000000000001")),
 		},
 	}
 
@@ -47,8 +50,10 @@ func TestTokenUnmarshal(t *testing.T) {
 	tokin := []byte("some-fake-jwt")
 	tok := &Token{
 		Claims: Claims{
-			ID:      "foo",
-			Subject: "valid-subject",
+			ID: uuid.Must(uuid.FromString(
+				"00000000-0000-4000-8000-000000000000")),
+			Subject: uuid.Must(uuid.FromString(
+				"00000000-0000-4000-8000-000000000001")),
 		},
 	}
 

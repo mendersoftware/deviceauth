@@ -25,12 +25,14 @@ import (
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
+	"github.com/mendersoftware/go-lib-micro/mongo/uuid"
 	ctxstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
+	"github.com/mendersoftware/deviceauth/jwt"
 	"github.com/mendersoftware/deviceauth/model"
 	"github.com/mendersoftware/deviceauth/store"
 	uto "github.com/mendersoftware/deviceauth/utils/to"
@@ -42,10 +44,30 @@ const (
 
 // data set
 var (
-	dev1   = model.NewDevice("id1", "idData1", "")
-	dev2   = model.NewDevice("id2", "idData2", "")
-	token1 = model.NewToken("id1", "devId1", "token1")
-	token2 = model.NewToken("id2", "devId2", "token2")
+	dev1 = model.NewDevice(
+		"00000000-0000-4000-8000-000000000001",
+		"idData1",
+		"")
+	dev2 = model.NewDevice(
+		"00000000-0000-4000-8000-000000000002",
+		"idData2",
+		"")
+	token1 = &jwt.Token{
+		Claims: jwt.Claims{
+			ID: uuid.Must(uuid.FromString(
+				"00000000-0000-4000-8000-000000000001")),
+			Subject: uuid.Must(uuid.FromString(
+				"00000000-0000-4000-8000-000000000001")),
+		},
+	}
+	token2 = &jwt.Token{
+		Claims: jwt.Claims{
+			ID: uuid.Must(uuid.FromString(
+				"00000000-0000-4000-8000-000000000002")),
+			Subject: uuid.Must(uuid.FromString(
+				"00000000-0000-4000-8000-000000000002")),
+		},
+	}
 	tenant = "foo"
 )
 
@@ -64,9 +86,16 @@ func setUpDevices(ctx context.Context, client *mongo.Client) error {
 
 // setup tokens
 func setUpTokens(ctx context.Context, client *mongo.Client) error {
+	tok1 := *token1
+	tok2 := *token2
+	id := identity.FromContext(ctx)
+	if id != nil {
+		tok1.Tenant = id.Tenant
+		tok2.Tenant = id.Tenant
+	}
 	inputTokens := bson.A{
-		token1,
-		token2,
+		tok1,
+		tok2,
 	}
 	c := client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbTokensColl)
 	_, err := c.InsertMany(ctx, inputTokens)
@@ -298,7 +327,7 @@ func TestStoreUpdateDevice(t *testing.T) {
 			tenant: "",
 		},
 		{
-			id:     "id3",
+			id:     "00000000-0000-4000-8000-000000000003",
 			update: model.DeviceUpdate{Status: model.DevStatusRejected},
 			outErr: store.ErrDevNotFound.Error(),
 			tenant: tenant,
@@ -345,29 +374,23 @@ func TestStoreUpsertToken(t *testing.T) {
 	}
 
 	//setup
-	token := model.Token{
-		Id:    "123",
-		DevId: "devId",
-		Token: "token",
-	}
-
 	ctx := identity.WithContext(context.Background(), &identity.Identity{
 		Tenant: "foo",
 	})
 	d := getDb(ctx)
 
-	err := d.UpsertToken(ctx, token)
+	err := d.UpsertToken(ctx, token1)
 	assert.NoError(t, err, "failed to add token")
 
 	//verify
-	var found model.Token
+	var found jwt.Token
 
 	c := d.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbTokensColl)
-	err = c.FindOne(ctx, bson.M{"_id": token.Id}).Decode(&found)
+	err = c.FindOne(ctx, bson.M{"_id": token1.ID}).Decode(&found)
 	assert.NoError(t, err, "failed to find token")
-	assert.Equal(t, found.Id, token.Id)
-	assert.Equal(t, found.DevId, token.DevId)
-	assert.Equal(t, found.Token, token.Token)
+	assert.Equal(t, found.ID, token1.ID)
+	assert.Equal(t, found.Subject, token1.Subject)
+	assert.Equal(t, found.Tenant, token1.Tenant)
 
 }
 
@@ -384,26 +407,31 @@ func TestStoreGetToken(t *testing.T) {
 	err := setUpTokens(dbCtx, d.client)
 	assert.NoError(t, err, "failed to setup input data")
 
+	t1 := *token1
+	t2 := *token2
+	t1.Tenant = tenant
+	t2.Tenant = tenant
+
 	testCases := []struct {
 		tokenId       string
 		tenant        string
-		expectedToken *model.Token
+		expectedToken *jwt.Token
 	}{
 		{
-			tokenId:       token1.Id,
+			tokenId:       token1.ID.String(),
 			tenant:        tenant,
-			expectedToken: token1,
+			expectedToken: &t1,
 		},
 		{
-			tokenId: token1.Id,
+			tokenId: token1.ID.String(),
 		},
 		{
-			tokenId:       token2.Id,
+			tokenId:       token2.ID.String(),
 			tenant:        tenant,
-			expectedToken: token2,
+			expectedToken: &t2,
 		},
 		{
-			tokenId: "id3",
+			tokenId: "00000000-0000-4000-8000-000000000003",
 			tenant:  tenant,
 		},
 	}
@@ -418,7 +446,10 @@ func TestStoreGetToken(t *testing.T) {
 				})
 			}
 
-			token, err := d.GetToken(ctx, tc.tokenId)
+			token, err := d.GetToken(
+				ctx,
+				uuid.Must(uuid.FromString(tc.tokenId)),
+			)
 			if tc.expectedToken != nil {
 				assert.NoError(t, err, "failed to get token")
 			} else {
@@ -449,21 +480,21 @@ func TestStoreDeleteToken(t *testing.T) {
 		err     bool
 	}{
 		{
-			tokenId: token1.Id,
+			tokenId: token1.ID.String(),
 			tenant:  tenant,
 			err:     false,
 		},
 		{
-			tokenId: token1.Id,
+			tokenId: token1.ID.String(),
 			err:     true,
 		},
 		{
-			tokenId: token2.Id,
+			tokenId: token2.ID.String(),
 			tenant:  tenant,
 			err:     false,
 		},
 		{
-			tokenId: "id3",
+			tokenId: "00000000-0000-4000-8000-000000000003",
 			tenant:  tenant,
 			err:     true,
 		},
@@ -479,7 +510,10 @@ func TestStoreDeleteToken(t *testing.T) {
 				})
 			}
 
-			err := d.DeleteToken(ctx, tc.tokenId)
+			err := d.DeleteToken(
+				ctx,
+				uuid.Must(uuid.FromString(tc.tokenId)),
+			)
 			if tc.err {
 				assert.Equal(t, store.ErrTokenNotFound, err)
 			} else {
@@ -495,24 +529,15 @@ func TestStoreDeleteTokens(t *testing.T) {
 	}
 
 	someTokens := []interface{}{
-		model.Token{
-			Id:        "id1",
-			DevId:     "devId1",
-			AuthSetId: "aId1-1",
-			Token:     "token1-1",
-		},
-		model.Token{
-			Id:        "id2",
-			DevId:     "devId1",
-			AuthSetId: "aId1-2",
-			Token:     "token1-2",
-		},
-		model.Token{
-			Id:        "id3",
-			DevId:     "devId2",
-			AuthSetId: "aId2-1",
-			Token:     "token2-1",
-		},
+		token1,
+		token2,
+		&jwt.Token{Claims: jwt.Claims{
+			ID: uuid.Must(uuid.FromString(
+				"00000000-0000-4000-8000-000000000003")),
+			Subject: uuid.Must(uuid.FromString(
+				"00000000-0000-4000-8000-000000000002")),
+			Tenant: "foobar",
+		}},
 	}
 
 	testCases := map[string]struct {
@@ -548,7 +573,7 @@ func TestStoreDeleteTokens(t *testing.T) {
 
 			err := d.DeleteTokens(ctx)
 			assert.NoError(t, err)
-			var out []model.Token
+			var out []*jwt.Token
 
 			c := d.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbTokensColl)
 
@@ -568,69 +593,45 @@ func TestStoreDeleteTokenByDevId(t *testing.T) {
 	}
 
 	inTokens := bson.A{
-		model.Token{
-			Id:        "id1",
-			DevId:     "devId1",
-			AuthSetId: "aId1-1",
-			Token:     "token1-1",
-		},
-		model.Token{
-			Id:        "id2",
-			DevId:     "devId1",
-			AuthSetId: "aId1-2",
-			Token:     "token1-2",
-		},
-		model.Token{
-			Id:        "id3",
-			DevId:     "devId2",
-			AuthSetId: "aId2-1",
-			Token:     "token2-1",
-		},
+		token1,
+		token2,
+		&jwt.Token{Claims: jwt.Claims{
+			ID: uuid.Must(uuid.FromString(
+				"00000000-0000-4000-8000-000000000003")),
+			Subject: uuid.Must(uuid.FromString(
+				"00000000-0000-4000-8000-000000000002")),
+			Tenant: "foobar",
+		}},
 	}
 
 	testCases := []struct {
 		devId  string
 		tenant string
 
-		outTokens []model.Token
+		outTokens []*jwt.Token
 		err       error
 	}{
 		{
-			devId:  "devId1",
+			devId:  "00000000-0000-4000-8000-000000000001",
 			tenant: "tenant-foo",
 
-			outTokens: []model.Token{
-				model.Token{
-					Id:        "id3",
-					DevId:     "devId2",
-					AuthSetId: "aId2-1",
-					Token:     "token2-1",
-				},
+			outTokens: []*jwt.Token{
+				inTokens[1].(*jwt.Token),
+				inTokens[2].(*jwt.Token),
 			},
 			err: nil,
 		},
 		{
-			devId:  "devId2",
+			devId:  "00000000-0000-4000-8000-000000000002",
 			tenant: "tenant-foo",
 
-			outTokens: []model.Token{
-				model.Token{
-					Id:        "id1",
-					DevId:     "devId1",
-					AuthSetId: "aId1-1",
-					Token:     "token1-1",
-				},
-				model.Token{
-					Id:        "id2",
-					DevId:     "devId1",
-					AuthSetId: "aId1-2",
-					Token:     "token1-2",
-				},
+			outTokens: []*jwt.Token{
+				inTokens[0].(*jwt.Token),
 			},
 			err: nil,
 		},
 		{
-			devId: "devIdNotFound",
+			devId: "00000000-0000-4000-8000-000000000000",
 
 			err: store.ErrTokenNotFound,
 		},
@@ -651,14 +652,15 @@ func TestStoreDeleteTokenByDevId(t *testing.T) {
 			_, err := c.InsertMany(ctx, inTokens)
 			assert.NoError(t, err)
 
-			err = d.DeleteTokenByDevId(ctx, tc.devId)
+			err = d.DeleteTokenByDevId(
+				ctx,
+				uuid.Must(uuid.FromString(tc.devId)),
+			)
 			if tc.err != nil {
 				assert.Equal(t, store.ErrTokenNotFound, err)
 			} else {
 				assert.NoError(t, err)
-				var out []model.Token
-
-				assert.NoError(t, err)
+				var out []*jwt.Token
 				cursor, err := c.Find(ctx, bson.M{})
 				assert.NoError(t, err)
 				err = cursor.All(ctx, &out)
@@ -717,7 +719,7 @@ func TestStoreMigrate(t *testing.T) {
 		DbVersion + " no automigrate": {
 			automigrate: false,
 			version:     DbVersion,
-			err:         "failed to apply migrations: db needs migration: deviceauth has version 0.0.0, needs version 1.6.0",
+			err:         "failed to apply migrations: db needs migration: deviceauth has version 0.0.0, needs version 1.7.0",
 		},
 		DbVersion + " multitenant": {
 			automigrate: true,
@@ -729,7 +731,7 @@ func TestStoreMigrate(t *testing.T) {
 			automigrate: false,
 			tenantDbs:   []string{"deviceauth-tenant1id", "deviceauth-tenant2id"},
 			version:     DbVersion,
-			err:         "failed to apply migrations: db needs migration: deviceauth-tenant1id has version 0.0.0, needs version 1.6.0",
+			err:         "failed to apply migrations: db needs migration: deviceauth-tenant1id has version 0.0.0, needs version 1.7.0",
 		},
 		"0.1 error": {
 			automigrate: true,

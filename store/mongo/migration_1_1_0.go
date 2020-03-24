@@ -46,6 +46,13 @@ type token_0_1_0 struct {
 	Token string `bson:"token,omitempty"`
 }
 
+type token_1_1_0 struct {
+	Id        string `bson:"_id,omitempty"`
+	DevId     string `bson:"dev_id,omitempty"`
+	Token     string `bson:"token,omitempty"`
+	AuthSetId string `bson:"auth_id,omitempty"`
+}
+
 func (m *migration_1_1_0) Up(from migrate.Version) error {
 	devColl := m.ms.client.Database(ctxstore.DbFromContext(m.ctx, DbName)).Collection(DbDevicesColl)
 	asColl := m.ms.client.Database(ctxstore.DbFromContext(m.ctx, DbName)).Collection(DbAuthSetColl)
@@ -93,7 +100,7 @@ func (m *migration_1_1_0) Up(from migrate.Version) error {
 
 		update := bson.M{
 			"$set": bson.M{
-				// see model.Token for field naming
+				// see token_1_1_0 for field naming
 				"auth_id": asetId,
 			},
 		}

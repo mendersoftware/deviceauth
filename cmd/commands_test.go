@@ -17,9 +17,11 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/mendersoftware/go-lib-micro/config"
 	"github.com/mendersoftware/go-lib-micro/identity"
+	"github.com/mendersoftware/go-lib-micro/mongo/uuid"
 	ctxstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
@@ -27,6 +29,7 @@ import (
 
 	minv "github.com/mendersoftware/deviceauth/client/inventory/mocks"
 	dconfig "github.com/mendersoftware/deviceauth/config"
+	"github.com/mendersoftware/deviceauth/jwt"
 	"github.com/mendersoftware/deviceauth/model"
 	"github.com/mendersoftware/deviceauth/store"
 	mstore "github.com/mendersoftware/deviceauth/store/mocks"
@@ -51,16 +54,18 @@ func TestMaintenanceWithDataStore(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping TestMaintenanceWithDataStore in short mode.")
 	}
+	uuid1 := uuid.Must(uuid.NewUUID())
+	uuid2 := uuid.Must(uuid.NewUUID())
 	datasetDevices := []interface{}{
 		model.Device{
-			Id:              "001",
+			Id:              uuid1.String(),
 			IdData:          "001",
 			PubKey:          "001",
 			Status:          model.DevStatusPending,
 			Decommissioning: false,
 		},
 		model.Device{
-			Id:              "002",
+			Id:              uuid2.String(),
 			IdData:          "002",
 			PubKey:          "002",
 			Status:          model.DevStatusPending,
@@ -70,32 +75,36 @@ func TestMaintenanceWithDataStore(t *testing.T) {
 
 	datasetAuthSets := []interface{}{
 		model.AuthSet{
-			Id:       "001",
-			DeviceId: "001",
+			Id:       uuid1.String(),
+			DeviceId: uuid1.String(),
 			IdData:   "001",
 			PubKey:   "001",
 		},
 		model.AuthSet{
-			Id:       "002",
-			DeviceId: "003",
+			Id:       uuid2.String(),
+			DeviceId: uuid2.String(),
 			IdData:   "001",
 			PubKey:   "002",
 		},
 	}
 
 	datasetTokens := []interface{}{
-		model.Token{
-			Id:        "001",
-			DevId:     "001",
-			AuthSetId: "001",
-			Token:     "foo",
-		},
-		model.Token{
-			Id:        "002",
-			DevId:     "003",
-			AuthSetId: "002",
-			Token:     "bar",
-		},
+		jwt.Token{Claims: jwt.Claims{
+			ID:        uuid1,
+			Subject:   uuid1,
+			Issuer:    "Tester",
+			IssuedAt:  &jwt.Time{time.Now()},
+			ExpiresAt: &jwt.Time{time.Now().Add(time.Hour)},
+			Tenant:    "foo",
+		}},
+		jwt.Token{Claims: jwt.Claims{
+			ID:        uuid2,
+			Subject:   uuid2,
+			Issuer:    "Tester",
+			IssuedAt:  &jwt.Time{time.Now()},
+			ExpiresAt: &jwt.Time{time.Now().Add(time.Hour)},
+			Tenant:    "foo",
+		}},
 	}
 
 	testCases := map[string]struct {
@@ -109,7 +118,7 @@ func TestMaintenanceWithDataStore(t *testing.T) {
 		},
 		"do nothing with tenant": {
 			decommissioningCleanupFlag: false,
-			tenant: "foo",
+			tenant:                     "foo",
 		},
 		"dry run without data": {
 			decommissioningCleanupFlag: true,
@@ -122,9 +131,9 @@ func TestMaintenanceWithDataStore(t *testing.T) {
 		},
 		"dry run with tenant": {
 			decommissioningCleanupFlag: true,
-			tenant:       "foo",
-			dryRunFlag:   true,
-			withDataSets: true,
+			tenant:                     "foo",
+			dryRunFlag:                 true,
+			withDataSets:               true,
 		},
 		"run without data": {
 			decommissioningCleanupFlag: true,
@@ -135,8 +144,8 @@ func TestMaintenanceWithDataStore(t *testing.T) {
 		},
 		"run with tenant": {
 			decommissioningCleanupFlag: true,
-			tenant:       "foo",
-			withDataSets: true,
+			tenant:                     "foo",
+			withDataSets:               true,
 		},
 	}
 

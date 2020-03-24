@@ -149,6 +149,8 @@ func TestMigration_1_0_0(t *testing.T) {
 	})
 	assert.EqualError(t, err, store.ErrObjectExists.Error())
 
+	collTokens := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).
+		Collection(DbTokensColl)
 	// verify that there is an auth set for every device
 	for i, dev := range data.devices {
 		aset, err := db.getAuthSetByDataKey(ctx, dev.IdData, dev.PubKey)
@@ -169,7 +171,11 @@ func TestMigration_1_0_0(t *testing.T) {
 				break
 			}
 
-			tok, err := db.GetToken(ctx, oldtok.Id)
+			var tok token_1_1_0
+			err := collTokens.FindOne(
+				ctx,
+				bson.M{"_id": oldtok.Id},
+			).Decode(&tok)
 			assert.NoError(t, err)
 			assert.Equal(t, oldtok.Token, tok.Token)
 			assert.Equal(t, dev.Id, tok.DevId)
