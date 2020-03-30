@@ -1,0 +1,136 @@
+# github.com/Azure/go-autorest v7.3.0+incompatible
+github.com/Azure/go-autorest/autorest/to
+# github.com/DataDog/zstd v0.0.0-20160706220725-2bf71ec48360
+github.com/DataDog/zstd
+# github.com/ant0ine/go-json-rest v3.3.3-0.20170219231650-4602b00d2caa+incompatible
+github.com/ant0ine/go-json-rest/rest
+github.com/ant0ine/go-json-rest/rest/test
+github.com/ant0ine/go-json-rest/rest/trie
+# github.com/asaskevich/govalidator v0.0.0-20170903095215-73945b6115bf
+github.com/asaskevich/govalidator
+# github.com/davecgh/go-spew v1.1.1
+github.com/davecgh/go-spew/spew
+# github.com/dgrijalva/jwt-go v3.0.1-0.20170608005149-a539ee1a749a+incompatible
+github.com/dgrijalva/jwt-go
+# github.com/fsnotify/fsnotify v1.4.3-0.20170329110642-4da3e2cfbabc
+github.com/fsnotify/fsnotify
+# github.com/go-stack/stack v1.8.0
+github.com/go-stack/stack
+# github.com/golang/snappy v0.0.2-0.20190904063534-ff6b7dc882cf
+github.com/golang/snappy
+# github.com/hashicorp/hcl v0.0.0-20170825171336-8f6b1344a92f
+github.com/hashicorp/hcl
+github.com/hashicorp/hcl/hcl/ast
+github.com/hashicorp/hcl/hcl/parser
+github.com/hashicorp/hcl/hcl/scanner
+github.com/hashicorp/hcl/hcl/strconv
+github.com/hashicorp/hcl/hcl/token
+github.com/hashicorp/hcl/json/parser
+github.com/hashicorp/hcl/json/scanner
+github.com/hashicorp/hcl/json/token
+# github.com/magiconair/properties v1.7.4-0.20170902060319-8d7837e64d3c
+github.com/magiconair/properties
+# github.com/mendersoftware/go-lib-micro v0.0.0-20191114142713-7109d19865f7
+github.com/mendersoftware/go-lib-micro/accesslog
+github.com/mendersoftware/go-lib-micro/apiclient
+github.com/mendersoftware/go-lib-micro/config
+github.com/mendersoftware/go-lib-micro/context
+github.com/mendersoftware/go-lib-micro/context/httpheader
+github.com/mendersoftware/go-lib-micro/customheader
+github.com/mendersoftware/go-lib-micro/identity
+github.com/mendersoftware/go-lib-micro/log
+github.com/mendersoftware/go-lib-micro/log/testing
+github.com/mendersoftware/go-lib-micro/mongo/dbtest
+github.com/mendersoftware/go-lib-micro/mongo/migrate
+github.com/mendersoftware/go-lib-micro/mongo/testing
+github.com/mendersoftware/go-lib-micro/requestid
+github.com/mendersoftware/go-lib-micro/requestlog
+github.com/mendersoftware/go-lib-micro/rest_utils
+github.com/mendersoftware/go-lib-micro/store
+github.com/mendersoftware/go-lib-micro/strings
+github.com/mendersoftware/go-lib-micro/testing
+# github.com/mendersoftware/mendertesting v0.0.0-20180410095158-9e728b524c29
+github.com/mendersoftware/mendertesting
+# github.com/mitchellh/mapstructure v0.0.0-20170523030023-d0303fe80992
+github.com/mitchellh/mapstructure
+# github.com/pelletier/go-toml v1.0.1-0.20170904195809-1d6b12b7cb29
+github.com/pelletier/go-toml
+# github.com/pkg/errors v0.8.1-0.20170910134614-2b3a18b5f0fb
+github.com/pkg/errors
+# github.com/pmezard/go-difflib v1.0.0
+github.com/pmezard/go-difflib/difflib
+# github.com/satori/go.uuid v1.2.1-0.20180103174451-36e9d2ebbde5
+github.com/satori/go.uuid
+# github.com/sirupsen/logrus v1.0.4-0.20170822132746-89742aefa4b2
+github.com/sirupsen/logrus
+# github.com/spf13/afero v0.0.0-20170901052352-ee1bd8ee15a1
+github.com/spf13/afero
+github.com/spf13/afero/mem
+# github.com/spf13/cast v1.1.0
+github.com/spf13/cast
+# github.com/spf13/jwalterweatherman v0.0.0-20170901151539-12bd96e66386
+github.com/spf13/jwalterweatherman
+# github.com/spf13/pflag v1.0.1-0.20170901120850-7aff26db30c1
+github.com/spf13/pflag
+# github.com/spf13/viper v1.0.0
+github.com/spf13/viper
+# github.com/stretchr/objx v0.2.0
+github.com/stretchr/objx
+# github.com/stretchr/testify v1.3.0
+github.com/stretchr/testify/assert
+github.com/stretchr/testify/mock
+# github.com/urfave/cli v1.19.2-0.20170706194625-4b90d79a682b
+github.com/urfave/cli
+# github.com/xdg/scram v0.0.0-20180814205039-7eeb5667e42c
+github.com/xdg/scram
+# github.com/xdg/stringprep v1.0.1-0.20180714160509-73f8eece6fdc
+github.com/xdg/stringprep
+# go.mongodb.org/mongo-driver v1.1.1-0.20191115221502-08f9f9e42b10
+go.mongodb.org/mongo-driver/bson
+go.mongodb.org/mongo-driver/bson/bsoncodec
+go.mongodb.org/mongo-driver/bson/bsonoptions
+go.mongodb.org/mongo-driver/bson/bsonrw
+go.mongodb.org/mongo-driver/bson/bsontype
+go.mongodb.org/mongo-driver/bson/primitive
+go.mongodb.org/mongo-driver/event
+go.mongodb.org/mongo-driver/internal
+go.mongodb.org/mongo-driver/mongo
+go.mongodb.org/mongo-driver/mongo/options
+go.mongodb.org/mongo-driver/mongo/readconcern
+go.mongodb.org/mongo-driver/mongo/readpref
+go.mongodb.org/mongo-driver/mongo/writeconcern
+go.mongodb.org/mongo-driver/tag
+go.mongodb.org/mongo-driver/version
+go.mongodb.org/mongo-driver/x/bsonx
+go.mongodb.org/mongo-driver/x/bsonx/bsoncore
+go.mongodb.org/mongo-driver/x/mongo/driver
+go.mongodb.org/mongo-driver/x/mongo/driver/address
+go.mongodb.org/mongo-driver/x/mongo/driver/auth
+go.mongodb.org/mongo-driver/x/mongo/driver/auth/internal/gssapi
+go.mongodb.org/mongo-driver/x/mongo/driver/connstring
+go.mongodb.org/mongo-driver/x/mongo/driver/description
+go.mongodb.org/mongo-driver/x/mongo/driver/dns
+go.mongodb.org/mongo-driver/x/mongo/driver/mongocrypt
+go.mongodb.org/mongo-driver/x/mongo/driver/mongocrypt/options
+go.mongodb.org/mongo-driver/x/mongo/driver/operation
+go.mongodb.org/mongo-driver/x/mongo/driver/session
+go.mongodb.org/mongo-driver/x/mongo/driver/topology
+go.mongodb.org/mongo-driver/x/mongo/driver/uuid
+go.mongodb.org/mongo-driver/x/mongo/driver/wiremessage
+# golang.org/x/crypto v0.0.0-20191117063200-497ca9f6d64f
+golang.org/x/crypto/pbkdf2
+golang.org/x/crypto/ssh/terminal
+# golang.org/x/net v0.0.0-20190404232315-eb5bcb51f2a3
+golang.org/x/net/context
+# golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
+golang.org/x/sync/semaphore
+# golang.org/x/sys v0.0.0-20190412213103-97732733099d
+golang.org/x/sys/unix
+golang.org/x/sys/windows
+# golang.org/x/text v0.3.0
+golang.org/x/text/transform
+golang.org/x/text/unicode/norm
+# gopkg.in/tomb.v2 v2.0.0-20161208151619-d5d1b5820637
+gopkg.in/tomb.v2
+# gopkg.in/yaml.v2 v2.0.0-20170812160011-eb3733d160e7
+gopkg.in/yaml.v2
