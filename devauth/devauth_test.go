@@ -478,14 +478,18 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 						mtesting.ContextMatcher(),
 						tc.inReq.TenantToken,
 						mock.AnythingOfType("*apiclient.HttpApi")).
-						Return(tc.tenantVerificationErr)
+						Return(
+							&tenant.Tenant{},
+							tc.tenantVerificationErr)
 				}
 				if tc.config.DefaultTenantToken != "" {
 					ct.On("VerifyToken",
 						mtesting.ContextMatcher(),
 						tc.config.DefaultTenantToken,
 						mock.AnythingOfType("*apiclient.HttpApi")).
-						Return(tc.tenantVerificationErr)
+						Return(
+							&tenant.Tenant{},
+							tc.tenantVerificationErr)
 				}
 				devauth = devauth.WithTenantVerification(&ct)
 			}
