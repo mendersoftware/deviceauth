@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@ package tenant
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"strings"
 	"time"
@@ -61,7 +62,7 @@ type Config struct {
 
 // ClientRunner is an interface of inventory client
 type ClientRunner interface {
-	VerifyToken(ctx context.Context, token string, client apiclient.HttpRunner) error
+	VerifyToken(ctx context.Context, token string, client apiclient.HttpRunner) (*Tenant, error)
 }
 
 // Client is an opaque implementation of tenant administrator client. Implements
@@ -73,7 +74,7 @@ type Client struct {
 // VerifyToken will execute a request to tenenatadm's endpoint for token
 // verification. Returns nil if verification was successful.
 func (tc *Client) VerifyToken(ctx context.Context, token string,
-	client apiclient.HttpRunner) error {
+	client apiclient.HttpRunner) (*Tenant, error) {
 
 	l := log.FromContext(ctx)
 
@@ -83,7 +84,7 @@ func (tc *Client) VerifyToken(ctx context.Context, token string,
 
 	req, err := http.NewRequest(http.MethodPost, url, nil)
 	if err != nil {
-		return errors.Wrap(err, "failed to create request to tenant administrator")
+		return nil, errors.Wrap(err, "failed to create request to tenant administrator")
 	}
 
 	// tenant token is passed in Authorization header
@@ -95,7 +96,7 @@ func (tc *Client) VerifyToken(ctx context.Context, token string,
 	rsp, err := client.Do(req.WithContext(ctx))
 	if err != nil {
 		l.Errorf("tenantadm request failed: %v", err)
-		return errors.Wrap(err, "request to verify token failed")
+		return nil, errors.Wrap(err, "request to verify token failed")
 	}
 	defer rsp.Body.Close()
 
@@ -104,15 +105,19 @@ func (tc *Client) VerifyToken(ctx context.Context, token string,
 	case http.StatusUnauthorized: // 401, verification result negative
 		apiErr := rest_utils.ParseApiError(rsp.Body)
 		if !rest_utils.IsApiError(apiErr) {
-			return errors.Errorf("failed to parse tenantadm api error response")
+			return nil, errors.Errorf("failed to parse tenantadm api error response")
 		}
 
-		return MakeErrTokenVerificationFailed(apiErr)
+		return nil, MakeErrTokenVerificationFailed(apiErr)
 
 	case http.StatusOK: // 200, token verified
-		return nil
+		tenant := Tenant{}
+		if err := json.NewDecoder(rsp.Body).Decode(&tenant); err != nil {
+			return nil, errors.Wrap(err, "error parsing tenant verification response")
+		}
+		return &tenant, nil
 	default:
-		return errors.Errorf("token verification request returned unexpected status %v",
+		return nil, errors.Errorf("token verification request returned unexpected status %v",
 			rsp.StatusCode)
 	}
 }
