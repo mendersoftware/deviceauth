@@ -23,13 +23,14 @@ import (
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
+	"github.com/mendersoftware/go-lib-micro/mongo/uuid"
 	ctxstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/pkg/errors"
-	"github.com/satori/go.uuid"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	mopts "go.mongodb.org/mongo-driver/mongo/options"
 
+	"github.com/mendersoftware/deviceauth/jwt"
 	"github.com/mendersoftware/deviceauth/model"
 	"github.com/mendersoftware/deviceauth/store"
 	uto "github.com/mendersoftware/deviceauth/utils/to"
@@ -80,10 +81,10 @@ func NewDataStoreMongo(config DataStoreMongoConfig) (*DataStoreMongo, error) {
 	if !strings.Contains(config.ConnectionString, "://") {
 		config.ConnectionString = "mongodb://" + config.ConnectionString
 	}
-	clientOptions := options.Client().ApplyURI(config.ConnectionString)
+	clientOptions := mopts.Client().ApplyURI(config.ConnectionString)
 
 	if config.Username != "" {
-		clientOptions.SetAuth(options.Credential{
+		clientOptions.SetAuth(mopts.Credential{
 			Username: config.Username,
 			Password: config.Password,
 		})
@@ -118,13 +119,13 @@ func (db *DataStoreMongo) GetDevices(ctx context.Context, skip, limit uint, filt
 	res := []model.Device{}
 
 	pipeline := []bson.D{
-		bson.D{
+		{
 			{Key: "$match", Value: filter},
 		},
-		bson.D{
+		{
 			{Key: "$sort", Value: bson.M{"_id": 1}},
 		},
-		bson.D{
+		{
 			{Key: "$skip", Value: skip},
 		},
 	}
@@ -201,10 +202,7 @@ func (db *DataStoreMongo) GetDeviceByIdentityDataHash(ctx context.Context, idata
 func (db *DataStoreMongo) AddDevice(ctx context.Context, d model.Device) error {
 
 	if d.Id == "" {
-		uid, err := uuid.NewV4()
-		if err != nil {
-			return err
-		}
+		uid := uuid.NewRandom()
 		d.Id = uid.String()
 	}
 
@@ -252,22 +250,32 @@ func (db *DataStoreMongo) DeleteDevice(ctx context.Context, id string) error {
 	return nil
 }
 
-func (db *DataStoreMongo) AddToken(ctx context.Context, t model.Token) error {
+func (db *DataStoreMongo) AddToken(ctx context.Context, t *jwt.Token) error {
+	database := db.client.Database(ctxstore.DbFromContext(ctx, DbName))
+	collTokens := database.Collection(DbTokensColl)
 
-	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbTokensColl)
+	filter := bson.M{"_id": t.Claims.ID}
+	update := bson.M{"$set": t}
+	updateOpts := mopts.Update()
+	updateOpts.SetUpsert(true)
 
-	if _, err := c.InsertOne(ctx, t); err != nil {
+	if _, err := collTokens.UpdateOne(
+		ctx, filter, update, updateOpts,
+	); err != nil {
 		return errors.Wrap(err, "failed to store token")
 	}
 
 	return nil
 }
 
-func (db *DataStoreMongo) GetToken(ctx context.Context, jti string) (*model.Token, error) {
+func (db *DataStoreMongo) GetToken(
+	ctx context.Context,
+	jti uuid.UUID,
+) (*jwt.Token, error) {
 
 	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbTokensColl)
 
-	res := model.Token{}
+	res := jwt.Token{}
 
 	err := c.FindOne(ctx, bson.M{"_id": jti}).Decode(&res)
 	if err != nil {
@@ -281,12 +289,12 @@ func (db *DataStoreMongo) GetToken(ctx context.Context, jti string) (*model.Toke
 	return &res, nil
 }
 
-func (db *DataStoreMongo) DeleteToken(ctx context.Context, jti string) error {
-
-	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbTokensColl)
+func (db *DataStoreMongo) DeleteToken(ctx context.Context, jti uuid.UUID) error {
+	database := db.client.Database(ctxstore.DbFromContext(ctx, DbName))
+	collTokens := database.Collection(DbTokensColl)
 
 	filter := bson.M{"_id": jti}
-	result, err := c.DeleteOne(ctx, filter)
+	result, err := collTokens.DeleteOne(ctx, filter)
 	if err != nil {
 		return errors.Wrap(err, "failed to remove token")
 	} else if result.DeletedCount < 1 {
@@ -297,15 +305,20 @@ func (db *DataStoreMongo) DeleteToken(ctx context.Context, jti string) error {
 }
 
 func (db *DataStoreMongo) DeleteTokens(ctx context.Context) error {
-	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbTokensColl)
+	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).
+		Collection(DbTokensColl)
 	_, err := c.DeleteMany(ctx, bson.D{})
 
 	return err
 }
 
-func (db *DataStoreMongo) DeleteTokenByDevId(ctx context.Context, devId string) error {
-	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbTokensColl)
-	ci, err := c.DeleteMany(ctx, bson.M{"dev_id": devId})
+func (db *DataStoreMongo) DeleteTokenByDevId(
+	ctx context.Context,
+	devID uuid.UUID,
+) error {
+	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).
+		Collection(DbTokensColl)
+	ci, err := c.DeleteMany(ctx, bson.M{"sub": devID})
 
 	if err != nil {
 		return errors.Wrap(err, "failed to remove tokens")
@@ -426,10 +439,7 @@ func (db *DataStoreMongo) AddAuthSet(ctx context.Context, set model.AuthSet) err
 	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
 
 	if set.Id == "" {
-		uid, err := uuid.NewV4()
-		if err != nil {
-			return err
-		}
+		uid := uuid.NewRandom()
 		set.Id = uid.String()
 	}
 
@@ -576,7 +586,7 @@ func (db *DataStoreMongo) EnsureIndexes(ctx context.Context) error {
 		Keys: bson.D{
 			{Key: model.DevKeyIdData, Value: 1},
 		},
-		Options: &options.IndexOptions{
+		Options: &mopts.IndexOptions{
 			Background: &_false,
 			Name:       &indexDevices_IdentityData,
 			Unique:     &_true,
@@ -589,7 +599,7 @@ func (db *DataStoreMongo) EnsureIndexes(ctx context.Context) error {
 			{Key: model.AuthSetKeyIdData, Value: 1},
 			{Key: model.AuthSetKeyPubKey, Value: 1},
 		},
-		Options: &options.IndexOptions{
+		Options: &mopts.IndexOptions{
 			Background: &_false,
 			Name:       &indexAuthSet_DeviceId_IdentityData_PubKey,
 			Unique:     &_true,
@@ -619,7 +629,7 @@ func (db *DataStoreMongo) PutLimit(ctx context.Context, lim model.Limit) error {
 
 	query := bson.M{"_id": lim.Name}
 
-	updateOptions := options.Update()
+	updateOptions := mopts.Update()
 	updateOptions.SetUpsert(true)
 	if _, err := c.UpdateOne(
 		ctx, query, bson.M{"$set": lim}, updateOptions); err != nil {
