@@ -31,3 +31,5 @@ profile.coverprofile
 
 .idea
 venv
+# Emacs directory local variables
+.dir-locals.el
