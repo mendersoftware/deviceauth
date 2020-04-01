@@ -15,14 +15,15 @@ package devauth
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/Azure/go-autorest/autorest/to"
 	ctxhttpheader "github.com/mendersoftware/go-lib-micro/context/httpheader"
 	"github.com/mendersoftware/go-lib-micro/identity"
+	"github.com/mendersoftware/go-lib-micro/mongo/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"go.mongodb.org/mongo-driver/bson"
@@ -37,6 +38,7 @@ import (
 	"github.com/mendersoftware/deviceauth/store"
 	mstore "github.com/mendersoftware/deviceauth/store/mocks"
 	mtesting "github.com/mendersoftware/deviceauth/utils/testing"
+	"github.com/pkg/errors"
 )
 
 func TestDevAuthSubmitAuthRequest(t *testing.T) {
@@ -44,8 +46,8 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 
 	pubKey := "dummy_pubkey"
 	idData := "{\"mac\":\"00:00:00:01\"}"
-	devId := "dummy_devid"
-	authId := "dummy_aid"
+	devId := uuid.NewRandom().String()
+	authId := uuid.NewRandom().String()
 
 	_, idDataHash, err := parseIdData(idData)
 	assert.NoError(t, err)
@@ -454,7 +456,7 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 
 			db.On("AddToken",
 				ctxMatcher,
-				mock.AnythingOfType("model.Token")).Return(nil)
+				mock.AnythingOfType("*jwt.Token")).Return(nil)
 			db.On("GetDeviceStatus", ctxMatcher,
 				mock.AnythingOfType("string")).Return(
 				"pending", nil)
@@ -466,8 +468,9 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 			jwth.On("ToJWT",
 				mock.MatchedBy(func(jt *jwt.Token) bool {
 					t.Logf("token: %v", jt)
+					devUUID, _ := uuid.FromString(devId)
 					return assert.NotNil(t, jt) &&
-						assert.Equal(t, devId, jt.Claims.Subject) &&
+						assert.Equal(t, devUUID, jt.Claims.Subject) &&
 						(tc.tenantVerify == false ||
 							assert.Equal(t, "foobar", jt.Claims.Tenant))
 				})).
@@ -533,7 +536,8 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 		TenantToken: "foo-tenant",
 	}
 
-	dummyDevId := "dummydevid"
+	dummyDevId := uuid.NewSHA1("dummy_devid").String()
+	dummyAuthID := uuid.NewSHA1("dummy_aid").String()
 	dummyToken := "dummytoken"
 
 	testCases := []struct {
@@ -586,6 +590,7 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 		{
 			desc: "error: preauthorized set would exceed limit",
 			dbGetAuthSetByDataKeyRes: &model.AuthSet{
+				Id:           dummyAuthID,
 				IdDataSha256: idDataSha256,
 				DeviceId:     dummyDevId,
 				PubKey:       inReq.PubKey,
@@ -604,6 +609,7 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 		{
 			desc: "error: can't get device limit",
 			dbGetAuthSetByDataKeyRes: &model.AuthSet{
+				Id:           dummyAuthID,
 				IdDataSha256: idDataSha256,
 				DeviceId:     dummyDevId,
 				PubKey:       inReq.PubKey,
@@ -619,6 +625,7 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 		{
 			desc: "error: failed to submit job to workflows",
 			dbGetAuthSetByDataKeyRes: &model.AuthSet{
+				Id:           dummyAuthID,
 				IdDataSha256: idDataSha256,
 				DeviceId:     dummyDevId,
 				PubKey:       inReq.PubKey,
@@ -638,6 +645,7 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 		{
 			desc: "ok: preauthorized set is auto-accepted, device was already accepted",
 			dbGetAuthSetByDataKeyRes: &model.AuthSet{
+				Id:           dummyAuthID,
 				IdDataSha256: idDataSha256,
 				DeviceId:     dummyDevId,
 				PubKey:       inReq.PubKey,
@@ -657,6 +665,7 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 		{
 			desc: "error: cannot get device status",
 			dbGetAuthSetByDataKeyRes: &model.AuthSet{
+				Id:           dummyAuthID,
 				IdDataSha256: idDataSha256,
 				DeviceId:     dummyDevId,
 				PubKey:       inReq.PubKey,
@@ -742,7 +751,7 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 			// only happy path, errors tested elsewhere
 			db.On("AddToken",
 				ctx,
-				mock.AnythingOfType("model.Token"),
+				mock.AnythingOfType("*jwt.Token"),
 			).Return(nil)
 
 			db.On("GetDeviceById",
@@ -785,21 +794,21 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 func TestDevAuthPreauthorizeDevice(t *testing.T) {
 	t.Parallel()
 
-	authsetId := "aid"
-	deviceId := "did"
+	authsetID := uuid.NewSHA1("aid").String()
+	deviceID := uuid.NewSHA1("did").String()
 	idData := "{\"mac\":\"00:00:00:01\"}"
 	pubKey := "pubkey"
 
 	req := &model.PreAuthReq{
-		AuthSetId: authsetId,
-		DeviceId:  deviceId,
+		AuthSetId: authsetID,
+		DeviceId:  deviceID,
 		IdData:    idData,
 		PubKey:    pubKey,
 	}
 
 	badReq := &model.PreAuthReq{
-		AuthSetId: authsetId,
-		DeviceId:  deviceId,
+		AuthSetId: authsetID,
+		DeviceId:  deviceID,
 		IdData:    "a",
 		PubKey:    pubKey,
 	}
@@ -907,6 +916,9 @@ func TestDevAuthPreauthorizeDevice(t *testing.T) {
 func TestDevAuthAcceptDevice(t *testing.T) {
 	t.Parallel()
 
+	dummyAuthID := uuid.NewSHA1("dummy_aid").String()
+	dummyDevID := uuid.NewSHA1("dummy_devid").String()
+
 	testCases := []struct {
 		aset *model.AuthSet
 
@@ -930,22 +942,22 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 	}{
 		{
 			aset: &model.AuthSet{
-				Id:       "dummy_aid",
-				DeviceId: "dummy_devid",
+				Id:       dummyAuthID,
+				DeviceId: dummyDevID,
 			},
 			dev: &model.Device{
-				Id:     "dummy_devid",
+				Id:     dummyDevID,
 				Status: model.DevStatusPending,
 			},
 			dbLimit: &model.Limit{Value: 0},
 		},
 		{
 			aset: &model.AuthSet{
-				Id:       "dummy_aid",
-				DeviceId: "dummy_devid",
+				Id:       dummyAuthID,
+				DeviceId: dummyDevID,
 			},
 			dev: &model.Device{
-				Id:     "dummy_devid",
+				Id:     dummyDevID,
 				Status: model.DevStatusPending,
 			},
 			dbLimit: &model.Limit{Value: 5},
@@ -953,12 +965,12 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 		},
 		{
 			aset: &model.AuthSet{
-				Id:       "dummy_aid",
-				DeviceId: "dummy_devid",
+				Id:       dummyAuthID,
+				DeviceId: dummyDevID,
 				Status:   model.DevStatusAccepted,
 			},
 			dev: &model.Device{
-				Id:     "dummy_devid",
+				Id:     dummyDevID,
 				Status: model.DevStatusPending,
 			},
 			coSubmitProvisionDeviceJobErr: errors.New("workflows shouldn't be called"),
@@ -967,12 +979,12 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 		},
 		{
 			aset: &model.AuthSet{
-				Id:       "dummy_aid",
-				DeviceId: "dummy_devid",
+				Id:       dummyAuthID,
+				DeviceId: dummyDevID,
 				Status:   model.DevStatusPending,
 			},
 			dev: &model.Device{
-				Id:     "dummy_devid",
+				Id:     dummyAuthID,
 				Status: model.DevStatusAccepted,
 			},
 			coSubmitProvisionDeviceJobErr: errors.New("workflows shouldn't be called"),
@@ -981,11 +993,11 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 		},
 		{
 			aset: &model.AuthSet{
-				Id:       "dummy_aid",
-				DeviceId: "dummy_devid",
+				Id:       dummyAuthID,
+				DeviceId: dummyDevID,
 			},
 			dev: &model.Device{
-				Id:     "dummy_devid",
+				Id:     dummyDevID,
 				Status: model.DevStatusPending,
 			},
 			dbLimit: &model.Limit{Value: 5},
@@ -994,11 +1006,11 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 		},
 		{
 			aset: &model.AuthSet{
-				Id:       "dummy_aid",
-				DeviceId: "dummy_devid",
+				Id:       dummyAuthID,
+				DeviceId: dummyDevID,
 			},
 			dev: &model.Device{
-				Id:     "dummy_devid",
+				Id:     dummyDevID,
 				Status: model.DevStatusPending,
 			},
 			dbLimit: &model.Limit{Value: 5},
@@ -1007,11 +1019,11 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 		},
 		{
 			aset: &model.AuthSet{
-				Id:       "dummy_aid",
-				DeviceId: "dummy_devid",
+				Id:       dummyAuthID,
+				DeviceId: dummyDevID,
 			},
 			dev: &model.Device{
-				Id:     "dummy_devid",
+				Id:     dummyDevID,
 				Status: model.DevStatusPending,
 			},
 			dbLimit:    &model.Limit{Value: 5},
@@ -1020,11 +1032,11 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 		},
 		{
 			aset: &model.AuthSet{
-				Id:       "dummy_aid",
-				DeviceId: "dummy_devid",
+				Id:       dummyAuthID,
+				DeviceId: dummyDevID,
 			},
 			dev: &model.Device{
-				Id:     "dummy_devid",
+				Id:     dummyDevID,
 				Status: model.DevStatusPending,
 			},
 			dbLimit:    &model.Limit{Value: 5},
@@ -1039,11 +1051,11 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 		{
 			dbLimit: &model.Limit{Value: 0},
 			aset: &model.AuthSet{
-				Id:       "dummy_aid",
-				DeviceId: "dummy_devid",
+				Id:       dummyAuthID,
+				DeviceId: dummyDevID,
 			},
 			dev: &model.Device{
-				Id:     "dummy_devid",
+				Id:     dummyDevID,
 				Status: model.DevStatusPending,
 			},
 			dbUpdateErr: errors.New("failed to update device"),
@@ -1052,11 +1064,11 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 		{
 			dbLimit: &model.Limit{Value: 0},
 			aset: &model.AuthSet{
-				Id:       "dummy_aid",
-				DeviceId: "dummy_devid",
+				Id:       dummyAuthID,
+				DeviceId: dummyDevID,
 			},
 			dev: &model.Device{
-				Id:     "dummy_devid",
+				Id:     dummyDevID,
 				Status: model.DevStatusPending,
 			},
 			coSubmitProvisionDeviceJobErr: errors.New("workflows failed"),
@@ -1065,11 +1077,11 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 		{
 			dbLimit: &model.Limit{Value: 0},
 			aset: &model.AuthSet{
-				Id:       "dummy_aid",
-				DeviceId: "dummy_devid",
+				Id:       dummyAuthID,
+				DeviceId: dummyDevID,
 			},
 			dev: &model.Device{
-				Id:     "dummy_devid",
+				Id:     dummyDevID,
 				Status: model.DevStatusPending,
 			},
 			dbUpdateRevokeAuthSetsErr: store.ErrAuthSetNotFound,
@@ -1077,11 +1089,11 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 		{
 			dbLimit: &model.Limit{Value: 0},
 			aset: &model.AuthSet{
-				Id:       "dummy_aid",
-				DeviceId: "dummy_devid",
+				Id:       dummyAuthID,
+				DeviceId: dummyDevID,
 			},
 			dev: &model.Device{
-				Id:     "dummy_devid",
+				Id:     dummyDevID,
 				Status: model.DevStatusPending,
 			},
 			dbUpdateRevokeAuthSetsErr: errors.New("foobar"),
@@ -1089,8 +1101,8 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 		},
 		{
 			aset: &model.AuthSet{
-				Id:       "dummy_aid",
-				DeviceId: "dummy_devid",
+				Id:       dummyAuthID,
+				DeviceId: dummyDevID,
 			},
 			dbLimit:            &model.Limit{Value: 5},
 			dbCount:            4,
@@ -1105,19 +1117,23 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 			t.Parallel()
 
 			db := mstore.DataStore{}
-			db.On("GetAuthSetById",
-				context.Background(), "dummy_aid").Return(tc.aset, tc.dbGetErr)
-			db.On("GetLimit",
-				context.Background(), model.LimitMaxDeviceCount).Return(tc.dbLimit, tc.dbLimitErr)
-			db.On("GetDevCountByStatus",
-				context.Background(), model.DevStatusAccepted).Return(tc.dbCount, tc.dbCountErr)
-			db.On("GetDeviceById",
-				context.Background(), "dummy_devid").Return(tc.dev, tc.dbGetDeviceByIdErr)
+			db.On("GetAuthSetById", context.Background(),
+				dummyAuthID).
+				Return(tc.aset, tc.dbGetErr)
+			db.On("GetLimit", context.Background(),
+				model.LimitMaxDeviceCount).
+				Return(tc.dbLimit, tc.dbLimitErr)
+			db.On("GetDevCountByStatus", context.Background(),
+				model.DevStatusAccepted).
+				Return(tc.dbCount, tc.dbCountErr)
+			db.On("GetDeviceById", context.Background(),
+				dummyDevID).
+				Return(tc.dev, tc.dbGetDeviceByIdErr)
 			db.On("UpdateDevice", context.Background(),
 				mock.AnythingOfType("model.Device"),
 				mock.AnythingOfType("model.DeviceUpdate")).Return(nil)
 			db.On("GetDeviceStatus", context.Background(),
-				"dummy_devid").Return(
+				dummyDevID).Return(
 				"accpted", nil)
 
 			if tc.aset != nil {
@@ -1148,7 +1164,8 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 				Return(nil)
 
 			devauth := NewDevAuth(&db, &co, nil, Config{})
-			err := devauth.AcceptDeviceAuth(context.Background(), "dummy_devid", "dummy_aid")
+			err := devauth.AcceptDeviceAuth(
+				context.Background(), dummyDevID, dummyAuthID)
 
 			if tc.outErr != "" {
 				assert.EqualError(t, err, tc.outErr)
@@ -1162,6 +1179,10 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 func TestDevAuthRejectDevice(t *testing.T) {
 	t.Parallel()
 
+	dummyAuthID := uuid.NewSHA1("dummy_aid").String()
+	dummyDevUUID := uuid.NewSHA1("dummy_devid")
+	dummyDevID := dummyDevUUID.String()
+
 	testCases := []struct {
 		aset             *model.AuthSet
 		dbErr            error
@@ -1171,8 +1192,8 @@ func TestDevAuthRejectDevice(t *testing.T) {
 	}{
 		{
 			aset: &model.AuthSet{
-				Id:       "dummy_aid",
-				DeviceId: "dummy_devid",
+				Id:       dummyAuthID,
+				DeviceId: dummyDevID,
 			},
 			dbDelDevTokenErr: nil,
 		},
@@ -1183,16 +1204,16 @@ func TestDevAuthRejectDevice(t *testing.T) {
 		},
 		{
 			aset: &model.AuthSet{
-				Id:       "dummy_aid",
-				DeviceId: "dummy_devid",
+				Id:       dummyAuthID,
+				DeviceId: dummyDevID,
 			},
 			dbDelDevTokenErr: store.ErrTokenNotFound,
 			outErr:           "db delete device token error: token not found",
 		},
 		{
 			aset: &model.AuthSet{
-				Id:       "dummy_aid",
-				DeviceId: "dummy_devid",
+				Id:       dummyAuthID,
+				DeviceId: dummyDevID,
 				Status:   "accepted",
 			},
 			dbDelDevTokenErr: errors.New("some error"),
@@ -1206,16 +1227,19 @@ func TestDevAuthRejectDevice(t *testing.T) {
 			t.Parallel()
 
 			db := mstore.DataStore{}
-			db.On("GetAuthSetById", context.Background(), "dummy_aid").Return(tc.aset, tc.dbErr)
+			db.On("GetAuthSetById", context.Background(),
+				dummyAuthID).
+				Return(tc.aset, tc.dbErr)
 			if tc.aset != nil {
 				db.On("UpdateAuthSetById", context.Background(), tc.aset.Id,
 					model.AuthSetUpdate{Status: model.DevStatusRejected}).Return(nil)
 			}
-			db.On("DeleteTokenByDevId", context.Background(), "dummy_devid").Return(
-				tc.dbDelDevTokenErr)
+			db.On("DeleteTokenByDevId", context.Background(),
+				dummyDevUUID).
+				Return(tc.dbDelDevTokenErr)
 			db.On("GetDeviceStatus", context.Background(),
-				"dummy_devid").Return(
-				"accpted", nil)
+				dummyDevID).
+				Return("accpted", nil)
 			db.On("UpdateDevice", context.Background(),
 				mock.AnythingOfType("model.Device"),
 				mock.AnythingOfType("model.DeviceUpdate")).Return(nil)
@@ -1225,7 +1249,9 @@ func TestDevAuthRejectDevice(t *testing.T) {
 				mock.AnythingOfType("orchestrator.UpdateDeviceStatusReq")).
 				Return(nil)
 			devauth := NewDevAuth(&db, &co, nil, Config{})
-			err := devauth.RejectDeviceAuth(context.Background(), "dummy_devid", "dummy_aid")
+			err := devauth.RejectDeviceAuth(
+				context.Background(), dummyDevID, dummyAuthID,
+			)
 
 			if tc.dbErr != nil || (tc.dbDelDevTokenErr != nil &&
 				tc.dbDelDevTokenErr != store.ErrTokenNotFound) {
@@ -1241,6 +1267,10 @@ func TestDevAuthRejectDevice(t *testing.T) {
 func TestDevAuthResetDevice(t *testing.T) {
 	t.Parallel()
 
+	dummyDevUUID := uuid.NewSHA1("dummy_devid")
+	dummyDevID := dummyDevUUID.String()
+	dummyAuthID := uuid.NewSHA1("dummy_aid").String()
+
 	testCases := []struct {
 		aset             *model.AuthSet
 		dbErr            error
@@ -1250,8 +1280,8 @@ func TestDevAuthResetDevice(t *testing.T) {
 	}{
 		{
 			aset: &model.AuthSet{
-				Id:       "dummy_aid",
-				DeviceId: "dummy_devid",
+				Id:       dummyAuthID,
+				DeviceId: dummyDevID,
 			},
 			dbDelDevTokenErr: nil,
 		},
@@ -1261,8 +1291,8 @@ func TestDevAuthResetDevice(t *testing.T) {
 		},
 		{
 			aset: &model.AuthSet{
-				Id:       "dummy_aid",
-				DeviceId: "dummy_devid",
+				Id:       dummyAuthID,
+				DeviceId: dummyDevID,
 				Status:   "accepted",
 			},
 			dbDelDevTokenErr: store.ErrTokenNotFound,
@@ -1270,8 +1300,8 @@ func TestDevAuthResetDevice(t *testing.T) {
 		},
 		{
 			aset: &model.AuthSet{
-				Id:       "dummy_aid",
-				DeviceId: "dummy_devid",
+				Id:       dummyAuthID,
+				DeviceId: dummyDevID,
 				Status:   "accepted",
 			},
 			dbDelDevTokenErr: errors.New("some error"),
@@ -1285,15 +1315,18 @@ func TestDevAuthResetDevice(t *testing.T) {
 			t.Parallel()
 
 			db := mstore.DataStore{}
-			db.On("GetAuthSetById", context.Background(), "dummy_aid").Return(tc.aset, tc.dbErr)
+			db.On("GetAuthSetById", context.Background(),
+				dummyAuthID).
+				Return(tc.aset, tc.dbErr)
 			if tc.aset != nil {
 				db.On("UpdateAuthSetById", context.Background(), tc.aset.Id,
 					model.AuthSetUpdate{Status: model.DevStatusPending}).Return(nil)
 			}
-			db.On("DeleteTokenByDevId", context.Background(), "dummy_devid").Return(
+			db.On("DeleteTokenByDevId", context.Background(),
+				dummyDevUUID).Return(
 				tc.dbDelDevTokenErr)
 			db.On("GetDeviceStatus", context.Background(),
-				"dummy_devid").Return(
+				dummyDevID).Return(
 				"accpted", nil)
 			db.On("UpdateDevice", context.Background(),
 				mock.AnythingOfType("model.Device"),
@@ -1305,7 +1338,9 @@ func TestDevAuthResetDevice(t *testing.T) {
 				Return(nil)
 
 			devauth := NewDevAuth(&db, &co, nil, Config{})
-			err := devauth.ResetDeviceAuth(context.Background(), "dummy_devid", "dummy_aid")
+			err := devauth.ResetDeviceAuth(
+				context.Background(), dummyDevID, dummyAuthID,
+			)
 
 			if tc.dbErr != nil ||
 				(tc.dbDelDevTokenErr != nil &&
@@ -1329,7 +1364,7 @@ func TestDevAuthVerifyToken(t *testing.T) {
 		jwToken     *jwt.Token
 		validateErr error
 
-		token       *model.Token
+		getToken    bool
 		getTokenErr error
 
 		auth       *model.AuthSet
@@ -1346,7 +1381,13 @@ func TestDevAuthVerifyToken(t *testing.T) {
 
 			jwToken: &jwt.Token{
 				Claims: jwt.Claims{
-					ID: "expired",
+					ID:      uuid.NewSHA1("expired"),
+					Subject: uuid.NewSHA1("foo"),
+					Device:  true,
+					ExpiresAt: jwt.Time{
+						Time: time.Now().
+							Add(-time.Hour),
+					},
 				},
 			},
 			validateErr: jwt.ErrTokenExpired,
@@ -1359,40 +1400,26 @@ func TestDevAuthVerifyToken(t *testing.T) {
 			validateErr: jwt.ErrTokenInvalid,
 		},
 		{
-			tokenString:      "good-no-auth",
-			tokenValidateErr: store.ErrDevNotFound,
-
-			jwToken: &jwt.Token{
-				Claims: jwt.Claims{
-					ID:     "good-no-auth",
-					Device: true,
-				},
-			},
-			token: &model.Token{
-				Id:        "good-no-auth",
-				AuthSetId: "not-found",
-			},
-			getAuthErr: store.ErrDevNotFound,
-		},
-		{
 			tokenString: "good-accepted",
 			jwToken: &jwt.Token{
 				Claims: jwt.Claims{
-					ID:     "good-accepted",
+					ID:      uuid.NewSHA1("good"),
+					Subject: uuid.NewSHA1("bar"),
+					ExpiresAt: jwt.Time{
+						Time: time.Now().Add(time.Hour),
+					},
+					Issuer: "Tester",
 					Device: true,
 				},
 			},
-			token: &model.Token{
-				Id:        "good-accepted",
-				AuthSetId: "foo",
-			},
+			getToken: true,
 			auth: &model.AuthSet{
-				Id:       "foo",
+				Id:       uuid.NewSHA1("good").String(),
 				Status:   model.DevStatusAccepted,
-				DeviceId: "foodev",
+				DeviceId: uuid.NewSHA1("bar").String(),
 			},
 			dev: &model.Device{
-				Id:              "foodev",
+				Id:              uuid.NewSHA1("bar").String(),
 				Decommissioning: false,
 			},
 		},
@@ -1402,16 +1429,19 @@ func TestDevAuthVerifyToken(t *testing.T) {
 
 			jwToken: &jwt.Token{
 				Claims: jwt.Claims{
-					ID:     "good-rejected",
+					ID:       uuid.NewSHA1("good-rejected"),
+					Subject:  uuid.NewSHA1("baz"),
+					Issuer:   "Tester",
+					IssuedAt: jwt.Time{Time: time.Now()},
+					ExpiresAt: jwt.Time{
+						Time: time.Now().Add(time.Hour),
+					},
 					Device: true,
 				},
 			},
-			token: &model.Token{
-				Id:        "good-rejected",
-				AuthSetId: "foo",
-			},
+			getToken: true,
 			auth: &model.AuthSet{
-				Id:     "foo",
+				Id:     uuid.NewSHA1("good-rejected").String(),
 				Status: model.DevStatusRejected,
 			},
 		},
@@ -1421,21 +1451,24 @@ func TestDevAuthVerifyToken(t *testing.T) {
 
 			jwToken: &jwt.Token{
 				Claims: jwt.Claims{
-					ID:     "good-accepted-decommissioning",
-					Device: true,
+					ID:      uuid.NewSHA1("good-decommissioning"),
+					Subject: uuid.NewSHA1("idk"),
+					Device:  true,
+					Issuer:  "Tester",
+					ExpiresAt: jwt.Time{
+						Time: time.Now().Add(time.Hour),
+					},
 				},
 			},
-			token: &model.Token{
-				Id:        "good-accepted-decommissioning",
-				AuthSetId: "foo",
-			},
+			getToken: true,
 			auth: &model.AuthSet{
-				Id:       "foo",
+				Id: uuid.NewSHA1("good-decommissioning").
+					String(),
 				Status:   model.DevStatusAccepted,
-				DeviceId: "foodev",
+				DeviceId: uuid.NewSHA1("idk").String(),
 			},
 			dev: &model.Device{
-				Id:              "foodev",
+				Id:              uuid.NewSHA1("idk").String(),
 				Decommissioning: true,
 			},
 		},
@@ -1445,7 +1478,8 @@ func TestDevAuthVerifyToken(t *testing.T) {
 
 			jwToken: &jwt.Token{
 				Claims: jwt.Claims{
-					ID: "missing-tenant-claim",
+					ID:      uuid.NewSHA1("missing-tenant"),
+					Subject: uuid.NewSHA1("foo"),
 				},
 			},
 
@@ -1467,7 +1501,6 @@ func TestDevAuthVerifyToken(t *testing.T) {
 				devauth = devauth.WithTenantVerification(nil)
 			}
 
-			// ja.On("FromJWT", tc.tokenString).Return(tc.jwToken, tc.validateErr)
 			ja.On("FromJWT", tc.tokenString).Return(
 				func(s string) *jwt.Token {
 					t.Logf("string: %v return %+v", s, tc.jwToken)
@@ -1480,15 +1513,13 @@ func TestDevAuthVerifyToken(t *testing.T) {
 					tc.jwToken.Claims.ID).Return(nil)
 			}
 
-			if tc.token != nil {
+			if tc.getToken {
 				db.On("GetToken", context.Background(),
 					tc.jwToken.Claims.ID).
-					Return(tc.token, tc.getTokenErr)
-			}
-
-			if tc.token != nil {
+					Return(tc.jwToken, tc.getTokenErr)
 				db.On("GetAuthSetById", context.Background(),
-					tc.token.AuthSetId).Return(tc.auth, tc.getAuthErr)
+					tc.jwToken.ID.String()).
+					Return(tc.auth, tc.getAuthErr)
 				// devauth will ask for a device if auth set is
 				// found and accepted
 				if tc.dev != nil {
@@ -1527,32 +1558,37 @@ func TestDevAuthDecommissionDevice(t *testing.T) {
 		outErr string
 	}{
 		{
-			devId:             "devId1",
+			devId: uuid.NewSHA1("devId1").String(),
+
 			dbUpdateDeviceErr: errors.New("UpdateDevice Error"),
 			outErr:            "UpdateDevice Error",
 		},
 		{
-			devId:                        "devId2",
+			devId: uuid.NewSHA1("devId2").String(),
+
 			dbDeleteAuthSetsForDeviceErr: errors.New("DeleteAuthSetsForDevice Error"),
 			outErr:                       "db delete device authorization sets error: DeleteAuthSetsForDevice Error",
 		},
 		{
-			devId:                   "devId3",
+			devId: uuid.NewSHA1("devId3").String(),
+
 			dbDeleteTokenByDevIdErr: errors.New("DeleteTokenByDevId Error"),
 			outErr:                  "db delete device tokens error: DeleteTokenByDevId Error",
 		},
 		{
-			devId:             "devId4",
+			devId: uuid.NewSHA1("devId4").String(),
+
 			dbUpdateDeviceErr: errors.New("DeleteDevice Error"),
 			outErr:            "DeleteDevice Error",
 		},
 		{
-			devId:                              "devId5",
+			devId: uuid.NewSHA1("devId5").String(),
+
 			coSubmitDeviceDecommisioningJobErr: errors.New("SubmitDeviceDecommisioningJob Error"),
 			outErr:                             "submit device decommissioning job error: SubmitDeviceDecommisioningJob Error",
 		},
 		{
-			devId:           "devId6",
+			devId:           uuid.NewSHA1("devId6").String(),
 			coAuthorization: "Bearer foobar",
 		},
 	}
@@ -1579,6 +1615,7 @@ func TestDevAuthDecommissionDevice(t *testing.T) {
 				Return(tc.coSubmitDeviceDecommisioningJobErr)
 
 			db := mstore.DataStore{}
+			devUUID, _ := uuid.FromString(tc.devId)
 			db.On("UpdateDevice", ctx,
 				model.Device{Id: tc.devId},
 				model.DeviceUpdate{
@@ -1589,7 +1626,7 @@ func TestDevAuthDecommissionDevice(t *testing.T) {
 				tc.devId).Return(
 				tc.dbDeleteAuthSetsForDeviceErr)
 			db.On("DeleteTokenByDevId", ctx,
-				tc.devId).Return(
+				devUUID).Return(
 				tc.dbDeleteTokenByDevIdErr)
 			db.On("DeleteDevice", ctx,
 				tc.devId).Return(
@@ -1916,7 +1953,7 @@ func TestDevAuthProvisionTenant(t *testing.T) {
 			db := mstore.DataStore{}
 			db.On("MigrateTenant", ctxMatcher,
 				mock.AnythingOfType("string"),
-				"1.6.0",
+				"1.7.0",
 			).Return(tc.datastoreError)
 			db.On("WithAutomigrate").Return(&db)
 			devauth := NewDevAuth(&db, nil, nil, Config{})
@@ -1954,68 +1991,68 @@ func TestDevAuthDeleteAuthSet(t *testing.T) {
 		outErr string
 	}{
 		{
-			devId:               "devId1",
-			authId:              "authId1",
+			devId:               uuid.NewSHA1("devId1").String(),
+			authId:              uuid.NewSHA1("authId1").String(),
 			dbGetAuthSetByIdErr: errors.New("GetAuthSetById Error"),
 			outErr:              "db get auth set error: GetAuthSetById Error",
 		},
 		{
-			devId:               "devId2",
-			authId:              "authId2",
+			devId:               uuid.NewSHA1("devId2").String(),
+			authId:              uuid.NewSHA1("authId2").String(),
 			dbGetAuthSetByIdErr: store.ErrAuthSetNotFound,
 			outErr:              store.ErrAuthSetNotFound.Error(),
 		},
 		{
-			devId:                   "devId3",
-			authId:                  "authId3",
+			devId:                   uuid.NewSHA1("devId3").String(),
+			authId:                  uuid.NewSHA1("authId3").String(),
 			authSet:                 &model.AuthSet{Status: model.DevStatusAccepted},
 			dbDeleteTokenByDevIdErr: errors.New("DeleteTokenByDevId Error"),
 			outErr:                  "db delete device tokens error: DeleteTokenByDevId Error",
 		},
 		{
-			devId:                   "devId4",
-			authId:                  "authId4",
+			devId:                   uuid.NewSHA1("devId4").String(),
+			authId:                  uuid.NewSHA1("authId4").String(),
 			authSet:                 &model.AuthSet{Status: model.DevStatusPending},
 			dbDeleteTokenByDevIdErr: errors.New("DeleteTokenByDevId Error"),
 		},
 		{
-			devId:                   "devId5",
-			authId:                  "authId5",
+			devId:                   uuid.NewSHA1("devId5").String(),
+			authId:                  uuid.NewSHA1("authId5").String(),
 			dbDeleteTokenByDevIdErr: store.ErrTokenNotFound,
 		},
 		{
-			devId:                       "devId6",
-			authId:                      "authId6",
+			devId:                       uuid.NewSHA1("devId6").String(),
+			authId:                      uuid.NewSHA1("authId6").String(),
 			dbDeleteAuthSetForDeviceErr: errors.New("DeleteAuthSetsForDevice Error"),
 			outErr:                      "DeleteAuthSetsForDevice Error",
 		},
 		{
-			devId:             "devId8",
-			authId:            "authId8",
+			devId:             uuid.NewSHA1("devId8").String(),
+			authId:            uuid.NewSHA1("authId8").String(),
 			authSet:           &model.AuthSet{Status: model.DevStatusPreauth},
 			dbDeleteDeviceErr: errors.New("DeleteDevice Error"),
 			outErr:            "DeleteDevice Error",
 		},
 		{
-			devId:             "devId9",
-			authId:            "authId9",
+			devId:             uuid.NewSHA1("devId9").String(),
+			authId:            uuid.NewSHA1("authId9").String(),
 			dbDeleteDeviceErr: errors.New("DeleteDevice Error"),
 		},
 		{
-			devId:                "devId10",
-			authId:               "authId10",
+			devId:                uuid.NewSHA1("devId10").String(),
+			authId:               uuid.NewSHA1("authId10").String(),
 			dbGetDeviceStatusErr: errors.New("Get Device Status Error"),
 			outErr:               "Cannot determine device status: Get Device Status Error",
 		},
 		{
-			devId:             "devId11",
-			authId:            "authId11",
+			devId:             uuid.NewSHA1("devId11").String(),
+			authId:            uuid.NewSHA1("authId11").String(),
 			dbUpdateDeviceErr: errors.New("Update Device Error"),
 			outErr:            "failed to update device status: Update Device Error",
 		},
 		{
-			devId:  "devId12",
-			authId: "authId12",
+			devId:  uuid.NewSHA1("devId12").String(),
+			authId: uuid.NewSHA1("authId12").String(),
 		},
 	}
 
@@ -2031,6 +2068,7 @@ func TestDevAuthDeleteAuthSet(t *testing.T) {
 				authSet = tc.authSet
 			}
 
+			devUUID, _ := uuid.FromString(tc.devId)
 			db := mstore.DataStore{}
 			db.On("GetAuthSetById", ctx,
 				tc.authId).Return(
@@ -2040,7 +2078,7 @@ func TestDevAuthDeleteAuthSet(t *testing.T) {
 				tc.devId, tc.authId).Return(
 				tc.dbDeleteAuthSetForDeviceErr)
 			db.On("DeleteTokenByDevId", ctx,
-				tc.devId).Return(
+				devUUID).Return(
 				tc.dbDeleteTokenByDevIdErr)
 			db.On("DeleteDevice", ctx,
 				tc.devId).Return(
@@ -2088,7 +2126,7 @@ func TestDeleteTokens(t *testing.T) {
 	}{
 		"ok, all tenant's devs": {
 			tenantId: "foo",
-			deviceId: "dev-foo",
+			deviceId: uuid.NewSHA1("dev-foo").String(),
 		},
 		"ok, single dev": {
 			tenantId: "foo",
@@ -2099,9 +2137,12 @@ func TestDeleteTokens(t *testing.T) {
 		},
 		"error, single dev": {
 			tenantId:             "foo",
-			deviceId:             "dev-foo",
+			deviceId:             uuid.NewSHA1("dev-foo").String(),
 			dbErrDeleteTokenById: errors.New("db error"),
-			outErr:               errors.New("failed to delete tokens for tenant: foo, device id: dev-foo: db error"),
+			outErr: errors.Errorf(
+				"failed to delete tokens for tenant: foo, "+
+					"device id: %s: db error",
+				uuid.NewSHA1("dev-foo").String()),
 		},
 		"error, all tenant's devs": {
 			tenantId:          "foo",
@@ -2119,7 +2160,8 @@ func TestDeleteTokens(t *testing.T) {
 			ctxMatcher := mtesting.ContextMatcher()
 
 			db := mstore.DataStore{}
-			db.On("DeleteTokenByDevId", ctxMatcher, tc.deviceId).
+			devUUID, _ := uuid.FromString(tc.deviceId)
+			db.On("DeleteTokenByDevId", ctxMatcher, devUUID).
 				Return(tc.dbErrDeleteTokenById)
 			db.On("DeleteTokens", ctxMatcher).
 				Return(tc.dbErrDeleteTokens)

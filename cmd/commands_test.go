@@ -17,35 +17,38 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
-	"github.com/mendersoftware/go-lib-micro/config"
+	//"github.com/mendersoftware/go-lib-micro/config"
 	"github.com/mendersoftware/go-lib-micro/identity"
+	"github.com/mendersoftware/go-lib-micro/mongo/uuid"
 	ctxstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
 	minv "github.com/mendersoftware/deviceauth/client/inventory/mocks"
-	dconfig "github.com/mendersoftware/deviceauth/config"
+	//dconfig "github.com/mendersoftware/deviceauth/config"
+	"github.com/mendersoftware/deviceauth/jwt"
 	"github.com/mendersoftware/deviceauth/model"
 	"github.com/mendersoftware/deviceauth/store"
 	mstore "github.com/mendersoftware/deviceauth/store/mocks"
 	"github.com/mendersoftware/deviceauth/store/mongo"
 )
 
-func TestMaintenance(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping TestMaintenance in short mode.")
-	}
-
-	config.SetDefaults(config.Config, dconfig.Defaults)
-	// Enable setting config values by environment variables
-	config.Config.SetEnvPrefix("DEVICEAUTH")
-	config.Config.AutomaticEnv()
-
-	err := Maintenance(true, "", false)
-	assert.NoError(t, err)
-}
+//func TestMaintenance(t *testing.T) {
+//	if testing.Short() {
+//		t.Skip("skipping TestMaintenance in short mode.")
+//	}
+//
+//	config.SetDefaults(config.Config, dconfig.Defaults)
+//	// Enable setting config values by environment variables
+//	config.Config.SetEnvPrefix("DEVICEAUTH")
+//	config.Config.AutomaticEnv()
+//
+//	err := Maintenance(true, "", false)
+//	assert.NoError(t, err)
+//}
 
 func TestMaintenanceWithDataStore(t *testing.T) {
 	if testing.Short() {
@@ -53,14 +56,14 @@ func TestMaintenanceWithDataStore(t *testing.T) {
 	}
 	datasetDevices := []interface{}{
 		model.Device{
-			Id:              "001",
+			Id:              uuid.NewSHA1("001").String(),
 			IdData:          "001",
 			PubKey:          "001",
 			Status:          model.DevStatusPending,
 			Decommissioning: false,
 		},
 		model.Device{
-			Id:              "002",
+			Id:              uuid.NewSHA1("002").String(),
 			IdData:          "002",
 			PubKey:          "002",
 			Status:          model.DevStatusPending,
@@ -70,32 +73,32 @@ func TestMaintenanceWithDataStore(t *testing.T) {
 
 	datasetAuthSets := []interface{}{
 		model.AuthSet{
-			Id:       "001",
-			DeviceId: "001",
+			Id:       uuid.NewSHA1("001").String(),
+			DeviceId: uuid.NewSHA1("001").String(),
 			IdData:   "001",
 			PubKey:   "001",
 		},
 		model.AuthSet{
-			Id:       "002",
-			DeviceId: "003",
+			Id:       uuid.NewSHA1("002").String(),
+			DeviceId: uuid.NewSHA1("003").String(),
 			IdData:   "001",
 			PubKey:   "002",
 		},
 	}
 
 	datasetTokens := []interface{}{
-		model.Token{
-			Id:        "001",
-			DevId:     "001",
-			AuthSetId: "001",
-			Token:     "foo",
-		},
-		model.Token{
-			Id:        "002",
-			DevId:     "003",
-			AuthSetId: "002",
-			Token:     "bar",
-		},
+		jwt.Token{Claims: jwt.Claims{
+			ID:        uuid.NewSHA1("001"),
+			Subject:   uuid.NewSHA1("001"),
+			Issuer:    "Tester",
+			ExpiresAt: jwt.Time{Time: time.Now().Add(time.Hour)},
+		}},
+		jwt.Token{Claims: jwt.Claims{
+			ID:        uuid.NewSHA1("002"),
+			Subject:   uuid.NewSHA1("003"),
+			Issuer:    "Tester",
+			ExpiresAt: jwt.Time{Time: time.Now().Add(time.Hour)},
+		}},
 	}
 
 	testCases := map[string]struct {

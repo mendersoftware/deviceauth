@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -14,6 +14,7 @@
 package cmd
 
 import (
+	"flag"
 	mtesting "github.com/mendersoftware/go-lib-micro/mongo/testing"
 	"os"
 	"testing"
@@ -25,6 +26,9 @@ var db mtesting.TestDBRunner
 func TestMain(m *testing.M) {
 
 	var status int
+	if !flag.Parsed() {
+		flag.Parse()
+	}
 	if !testing.Short() {
 		status = mtesting.WithDB(func(dbtest mtesting.TestDBRunner) int {
 			db = dbtest
