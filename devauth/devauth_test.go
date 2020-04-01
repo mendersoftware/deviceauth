@@ -271,7 +271,7 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 				PubKey:      pubKey,
 			},
 
-			err: MakeErrDevAuthUnauthorized(errors.New(tenant.MsgErrTokenMissing)),
+			err: MakeErrDevAuthUnauthorized(errors.New("tenant token missing")),
 
 			tenantVerify:          true,
 			tenantVerificationErr: errors.New("should not be called"),
