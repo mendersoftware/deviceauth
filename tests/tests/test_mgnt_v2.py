@@ -2,15 +2,30 @@ from client import ManagementClient
 import bravado
 import json
 import pytest
-from common import Device, DevAuthorizer, \
-    device_auth_req, make_devices, devices, \
-    clean_migrated_db, clean_db, mongo, cli, \
-    management_api, internal_api, device_api, \
-    tenant_foobar, tenant_foobar_devices, tenant_foobar_clean_migrated_db,\
-    get_keypair
+import uuid
+
+from common import (
+    Device,
+    DevAuthorizer,
+    device_auth_req,
+    make_devices,
+    devices,
+    clean_migrated_db,
+    clean_db,
+    mongo,
+    cli,
+    management_api,
+    internal_api,
+    device_api,
+    tenant_foobar,
+    tenant_foobar_devices,
+    tenant_foobar_clean_migrated_db,
+    get_keypair,
+)
 
 from tenantadm import fake_tenantadm
 import orchestrator
+
 
 class TestDeleteDevice(ManagementClient):
     def test_delete_device(self, management_api, devices):
@@ -21,12 +36,11 @@ class TestDeleteDevice(ManagementClient):
         assert ourdev
 
         with orchestrator.run_fake_for_device_id(ourdev.id) as server:
-            rsp = management_api.delete_device(ourdev.id, {
-                'X-MEN-RequestID':'delete_device',
-                'Authorization': 'Bearer foobar',
-                })
-        print('decommission request finished with status:',
-              rsp.status_code)
+            rsp = management_api.delete_device(
+                ourdev.id,
+                {"X-MEN-RequestID": "delete_device", "Authorization": "Bearer foobar",},
+            )
+        print("decommission request finished with status:", rsp.status_code)
         assert rsp.status_code == 204
 
         found = None
@@ -47,17 +61,16 @@ class TestDeleteDevice(ManagementClient):
         assert ourdev
 
         with orchestrator.run_fake_for_device_id(ourdev.id, 500) as server:
-            rsp = management_api.delete_device(ourdev.id, {
-                'X-MEN-RequestID':'delete_device',
-                'Authorization': 'Bearer foobar',
-                })
-        print('decommission request finished with status:',
-              rsp.status_code)
+            rsp = management_api.delete_device(
+                ourdev.id,
+                {"X-MEN-RequestID": "delete_device", "Authorization": "Bearer foobar",},
+            )
+        print("decommission request finished with status:", rsp.status_code)
         assert rsp.status_code == 500
 
     def test_delete_device_nonexistent(self, management_api):
         # try delete a nonexistent device
-        rsp = management_api.delete_device('some-devid-foo')
+        rsp = management_api.delete_device(str(uuid.uuid4()))
         assert rsp.status_code == 404
 
     def test_device_accept_reject_cycle(self, devices, device_api, management_api):
@@ -69,7 +82,7 @@ class TestDeleteDevice(ManagementClient):
         assert dev
         devid = dev.id
 
-        print('found device with ID:', dev.id)
+        print("found device with ID:", dev.id)
         aid = dev.auth_sets[0].id
 
         with orchestrator.run_fake_for_device_id(devid) as server:
@@ -86,14 +99,16 @@ class TestDeleteDevice(ManagementClient):
 
         # reject it now
         _, rsp = management_api.reject_device(devid, aid)
-        print('RSP:', rsp)
+        print("RSP:", rsp)
         assert rsp.status_code == 204
 
         # device is rejected, should get unauthorized
         rsp = device_auth_req(url, da, d)
         assert rsp.status_code == 401
 
-    def test_device_accept_orchestrator_failure(self, devices, device_api, management_api):
+    def test_device_accept_orchestrator_failure(
+        self, devices, device_api, management_api
+    ):
         d, da = devices[0]
         url = device_api.auth_requests_url
 
@@ -102,7 +117,7 @@ class TestDeleteDevice(ManagementClient):
         assert dev
         devid = dev.id
 
-        print('found device with ID:', dev.id)
+        print("found device with ID:", dev.id)
         aid = dev.auth_sets[0].id
 
         status = None
