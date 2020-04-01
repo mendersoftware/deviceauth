@@ -64,6 +64,7 @@ func (t *Time) UnmarshalJSON(b []byte) error {
 func (c *Claims) Valid() error {
 	var uuidNil uuid.UUID
 	if c.Issuer == "" ||
+		c.ID == uuidNil ||
 		c.Subject == uuidNil {
 		return ErrTokenInvalid
 	}

@@ -318,7 +318,7 @@ func (d *DevAuth) SubmitAuthRequest(ctx context.Context, r *model.AuthReq) (stri
 	if authSet.Status == model.DevStatusAccepted {
 		jti, err := uuid.FromString(authSet.Id)
 		if err != nil {
-			return "", ErrAuthSetUUIDInvalid
+			return "", errors.Errorf("authset id: %s", authSet.Id)
 		}
 		sub, err := uuid.FromString(authSet.DeviceId)
 		if err != nil {
@@ -428,11 +428,17 @@ func (d *DevAuth) processPreAuthRequest(ctx context.Context, r *model.AuthReq) (
 			return nil, errors.Wrap(err, "submit device provisioning job error")
 		}
 	}
-
-	// persist the 'accepted' status in both auth set, and device
-	if err := d.db.UpdateAuthSetById(ctx, aset.Id, model.AuthSetUpdate{
+	// Enforce preauthorized auth set to have a UUID type id
+	update := model.AuthSetUpdate{
 		Status: model.DevStatusAccepted,
-	}); err != nil {
+	}
+	if _, err := uuid.FromString(aset.Id); err != nil {
+		// Sneaky migration incoming (should never occur)
+		update.Id = uuid.NewRandom().String()
+		aset.Id = update.Id
+	}
+	// persist the 'accepted' status in both auth set, and device
+	if err := d.db.UpdateAuthSetById(ctx, aset.Id, update); err != nil {
 		return nil, errors.Wrap(err, "failed to update auth set status")
 	}
 
@@ -518,6 +524,7 @@ func (d *DevAuth) processAuthRequest(ctx context.Context, r *model.AuthReq) (*mo
 	}
 
 	areq := &model.AuthSet{
+		Id:           uuid.NewRandom().String(),
 		IdData:       r.IdData,
 		IdDataStruct: idDataStruct,
 		IdDataSha256: idDataSha256,
@@ -1096,7 +1103,8 @@ func (d *DevAuth) DeleteTokens(
 	})
 
 	if deviceID != "" {
-		deviceUUID, err := uuid.FromString(deviceID)
+		var deviceUUID uuid.UUID
+		deviceUUID, err = uuid.FromString(deviceID)
 		if err != nil {
 			return ErrAuthSetUUIDInvalid
 		}
