@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -15,7 +15,9 @@ package jwt
 
 import (
 	"testing"
+	"time"
 
+	"github.com/mendersoftware/go-lib-micro/mongo/uuid"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 )
@@ -23,8 +25,11 @@ import (
 func TestTokenMarshal(t *testing.T) {
 	tok := &Token{
 		Claims: Claims{
-			ID:      "foo",
-			Subject: "valid-subject",
+			ID:      uuid.NewSHA1("foo"),
+			Subject: uuid.NewSHA1("valid-subject"),
+			ExpiresAt: Time{
+				Time: time.Now().Add(time.Hour),
+			},
 		},
 	}
 
@@ -47,8 +52,11 @@ func TestTokenUnmarshal(t *testing.T) {
 	tokin := []byte("some-fake-jwt")
 	tok := &Token{
 		Claims: Claims{
-			ID:      "foo",
-			Subject: "valid-subject",
+			ID:      uuid.NewSHA1("foo"),
+			Subject: uuid.NewSHA1("valid-subject"),
+			ExpiresAt: Time{
+				Time: time.Now().Add(time.Hour),
+			},
 		},
 	}
 
