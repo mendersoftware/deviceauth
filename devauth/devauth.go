@@ -498,6 +498,7 @@ func (d *DevAuth) processAuthRequest(ctx context.Context, r *model.AuthReq) (*mo
 		IdDataSha256: idDataSha256,
 		PubKey:       r.PubKey,
 		DeviceId:     dev.Id,
+		Group:        dev.Group,
 		Status:       model.DevStatusPending,
 		Timestamp:    uto.TimePtr(time.Now()),
 	}

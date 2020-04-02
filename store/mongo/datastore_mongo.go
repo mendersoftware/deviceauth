@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -32,6 +32,7 @@ import (
 
 	"github.com/mendersoftware/deviceauth/model"
 	"github.com/mendersoftware/deviceauth/store"
+	"github.com/mendersoftware/deviceauth/utils/rbac"
 	uto "github.com/mendersoftware/deviceauth/utils/to"
 )
 
@@ -112,28 +113,51 @@ func NewDataStoreMongo(config DataStoreMongoConfig) (*DataStoreMongo, error) {
 }
 
 func (db *DataStoreMongo) GetDevices(ctx context.Context, skip, limit uint, filter store.DeviceFilter) ([]model.Device, error) {
-
+	allowedGroups := ctx.Value(rbac.RBACGroupsContextKey).([]string)
+	l := log.FromContext(ctx)
 	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
 
+	l.Debugf("GetDevices starts with allowedGroups: %q", allowedGroups)
 	res := []model.Device{}
+	var f bson.M
+	if len(allowedGroups) < 1 || filter.Status == "pending" {
+		f = bson.M{
+			"$match": bson.M{
+				"$and": []bson.M{
+					bson.M{"status": filter.Status},
+				},
+			},
+		}
+	} else {
+		f = bson.M{
+			"$match": bson.M{
+				"$and": []bson.M{
+					bson.M{"status": filter.Status},
+					bson.M{"$or": []bson.M{
+						bson.M{"group": bson.M{"$in": allowedGroups}},
+						bson.M{"group": nil},
+					}},
+				},
+			},
+		}
+	}
 
-	pipeline := []bson.D{
-		bson.D{
-			{Key: "$match", Value: filter},
+	pipeline := []bson.M{
+		f,
+		bson.M{
+			"$sort": bson.M{"_id": 1},
 		},
-		bson.D{
-			{Key: "$sort", Value: bson.M{"_id": 1}},
-		},
-		bson.D{
-			{Key: "$skip", Value: skip},
+		bson.M{
+			"$skip": skip,
 		},
 	}
 
 	if limit > 0 {
 		pipeline = append(pipeline,
-			bson.D{{Key: "$limit", Value: limit}})
+			bson.M{"$limit": limit})
 	}
 
+	l.Debugf("db.GetDevices calling aggregate(..,%q)", pipeline)
 	cursor, err := c.Aggregate(ctx, pipeline)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to fetch device list")
@@ -161,6 +185,10 @@ func (db *DataStoreMongo) GetDeviceById(ctx context.Context, id string) (*model.
 		}
 	}
 
+	if !rbac.RBACCanGetDevice(ctx, res) {
+		return nil, store.ErrDevNotFound
+	}
+
 	return &res, nil
 }
 
@@ -178,6 +206,10 @@ func (db *DataStoreMongo) GetDeviceByIdentityDataHash(ctx context.Context, idata
 		} else {
 			return nil, errors.Wrap(err, "failed to fetch device")
 		}
+	}
+
+	if !rbac.RBACCanGetDevice(ctx, res) {
+		return nil, store.ErrDevNotFound
 	}
 
 	return &res, nil
@@ -212,7 +244,20 @@ func (db *DataStoreMongo) UpdateDevice(ctx context.Context,
 	updev.UpdatedTs = uto.TimePtr(time.Now().UTC())
 	update := bson.M{"$set": updev}
 
-	res, err := c.UpdateOne(ctx, bson.M{"_id": d.Id}, update)
+	filter := bson.M{"_id": d.Id}
+	allowedGroups := ctx.Value(rbac.RBACGroupsContextKey).([]string)
+	if len(allowedGroups) > 1 {
+		filter = bson.M{
+			"$and": []bson.M{
+				bson.M{"_id": d.Id},
+				bson.M{"$or": []bson.M{
+					bson.M{"group": bson.M{"$in": allowedGroups}},
+					bson.M{"group": nil},
+				}},
+			},
+		}
+	}
+	res, err := c.UpdateOne(ctx, filter, update)
 	if err != nil {
 		return errors.Wrap(err, "failed to update device")
 	} else if res.MatchedCount < 1 {
@@ -227,6 +272,11 @@ func (db *DataStoreMongo) DeleteDevice(ctx context.Context, id string) error {
 	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
 
 	filter := bson.M{"_id": id}
+	allowedGroups := ctx.Value(rbac.RBACGroupsContextKey).([]string)
+	if len(allowedGroups) > 1 {
+		filter = bson.M{"_id": id, "group": bson.M{"$in": allowedGroups}}
+	}
+
 	result, err := c.DeleteOne(ctx, filter)
 	if err != nil {
 		return errors.Wrap(err, "failed to remove device")
@@ -457,6 +507,9 @@ func (db *DataStoreMongo) GetAuthSetById(ctx context.Context, auth_id string) (*
 			return nil, errors.Wrap(err, "failed to fetch authentication set")
 		}
 	}
+	if !rbac.RBACCanGetDeviceAuthSet(ctx, res) {
+		return nil, errors.Wrap(err, "failed to fetch authentication set")
+	}
 
 	return &res, nil
 }
@@ -527,7 +580,45 @@ func (db *DataStoreMongo) DeleteAuthSetForDevice(ctx context.Context, devId stri
 	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
 
 	filter := model.AuthSet{Id: authId, DeviceId: devId}
-	result, err := c.DeleteOne(ctx, filter)
+
+	var err error
+	var result *mongo.DeleteResult
+
+	allowedGroups := ctx.Value(rbac.RBACGroupsContextKey).([]string)
+	if len(allowedGroups) > 1 {
+		f := bson.D{
+			{
+				Key: "$match",
+				Value: bson.M{
+					"$and": []bson.D{
+						bson.D{
+							{
+								Key: "$match",
+								Value: bson.M{
+									"$and": []bson.M{
+										{"id": authId},
+										{"device_id": devId},
+									},
+								},
+							},
+						},
+						bson.D{
+							{
+								Key: "group",
+								Value: bson.M{
+									"$in": allowedGroups,
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+		result, err = c.DeleteOne(ctx, f)
+	} else {
+		result, err = c.DeleteOne(ctx, filter)
+	}
+
 	if err != nil {
 		return errors.Wrap(err, "failed to remove authentication set for device")
 	} else if result.DeletedCount < 1 {
@@ -628,13 +719,26 @@ func (db *DataStoreMongo) GetLimit(ctx context.Context, name string) (*model.Lim
 	return &lim, nil
 }
 
-func (db *DataStoreMongo) GetDevCountByStatus(ctx context.Context, status string) (int, error) {
+func (db *DataStoreMongo) GetDevCountByStatus(ctx context.Context,
+	status string) (int, error) {
+	allowedGroups := ctx.Value(rbac.RBACGroupsContextKey).([]string)
+	l := log.FromContext(ctx)
+	l.Debugf("GetDevCountByStatus allowedGroups: %q/%q", ctx.Value(rbac.RBACGroupsContextKey).([]string), allowedGroups)
+
 	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
+
+	var matchAllowedGroups bson.D
+
+	if len(allowedGroups) > 0 && status != "pending" && status != "preauthorized" {
+		matchAllowedGroups = bson.D{{Key: "$match", Value: bson.M{"group": bson.M{"$in": allowedGroups}}}}
+	} else {
+		matchAllowedGroups = bson.D{{Key: "$match", Value: bson.M{}}}
+	}
 
 	// if status == "", fallback to a simple count of all devices
 	if status == "" {
 		devsColl := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
-		count, err := devsColl.CountDocuments(ctx, bson.D{})
+		count, err := devsColl.CountDocuments(ctx, matchAllowedGroups)
 		if err != nil {
 			return 0, err
 		}
@@ -649,7 +753,8 @@ func (db *DataStoreMongo) GetDevCountByStatus(ctx context.Context, status string
 	// {_id: {"devid": "dev1", "status": "pending"}, count: 2}
 	// {_id: {"devid": "dev1", "status": "rejected"}, count: 0}
 	// etc. for all devs
-	grp := bson.D{
+	var grp bson.D
+	grp = bson.D{
 		{Key: "$group", Value: bson.D{
 			{Key: "_id", Value: bson.M{
 				"devid":  "$device_id",
@@ -760,8 +865,9 @@ func (db *DataStoreMongo) GetDevCountByStatus(ctx context.Context, status string
 		{Key: "$count", Value: "count"}}
 
 	var resp []bson.M
+	l.Debugf("GetDevCountByStatus(%s) running aggregate: %q", status, []bson.D{matchAllowedGroups, grp, proj, sum, filt, cnt})
 
-	cursor, err := c.Aggregate(ctx, []bson.D{grp, proj, sum, filt, cnt})
+	cursor, err := c.Aggregate(ctx, []bson.D{matchAllowedGroups, grp, proj, sum, filt, cnt})
 	if err != nil {
 		return 0, err
 	}
@@ -778,20 +884,37 @@ func (db *DataStoreMongo) GetDevCountByStatus(ctx context.Context, status string
 	return 0, err
 }
 
-func (db *DataStoreMongo) GetDeviceStatus(ctx context.Context, devId string) (string, error) {
+func (db *DataStoreMongo) GetDeviceStatus(ctx context.Context,
+	devId string) (string, error) {
 	var statuses = map[string]int{}
 
+	allowedGroups := ctx.Value(rbac.RBACGroupsContextKey).([]string)
 	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
 
+	var match bson.D
+
+	l := log.FromContext(ctx)
+	l.Debugf("GetDeviceStatus(ctx,%s): starting with allowedGroups: %q", devId, allowedGroups)
 	// get device auth sets; group by status
-
-	filter := model.AuthSet{
-		DeviceId: devId,
+	if len(allowedGroups) > 1 {
+		filter := bson.D{
+			{Key: "$and", Value: []bson.D{
+				bson.D{{Key: "device_id", Value: devId}},
+				bson.D{{Key: "group", Value: bson.D{{Key: "$in", Value: allowedGroups}}}},
+			}},
+		}
+		match = bson.D{
+			{Key: "$match", Value: filter},
+		}
+	} else {
+		filter := model.AuthSet{
+			DeviceId: devId,
+		}
+		match = bson.D{
+			{Key: "$match", Value: filter},
+		}
 	}
 
-	match := bson.D{
-		{Key: "$match", Value: filter},
-	}
 	group := bson.D{
 		{Key: "$group", Value: bson.D{
 			{Key: "_id", Value: "$status"},
@@ -808,6 +931,7 @@ func (db *DataStoreMongo) GetDeviceStatus(ctx context.Context, devId string) (st
 		Value  int    `bson:"count"`
 	}
 	cursor, err := c.Aggregate(ctx, pipeline)
+	l.Infof("GetDeviceStatus Aggregate returned: cursor,'%v'", err)
 	if err != nil {
 		return "", err
 	}
@@ -834,15 +958,40 @@ func (db *DataStoreMongo) GetDeviceStatus(ctx context.Context, devId string) (st
 	return status, nil
 }
 
-func (db *DataStoreMongo) GetAuthSets(ctx context.Context, skip, limit int, filter store.AuthSetFilter) ([]model.DevAdmAuthSet, error) {
+func (db *DataStoreMongo) GetAuthSets(ctx context.Context, skip,
+	limit int,
+	filter store.AuthSetFilter) ([]model.DevAdmAuthSet, error) {
+	allowedGroups := ctx.Value(rbac.RBACGroupsContextKey).([]string)
 	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
 
 	res := []model.AuthSet{}
+	f := bson.D{
+		{Key: "$match", Value: filter},
+	}
+	if len(allowedGroups) > 1 {
+		fm := bson.D{
+			{
+				Key: "$match",
+				Value: bson.M{
+					"$and": []bson.D{
+						f,
+						bson.D{
+							{
+								Key: "group",
+								Value: bson.M{
+									"$in": allowedGroups,
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+		f = fm
+	}
 
 	pipeline := []bson.D{
-		bson.D{
-			{Key: "$match", Value: filter},
-		},
+		f,
 		bson.D{
 			{Key: "$sort", Value: bson.M{"_id": 1}},
 		},
@@ -874,6 +1023,35 @@ func (db *DataStoreMongo) GetAuthSets(ctx context.Context, skip, limit int, filt
 	}
 
 	return resDevAdm, nil
+}
+
+func (db *DataStoreMongo) SetDeviceGroup(ctx context.Context, deviceId string, groupName string) error {
+	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
+
+	l := log.FromContext(ctx)
+	l.Debugf("SetDeviceGroup(%q,..) changing %q for device %s", ctx.Value(rbac.RBACGroupsContextKey).([]string), groupName, deviceId)
+
+	var err error
+	var res *mongo.UpdateResult
+
+	if groupName == "" {
+		l.Debugf("SetDeviceGroup unset %s for device %s", groupName, deviceId)
+		res, err = c.UpdateOne(ctx,
+			bson.M{"_id": deviceId},
+			bson.M{"$unset": bson.M{"group": 1}})
+	} else {
+		l.Debugf("SetDeviceGroup set %s for device %s", groupName, deviceId)
+		res, err = c.UpdateOne(ctx,
+			bson.M{"_id": deviceId},
+			bson.M{"$set": bson.M{"group": groupName}})
+	}
+	if err != nil {
+		return errors.Wrap(err, "failed to update device")
+	} else if res.MatchedCount < 1 {
+		return store.ErrDevNotFound
+	}
+
+	return nil
 }
 
 func getDeviceStatus(statuses map[string]int) (string, error) {

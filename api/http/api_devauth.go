@@ -14,6 +14,7 @@
 package http
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -42,6 +43,7 @@ const (
 	uriTenants            = "/api/internal/v1/devauth/tenants"
 	uriTenantDeviceStatus = "/api/internal/v1/devauth/tenants/:tid/devices/:did/status"
 	uriTenantDevices      = "/api/internal/v1/devauth/tenants/:tid/devices"
+	uriSetDeviceGroup     = "/api/internal/v1/devauth/tenants/:tid/devices/:did/group/:name"
 
 	// management API v2
 	v2uriDevices             = "/api/management/v2/devauth/devices"
@@ -90,6 +92,9 @@ func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
 		rest.Post(uriTenants, d.ProvisionTenantHandler),
 		rest.Get(uriTenantDeviceStatus, d.GetTenantDeviceStatus),
 		rest.Get(uriTenantDevices, d.GetTenantDevicesHandler),
+
+		rest.Post(uriSetDeviceGroup, d.SetDeviceGroupHandler),
+		rest.Delete(uriSetDeviceGroup, d.UnSetDeviceGroupHandler),
 
 		// API v2
 		rest.Get(v2uriDevicesCount, d.GetDevicesCountHandler),
@@ -648,6 +653,61 @@ func (d *DevAuthApiHandlers) GetTenantDevicesHandler(w rest.ResponseWriter, r *r
 	r.Request = r.WithContext(ctx)
 
 	d.GetDevicesV2Handler(w, r)
+}
+
+func getTenantContext(ctx context.Context, tenantId string) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	id := &identity.Identity{
+		Tenant: tenantId,
+	}
+
+	ctx = identity.WithContext(ctx, id)
+
+	return ctx
+}
+
+func (d *DevAuthApiHandlers) SetDeviceGroupHandler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+	l := log.FromContext(ctx)
+
+	defer r.Body.Close()
+
+	tenantId := r.PathParam("tid")
+	groupName := r.PathParam("name")
+	deviceId := r.PathParam("did")
+
+	ctx = getTenantContext(ctx, tenantId)
+	l.Debugf("SetDeviceGroupHandler setting %s for device %s", groupName, deviceId)
+	err := d.db.SetDeviceGroup(ctx, deviceId, groupName)
+	if err != nil {
+		rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func (d *DevAuthApiHandlers) UnSetDeviceGroupHandler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+	l := log.FromContext(ctx)
+
+	defer r.Body.Close()
+
+	tenantId := r.PathParam("tid")
+	groupName := r.PathParam("name")
+	deviceId := r.PathParam("did")
+
+	ctx = getTenantContext(ctx, tenantId)
+	l.Debugf("UnSetDeviceGroupHandler removing %s from %s", deviceId, groupName)
+	err := d.db.SetDeviceGroup(ctx, deviceId, "")
+	if err != nil {
+		rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }
 
 // Validate status.

@@ -37,6 +37,7 @@ type AuthSet struct {
 	DeviceId     string                 `json:"-" bson:"device_id,omitempty"`
 	Timestamp    *time.Time             `json:"ts" bson:"ts,omitempty"`
 	Status       string                 `json:"status" bson:"status,omitempty"`
+	Group        string                 `json:"-" bson:"group,omitempty"`
 }
 
 type AuthSetUpdate struct {

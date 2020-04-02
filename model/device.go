@@ -40,6 +40,7 @@ type Device struct {
 	CreatedTs       time.Time              `json:"created_ts" bson:"created_ts,omitempty"`
 	UpdatedTs       time.Time              `json:"updated_ts" bson:"updated_ts,omitempty"`
 	AuthSets        []AuthSet              `json:"auth_sets" bson:"-"`
+	Group           string                 `json:"group" bson:",omitempty"`
 }
 
 type DeviceUpdate struct {

@@ -17,8 +17,10 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/mendersoftware/deviceauth/utils/rbac"
 	"github.com/mendersoftware/go-lib-micro/accesslog"
 	mctx "github.com/mendersoftware/go-lib-micro/context"
 	ctxhttpheader "github.com/mendersoftware/go-lib-micro/context/httpheader"
@@ -30,8 +32,9 @@ import (
 )
 
 const (
-	EnvProd = "prod"
-	EnvDev  = "dev"
+	EnvProd                = "prod"
+	EnvDev                 = "dev"
+	RBACGroupNameSeparator = ","
 )
 
 var (
@@ -116,6 +119,7 @@ var (
 		&mctx.UpdateContextMiddleware{
 			Updates: []mctx.UpdateContextFunc{
 				preserveHeaders,
+				rbacContextUpdate,
 			},
 		},
 		&identity.IdentityMiddleware{
@@ -156,4 +160,13 @@ func SetupMiddleware(api *rest.Api, mwtype string) error {
 
 func preserveHeaders(ctx context.Context, r *rest.Request) context.Context {
 	return ctxhttpheader.WithContext(ctx, r.Header, "Authorization")
+}
+
+func rbacContextUpdate(ctx context.Context, r *rest.Request) context.Context {
+	groupNames := r.Header.Get(rbac.RBACGroupsHeaderKey)
+	var allowedGroups []string
+	if len(groupNames) > 1 {
+		allowedGroups = strings.Split(groupNames, RBACGroupNameSeparator)
+	}
+	return context.WithValue(ctx, rbac.RBACGroupsContextKey, allowedGroups)
 }

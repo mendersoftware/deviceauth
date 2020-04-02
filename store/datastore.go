@@ -119,6 +119,8 @@ type DataStore interface {
 
 	GetAuthSets(ctx context.Context, skip, limit int, filter AuthSetFilter) ([]model.DevAdmAuthSet, error)
 
+	SetDeviceGroup(ctx context.Context, deviceId string, groupName string) error
+
 	GetTenantDbs() ([]string, error)
 
 	MigrateTenant(ctx context.Context, version string, tenant string) error
