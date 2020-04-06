@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -40,6 +40,7 @@ type AuthSet struct {
 }
 
 type AuthSetUpdate struct {
+	Id           string                 `bson:"id,omitempty"`
 	IdData       string                 `bson:"id_data,omitempty"`
 	IdDataStruct map[string]interface{} `bson:"id_data_struct,omitempty"`
 	IdDataSha256 []byte                 `bson:"id_data_sha256,omitempty"`

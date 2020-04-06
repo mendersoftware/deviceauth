@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -362,11 +362,11 @@ func (d *DevAuthApiHandlers) DeleteTokenHandler(w rest.ResponseWriter, r *rest.R
 
 	l := log.FromContext(ctx)
 
-	tokenId := r.PathParam("id")
-
-	err := d.devAuth.RevokeToken(ctx, tokenId)
+	tokenID := r.PathParam("id")
+	err := d.devAuth.RevokeToken(ctx, tokenID)
 	if err != nil {
-		if err == store.ErrTokenNotFound {
+		if err == store.ErrTokenNotFound ||
+			err == devauth.ErrAuthSetUUIDInvalid {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}

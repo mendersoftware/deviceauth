@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -167,19 +167,6 @@ func decommissioningCleanupDryRun(db *mongo.DataStoreMongo, dbName string) error
 		}
 	}
 
-	//tokens
-	tokenIds, err := db.GetBrokenTokens(dbName)
-	if err != nil {
-		return err
-	}
-
-	if len(tokenIds) > 0 {
-		fmt.Println("tokens to be removed:")
-		for _, tokenId := range tokenIds {
-			fmt.Println(tokenId)
-		}
-	}
-
 	return nil
 }
 
@@ -193,10 +180,6 @@ func decommissioningCleanupExecute(db *mongo.DataStoreMongo, dbName string) erro
 	}
 
 	if err := db.DeleteBrokenAuthSets(dbName); err != nil {
-		return err
-	}
-
-	if err := db.DeleteBrokenTokens(dbName); err != nil {
 		return err
 	}
 

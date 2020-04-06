@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -25,12 +25,14 @@ import (
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
+	"github.com/mendersoftware/go-lib-micro/mongo/uuid"
 	ctxstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
+	"github.com/mendersoftware/deviceauth/jwt"
 	"github.com/mendersoftware/deviceauth/model"
 	"github.com/mendersoftware/deviceauth/store"
 	uto "github.com/mendersoftware/deviceauth/utils/to"
@@ -42,12 +44,58 @@ const (
 
 // data set
 var (
-	dev1   = model.NewDevice("id1", "idData1", "")
-	dev2   = model.NewDevice("id2", "idData2", "")
-	token1 = model.NewToken("id1", "devId1", "token1")
-	token2 = model.NewToken("id2", "devId2", "token2")
+	dev1   = model.NewDevice(uuid.NewSHA1("devID1").String(), "idData1", "")
+	dev2   = model.NewDevice(uuid.NewSHA1("devID2").String(), "idData2", "")
+	token1 = &jwt.Token{Claims: jwt.Claims{
+		ID:        uuid.NewSHA1("id1"),
+		Subject:   uuid.NewSHA1("devID1"),
+		ExpiresAt: jwt.Time{Time: time.Now().Add(time.Hour * 24)},
+		IssuedAt:  jwt.Time{Time: time.Now()},
+		Issuer:    "Mender testing",
+	}}
+	token2 = &jwt.Token{Claims: jwt.Claims{
+		ID:        uuid.NewSHA1("id2"),
+		Subject:   uuid.NewSHA1("devID2"),
+		ExpiresAt: jwt.Time{Time: time.Now().Add(time.Hour * 24)},
+		IssuedAt:  jwt.Time{Time: time.Now()},
+		Issuer:    "Mender testing",
+	}}
 	tenant = "foo"
 )
+
+func assertEqualTokens(t *testing.T, expected, actual []jwt.Token) bool {
+	var ret bool = true
+	for _, ex := range expected {
+		var a *jwt.Token
+		for _, act := range actual {
+			if act.ID == ex.ID {
+				a = &act
+				break
+			}
+		}
+		if !assert.NotNil(t, a, "Expected token not found: %v", ex) {
+			ret = false
+			continue
+		}
+		ret = ret && assert.Equal(t, ex.Subject, a.Subject)
+		ret = ret && assert.Equal(t, ex.Audience, a.Audience)
+		ret = ret && assert.WithinDuration(t,
+			ex.ExpiresAt.Time,
+			a.ExpiresAt.Time, time.Second)
+		ret = ret && assert.WithinDuration(t,
+			ex.IssuedAt.Time,
+			a.IssuedAt.Time, time.Second)
+		ret = ret && assert.WithinDuration(t,
+			ex.NotBefore.Time,
+			a.NotBefore.Time, time.Second)
+		ret = ret && assert.Equal(t, ex.Issuer, a.Issuer)
+		ret = ret && assert.Equal(t, ex.Scope, a.Scope)
+		ret = ret && assert.Equal(t, ex.Tenant, a.Tenant)
+
+		ret = ret && assert.Equal(t, ex.Device, a.Device)
+	}
+	return ret
+}
 
 // setup devices
 func setUpDevices(ctx context.Context, client *mongo.Client) error {
@@ -345,30 +393,21 @@ func TestStoreAddToken(t *testing.T) {
 	}
 
 	//setup
-	token := model.Token{
-		Id:    "123",
-		DevId: "devId",
-		Token: "token",
-	}
-
 	ctx := identity.WithContext(context.Background(), &identity.Identity{
 		Tenant: "foo",
 	})
 	d := getDb(ctx)
 
-	err := d.AddToken(ctx, token)
+	err := d.AddToken(ctx, token1)
 	assert.NoError(t, err, "failed to add token")
 
 	//verify
-	var found model.Token
+	var found jwt.Token
 
 	c := d.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbTokensColl)
-	err = c.FindOne(ctx, bson.M{"_id": token.Id}).Decode(&found)
+	err = c.FindOne(ctx, bson.M{"_id": token1.ID}).Decode(&found)
 	assert.NoError(t, err, "failed to find token")
-	assert.Equal(t, found.Id, token.Id)
-	assert.Equal(t, found.DevId, token.DevId)
-	assert.Equal(t, found.Token, token.Token)
-
+	assertEqualTokens(t, []jwt.Token{*token1}, []jwt.Token{found})
 }
 
 func TestStoreGetToken(t *testing.T) {
@@ -385,25 +424,25 @@ func TestStoreGetToken(t *testing.T) {
 	assert.NoError(t, err, "failed to setup input data")
 
 	testCases := []struct {
-		tokenId       string
+		tokenID       uuid.UUID
 		tenant        string
-		expectedToken *model.Token
+		expectedToken *jwt.Token
 	}{
 		{
-			tokenId:       token1.Id,
+			tokenID:       token1.ID,
 			tenant:        tenant,
 			expectedToken: token1,
 		},
 		{
-			tokenId: token1.Id,
+			tokenID: token1.ID,
 		},
 		{
-			tokenId:       token2.Id,
+			tokenID:       token2.ID,
 			tenant:        tenant,
 			expectedToken: token2,
 		},
 		{
-			tokenId: "id3",
+			tokenID: uuid.NewSHA1("id3"),
 			tenant:  tenant,
 		},
 	}
@@ -418,14 +457,22 @@ func TestStoreGetToken(t *testing.T) {
 				})
 			}
 
-			token, err := d.GetToken(ctx, tc.tokenId)
+			token, err := d.GetToken(ctx, tc.tokenID)
 			if tc.expectedToken != nil {
 				assert.NoError(t, err, "failed to get token")
 			} else {
 				assert.Equal(t, store.ErrTokenNotFound, err)
 			}
 
-			assert.Equal(t, tc.expectedToken, token)
+			if tc.expectedToken == nil {
+				assert.Nil(t, tc.expectedToken)
+			} else {
+				assertEqualTokens(
+					t,
+					[]jwt.Token{*tc.expectedToken},
+					[]jwt.Token{*token},
+				)
+			}
 		})
 	}
 }
@@ -444,26 +491,26 @@ func TestStoreDeleteToken(t *testing.T) {
 	assert.NoError(t, err, "failed to setup input data")
 
 	testCases := []struct {
-		tokenId string
+		tokenID uuid.UUID
 		tenant  string
 		err     bool
 	}{
 		{
-			tokenId: token1.Id,
+			tokenID: token1.ID,
 			tenant:  tenant,
 			err:     false,
 		},
 		{
-			tokenId: token1.Id,
+			tokenID: token1.ID,
 			err:     true,
 		},
 		{
-			tokenId: token2.Id,
+			tokenID: token2.ID,
 			tenant:  tenant,
 			err:     false,
 		},
 		{
-			tokenId: "id3",
+			tokenID: uuid.NewSHA1("id3"),
 			tenant:  tenant,
 			err:     true,
 		},
@@ -479,7 +526,7 @@ func TestStoreDeleteToken(t *testing.T) {
 				})
 			}
 
-			err := d.DeleteToken(ctx, tc.tokenId)
+			err := d.DeleteToken(ctx, tc.tokenID)
 			if tc.err {
 				assert.Equal(t, store.ErrTokenNotFound, err)
 			} else {
@@ -494,25 +541,17 @@ func TestStoreDeleteTokens(t *testing.T) {
 		t.Skip("skipping TestDeleteTokens in short mode.")
 	}
 
-	someTokens := []interface{}{
-		model.Token{
-			Id:        "id1",
-			DevId:     "devId1",
-			AuthSetId: "aId1-1",
-			Token:     "token1-1",
-		},
-		model.Token{
-			Id:        "id2",
-			DevId:     "devId1",
-			AuthSetId: "aId1-2",
-			Token:     "token1-2",
-		},
-		model.Token{
-			Id:        "id3",
-			DevId:     "devId2",
-			AuthSetId: "aId2-1",
-			Token:     "token2-1",
-		},
+	someTokens := bson.A{
+		token1,
+		token2,
+		&jwt.Token{Claims: jwt.Claims{
+			ID:      uuid.NewSHA1("id3"),
+			Subject: uuid.NewSHA1("devId2"),
+			Issuer:  "Mender testing",
+			ExpiresAt: jwt.Time{
+				Time: time.Now().Add(time.Hour),
+			},
+		}},
 	}
 
 	testCases := map[string]struct {
@@ -548,7 +587,7 @@ func TestStoreDeleteTokens(t *testing.T) {
 
 			err := d.DeleteTokens(ctx)
 			assert.NoError(t, err)
-			var out []model.Token
+			var out []jwt.Token
 
 			c := d.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbTokensColl)
 
@@ -568,69 +607,53 @@ func TestStoreDeleteTokenByDevId(t *testing.T) {
 	}
 
 	inTokens := bson.A{
-		model.Token{
-			Id:        "id1",
-			DevId:     "devId1",
-			AuthSetId: "aId1-1",
-			Token:     "token1-1",
-		},
-		model.Token{
-			Id:        "id2",
-			DevId:     "devId1",
-			AuthSetId: "aId1-2",
-			Token:     "token1-2",
-		},
-		model.Token{
-			Id:        "id3",
-			DevId:     "devId2",
-			AuthSetId: "aId2-1",
-			Token:     "token2-1",
-		},
+		token1,
+		token2,
+		&jwt.Token{Claims: jwt.Claims{
+			ID:      uuid.NewSHA1("id3"),
+			Subject: uuid.NewSHA1("devID2"),
+			Issuer:  "Mender testing",
+			ExpiresAt: jwt.Time{
+				Time: time.Now().Add(time.Hour),
+			},
+		}},
 	}
 
 	testCases := []struct {
-		devId  string
+		devID  uuid.UUID
 		tenant string
 
-		outTokens []model.Token
+		outTokens []jwt.Token
 		err       error
 	}{
 		{
-			devId:  "devId1",
+			devID:  token1.Subject,
 			tenant: "tenant-foo",
 
-			outTokens: []model.Token{
-				model.Token{
-					Id:        "id3",
-					DevId:     "devId2",
-					AuthSetId: "aId2-1",
-					Token:     "token2-1",
-				},
+			outTokens: []jwt.Token{
+				*token2,
+				jwt.Token{Claims: jwt.Claims{
+					ID:      uuid.NewSHA1("id3"),
+					Subject: uuid.NewSHA1("devID2"),
+					Issuer:  "Mender testing",
+					ExpiresAt: jwt.Time{
+						Time: time.Now().Add(time.Hour),
+					},
+				}},
 			},
 			err: nil,
 		},
 		{
-			devId:  "devId2",
+			devID:  token2.Subject,
 			tenant: "tenant-foo",
 
-			outTokens: []model.Token{
-				model.Token{
-					Id:        "id1",
-					DevId:     "devId1",
-					AuthSetId: "aId1-1",
-					Token:     "token1-1",
-				},
-				model.Token{
-					Id:        "id2",
-					DevId:     "devId1",
-					AuthSetId: "aId1-2",
-					Token:     "token1-2",
-				},
+			outTokens: []jwt.Token{
+				*token1,
 			},
 			err: nil,
 		},
 		{
-			devId: "devIdNotFound",
+			devID: uuid.NewSHA1("devID3"),
 
 			err: store.ErrTokenNotFound,
 		},
@@ -651,12 +674,12 @@ func TestStoreDeleteTokenByDevId(t *testing.T) {
 			_, err := c.InsertMany(ctx, inTokens)
 			assert.NoError(t, err)
 
-			err = d.DeleteTokenByDevId(ctx, tc.devId)
+			err = d.DeleteTokenByDevId(ctx, tc.devID)
 			if tc.err != nil {
 				assert.Equal(t, store.ErrTokenNotFound, err)
 			} else {
 				assert.NoError(t, err)
-				var out []model.Token
+				var out []jwt.Token
 
 				assert.NoError(t, err)
 				cursor, err := c.Find(ctx, bson.M{})
@@ -664,7 +687,7 @@ func TestStoreDeleteTokenByDevId(t *testing.T) {
 				err = cursor.All(ctx, &out)
 				assert.NoError(t, err)
 
-				assert.Equal(t, tc.outTokens, out)
+				assertEqualTokens(t, tc.outTokens, out)
 			}
 		})
 	}
@@ -717,7 +740,7 @@ func TestStoreMigrate(t *testing.T) {
 		DbVersion + " no automigrate": {
 			automigrate: false,
 			version:     DbVersion,
-			err:         "failed to apply migrations: db needs migration: deviceauth has version 0.0.0, needs version 1.6.0",
+			err:         "failed to apply migrations: db needs migration: deviceauth has version 0.0.0, needs version 1.7.0",
 		},
 		DbVersion + " multitenant": {
 			automigrate: true,
@@ -729,7 +752,7 @@ func TestStoreMigrate(t *testing.T) {
 			automigrate: false,
 			tenantDbs:   []string{"deviceauth-tenant1id", "deviceauth-tenant2id"},
 			version:     DbVersion,
-			err:         "failed to apply migrations: db needs migration: deviceauth-tenant1id has version 0.0.0, needs version 1.6.0",
+			err:         "failed to apply migrations: db needs migration: deviceauth-tenant1id has version 0.0.0, needs version 1.7.0",
 		},
 		"0.1 error": {
 			automigrate: true,
@@ -875,7 +898,7 @@ func TestStoreGetDevices(t *testing.T) {
 
 	devsCountByStatus := make(map[string]int)
 
-	devs_list := make([]model.Device, 0, devCount)
+	devsList := make([]model.Device, 0, devCount)
 
 	// populate DB with a set of devices
 	for i := 0; i < devCount; i++ {
@@ -886,7 +909,7 @@ func TestStoreGetDevices(t *testing.T) {
 			Status: randDevStatus(),
 		}
 
-		devs_list = append(devs_list, dev)
+		devsList = append(devsList, dev)
 		err := db.AddDevice(ctx, dev)
 		assert.NoError(t, err)
 		devsCountByStatus[dev.Status]++
@@ -973,7 +996,7 @@ func TestStoreGetDevices(t *testing.T) {
 					// make sure that ID is not empty
 					assert.NotEmpty(t, dbdevs[dbidx].Id)
 					// clear it now so that next assert does not fail
-					assert.EqualValues(t, devs_list[i], dbdevs[dbidx])
+					assert.EqualValues(t, devsList[i], dbdevs[dbidx])
 				}
 			}
 		})

@@ -28,3 +28,5 @@ _testmain.go
 profile.cov
 gover.coverprofile
 profile.coverprofile
+
+.dir-locals.el
