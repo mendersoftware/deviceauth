@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -37,6 +37,11 @@ type AuthSet struct {
 	DeviceId     string                 `json:"-" bson:"device_id,omitempty"`
 	Timestamp    *time.Time             `json:"ts" bson:"ts,omitempty"`
 	Status       string                 `json:"status" bson:"status,omitempty"`
+}
+
+type DevAuthSet struct {
+	Id       string `json:"id" bson:"_id,omitempty"`
+	DeviceId string `json:"device_id" bson:"device_id,omitempty"`
 }
 
 type AuthSetUpdate struct {
