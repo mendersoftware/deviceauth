@@ -74,24 +74,24 @@ class TestDeleteDevice(ManagementClient):
 
         with orchestrator.run_fake_for_device_id(devid) as server:
             _, rsp = management_api.accept_device(devid, aid)
-        assert rsp.status_code == 204
+            assert rsp.status_code == 204
 
-        # device is accepted, we should get a token now
-        rsp = device_auth_req(url, da, d)
-        assert rsp.status_code == 200
+            # device is accepted, we should get a token now
+            rsp = device_auth_req(url, da, d)
+            assert rsp.status_code == 200
 
-        da.parse_rsp_payload(d, rsp.text)
+            da.parse_rsp_payload(d, rsp.text)
 
-        assert len(d.token) > 0
+            assert len(d.token) > 0
 
-        # reject it now
-        _, rsp = management_api.reject_device(devid, aid)
-        print('RSP:', rsp)
-        assert rsp.status_code == 204
+            # reject it now
+            _, rsp = management_api.reject_device(devid, aid)
+            print('RSP:', rsp)
+            assert rsp.status_code == 204
 
-        # device is rejected, should get unauthorized
-        rsp = device_auth_req(url, da, d)
-        assert rsp.status_code == 401
+            # device is rejected, should get unauthorized
+            rsp = device_auth_req(url, da, d)
+            assert rsp.status_code == 401
 
     def test_device_accept_orchestrator_failure(self, devices, device_api, management_api):
         d, da = devices[0]

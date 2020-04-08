@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -52,6 +52,8 @@ const (
 	v2uriToken               = "/api/management/v2/devauth/tokens/:id"
 	v2uriDevicesLimit        = "/api/management/v2/devauth/limits/:name"
 
+	v3uriDeviceStatus = "/api/management/v3/devauth/devices/:status"
+
 	HdrAuthReqSign = "X-MEN-Signature"
 )
 
@@ -102,6 +104,8 @@ func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
 		rest.Get(v2uriDeviceAuthSetStatus, d.GetAuthSetStatusHandler),
 		rest.Delete(v2uriToken, d.DeleteTokenHandler),
 		rest.Get(v2uriDevicesLimit, d.GetLimitHandler),
+
+		rest.Put(v3uriDeviceStatus, d.DeviceStatusHandler),
 	}
 
 	app, err := rest.MakeRouter(
@@ -448,6 +452,56 @@ func (d *DevAuthApiHandlers) UpdateDeviceStatusHandler(w rest.ResponseWriter, r 
 			rest_utils.RestErrWithLogInternal(w, r, l, err)
 		}
 		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func isValidStatus(status string) bool {
+	return status == "rejected" || status == "accepted"
+}
+
+func (d *DevAuthApiHandlers) DeviceStatusHandler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+
+	l := log.FromContext(ctx)
+
+	status := r.PathParam("status")
+	if !isValidStatus(status) {
+		err := errors.New("failed to decode authsets")
+		rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		return
+	}
+
+	var authSets []model.DevAuthSet
+	err := r.DecodeJsonPayload(&authSets)
+	if err != nil {
+		err = errors.Wrap(err, "failed to decode authsets")
+		rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		return
+	}
+
+	for _, auth := range authSets {
+		if status == "rejected" {
+			err = d.devAuth.RejectDeviceAuth(ctx, auth.DeviceId, auth.Id)
+		}
+		if status == "accepted" {
+			err = d.devAuth.AcceptDeviceAuth(ctx, auth.DeviceId, auth.Id)
+		}
+		if err != nil {
+			switch err {
+			case store.ErrDevNotFound, store.ErrAuthSetNotFound:
+				rest_utils.RestErrWithLog(w, r, l, err, http.StatusNotFound)
+			case devauth.ErrDevIdAuthIdMismatch:
+				rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+			case devauth.ErrMaxDeviceCountReached:
+				rest_utils.RestErrWithLog(w, r, l, err, http.StatusUnprocessableEntity)
+
+			default:
+				rest_utils.RestErrWithLogInternal(w, r, l, err)
+			}
+			return
+		}
 	}
 
 	w.WriteHeader(http.StatusNoContent)

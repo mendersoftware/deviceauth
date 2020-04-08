@@ -22,8 +22,12 @@ class TestDevice:
         d = Device()
         da = DevAuthorizer()
 
-        rsp = device_auth_req(device_api.auth_requests_url, da, d)
-        assert rsp.status_code == 401
+        try:
+            with orchestrator.run_fake_for_device_id(1) as server:
+                rsp = device_auth_req(device_api.auth_requests_url, da, d)
+                assert rsp.status_code == 401
+        except bravado.exception.HTTPError as e:
+            assert e.response.status_code == 204
 
         devs = management_api.list_devices()
 
@@ -78,22 +82,26 @@ class TestDevice:
             assert e.response.status_code == 204
 
         # device is accepted, we should get a token now
-        rsp = device_auth_req(url, da, d)
-        assert rsp.status_code == 200
-
-        da.parse_rsp_payload(d, rsp.text)
-
-        assert len(d.token) > 0
-
-        # reject it now
         try:
-            management_api.reject_device(devid, aid)
+            with orchestrator.run_fake_for_device_id(devid) as server:
+                rsp = device_auth_req(url, da, d)
+                assert rsp.status_code == 200
+
+                da.parse_rsp_payload(d, rsp.text)
+
+                assert len(d.token) > 0
+
+                # reject it now
+                try:
+                    management_api.reject_device(devid, aid)
+                except bravado.exception.HTTPError as e:
+                    assert e.response.status_code == 204
+
+                # device is rejected, should get unauthorized
+                rsp = device_auth_req(url, da, d)
+                assert rsp.status_code == 401
         except bravado.exception.HTTPError as e:
             assert e.response.status_code == 204
-
-        # device is rejected, should get unauthorized
-        rsp = device_auth_req(url, da, d)
-        assert rsp.status_code == 401
 
     @pytest.mark.parametrize('devices', ['50'], indirect=True)
     def test_get_devices(self, management_api, devices):
@@ -290,8 +298,9 @@ class TestDeleteAuthsetBase:
         print('found matching device with ID:', dev.id)
         aid = dev.auth_sets[0].id
 
-        rsp = management_api.delete_authset(dev.id, aid, **kwargs)
-        assert rsp.status_code == 204
+        with orchestrator.run_fake_for_device_id(dev.id) as server:
+            rsp = management_api.delete_authset(dev.id, aid, **kwargs)
+            assert rsp.status_code == 204
 
         found = management_api.get_device(id=dev.id, **kwargs)
         assert found

@@ -33,6 +33,7 @@ from client import SimpleInternalClient, SimpleManagementClient, \
     BaseDevicesApiClient
 
 import mockserver
+import orchestrator
 import os
 
 def get_keypair():
@@ -211,13 +212,15 @@ def make_devices(device_api, devcount=1, tenant_token=""):
     url = device_api.auth_requests_url
 
     out_devices = []
-    for _ in range(devcount):
-        dev = Device()
-        da = DevAuthorizer(tenant_token=tenant_token)
-        # poke devauth so that device appears
-        rsp = device_auth_req(url, da, dev)
-        assert rsp.status_code == 401
-        out_devices.append((dev, da))
+
+    with orchestrator.run_fake_for_device_id(1) as server:
+        for _ in range(devcount):
+            dev = Device()
+            da = DevAuthorizer(tenant_token=tenant_token)
+            # poke devauth so that device appears
+            rsp = device_auth_req(url, da, dev)
+            assert rsp.status_code == 401
+            out_devices.append((dev, da))
 
     return out_devices
 

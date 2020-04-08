@@ -32,6 +32,7 @@ const (
 	// orchestrator endpoint
 	DeviceDecommissioningOrchestratorUri = "/api/v1/workflow/decommission_device"
 	ProvisionDeviceOrchestratorUri       = "/api/v1/workflow/provision_device"
+	UpdateDeviceStatusOrchestratorUri    = "/api/v1/workflow/update_device_status"
 	// default request timeout, 10s?
 	defaultReqTimeout = time.Duration(10) * time.Second
 )
@@ -58,6 +59,20 @@ type ProvisionDeviceReq struct {
 	Device model.Device `json:"device"`
 }
 
+// UpdateDeviceStatusReq contains request data of request to start update
+// device status  workflow
+type UpdateDeviceStatusReq struct {
+	// Request ID
+	RequestId string `json:"request_id"`
+	// Device IDs
+	//Ids []string `json:"device_ids"`
+	Ids string `json:"device_ids"`
+	// Tenant ID
+	TenantId string `json:"tenant_id"`
+	// new status
+	Status string `json:"device_status"`
+}
+
 // Config conveys client configuration
 type Config struct {
 	// Orchestrator host
@@ -70,6 +85,7 @@ type Config struct {
 type ClientRunner interface {
 	SubmitDeviceDecommisioningJob(ctx context.Context, req DecommissioningReq) error
 	SubmitProvisionDeviceJob(ctx context.Context, req ProvisionDeviceReq) error
+	SubmitUpdateDeviceStatusJob(ctx context.Context, req UpdateDeviceStatusReq) error
 }
 
 // Client is an opaque implementation of orchestrator client. Implements
@@ -170,6 +186,53 @@ func (co *Client) SubmitProvisionDeviceJob(ctx context.Context, provisionDeviceR
 
 		return errors.Errorf(
 			"submit provision device request failed with status %v", rsp.Status)
+	}
+	return nil
+}
+
+func (co *Client) SubmitUpdateDeviceStatusJob(ctx context.Context, updateDeviceStatusReq UpdateDeviceStatusReq) error {
+	l := log.FromContext(ctx)
+	client := http.Client{}
+
+	l.Debugf("Submit update device status job for devices: %q", updateDeviceStatusReq.Ids)
+
+	UpdateDeviceStatusReqJson, err := json.Marshal(updateDeviceStatusReq)
+	if err != nil {
+		return errors.Wrapf(err, "failed to submit update device status job")
+	}
+
+	contentReader := bytes.NewReader(UpdateDeviceStatusReqJson)
+
+	req, err := http.NewRequest(
+		http.MethodPost,
+		utils.JoinURL(co.conf.OrchestratorAddr, UpdateDeviceStatusOrchestratorUri),
+		contentReader)
+	if err != nil {
+		return errors.Wrapf(err, "failed to create request")
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	// set the device admission request timeout
+	ctx, cancel := context.WithTimeout(ctx, co.conf.Timeout)
+	defer cancel()
+
+	rsp, err := client.Do(req.WithContext(ctx))
+	if err != nil {
+		return errors.Wrapf(err, "failed to submit update device status job")
+	}
+	defer rsp.Body.Close()
+
+	if rsp.StatusCode != http.StatusOK && rsp.StatusCode != http.StatusCreated {
+		body, err := ioutil.ReadAll(rsp.Body)
+		if err != nil {
+			body = []byte("<failed to read>")
+		}
+		l.Errorf("update device status request %s %s failed with status %v, response text: %s",
+			req.Method, req.URL, rsp.Status, body)
+
+		return errors.Errorf(
+			"submit update device status request failed with status %v", rsp.Status)
 	}
 	return nil
 }
