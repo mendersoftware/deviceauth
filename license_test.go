@@ -20,5 +20,5 @@ import mt "github.com/mendersoftware/mendertesting"
 func TestLicenses(t *testing.T) {
 	t.Parallel()
 
-	mt.CheckLicenses(t)
+	mt.CheckMenderCompliance(t)
 }

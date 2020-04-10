@@ -16,7 +16,7 @@ require (
 	github.com/hashicorp/hcl v0.0.0-20170825171336-8f6b1344a92f // indirect
 	github.com/magiconair/properties v1.7.4-0.20170902060319-8d7837e64d3c // indirect
 	github.com/mendersoftware/go-lib-micro v0.0.0-20191114142713-7109d19865f7
-	github.com/mendersoftware/mendertesting v0.0.0-20180410095158-9e728b524c29
+	github.com/mendersoftware/mendertesting v0.0.0-20200407121219-f197133a4c14
 	github.com/mitchellh/mapstructure v0.0.0-20170523030023-d0303fe80992 // indirect
 	github.com/onsi/ginkgo v1.12.0 // indirect
 	github.com/onsi/gomega v1.9.0 // indirect
