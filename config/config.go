@@ -63,6 +63,14 @@ const (
 	SettingMaxDevicesLimitDefault        = "max_devices_limit_default"
 	SettingMaxDevicesLimitDefaultDefault = "0" // no limit
 
+	SettingRedisAddress        = "redis_address"
+	SettingRedisAddressDefault = ""
+
+	SettingRedisPassword        = "redis_password"
+	SettingRedisPasswordDefault = ""
+
+	SettingRedisDb        = "redis_db"
+	SettingRedisDbDefault = "0"
 )
 
 var (
@@ -82,5 +90,8 @@ var (
 		{Key: SettingDbSSL, Value: SettingDbSSLDefault},
 		{Key: SettingDbSSLSkipVerify, Value: SettingDbSSLSkipVerifyDefault},
 		{Key: SettingMaxDevicesLimitDefault, Value: SettingMaxDevicesLimitDefaultDefault},
+		{Key: SettingRedisAddress, Value: SettingRedisAddressDefault},
+		{Key: SettingRedisPassword, Value: SettingRedisPasswordDefault},
+		{Key: SettingRedisDb, Value: SettingRedisDbDefault},
 	}
 )
