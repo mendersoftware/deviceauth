@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -11,17 +11,32 @@
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
+
 package http
 
 import (
-	"github.com/ant0ine/go-json-rest/rest"
+	"flag"
+	"os"
+	"strings"
+	"testing"
 
-	"github.com/mendersoftware/deviceauth/client/cache"
+	dconfig "github.com/mendersoftware/deviceauth/config"
+	"github.com/mendersoftware/go-lib-micro/config"
 )
 
-// thin API handler interface
-type ApiHandler interface {
-	// produce a rest.App with routing setup or an error
-	GetApp() (rest.App, error)
-	WithCache(client cache.Client) ApiHandler
+func TestMain(m *testing.M) {
+	flag.Parse()
+	if !testing.Short() {
+		setupRedis()
+	}
+	result := m.Run()
+	os.Exit(result)
+}
+
+func setupRedis() {
+	config.SetDefaults(config.Config, dconfig.Defaults)
+
+	config.Config.SetEnvPrefix("DEVICEAUTH")
+	config.Config.AutomaticEnv()
+	config.Config.SetEnvKeyReplacer(strings.NewReplacer(".", "_", "-", "_"))
 }

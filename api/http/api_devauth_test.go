@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -33,6 +33,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
+	"github.com/mendersoftware/deviceauth/client/cache"
+	mocks_cache "github.com/mendersoftware/deviceauth/client/cache/mocks"
 	"github.com/mendersoftware/deviceauth/client/tenant"
 	"github.com/mendersoftware/deviceauth/devauth"
 	"github.com/mendersoftware/deviceauth/devauth/mocks"
@@ -65,8 +67,16 @@ func runTestRequest(t *testing.T, handler http.Handler, req *http.Request, code 
 }
 
 func makeMockApiHandler(t *testing.T, da devauth.App, db store.DataStore) http.Handler {
+	return makeMockApiHandlerWithCache(t, da, db, nil)
+}
+
+func makeMockApiHandlerWithCache(t *testing.T, da devauth.App, db store.DataStore, cache cache.Client) http.Handler {
 	handlers := NewDevAuthApiHandlers(da, db)
 	assert.NotNil(t, handlers)
+
+	if cache != nil {
+		handlers = handlers.WithCache(cache)
+	}
 
 	app, err := handlers.GetApp()
 	assert.NotNil(t, app)
@@ -627,6 +637,7 @@ func TestApiDevAuthVerifyToken(t *testing.T) {
 		body    string
 		headers map[string]string
 		err     error
+		result  *model.JWTVerifyResult
 	}{
 		{
 			req: test.MakeSimpleRequest("POST",
@@ -643,6 +654,9 @@ func TestApiDevAuthVerifyToken(t *testing.T) {
 				"authorization": "dummytoken",
 			},
 			err: nil,
+			result: &model.JWTVerifyResult{
+				Valid: true,
+			},
 		},
 		{
 			req: test.MakeSimpleRequest("POST",
@@ -652,6 +666,10 @@ func TestApiDevAuthVerifyToken(t *testing.T) {
 				"authorization": "dummytoken",
 			},
 			err: jwt.ErrTokenExpired,
+			result: &model.JWTVerifyResult{
+				Expired: true,
+				Valid:   false,
+			},
 		},
 		{
 			req: test.MakeSimpleRequest("POST",
@@ -661,6 +679,10 @@ func TestApiDevAuthVerifyToken(t *testing.T) {
 				"authorization": "dummytoken",
 			},
 			err: jwt.ErrTokenInvalid,
+			result: &model.JWTVerifyResult{
+				Expired: false,
+				Valid:   false,
+			},
 		},
 		{
 			req: test.MakeSimpleRequest("POST",
@@ -671,6 +693,10 @@ func TestApiDevAuthVerifyToken(t *testing.T) {
 				"authorization": "dummytoken",
 			},
 			err: errors.New("some error that will only be logged"),
+			result: &model.JWTVerifyResult{
+				Expired: false,
+				Valid:   false,
+			},
 		},
 	}
 
@@ -683,7 +709,7 @@ func TestApiDevAuthVerifyToken(t *testing.T) {
 			da.On("VerifyToken",
 				mtest.ContextMatcher(),
 				mock.AnythingOfType("string")).
-				Return(tc.err)
+				Return(tc.result, tc.err)
 
 			apih := makeMockApiHandler(t, da, nil)
 			if len(tc.headers) > 0 {
@@ -692,7 +718,218 @@ func TestApiDevAuthVerifyToken(t *testing.T) {
 			runTestRequest(t, apih, tc.req, tc.code, tc.body)
 		})
 	}
+}
 
+func TestApiDevAuthVerifyTokenWithCache(t *testing.T) {
+	t.Parallel()
+
+	// enforce specific field naming in errors returned by API
+	updateRestErrorFieldName()
+
+	tcases := []struct {
+		req           *http.Request
+		code          int
+		body          string
+		headers       map[string]string
+		err           error
+		result        *model.JWTVerifyResult
+		cacheGetValue *model.JWTVerifyResult
+		cacheGetError error
+		cacheSetValue *model.JWTVerifyResult
+	}{
+		{
+			req: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/internal/v1/devauth/tokens/verify", nil),
+			code:          http.StatusUnauthorized,
+			body:          RestError(ErrNoAuthHeader.Error()),
+			err:           nil,
+			cacheGetValue: nil,
+			cacheGetError: nil,
+			cacheSetValue: nil,
+		},
+		// cache MISS
+		{
+			req: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/internal/v1/devauth/tokens/verify", nil),
+			code: 200,
+			headers: map[string]string{
+				"authorization": "dummytoken",
+			},
+			err: nil,
+			result: &model.JWTVerifyResult{
+				Expired: false,
+				Valid:   true,
+			},
+			cacheGetValue: nil,
+			cacheGetError: errors.New("not found"),
+			cacheSetValue: &model.JWTVerifyResult{
+				Expired: false,
+				Valid:   true,
+			},
+		},
+		{
+			req: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/internal/v1/devauth/tokens/verify", nil),
+			code: http.StatusForbidden,
+			headers: map[string]string{
+				"authorization": "dummytoken",
+			},
+			err: jwt.ErrTokenExpired,
+			result: &model.JWTVerifyResult{
+				Expired: true,
+				Valid:   false,
+			},
+			cacheGetValue: nil,
+			cacheGetError: errors.New("not found"),
+			cacheSetValue: &model.JWTVerifyResult{
+				Expired: true,
+				Valid:   false,
+			},
+		},
+		{
+			req: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/internal/v1/devauth/tokens/verify", nil),
+			code: http.StatusUnauthorized,
+			headers: map[string]string{
+				"authorization": "dummytoken",
+			},
+			err: jwt.ErrTokenInvalid,
+			result: &model.JWTVerifyResult{
+				Expired: false,
+				Valid:   false,
+			},
+			cacheGetValue: nil,
+			cacheGetError: errors.New("not found"),
+			cacheSetValue: &model.JWTVerifyResult{
+				Expired: false,
+				Valid:   false,
+			},
+		},
+		{
+			req: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/internal/v1/devauth/tokens/verify", nil),
+			code: 500,
+			body: RestError("internal error"),
+			headers: map[string]string{
+				"authorization": "dummytoken",
+			},
+			err: errors.New("some error that will only be logged"),
+			result: &model.JWTVerifyResult{
+				Expired: false,
+				Valid:   false,
+			},
+			cacheGetValue: nil,
+			cacheGetError: errors.New("not found"),
+			cacheSetValue: &model.JWTVerifyResult{
+				Expired: false,
+				Valid:   false,
+			},
+		},
+		// cache HIT
+		{
+			req: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/internal/v1/devauth/tokens/verify", nil),
+			code: 200,
+			headers: map[string]string{
+				"authorization": "dummytoken",
+			},
+			err: nil,
+			result: &model.JWTVerifyResult{
+				Expired: false,
+				Valid:   true,
+			},
+			cacheGetValue: &model.JWTVerifyResult{
+				Expired: false,
+				Valid:   true,
+			},
+			cacheGetError: nil,
+			cacheSetValue: nil,
+		},
+		{
+			req: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/internal/v1/devauth/tokens/verify", nil),
+			code: http.StatusForbidden,
+			headers: map[string]string{
+				"authorization": "dummytoken",
+			},
+			err: jwt.ErrTokenExpired,
+			result: &model.JWTVerifyResult{
+				Expired: true,
+				Valid:   false,
+			},
+			cacheGetValue: &model.JWTVerifyResult{
+				Expired: true,
+				Valid:   false,
+			},
+			cacheGetError: nil,
+			cacheSetValue: nil,
+		},
+		{
+			req: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/internal/v1/devauth/tokens/verify", nil),
+			code: http.StatusUnauthorized,
+			headers: map[string]string{
+				"authorization": "dummytoken",
+			},
+			err: jwt.ErrTokenInvalid,
+			result: &model.JWTVerifyResult{
+				Expired: false,
+				Valid:   false,
+			},
+			cacheGetValue: &model.JWTVerifyResult{
+				Expired: false,
+				Valid:   false,
+			},
+			cacheGetError: nil,
+			cacheSetValue: nil,
+		},
+	}
+
+	for i := range tcases {
+		tc := tcases[i]
+		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			t.Parallel()
+
+			da := &mocks.App{}
+
+			da.On("VerifyToken",
+				mtest.ContextMatcher(),
+				mock.AnythingOfType("string")).
+				Return(tc.result, tc.err)
+
+			mockCache := &mocks_cache.Client{}
+			if tc.cacheGetValue != nil || tc.cacheGetError != nil {
+				var str []byte
+				if tc.cacheGetValue != nil {
+					str, _ = json.Marshal(*tc.cacheGetValue)
+				}
+				mockCache.On("Get",
+					mtest.ContextMatcher(),
+					mock.AnythingOfType("string"),
+				).Return(string(str), tc.cacheGetError)
+			}
+
+			if tc.cacheSetValue != nil {
+				mockCache.On("Set",
+					mtest.ContextMatcher(),
+					mock.AnythingOfType("string"),
+					mock.MatchedBy(func(value string) bool {
+						str, _ := json.Marshal(*tc.cacheSetValue)
+						return value == string(str)
+					}),
+					mock.AnythingOfType("time.Duration"),
+				).Return(nil)
+			}
+
+			apih := makeMockApiHandlerWithCache(t, da, nil, mockCache)
+			if len(tc.headers) > 0 {
+				tc.req.Header.Set("authorization", tc.headers["authorization"])
+			}
+			runTestRequest(t, apih, tc.req, tc.code, tc.body)
+
+			mockCache.AssertExpectations(t)
+		})
+	}
 }
 
 func TestApiV2DevAuthDeleteToken(t *testing.T) {

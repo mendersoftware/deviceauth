@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -72,12 +72,6 @@ func MakeErrDevAuthBadRequest(e error) error {
 	return errors.Wrap(e, MsgErrDevAuthBadRequest)
 }
 
-// Expiration Timeout should be moved to database
-// Do we need Expiration Timeout per device?
-const (
-	defaultExpirationTimeout = 3600
-)
-
 // helper for obtaining API clients
 type ApiClientGetter func() apiclient.HttpRunner
 
@@ -100,7 +94,7 @@ type App interface {
 	GetDeviceToken(ctx context.Context, dev_id string) (*model.Token, error)
 
 	RevokeToken(ctx context.Context, token_id string) error
-	VerifyToken(ctx context.Context, token string) error
+	VerifyToken(ctx context.Context, token string) (*model.JWTVerifyResult, error)
 	DeleteTokens(ctx context.Context, tenant_id, device_id string) error
 
 	SetTenantLimit(ctx context.Context, tenant_id string, limit model.Limit) error
@@ -865,9 +859,11 @@ func verifyTenantClaim(ctx context.Context, verifyTenant bool, tenant string) er
 	return nil
 }
 
-func (d *DevAuth) VerifyToken(ctx context.Context, raw string) error {
+func (d *DevAuth) VerifyToken(ctx context.Context, raw string) (*model.JWTVerifyResult, error) {
 
 	l := log.FromContext(ctx)
+
+	result := &model.JWTVerifyResult{}
 
 	token := &jwt.Token{}
 
@@ -879,24 +875,25 @@ func (d *DevAuth) VerifyToken(ctx context.Context, raw string) error {
 			err := d.db.DeleteToken(ctx, jti)
 			if err == store.ErrTokenNotFound {
 				l.Errorf("Token %s not found", jti)
-				return err
+				return result, err
 			}
 			if err != nil {
-				return errors.Wrapf(err, "Cannot delete token with jti: %s : %s", jti, err)
+				return result, errors.Wrapf(err, "Cannot delete token with jti: %s : %s", jti, err)
 			}
-			return jwt.ErrTokenExpired
+			result.Expired = true
+			return result, jwt.ErrTokenExpired
 		}
 		l.Errorf("Token %s invalid: %v", jti, err)
-		return jwt.ErrTokenInvalid
+		return result, jwt.ErrTokenInvalid
 	}
 
 	if token.Claims.Device != true {
 		l.Errorf("not a device token")
-		return jwt.ErrTokenInvalid
+		return result, jwt.ErrTokenInvalid
 	}
 
 	if err := verifyTenantClaim(ctx, d.verifyTenant, token.Claims.Tenant); err != nil {
-		return err
+		return result, err
 	}
 
 	// check if token is in the system
@@ -904,9 +901,9 @@ func (d *DevAuth) VerifyToken(ctx context.Context, raw string) error {
 	if err != nil {
 		if err == store.ErrTokenNotFound {
 			l.Errorf("Token %s not found", jti)
-			return err
+			return result, err
 		}
-		return errors.Wrapf(err, "Cannot get token with id: %s from database: %s", jti, err)
+		return result, errors.Wrapf(err, "Cannot get token with id: %s from database: %s", jti, err)
 	}
 
 	auth, err := d.db.GetAuthSetById(ctx, tok.AuthSetId)
@@ -914,27 +911,30 @@ func (d *DevAuth) VerifyToken(ctx context.Context, raw string) error {
 		if err == store.ErrAuthSetNotFound {
 			l.Errorf("Token %s auth set %s not found",
 				jti, tok.AuthSetId)
-			return err
+			return result, err
 		}
-		return err
+		return result, err
 	}
 
 	if auth.Status != model.DevStatusAccepted {
-		return jwt.ErrTokenInvalid
+		return result, jwt.ErrTokenInvalid
 	}
 
 	// reject authentication for device that is in the process of
 	// decommissioning
 	dev, err := d.db.GetDeviceById(ctx, auth.DeviceId)
 	if err != nil {
-		return err
+		return result, err
 	}
 	if dev.Decommissioning {
 		l.Errorf("Token %s rejected, device %s is being decommissioned", jti, auth.DeviceId)
-		return jwt.ErrTokenInvalid
+		return result, jwt.ErrTokenInvalid
 	}
 
-	return nil
+	result.Valid = true
+	result.DeviceID = auth.DeviceId
+	result.Expiration = time.Duration(token.Claims.ExpiresAt-time.Now().Unix()) * time.Second
+	return result, nil
 }
 
 func (d *DevAuth) GetLimit(ctx context.Context, name string) (*model.Limit, error) {

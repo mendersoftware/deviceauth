@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import (
 	"github.com/mendersoftware/go-lib-micro/rest_utils"
 	"github.com/pkg/errors"
 
+	"github.com/mendersoftware/deviceauth/client/cache"
 	"github.com/mendersoftware/deviceauth/devauth"
 	"github.com/mendersoftware/deviceauth/jwt"
 	"github.com/mendersoftware/deviceauth/model"
@@ -65,6 +66,7 @@ var (
 type DevAuthApiHandlers struct {
 	devAuth devauth.App
 	db      store.DataStore
+	cache   cache.Client
 }
 
 type DevAuthApiStatus struct {
@@ -76,6 +78,12 @@ func NewDevAuthApiHandlers(devAuth devauth.App, db store.DataStore) ApiHandler {
 		devAuth: devAuth,
 		db:      db,
 	}
+}
+
+// WithCache sets the cache client and enable the cache
+func (d *DevAuthApiHandlers) WithCache(client cache.Client) ApiHandler {
+	d.cache = client
+	return d
 }
 
 func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
@@ -388,20 +396,55 @@ func (d *DevAuthApiHandlers) VerifyTokenHandler(w rest.ResponseWriter, r *rest.R
 		return
 	}
 
-	// verify token
-	err = d.devAuth.VerifyToken(ctx, tokenStr)
+	var verifyResult *model.JWTVerifyResult
+	var verifyError error
+
+	// if cache is enabled, retry toekn verification result from cache
+	cacheHit := false
+	if d.cache != nil {
+		if cachedValue, err := d.cache.Get(ctx, tokenStr); err == nil {
+			// value is in the cache, decode it
+			if err := json.Unmarshal([]byte(cachedValue), &verifyResult); err == nil {
+				// cache HIT, no need to call VerifyToken
+				cacheHit = true
+				if verifyResult.Expired {
+					// token has expired
+					verifyError = jwt.ErrTokenExpired
+				} else if !verifyResult.Valid {
+					// token is invalid
+					verifyError = jwt.ErrTokenInvalid
+				} else {
+					// token is valid
+					verifyError = nil
+				}
+			}
+		}
+	}
+	// cache MISS, call VerifyToken and cache the reslt if cache is enabled
+	if !cacheHit {
+		// verify token
+		verifyResult, verifyError = d.devAuth.VerifyToken(ctx, tokenStr)
+	}
+
+	// cache is enabled, current request is not a MISS,cache the result
+	if d.cache != nil && !cacheHit {
+		if verifyResultStr, err := json.Marshal(verifyResult); err == nil {
+			d.cache.Set(ctx, tokenStr, string(verifyResultStr), verifyResult.Expiration)
+		}
+	}
+
 	code := http.StatusOK
-	if err != nil {
-		switch err {
+	if verifyError != nil {
+		switch verifyError {
 		case jwt.ErrTokenExpired:
 			code = http.StatusForbidden
 		case store.ErrTokenNotFound, jwt.ErrTokenInvalid:
 			code = http.StatusUnauthorized
 		default:
-			rest_utils.RestErrWithLogInternal(w, r, l, err)
+			rest_utils.RestErrWithLogInternal(w, r, l, verifyError)
 			return
 		}
-		l.Error(err)
+		l.Error(verifyError)
 	}
 
 	w.WriteHeader(code)

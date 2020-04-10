@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -14,6 +14,7 @@
 package main
 
 import (
+	"context"
 	"net/http"
 	"time"
 
@@ -23,6 +24,7 @@ import (
 	"github.com/pkg/errors"
 
 	api_http "github.com/mendersoftware/deviceauth/api/http"
+	"github.com/mendersoftware/deviceauth/client/cache"
 	"github.com/mendersoftware/deviceauth/client/orchestrator"
 	"github.com/mendersoftware/deviceauth/client/tenant"
 	dconfig "github.com/mendersoftware/deviceauth/config"
@@ -103,6 +105,17 @@ func RunServer(c config.Reader) error {
 	}
 
 	devauthapi := api_http.NewDevAuthApiHandlers(devauth, db)
+
+	redisAddress := c.GetString(dconfig.SettingRedisAddress)
+	if redisAddress != "" {
+		l.Infof("settting up redis cache: %s", redisAddress)
+
+		client := cache.NewClientRedis()
+
+		ctx := context.Background()
+		client.Connect(ctx)
+		devauthapi = devauthapi.WithCache(client)
+	}
 
 	apph, err := devauthapi.GetApp()
 	if err != nil {

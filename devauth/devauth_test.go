@@ -1452,7 +1452,7 @@ func TestDevAuthVerifyToken(t *testing.T) {
 				}
 			}
 
-			err := devauth.VerifyToken(context.Background(), tc.tokenString)
+			_, err := devauth.VerifyToken(context.Background(), tc.tokenString)
 			if tc.tokenValidateErr != nil {
 				assert.EqualError(t, err, tc.tokenValidateErr.Error())
 			} else {

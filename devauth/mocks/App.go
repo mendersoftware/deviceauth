@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -345,15 +345,22 @@ func (_m *App) SubmitAuthRequest(ctx context.Context, r *model.AuthReq) (string,
 }
 
 // VerifyToken provides a mock function with given fields: ctx, token
-func (_m *App) VerifyToken(ctx context.Context, token string) error {
+func (_m *App) VerifyToken(ctx context.Context, token string) (*model.JWTVerifyResult, error) {
 	ret := _m.Called(ctx, token)
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
+	var r0 *model.JWTVerifyResult
+	if rf, ok := ret.Get(0).(func(context.Context, string) *model.JWTVerifyResult); ok {
 		r0 = rf(ctx, token)
 	} else {
-		r0 = ret.Error(0)
+		r0 = ret.Get(0).(*model.JWTVerifyResult)
 	}
 
-	return r0
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, token)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
