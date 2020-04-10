@@ -24,5 +24,9 @@ test:static:
 
 test:unit:
   image: golang:1.11
+  services:
+    - mongo
+    - redis:5.0-alpine
   variables:
-    DEVICEAUTH_MONGO: mongo
+    DEVICEAUTH_MONGO: mongodb://mongo
+    DEVICEAUTH_REDIS_ADDRESS: redis:6379
