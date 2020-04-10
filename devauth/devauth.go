@@ -174,7 +174,7 @@ func (d *DevAuth) getDeviceFromAuthRequest(ctx context.Context, r *model.AuthReq
 
 	// check if the device is in the decommissioning state
 	if dev.Decommissioning {
-		l.Warnf("Device %s in the decommissioning state. %s", dev.Id)
+		l.Warnf("Device %s in the decommissioning state.", dev.Id)
 		return nil, ErrDevAuthUnauthorized
 	}
 

@@ -14,6 +14,7 @@
 package cmd
 
 import (
+	"flag"
 	mtesting "github.com/mendersoftware/go-lib-micro/mongo/testing"
 	"os"
 	"testing"
@@ -23,6 +24,7 @@ var db mtesting.TestDBRunner
 
 // Overwrites test execution and allows for test database setup
 func TestMain(m *testing.M) {
+	flag.Parse()
 
 	var status int
 	if !testing.Short() {

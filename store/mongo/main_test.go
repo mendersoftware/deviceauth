@@ -15,6 +15,7 @@
 package mongo
 
 import (
+	"flag"
 	"os"
 	"testing"
 
@@ -25,6 +26,7 @@ var db mtesting.TestDBRunner
 
 // Overwrites test execution and allows for test database setup
 func TestMain(m *testing.M) {
+	flag.Parse()
 
 	var status int
 	if !testing.Short() {

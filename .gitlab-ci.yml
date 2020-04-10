@@ -19,11 +19,7 @@ include:
   - project: 'Northern.tech/Mender/mendertesting'
     file: '.gitlab-ci-check-docker-build.yml'
 
-test:static:
-  image: golang:1.11
-
 test:unit:
-  image: golang:1.11
   services:
     - mongo
     - redis:5.0-alpine

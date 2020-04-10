@@ -29,6 +29,11 @@ var runAcceptanceTests bool
 // this is because of a conflict between urfave/cli and regular go flags required for testing (can't mix the two)
 var cliArgsRaw string
 
+var _ = func() bool {
+	testing.Init()
+	return true
+}()
+
 func init() {
 	tlog.MaybeDiscardLogs()
 
