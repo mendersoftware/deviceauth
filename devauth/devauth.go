@@ -933,6 +933,8 @@ func (d *DevAuth) VerifyToken(ctx context.Context, raw string) (*model.JWTVerify
 
 	result.Valid = true
 	result.DeviceID = auth.DeviceId
+	result.IntervalDeploymentsNext = dev.IntervalDeploymentsNext
+	result.IntervalInventoryUpdate = dev.IntervalInventoryUpdate
 	result.Expiration = time.Duration(token.Claims.ExpiresAt-time.Now().Unix()) * time.Second
 	return result, nil
 }

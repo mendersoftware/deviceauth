@@ -20,8 +20,12 @@ import (
 
 // JWTVerifyResult holds the result of the JWT token verification
 type JWTVerifyResult struct {
-	DeviceID   string        `json:"-"`
-	Expiration time.Duration `json:"-"`
-	Expired    bool          `json:"expired"`
-	Valid      bool          `json:"valid"`
+	DeviceID                string        `json:"-"`
+	Expiration              time.Duration `json:"-"`
+	Expired                 bool          `json:"expired"`
+	Valid                   bool          `json:"valid"`
+	LatestDeploymentsNext   time.Time     `json:"latest_deployments_next"`
+	IntervalDeploymentsNext time.Duration `json:"interval_deployments_next"`
+	LatestInventoryUpdate   time.Time     `json:"latest_inventory_update"`
+	IntervalInventoryUpdate time.Duration `json:"interval_inventory_update"`
 }

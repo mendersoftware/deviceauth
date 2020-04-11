@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/ant0ine/go-json-rest/rest/test"
@@ -883,6 +884,94 @@ func TestApiDevAuthVerifyTokenWithCache(t *testing.T) {
 			cacheGetError: nil,
 			cacheSetValue: nil,
 		},
+		// throttling deployments/next
+		{
+			req: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/internal/v1/devauth/tokens/verify", nil),
+			code: http.StatusTooManyRequests,
+			headers: map[string]string{
+				"authorization":     "dummytoken",
+				"X-Original-Method": http.MethodGet,
+				"X-Original-URI":    throttlingDeploymentsNext,
+			},
+			err:    nil,
+			result: nil,
+			cacheGetValue: &model.JWTVerifyResult{
+				Expired:                 false,
+				Valid:                   true,
+				LatestDeploymentsNext:   time.Now().UTC(),
+				IntervalDeploymentsNext: 100,
+			},
+			cacheGetError: nil,
+			cacheSetValue: nil,
+		},
+		{
+			req: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/internal/v1/devauth/tokens/verify", nil),
+			code: http.StatusOK,
+			headers: map[string]string{
+				"authorization":     "dummytoken",
+				"X-Original-Method": http.MethodGet,
+				"X-Original-URI":    throttlingDeploymentsNext,
+			},
+			err:    nil,
+			result: nil,
+			cacheGetValue: &model.JWTVerifyResult{
+				Expired:                 false,
+				Valid:                   true,
+				LatestDeploymentsNext:   time.Now().UTC(),
+				IntervalDeploymentsNext: 0,
+			},
+			cacheGetError: nil,
+			cacheSetValue: &model.JWTVerifyResult{
+				Expired: false,
+				Valid:   true,
+			},
+		},
+		// throttling inventory update
+		{
+			req: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/internal/v1/devauth/tokens/verify", nil),
+			code: http.StatusTooManyRequests,
+			headers: map[string]string{
+				"authorization":     "dummytoken",
+				"X-Original-Method": http.MethodPatch,
+				"X-Original-URI":    throttlingInventoryUpdate,
+			},
+			err:    nil,
+			result: nil,
+			cacheGetValue: &model.JWTVerifyResult{
+				Expired:                 false,
+				Valid:                   true,
+				LatestInventoryUpdate:   time.Now().UTC(),
+				IntervalInventoryUpdate: 100,
+			},
+			cacheGetError: nil,
+			cacheSetValue: nil,
+		},
+		{
+			req: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/internal/v1/devauth/tokens/verify", nil),
+			code: http.StatusOK,
+			headers: map[string]string{
+				"authorization":     "dummytoken",
+				"X-Original-Method": http.MethodPatch,
+				"X-Original-URI":    throttlingInventoryUpdate,
+			},
+			err:    nil,
+			result: nil,
+			cacheGetValue: &model.JWTVerifyResult{
+				Expired:                 false,
+				Valid:                   true,
+				LatestInventoryUpdate:   time.Now().UTC(),
+				IntervalInventoryUpdate: 0,
+			},
+			cacheGetError: nil,
+			cacheSetValue: &model.JWTVerifyResult{
+				Expired: false,
+				Valid:   true,
+			},
+		},
 	}
 
 	for i := range tcases {
@@ -914,8 +1003,9 @@ func TestApiDevAuthVerifyTokenWithCache(t *testing.T) {
 					mtest.ContextMatcher(),
 					mock.AnythingOfType("string"),
 					mock.MatchedBy(func(value string) bool {
-						str, _ := json.Marshal(*tc.cacheSetValue)
-						return value == string(str)
+						var obj *model.JWTVerifyResult
+						json.Unmarshal([]byte(value), &obj)
+						return (obj.Valid == tc.cacheSetValue.Valid && obj.Expiration == tc.cacheSetValue.Expiration)
 					}),
 					mock.AnythingOfType("time.Duration"),
 				).Return(nil)
@@ -923,7 +1013,9 @@ func TestApiDevAuthVerifyTokenWithCache(t *testing.T) {
 
 			apih := makeMockApiHandlerWithCache(t, da, nil, mockCache)
 			if len(tc.headers) > 0 {
-				tc.req.Header.Set("authorization", tc.headers["authorization"])
+				for key, value := range tc.headers {
+					tc.req.Header.Set(key, value)
+				}
 			}
 			runTestRequest(t, apih, tc.req, tc.code, tc.body)
 

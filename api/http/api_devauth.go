@@ -14,9 +14,11 @@
 package http
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/mendersoftware/go-lib-micro/identity"
 
@@ -56,9 +58,15 @@ const (
 	HdrAuthReqSign = "X-MEN-Signature"
 )
 
+const (
+	throttlingDeploymentsNext = "/api/devices/v1/deployments/device/deployments/next"
+	throttlingInventoryUpdate = "/api/devices/v1/inventory/device/attributes"
+)
+
 var (
 	ErrIncorrectStatus = errors.New("incorrect device status")
 	ErrNoAuthHeader    = errors.New("no authorization header")
+	ErrTooManyRequests = errors.New("too many requests")
 
 	DevStatuses = []string{model.DevStatusPending, model.DevStatusRejected, model.DevStatusAccepted, model.DevStatusPreauth}
 )
@@ -396,40 +404,30 @@ func (d *DevAuthApiHandlers) VerifyTokenHandler(w rest.ResponseWriter, r *rest.R
 		return
 	}
 
-	var verifyResult *model.JWTVerifyResult
+	var cacheHit bool = false
 	var verifyError error
+	var verifyResult *model.JWTVerifyResult = &model.JWTVerifyResult{}
 
-	// if cache is enabled, retry toekn verification result from cache
-	cacheHit := false
+	// if cache is enabled, retrive token verification result from cache
 	if d.cache != nil {
-		if cachedValue, err := d.cache.Get(ctx, tokenStr); err == nil {
-			// value is in the cache, decode it
-			if err := json.Unmarshal([]byte(cachedValue), &verifyResult); err == nil {
-				// cache HIT, no need to call VerifyToken
-				cacheHit = true
-				if verifyResult.Expired {
-					// token has expired
-					verifyError = jwt.ErrTokenExpired
-				} else if !verifyResult.Valid {
-					// token is invalid
-					verifyError = jwt.ErrTokenInvalid
-				} else {
-					// token is valid
-					verifyError = nil
-				}
-			}
-		}
+		cacheHit, verifyError = d.verifyTokenFromCache(ctx, tokenStr, verifyResult)
 	}
+
 	// cache MISS, call VerifyToken and cache the reslt if cache is enabled
 	if !cacheHit {
 		// verify token
 		verifyResult, verifyError = d.devAuth.VerifyToken(ctx, tokenStr)
 	}
 
-	// cache is enabled, current request is not a MISS,cache the result
-	if d.cache != nil && !cacheHit {
-		if verifyResultStr, err := json.Marshal(verifyResult); err == nil {
-			d.cache.Set(ctx, tokenStr, string(verifyResultStr), verifyResult.Expiration)
+	// original method and URI
+	method := r.Header.Get("X-Original-Method")
+	uri := r.Header.Get("X-Original-URI")
+
+	// if cache is enabled, enforce throttling
+	if d.cache != nil {
+		cacheHit, verifyError = d.verifyTokenThrottling(method, uri, verifyResult, cacheHit, verifyError)
+		if !cacheHit {
+			d.verifyTokenToCache(ctx, tokenStr, verifyResult)
 		}
 	}
 
@@ -440,6 +438,8 @@ func (d *DevAuthApiHandlers) VerifyTokenHandler(w rest.ResponseWriter, r *rest.R
 			code = http.StatusForbidden
 		case store.ErrTokenNotFound, jwt.ErrTokenInvalid:
 			code = http.StatusUnauthorized
+		case ErrTooManyRequests:
+			code = http.StatusTooManyRequests
 		default:
 			rest_utils.RestErrWithLogInternal(w, r, l, verifyError)
 			return
@@ -448,6 +448,62 @@ func (d *DevAuthApiHandlers) VerifyTokenHandler(w rest.ResponseWriter, r *rest.R
 	}
 
 	w.WriteHeader(code)
+}
+
+func (d *DevAuthApiHandlers) verifyTokenFromCache(ctx context.Context, tokenStr string, verifyResult *model.JWTVerifyResult) (bool, error) {
+	cacheHit := false
+	var verifyError error
+	if cachedValue, err := d.cache.Get(ctx, tokenStr); err == nil {
+		// value is in the cache, decode it
+		if err := json.Unmarshal([]byte(cachedValue), &verifyResult); err == nil {
+			// cache HIT, no need to call VerifyToken
+			cacheHit = true
+			if verifyResult.Expired {
+				// token has expired
+				verifyError = jwt.ErrTokenExpired
+			} else if !verifyResult.Valid {
+				// token is invalid
+				verifyError = jwt.ErrTokenInvalid
+			} else {
+				// token is valid
+				verifyError = nil
+			}
+		}
+	}
+	return cacheHit, verifyError
+}
+
+func (d *DevAuthApiHandlers) verifyTokenToCache(ctx context.Context, tokenStr string, verifyResult *model.JWTVerifyResult) error {
+	verifyResultStr, err := json.Marshal(verifyResult)
+	if err == nil {
+		err = d.cache.Set(ctx, tokenStr, string(verifyResultStr), verifyResult.Expiration)
+	}
+	return err
+}
+
+func (d *DevAuthApiHandlers) verifyTokenThrottling(method string, uri string, verifyResult *model.JWTVerifyResult, cacheHit bool, verifyError error) (bool, error) {
+	if method == http.MethodGet && uri[:len(throttlingDeploymentsNext)] == throttlingDeploymentsNext {
+		// throttle deployments next
+		var now = time.Now().UTC()
+		var next = verifyResult.LatestDeploymentsNext.Add(verifyResult.IntervalDeploymentsNext * time.Second)
+		if !verifyResult.LatestDeploymentsNext.IsZero() && now.Before(next) {
+			verifyError = ErrTooManyRequests
+		} else {
+			verifyResult.LatestDeploymentsNext = now
+			cacheHit = false
+		}
+	} else if method == http.MethodPatch && uri[:len(throttlingInventoryUpdate)] == throttlingInventoryUpdate {
+		// throttle deployments next
+		var now = time.Now().UTC()
+		var next = verifyResult.LatestInventoryUpdate.Add(verifyResult.IntervalInventoryUpdate * time.Second)
+		if !verifyResult.LatestInventoryUpdate.IsZero() && now.Before(next) {
+			verifyError = ErrTooManyRequests
+		} else {
+			verifyResult.LatestInventoryUpdate = now
+			cacheHit = false
+		}
+	}
+	return cacheHit, verifyError
 }
 
 func (d *DevAuthApiHandlers) UpdateDeviceStatusHandler(w rest.ResponseWriter, r *rest.Request) {
