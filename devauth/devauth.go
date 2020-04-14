@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -214,97 +214,85 @@ func tenantWithContext(ctx context.Context, tenantToken string) (context.Context
 	return ctx, nil
 }
 
-// This function explicitly returns string pointer, not string, so that in the
-// event that we have made a logic error somewhere, we will get a nil-pointer
-// exception instead of a incorrect succeeded login, which would be very bad for
-// security.
-func logAndGetCorrectTenantToken(l *log.Logger, tenantToken, defaultTenantToken string,
-	errToken, errDefaultToken error) (*string, error) {
-	// The logic here is: If any error is nil, we return success immediately
-	// (authentication succeeded). If both are non-nil, we consider "missing
-	// token" errors priority 2, and all other errors priority 1. Then we
-	// log all errors at the most serious level. So "missing token" errors
-	// will not be logged if there is another more serious error present.
+func (d *DevAuth) doVerifyTenant(ctx context.Context, token string) (*tenant.Tenant, error) {
+	t, err := d.cTenant.VerifyToken(ctx, token, d.clientGetter())
 
-	if errToken == nil {
-		return &tenantToken, nil
-	}
-	if errDefaultToken == nil {
-		return &defaultTenantToken, nil
-	}
-
-	var returnError error
-
-	if errToken != nil && !tenant.IsErrTokenMissing(errToken) {
-		l.Errorf("Failed to verify supplied tenant token: %s", errToken.Error())
-		returnError = errToken
-	}
-	if errDefaultToken != nil && !tenant.IsErrTokenMissing(errDefaultToken) {
-		l.Errorf("Failed to verify default tenant token: %s", errDefaultToken.Error())
-		if returnError == nil {
-			returnError = errDefaultToken
+	if err != nil {
+		if tenant.IsErrTokenVerificationFailed(err) {
+			return nil, MakeErrDevAuthUnauthorized(err)
 		}
+
+		return nil, errors.Wrap(err, "request to verify tenant token failed")
 	}
 
-	if returnError == nil {
-		if errToken != nil {
-			l.Errorf("Failed to verify supplied tenant token: %s", errToken.Error())
-			returnError = errToken
-		}
-		if errDefaultToken != nil {
-			l.Errorf("Failed to verify default tenant token: %s", errDefaultToken.Error())
-			returnError = errDefaultToken
-		}
-	}
-
-	if tenant.IsErrTokenVerificationFailed(returnError) || tenant.IsErrTokenMissing(returnError) {
-		return nil, MakeErrDevAuthUnauthorized(returnError)
-	} else {
-		return nil, errors.Wrap(returnError, "request to verify tenant token failed")
-	}
+	return t, nil
 }
 
-func (d *DevAuth) verifyTenantToken(ctx context.Context, tenantToken, defaultTenantToken string) (context.Context, error) {
+func (d *DevAuth) getTenantWithDefault(ctx context.Context, tenantToken, defaultToken string) (context.Context, *tenant.Tenant, error) {
 	l := log.FromContext(ctx)
 
-	errToken := errors.New(tenant.MsgErrTokenMissing)
-	errDefaultToken := errToken
+	if tenantToken == "" && defaultToken == "" {
+		return nil, nil, MakeErrDevAuthUnauthorized(errors.New("tenant token missing"))
+	}
 
-	// verify tenant token with tenant administration, and fall back to
-	// verifying default tenant token if that fails.
+	var chosenToken string
+	var t *tenant.Tenant
+	var err error
+
+	// try the provided token
+	// but continue on errors and maybe try the default token
 	if tenantToken != "" {
-		errToken = d.cTenant.VerifyToken(ctx, tenantToken, d.clientGetter())
-	}
-	if errToken != nil && defaultTenantToken != "" {
-		errDefaultToken = d.cTenant.VerifyToken(ctx, defaultTenantToken, d.clientGetter())
+		t, err = d.doVerifyTenant(ctx, tenantToken)
+
+		if err == nil {
+			chosenToken = tenantToken
+		} else {
+			l.Errorf("Failed to verify supplied tenant token: %s", err.Error())
+		}
 	}
 
-	chosenTenantToken, err := logAndGetCorrectTenantToken(l, tenantToken, defaultTenantToken, errToken, errDefaultToken)
+	// if we still haven't selected a tenant - the token didn't work
+	// try the default one
+	if t == nil && defaultToken != "" {
+		t, err = d.doVerifyTenant(ctx, defaultToken)
+
+		if err == nil {
+			chosenToken = defaultToken
+		}
+		if err != nil {
+			l.Errorf("Failed to verify default tenant token: %s", err.Error())
+		}
+	}
+
+	// none of the tokens worked
 	if err != nil {
-		return ctx, err
+		if tenant.IsErrTokenVerificationFailed(err) {
+			return ctx, nil, MakeErrDevAuthUnauthorized(err)
+		}
+		return ctx, nil, err
 	}
 
-	tCtx, err := tenantWithContext(ctx, *chosenTenantToken)
+	// we do have a working token/valid tenant
+	tCtx, err := tenantWithContext(ctx, chosenToken)
 	if err != nil {
 		l.Errorf("failed to setup tenant context: %v", err)
-		return ctx, ErrDevAuthUnauthorized
+		return nil, nil, ErrDevAuthUnauthorized
 	}
 
-	// return updated context
-	return tCtx, nil
+	return tCtx, t, nil
 }
 
 func (d *DevAuth) SubmitAuthRequest(ctx context.Context, r *model.AuthReq) (string, error) {
 	l := log.FromContext(ctx)
 
+	var tenant *tenant.Tenant
+	var err error
+
 	if d.verifyTenant {
-		tctx, err := d.verifyTenantToken(ctx, r.TenantToken, d.config.DefaultTenantToken)
+		ctx, tenant, err = d.getTenantWithDefault(ctx, r.TenantToken, d.config.DefaultTenantToken)
 		if err != nil {
 			return "", err
 		}
-
-		// update context
-		ctx = tctx
 	}
 
 	// first, try to handle preauthorization
@@ -327,7 +315,7 @@ func (d *DevAuth) SubmitAuthRequest(ctx context.Context, r *model.AuthReq) (stri
 		return "", err
 	}
 
-	// request was already present in DB, check its status
+	// authset was present or created just now - check status
 	if authSet.Status == model.DevStatusAccepted {
 		rawJwt := &jwt.Token{
 			Claims: jwt.Claims{
@@ -340,10 +328,10 @@ func (d *DevAuth) SubmitAuthRequest(ctx context.Context, r *model.AuthReq) (stri
 		}
 
 		if d.verifyTenant {
-			// update token tenant claim if needed
 			ident := identity.FromContext(ctx)
 			if ident != nil && ident.Tenant != "" {
 				rawJwt.Claims.Tenant = ident.Tenant
+				rawJwt.Claims.Plan = tenant.Plan
 			}
 		}
 

@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -38,55 +38,74 @@ func TestClient(t *testing.T) {
 	t.Parallel()
 
 	tcs := []struct {
-		status int
-		body   []byte
-		token  string
+		tadmStatus int
+		tadmBody   interface{}
+		token      string
+
+		tenant *Tenant
 		err    error
 	}{
 		{
-			status: http.StatusBadRequest,
-			err:    errors.New("token verification request returned unexpected status 400"),
+			tadmStatus: http.StatusBadRequest,
+			err:        errors.New("token verification request returned unexpected status 400"),
 		},
 		{
-			// try some bogus status
-			status: http.StatusNotAcceptable,
-			err:    errors.New("token verification request returned unexpected status 406"),
+			// try some bogus tadmStatus
+			tadmStatus: http.StatusNotAcceptable,
+			err:        errors.New("token verification request returned unexpected status 406"),
 		},
 		{
 			// token verified ok
-			status: http.StatusOK,
+			tadmStatus: http.StatusOK,
+			tadmBody: &Tenant{
+				ID:     "foo",
+				Name:   "foo-name",
+				Status: "active",
+				Plan:   "enterprise",
+			},
+			tenant: &Tenant{
+				ID:     "foo",
+				Name:   "foo-name",
+				Status: "active",
+				Plan:   "enterprise",
+			},
 		},
 		{
-			status: http.StatusUnauthorized,
-			body:   restError("account suspended"),
-			err:    errors.New("tenant token verification failed: account suspended"),
+			tadmStatus: http.StatusUnauthorized,
+			tadmBody:   restError("account suspended"),
+			err:        errors.New("tenant token verification failed: account suspended"),
 		},
 	}
 
 	for i := range tcs {
 		tc := tcs[i]
-		t.Run(fmt.Sprintf("status %v", tc.status), func(t *testing.T) {
+		t.Run(fmt.Sprintf("status %v", tc.tadmStatus), func(t *testing.T) {
 			t.Parallel()
 
-			s, rd := ct.NewMockServer(tc.status, tc.body)
+			var body []byte
+
+			body, err := json.Marshal(tc.tadmBody)
+			assert.NoError(t, err)
+
+			s, rd := ct.NewMockServer(tc.tadmStatus, body)
 
 			c := NewClient(Config{
 				TenantAdmAddr: s.URL,
 			})
 
-			err := c.VerifyToken(context.Background(), tc.token, &apiclient.HttpApi{})
+			tenant, err := c.VerifyToken(context.Background(), tc.token, &apiclient.HttpApi{})
 			if tc.err != nil {
 				assert.EqualError(t, err, tc.err.Error())
 			} else {
 				assert.NoError(t, err)
 				assert.Equal(t, TenantVerifyUri, rd.Url.Path)
+				assert.Equal(t, tc.tenant, tenant)
 			}
 			s.Close()
 		})
 	}
 }
 
-func restError(msg string) []byte {
-	err, _ := json.Marshal(map[string]interface{}{"error": msg, "request_id": "test"})
-	return err
+func restError(msg string) interface{} {
+	return map[string]interface{}{"error": msg, "request_id": "test"}
 }

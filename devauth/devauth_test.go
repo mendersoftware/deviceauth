@@ -271,7 +271,7 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 				PubKey:      pubKey,
 			},
 
-			err: MakeErrDevAuthUnauthorized(errors.New(tenant.MsgErrTokenMissing)),
+			err: MakeErrDevAuthUnauthorized(errors.New("tenant token missing")),
 
 			tenantVerify:          true,
 			tenantVerificationErr: errors.New("should not be called"),
@@ -478,14 +478,18 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 						mtesting.ContextMatcher(),
 						tc.inReq.TenantToken,
 						mock.AnythingOfType("*apiclient.HttpApi")).
-						Return(tc.tenantVerificationErr)
+						Return(
+							&tenant.Tenant{},
+							tc.tenantVerificationErr)
 				}
 				if tc.config.DefaultTenantToken != "" {
 					ct.On("VerifyToken",
 						mtesting.ContextMatcher(),
 						tc.config.DefaultTenantToken,
 						mock.AnythingOfType("*apiclient.HttpApi")).
-						Return(tc.tenantVerificationErr)
+						Return(
+							&tenant.Tenant{},
+							tc.tenantVerificationErr)
 				}
 				devauth = devauth.WithTenantVerification(&ct)
 			}
