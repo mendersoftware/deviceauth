@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -11,6 +11,7 @@
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
+
 package mocks
 
 import apiclient "github.com/mendersoftware/go-lib-micro/apiclient"
@@ -24,17 +25,24 @@ type ClientRunner struct {
 }
 
 // VerifyToken provides a mock function with given fields: ctx, token, client
-func (_m *ClientRunner) VerifyToken(ctx context.Context, token string, client apiclient.HttpRunner) error {
+func (_m *ClientRunner) VerifyToken(ctx context.Context, token string, client apiclient.HttpRunner) (*tenant.Tenant, error) {
 	ret := _m.Called(ctx, token, client)
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, apiclient.HttpRunner) error); ok {
+	var r0 *tenant.Tenant
+	if rf, ok := ret.Get(0).(func(context.Context, string, apiclient.HttpRunner) *tenant.Tenant); ok {
 		r0 = rf(ctx, token, client)
 	} else {
-		r0 = ret.Error(0)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*tenant.Tenant)
+		}
 	}
 
-	return r0
-}
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, string, apiclient.HttpRunner) error); ok {
+		r1 = rf(ctx, token, client)
+	} else {
+		r1 = ret.Error(1)
+	}
 
-var _ tenant.ClientRunner = (*ClientRunner)(nil)
+	return r0, r1
+}
