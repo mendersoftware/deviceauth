@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -109,7 +109,7 @@ func TestMaintenanceWithDataStore(t *testing.T) {
 		},
 		"do nothing with tenant": {
 			decommissioningCleanupFlag: false,
-			tenant: "foo",
+			tenant:                     "foo",
 		},
 		"dry run without data": {
 			decommissioningCleanupFlag: true,
@@ -122,9 +122,9 @@ func TestMaintenanceWithDataStore(t *testing.T) {
 		},
 		"dry run with tenant": {
 			decommissioningCleanupFlag: true,
-			tenant:       "foo",
-			dryRunFlag:   true,
-			withDataSets: true,
+			tenant:                     "foo",
+			dryRunFlag:                 true,
+			withDataSets:               true,
 		},
 		"run without data": {
 			decommissioningCleanupFlag: true,
@@ -135,8 +135,8 @@ func TestMaintenanceWithDataStore(t *testing.T) {
 		},
 		"run with tenant": {
 			decommissioningCleanupFlag: true,
-			tenant:       "foo",
-			withDataSets: true,
+			tenant:                     "foo",
+			withDataSets:               true,
 		},
 	}
 

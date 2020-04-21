@@ -24,6 +24,7 @@ from common import Device, DevAuthorizer, \
     get_fake_tenantadm_addr
 
 import mockserver
+import orchestrator
 
 
 class TestEnterprise:
@@ -78,10 +79,15 @@ class TestEnterprise:
                  'name': 'Acme',
              })),
         ]
-        with mockserver.run_fake(get_fake_tenantadm_addr(),
-                                handlers=handlers) as fake:
-            rsp = device_auth_req(url, da, d)
-            assert rsp.status_code == 401
+
+        try:
+            with orchestrator.run_fake_for_device_id(1) as server:
+                with mockserver.run_fake(get_fake_tenantadm_addr(),
+                                        handlers=handlers) as fake:
+                    rsp = device_auth_req(url, da, d)
+                    assert rsp.status_code == 401
+        except bravado.exception.HTTPError as e:
+            assert e.response.status_code == 204
 
         # device should be appear in devices listing
         TestEnterprise.verify_tenant_dev_present(management_api, d.identity, tenant_foobar,

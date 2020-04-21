@@ -27,19 +27,20 @@ def accepted_device(device_api, management_api, clean_migrated_db):
     da = DevAuthorizer()
     url = device_api.auth_requests_url
 
-    # poke devauth so that device appears
-    rsp = device_auth_req(url, da, d)
-    assert rsp.status_code == 401
-
-    # try to find our devices in all devices listing
-    dev = management_api.find_device_by_identity(d.identity)
-
-    print('found matching device with ID', dev.id)
-    devid = dev.id
-    # extract authentication data set ID
-    aid = dev.auth_sets[0].id
-
     try:
+        with orchestrator.run_fake_for_device_id(1) as server:
+            # poke devauth so that device appears
+            rsp = device_auth_req(url, da, d)
+            assert rsp.status_code == 401
+
+            # try to find our devices in all devices listing
+            dev = management_api.find_device_by_identity(d.identity)
+
+            print('found matching device with ID', dev.id)
+            devid = dev.id
+            # extract authentication data set ID
+            aid = dev.auth_sets[0].id
+
         with orchestrator.run_fake_for_device_id(devid) as server:
             management_api.accept_device(devid, aid)
     except bravado.exception.HTTPError as e:
@@ -51,7 +52,13 @@ def accepted_device(device_api, management_api, clean_migrated_db):
 @pytest.yield_fixture(scope='function')
 def device_token(accepted_device, device_api):
     devid, d, da = accepted_device
-    token = request_token(d, da, device_api.auth_requests_url)
+
+    try:
+        with orchestrator.run_fake_for_device_id(devid) as server:
+            token = request_token(d, da, device_api.auth_requests_url)
+    except bravado.exception.HTTPError as e:
+        assert e.response.status_code == 204
+
     print("device token:", token)
     assert token
     yield token
@@ -68,7 +75,11 @@ class TestToken:
     def test_token_claims(self, accepted_device, management_api, device_api):
         devid, d, da = accepted_device
 
-        token = request_token(d, da, device_api.auth_requests_url)
+        try:
+            with orchestrator.run_fake_for_device_id(devid) as server:
+                token = request_token(d, da, device_api.auth_requests_url)
+        except bravado.exception.HTTPError as e:
+            assert e.response.status_code == 204
 
         assert len(token) > 0
         print("device token:", d.token)
