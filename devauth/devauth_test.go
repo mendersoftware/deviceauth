@@ -407,6 +407,10 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 						return d.IdData == idData
 					})).Return(tc.addDeviceErr)
 
+			db.On("GetDeviceStatus", ctxMatcher,
+				mock.AnythingOfType("string")).Return(
+				"pending", nil)
+
 			db.On("GetDeviceByIdentityDataHash",
 				ctxMatcher,
 				idDataHash).Return(
@@ -469,7 +473,17 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 				})).
 				Return("dummytoken", nil)
 
-			devauth := NewDevAuth(&db, nil, &jwth, tc.config)
+			ctx := context.Background()
+			id := &identity.Identity{
+				Tenant: "foobar",
+			}
+			ctx = identity.WithContext(ctx, id)
+			co := morchestrator.ClientRunner{}
+			co.On("SubmitUpdateDeviceStatusJob", mock.Anything,
+				mock.AnythingOfType("orchestrator.UpdateDeviceStatusReq")).
+				Return(nil)
+
+			devauth := NewDevAuth(&db, &co, &jwth, tc.config)
 
 			if tc.tenantVerify {
 				ct := mtenant.ClientRunner{}
@@ -494,7 +508,7 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 				devauth = devauth.WithTenantVerification(&ct)
 			}
 
-			res, err := devauth.SubmitAuthRequest(context.Background(), &tc.inReq)
+			res, err := devauth.SubmitAuthRequest(ctx, &tc.inReq)
 
 			t.Logf("error: %v", err)
 			assert.Equal(t, tc.res, res)
@@ -663,6 +677,10 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 			t.Parallel()
 
 			ctx := context.Background()
+			id := &identity.Identity{
+				Tenant: "5f89045239781243abcfdefdf",
+			}
+			ctx = identity.WithContext(ctx, id)
 
 			// setup mocks
 			db := mstore.DataStore{}
@@ -728,8 +746,11 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 			).Return(nil)
 
 			db.On("GetDeviceById",
-				context.Background(), dummyDevId).Return(tc.dev, tc.dbGetDeviceByIdErr)
+				ctx, dummyDevId).Return(tc.dev, tc.dbGetDeviceByIdErr)
 
+			db.On("GetDeviceStatus", ctx,
+				mock.AnythingOfType("string")).Return(
+				"pending", nil)
 			// token serialization - happy path only, errors tested elsewhere
 			jwth := mjwt.Handler{}
 			jwth.On("ToJWT",
@@ -740,6 +761,9 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 			co.On("SubmitProvisionDeviceJob", ctx,
 				mock.AnythingOfType("orchestrator.ProvisionDeviceReq")).
 				Return(tc.coSubmitProvisionDeviceJobErr)
+			co.On("SubmitUpdateDeviceStatusJob", ctx,
+				mock.AnythingOfType("orchestrator.UpdateDeviceStatusReq")).
+				Return(nil)
 
 			// setup devauth
 			devauth := NewDevAuth(&db, &co, &jwth, Config{})
@@ -864,7 +888,11 @@ func TestDevAuthPreauthorizeDevice(t *testing.T) {
 							(m.PubKey == tc.req.PubKey)
 					})).Return(tc.addAuthSetErr)
 
-			devauth := NewDevAuth(&db, nil, nil, Config{})
+			co := morchestrator.ClientRunner{}
+			co.On("SubmitUpdateDeviceStatusJob", ctxMatcher,
+				mock.AnythingOfType("orchestrator.UpdateDeviceStatusReq")).
+				Return(nil)
+			devauth := NewDevAuth(&db, &co, nil, Config{})
 			err := devauth.PreauthorizeDevice(context.Background(), tc.req)
 
 			if tc.err != nil {
@@ -1088,6 +1116,9 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 			db.On("UpdateDevice", context.Background(),
 				mock.AnythingOfType("model.Device"),
 				mock.AnythingOfType("model.DeviceUpdate")).Return(nil)
+			db.On("GetDeviceStatus", context.Background(),
+				"dummy_devid").Return(
+				"accpted", nil)
 
 			if tc.aset != nil {
 				// for rejecting all auth sets
@@ -1108,12 +1139,13 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 					}).Return(tc.dbUpdateErr)
 			}
 
-			ctx := context.Background()
-
 			co := morchestrator.ClientRunner{}
-			co.On("SubmitProvisionDeviceJob", ctx,
+			co.On("SubmitProvisionDeviceJob", context.Background(),
 				mock.AnythingOfType("orchestrator.ProvisionDeviceReq")).
 				Return(tc.coSubmitProvisionDeviceJobErr)
+			co.On("SubmitUpdateDeviceStatusJob", context.Background(),
+				mock.AnythingOfType("orchestrator.UpdateDeviceStatusReq")).
+				Return(nil)
 
 			devauth := NewDevAuth(&db, &co, nil, Config{})
 			err := devauth.AcceptDeviceAuth(context.Background(), "dummy_devid", "dummy_aid")
@@ -1188,7 +1220,11 @@ func TestDevAuthRejectDevice(t *testing.T) {
 				mock.AnythingOfType("model.Device"),
 				mock.AnythingOfType("model.DeviceUpdate")).Return(nil)
 
-			devauth := NewDevAuth(&db, nil, nil, Config{})
+			co := morchestrator.ClientRunner{}
+			co.On("SubmitUpdateDeviceStatusJob", context.Background(),
+				mock.AnythingOfType("orchestrator.UpdateDeviceStatusReq")).
+				Return(nil)
+			devauth := NewDevAuth(&db, &co, nil, Config{})
 			err := devauth.RejectDeviceAuth(context.Background(), "dummy_devid", "dummy_aid")
 
 			if tc.dbErr != nil || (tc.dbDelDevTokenErr != nil &&
@@ -1263,7 +1299,12 @@ func TestDevAuthResetDevice(t *testing.T) {
 				mock.AnythingOfType("model.Device"),
 				mock.AnythingOfType("model.DeviceUpdate")).Return(nil)
 
-			devauth := NewDevAuth(&db, nil, nil, Config{})
+			co := morchestrator.ClientRunner{}
+			co.On("SubmitUpdateDeviceStatusJob", context.Background(),
+				mock.AnythingOfType("orchestrator.UpdateDeviceStatusReq")).
+				Return(nil)
+
+			devauth := NewDevAuth(&db, &co, nil, Config{})
 			err := devauth.ResetDeviceAuth(context.Background(), "dummy_devid", "dummy_aid")
 
 			if tc.dbErr != nil ||
@@ -1774,6 +1815,10 @@ func TestDevAuthGetTenantLimit(t *testing.T) {
 			t.Parallel()
 
 			ctx := context.Background()
+			id := &identity.Identity{
+				Tenant: "5f23456789cafddfe",
+			}
+			ctx = identity.WithContext(ctx, id)
 
 			db := mstore.DataStore{}
 			// in get limit, verify the correct db was set
@@ -2027,7 +2072,12 @@ func TestDevAuthDeleteAuthSet(t *testing.T) {
 				mock.AnythingOfType("model.Device"),
 				mock.AnythingOfType("model.DeviceUpdate")).Return(tc.dbUpdateDeviceErr)
 
-			devauth := NewDevAuth(&db, nil, nil, Config{})
+			co := morchestrator.ClientRunner{}
+			co.On("SubmitUpdateDeviceStatusJob", ctx,
+				mock.AnythingOfType("orchestrator.UpdateDeviceStatusReq")).
+				Return(nil)
+
+			devauth := NewDevAuth(&db, &co, nil, Config{})
 			err := devauth.DeleteAuthSet(ctx, tc.devId, tc.authId)
 
 			if tc.outErr != "" {

@@ -150,7 +150,7 @@ func NewDevAuth(d store.DataStore, co orchestrator.ClientRunner,
 	}
 }
 
-func (d *DevAuth) getDeviceFromAuthRequest(ctx context.Context, r *model.AuthReq) (*model.Device, error) {
+func (d *DevAuth) getDeviceFromAuthRequest(ctx context.Context, r *model.AuthReq, currentStatus *string) (*model.Device, error) {
 	dev := model.NewDevice("", r.IdData, r.PubKey)
 
 	l := log.FromContext(ctx)
@@ -165,6 +165,7 @@ func (d *DevAuth) getDeviceFromAuthRequest(ctx context.Context, r *model.AuthReq
 
 	// record device
 	err = d.db.AddDevice(ctx, *dev)
+	addDeviceErr := err
 	if err != nil && err != store.ErrObjectExists {
 		l.Errorf("failed to add/find device: %v", err)
 		return nil, err
@@ -178,9 +179,13 @@ func (d *DevAuth) getDeviceFromAuthRequest(ctx context.Context, r *model.AuthReq
 		return nil, errors.New("failed to locate device")
 	}
 
+	if addDeviceErr == store.ErrObjectExists {
+		*currentStatus = dev.Status
+	}
+
 	// check if the device is in the decommissioning state
 	if dev.Decommissioning {
-		l.Warnf("Device %s in the decommissioning state. %s", dev.Id)
+		l.Warnf("Device %s in the decommissioning state.", dev.Id)
 		return nil, ErrDevAuthUnauthorized
 	}
 
@@ -390,6 +395,7 @@ func (d *DevAuth) processPreAuthRequest(ctx context.Context, r *model.AuthReq) (
 		return nil, err
 	}
 
+	currentStatus := dev.Status
 	if dev.Status == model.DevStatusAccepted {
 		deviceAlreadyAccepted = true
 	}
@@ -428,7 +434,7 @@ func (d *DevAuth) processPreAuthRequest(ctx context.Context, r *model.AuthReq) (
 		return nil, errors.Wrap(err, "failed to update auth set status")
 	}
 
-	if err := d.updateDeviceStatus(ctx, aset.DeviceId, model.DevStatusAccepted); err != nil {
+	if err := d.updateDeviceStatus(ctx, aset.DeviceId, model.DevStatusAccepted, currentStatus); err != nil {
 		return nil, err
 	}
 
@@ -436,9 +442,13 @@ func (d *DevAuth) processPreAuthRequest(ctx context.Context, r *model.AuthReq) (
 	return aset, nil
 }
 
-func (d *DevAuth) updateDeviceStatus(ctx context.Context, devId, status string) error {
+func (d *DevAuth) updateDeviceStatus(ctx context.Context, devId, status string, currentStatus string) error {
+	statusChanged := true
+	newStatus, err := d.db.GetDeviceStatus(ctx, devId)
+	if currentStatus == newStatus {
+		statusChanged = false
+	}
 	if status == "" {
-		newStatus, err := d.db.GetDeviceStatus(ctx, devId)
 		switch err {
 		case nil:
 			status = newStatus
@@ -459,6 +469,29 @@ func (d *DevAuth) updateDeviceStatus(ctx context.Context, devId, status string) 
 		}); err != nil {
 		return errors.Wrap(err, "failed to update device status")
 	}
+
+	b, err := json.Marshal([]string{devId})
+	if err != nil {
+		return errors.New("internal error: cannot marshal array into json")
+	}
+	// submit device status change job
+	if statusChanged {
+		tenantId := ""
+		idData := identity.FromContext(ctx)
+		if idData != nil {
+			tenantId = idData.Tenant
+		}
+		if err := d.cOrch.SubmitUpdateDeviceStatusJob(
+			ctx,
+			orchestrator.UpdateDeviceStatusReq{
+				RequestId: requestid.FromContext(ctx),
+				Ids:       string(b), // []string{devId},
+				TenantId:  tenantId,
+				Status:    status,
+			}); err != nil {
+			return errors.Wrap(err, "update device status job error")
+		}
+	}
 	return nil
 }
 
@@ -469,8 +502,10 @@ func (d *DevAuth) processAuthRequest(ctx context.Context, r *model.AuthReq) (*mo
 
 	l := log.FromContext(ctx)
 
+	var currentState string
+	currentState = ""
 	// get device associated with given authorization request
-	dev, err := d.getDeviceFromAuthRequest(ctx, r)
+	dev, err := d.getDeviceFromAuthRequest(ctx, r, &currentState)
 	if err != nil {
 		return nil, err
 	}
@@ -497,7 +532,7 @@ func (d *DevAuth) processAuthRequest(ctx context.Context, r *model.AuthReq) (*mo
 	}
 
 	// update the device status
-	if err := d.updateDeviceStatus(ctx, dev.Id, ""); err != nil {
+	if err := d.updateDeviceStatus(ctx, dev.Id, "", currentState); err != nil {
 		return nil, err
 	}
 
@@ -622,7 +657,7 @@ func (d *DevAuth) DeleteAuthSet(ctx context.Context, devId string, authId string
 		return d.db.DeleteDevice(ctx, devId)
 	}
 
-	return d.updateDeviceStatus(ctx, devId, "")
+	return d.updateDeviceStatus(ctx, devId, "", authSet.Status)
 }
 
 func (d *DevAuth) AcceptDeviceAuth(ctx context.Context, device_id string, auth_id string) error {
@@ -709,6 +744,8 @@ func (d *DevAuth) setAuthSetStatus(ctx context.Context, device_id string, auth_i
 		return nil
 	}
 
+	currentStatus := aset.Status
+
 	if aset.Status == model.DevStatusAccepted && (status == model.DevStatusRejected || status == model.DevStatusPending) {
 		// delete device token
 		err := d.db.DeleteTokenByDevId(ctx, aset.DeviceId)
@@ -742,9 +779,9 @@ func (d *DevAuth) setAuthSetStatus(ctx context.Context, device_id string, auth_i
 	}
 
 	if status == model.DevStatusAccepted {
-		return d.updateDeviceStatus(ctx, device_id, status)
+		return d.updateDeviceStatus(ctx, device_id, status, currentStatus)
 	} else {
-		return d.updateDeviceStatus(ctx, device_id, "")
+		return d.updateDeviceStatus(ctx, device_id, "", currentStatus)
 	}
 }
 
@@ -798,6 +835,28 @@ func (d *DevAuth) PreauthorizeDevice(ctx context.Context, req *model.PreAuthReq)
 		return ErrDeviceExists
 	default:
 		return errors.Wrap(err, "failed to add device")
+	}
+
+	// submit device status change job
+	b, err := json.Marshal([]string{dev.Id})
+	if err != nil {
+		return errors.New("internal error: cannot marshal array into json")
+	}
+
+	tenantId := ""
+	idData := identity.FromContext(ctx)
+	if idData != nil {
+		tenantId = idData.Tenant
+	}
+	if err = d.cOrch.SubmitUpdateDeviceStatusJob(
+		ctx,
+		orchestrator.UpdateDeviceStatusReq{
+			RequestId: requestid.FromContext(ctx),
+			Ids:       string(b), // []string{dev.Id},
+			TenantId:  tenantId,
+			Status:    dev.Status,
+		}); err != nil {
+		return errors.Wrap(err, "update device status job error")
 	}
 
 	// record authentication request
