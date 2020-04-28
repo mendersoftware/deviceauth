@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -189,29 +189,6 @@ func (_m *DataStore) GetAuthSetByIdDataHashKey(ctx context.Context, idDataHash [
 	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, []byte, string) error); ok {
 		r1 = rf(ctx, idDataHash, key)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// GetAuthSets provides a mock function with given fields: ctx, skip, limit, filter
-func (_m *DataStore) GetAuthSets(ctx context.Context, skip int, limit int, filter store.AuthSetFilter) ([]model.DevAdmAuthSet, error) {
-	ret := _m.Called(ctx, skip, limit, filter)
-
-	var r0 []model.DevAdmAuthSet
-	if rf, ok := ret.Get(0).(func(context.Context, int, int, store.AuthSetFilter) []model.DevAdmAuthSet); ok {
-		r0 = rf(ctx, skip, limit, filter)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]model.DevAdmAuthSet)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, int, int, store.AuthSetFilter) error); ok {
-		r1 = rf(ctx, skip, limit, filter)
 	} else {
 		r1 = ret.Error(1)
 	}
