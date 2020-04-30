@@ -59,10 +59,6 @@ const (
 
 	SettingJWTExpirationTimeout        = "jwt_exp_timeout"
 	SettingJWTExpirationTimeoutDefault = "604800" //one week
-
-	SettingMaxDevicesLimitDefault        = "max_devices_limit_default"
-	SettingMaxDevicesLimitDefaultDefault = "0" // no limit
-
 )
 
 var (
@@ -81,6 +77,5 @@ var (
 		{Key: SettingJWTExpirationTimeout, Value: SettingJWTExpirationTimeoutDefault},
 		{Key: SettingDbSSL, Value: SettingDbSSLDefault},
 		{Key: SettingDbSSLSkipVerify, Value: SettingDbSSLSkipVerifyDefault},
-		{Key: SettingMaxDevicesLimitDefault, Value: SettingMaxDevicesLimitDefaultDefault},
 	}
 )
