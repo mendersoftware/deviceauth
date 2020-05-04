@@ -21,7 +21,7 @@ import (
 
 	//"github.com/mendersoftware/go-lib-micro/config"
 	"github.com/mendersoftware/go-lib-micro/identity"
-	"github.com/mendersoftware/go-lib-micro/mongo/uuid"
+	"github.com/mendersoftware/go-lib-micro/mongo/oid"
 	ctxstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
@@ -56,14 +56,14 @@ func TestMaintenanceWithDataStore(t *testing.T) {
 	}
 	datasetDevices := []interface{}{
 		model.Device{
-			Id:              uuid.NewSHA1("001").String(),
+			Id:              oid.NewUUIDv5("001").String(),
 			IdData:          "001",
 			PubKey:          "001",
 			Status:          model.DevStatusPending,
 			Decommissioning: false,
 		},
 		model.Device{
-			Id:              uuid.NewSHA1("002").String(),
+			Id:              oid.NewUUIDv5("002").String(),
 			IdData:          "002",
 			PubKey:          "002",
 			Status:          model.DevStatusPending,
@@ -73,14 +73,14 @@ func TestMaintenanceWithDataStore(t *testing.T) {
 
 	datasetAuthSets := []interface{}{
 		model.AuthSet{
-			Id:       uuid.NewSHA1("001").String(),
-			DeviceId: uuid.NewSHA1("001").String(),
+			Id:       oid.NewUUIDv5("001").String(),
+			DeviceId: oid.NewUUIDv5("001").String(),
 			IdData:   "001",
 			PubKey:   "001",
 		},
 		model.AuthSet{
-			Id:       uuid.NewSHA1("002").String(),
-			DeviceId: uuid.NewSHA1("003").String(),
+			Id:       oid.NewUUIDv5("002").String(),
+			DeviceId: oid.NewUUIDv5("003").String(),
 			IdData:   "001",
 			PubKey:   "002",
 		},
@@ -88,14 +88,14 @@ func TestMaintenanceWithDataStore(t *testing.T) {
 
 	datasetTokens := []interface{}{
 		jwt.Token{Claims: jwt.Claims{
-			ID:        uuid.NewSHA1("001"),
-			Subject:   uuid.NewSHA1("001"),
+			ID:        oid.NewUUIDv5("001"),
+			Subject:   oid.NewUUIDv5("001"),
 			Issuer:    "Tester",
 			ExpiresAt: jwt.Time{Time: time.Now().Add(time.Hour)},
 		}},
 		jwt.Token{Claims: jwt.Claims{
-			ID:        uuid.NewSHA1("002"),
-			Subject:   uuid.NewSHA1("003"),
+			ID:        oid.NewUUIDv5("002"),
+			Subject:   oid.NewUUIDv5("003"),
 			Issuer:    "Tester",
 			ExpiresAt: jwt.Time{Time: time.Now().Add(time.Hour)},
 		}},
@@ -180,14 +180,14 @@ func TestMaintenanceWithDataStore(t *testing.T) {
 
 func TestPropagateInventory(t *testing.T) {
 	devSet1 := []model.Device{
-		model.Device{
+		{
 			Id: "001",
 			IdDataStruct: map[string]interface{}{
 				"mac": "mac001",
 				"sn":  "sn001",
 			},
 		},
-		model.Device{
+		{
 			Id: "002",
 			IdDataStruct: map[string]interface{}{
 				"mac":    "mac002",
@@ -197,13 +197,13 @@ func TestPropagateInventory(t *testing.T) {
 	}
 
 	devSet2 := []model.Device{
-		model.Device{
+		{
 			Id: "003",
 			IdDataStruct: map[string]interface{}{
 				"mac": "mac003",
 			},
 		},
-		model.Device{
+		{
 			Id: "004",
 			IdDataStruct: map[string]interface{}{
 				"mac":    "mac004",
@@ -212,7 +212,7 @@ func TestPropagateInventory(t *testing.T) {
 				"arrstr": []string{"s1", "s2", "s3"},
 			},
 		},
-		model.Device{
+		{
 			Id: "005",
 			IdDataStruct: map[string]interface{}{
 				"mac":    "mac005",
@@ -285,7 +285,7 @@ func TestPropagateInventory(t *testing.T) {
 		},
 	}
 
-	for k, _ := range cases {
+	for k := range cases {
 		tc := cases[k]
 		t.Run(fmt.Sprintf("tc %s", k), func(t *testing.T) {
 
@@ -298,7 +298,7 @@ func TestPropagateInventory(t *testing.T) {
 				db.On("GetTenantDbs").Return([]string{}, tc.errDbTenants)
 			} else {
 				dbs := []string{}
-				for k, _ := range tc.dbDevs {
+				for k := range tc.dbDevs {
 					dbs = append(dbs, k)
 				}
 				db.On("GetTenantDbs").Return(dbs, tc.errDbTenants)

@@ -23,7 +23,7 @@ import (
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
-	"github.com/mendersoftware/go-lib-micro/mongo/uuid"
+	"github.com/mendersoftware/go-lib-micro/mongo/oid"
 	ctxstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/pkg/errors"
 	"go.mongodb.org/mongo-driver/bson"
@@ -119,13 +119,13 @@ func (db *DataStoreMongo) GetDevices(ctx context.Context, skip, limit uint, filt
 	res := []model.Device{}
 
 	pipeline := []bson.D{
-		bson.D{
+		{
 			{Key: "$match", Value: filter},
 		},
-		bson.D{
+		{
 			{Key: "$sort", Value: bson.M{"_id": 1}},
 		},
-		bson.D{
+		{
 			{Key: "$skip", Value: skip},
 		},
 	}
@@ -187,7 +187,7 @@ func (db *DataStoreMongo) GetDeviceByIdentityDataHash(ctx context.Context, idata
 func (db *DataStoreMongo) AddDevice(ctx context.Context, d model.Device) error {
 
 	if d.Id == "" {
-		uid := uuid.NewRandom()
+		uid := oid.NewUUIDv4()
 		d.Id = uid.String()
 	}
 
@@ -255,7 +255,7 @@ func (db *DataStoreMongo) AddToken(ctx context.Context, t *jwt.Token) error {
 
 func (db *DataStoreMongo) GetToken(
 	ctx context.Context,
-	jti uuid.UUID,
+	jti oid.ObjectID,
 ) (*jwt.Token, error) {
 
 	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbTokensColl)
@@ -274,7 +274,7 @@ func (db *DataStoreMongo) GetToken(
 	return &res, nil
 }
 
-func (db *DataStoreMongo) DeleteToken(ctx context.Context, jti uuid.UUID) error {
+func (db *DataStoreMongo) DeleteToken(ctx context.Context, jti oid.ObjectID) error {
 	database := db.client.Database(ctxstore.DbFromContext(ctx, DbName))
 	collTokens := database.Collection(DbTokensColl)
 
@@ -299,7 +299,7 @@ func (db *DataStoreMongo) DeleteTokens(ctx context.Context) error {
 
 func (db *DataStoreMongo) DeleteTokenByDevId(
 	ctx context.Context,
-	devID uuid.UUID,
+	devID oid.ObjectID,
 ) error {
 	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).
 		Collection(DbTokensColl)
@@ -424,7 +424,7 @@ func (db *DataStoreMongo) AddAuthSet(ctx context.Context, set model.AuthSet) err
 	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
 
 	if set.Id == "" {
-		uid := uuid.NewRandom()
+		uid := oid.NewUUIDv4()
 		set.Id = uid.String()
 	}
 
