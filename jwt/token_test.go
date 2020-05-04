@@ -17,7 +17,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mendersoftware/go-lib-micro/mongo/uuid"
+	"github.com/mendersoftware/go-lib-micro/mongo/oid"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 )
@@ -25,8 +25,8 @@ import (
 func TestTokenMarshal(t *testing.T) {
 	tok := &Token{
 		Claims: Claims{
-			ID:      uuid.NewSHA1("foo"),
-			Subject: uuid.NewSHA1("valid-subject"),
+			ID:      oid.NewUUIDv5("foo"),
+			Subject: oid.NewUUIDv5("valid-subject"),
 			ExpiresAt: Time{
 				Time: time.Now().Add(time.Hour),
 			},
@@ -52,8 +52,8 @@ func TestTokenUnmarshal(t *testing.T) {
 	tokin := []byte("some-fake-jwt")
 	tok := &Token{
 		Claims: Claims{
-			ID:      uuid.NewSHA1("foo"),
-			Subject: uuid.NewSHA1("valid-subject"),
+			ID:      oid.NewUUIDv5("foo"),
+			Subject: oid.NewUUIDv5("valid-subject"),
 			ExpiresAt: Time{
 				Time: time.Now().Add(time.Hour),
 			},
