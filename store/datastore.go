@@ -21,7 +21,7 @@ import (
 	"github.com/mendersoftware/deviceauth/jwt"
 	"github.com/mendersoftware/deviceauth/model"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
-	"github.com/mendersoftware/go-lib-micro/mongo/uuid"
+	"github.com/mendersoftware/go-lib-micro/mongo/oid"
 )
 
 var (
@@ -96,16 +96,16 @@ type DataStore interface {
 
 	// retrieves JWT from database using JWT Id and device Id
 	// returns ErrTokenNotFound if token not found
-	GetToken(ctx context.Context, jti uuid.UUID) (*jwt.Token, error)
+	GetToken(ctx context.Context, jti oid.ObjectID) (*jwt.Token, error)
 
 	// deletes token
-	DeleteToken(ctx context.Context, jti uuid.UUID) error
+	DeleteToken(ctx context.Context, jti oid.ObjectID) error
 
 	// deletes all (tenant's) tokens (identity in context)
 	DeleteTokens(ctx context.Context) error
 
 	// deletes device token
-	DeleteTokenByDevId(ctx context.Context, dev_id uuid.UUID) error
+	DeleteTokenByDevId(ctx context.Context, dev_id oid.ObjectID) error
 
 	// put limit information into data store
 	PutLimit(ctx context.Context, lim model.Limit) error

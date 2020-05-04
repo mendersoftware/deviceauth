@@ -339,16 +339,16 @@
 			"revisionTime": "2020-05-07T15:24:41Z"
 		},
 		{
+			"checksumSHA1": "35dmQYi0wQaKpS7tkQ6z6AFCH4Q=",
+			"path": "github.com/mendersoftware/go-lib-micro/mongo/oid",
+			"revision": "4df90950a77cca8f4be242dee6f89f0403437c3e",
+			"revisionTime": "2020-05-15T04:08:51Z"
+		},
+		{
 			"checksumSHA1": "sieXjK4uGibGjwVjk174Fas3jW8=",
 			"path": "github.com/mendersoftware/go-lib-micro/mongo/testing",
 			"revision": "6829ff01e034e52dcc1d76b29b30818a8364ee32",
 			"revisionTime": "2020-05-07T15:24:41Z"
-		},
-		{
-			"checksumSHA1": "K6atxufr11Vyiik2LQVLuizvv8g=",
-			"path": "github.com/mendersoftware/go-lib-micro/mongo/uuid",
-			"revision": "b2558c652499c089646c0cf5eab935c20e8d14f6",
-			"revisionTime": "2020-03-30T11:28:08Z"
 		},
 		{
 			"checksumSHA1": "sve6XoM2mIBPxtjjLBy7Oq8EHQo=",
