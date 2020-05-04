@@ -934,7 +934,6 @@ func verifyTenantClaim(ctx context.Context, verifyTenant bool, tenant string) er
 func (d *DevAuth) VerifyToken(ctx context.Context, raw string) error {
 
 	l := log.FromContext(ctx)
-
 	token := &jwt.Token{}
 
 	err := token.UnmarshalJWT([]byte(raw), d.jwt.FromJWT)
