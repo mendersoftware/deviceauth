@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -31,12 +31,14 @@ import (
 )
 
 const (
-	urlPatchAttrs = "/api/internal/v2/inventory/devices/:id"
-	timeout       = 10 * time.Second
+	urlPatchAttrs         = "/api/internal/v2/inventory/devices/:id"
+	urlUpdateDeviceStatus = "/api/internal/v1/inventory/tenants/:tid/devices/"
+	timeout               = 10 * time.Second
 )
 
 type Client interface {
 	PatchDeviceV2(ctx context.Context, did, tid, src string, ts int64, attrs []Attribute) error
+	SetDeviceStatus(ctx context.Context, tenantId string, deviceIds []string, status string) error
 }
 
 type client struct {
@@ -85,6 +87,54 @@ func (c *client) PatchDeviceV2(ctx context.Context, did, tid, src string, ts int
 		q.Add("tenant_id", tid)
 		req.URL.RawQuery = q.Encode()
 	}
+
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	rsp, err := c.client.Do(req.WithContext(ctx))
+	if err != nil {
+		return errors.Wrapf(err, "failed to submit %s %s", req.Method, req.URL)
+	}
+	defer rsp.Body.Close()
+
+	if rsp.StatusCode != http.StatusOK {
+		body, err := ioutil.ReadAll(rsp.Body)
+		if err != nil {
+			body = []byte("<failed to read>")
+		}
+		l.Errorf("request %s %s failed with status %v, response: %s",
+			req.Method, req.URL, rsp.Status, body)
+
+		return errors.Errorf(
+			"%s %s request failed with status %v", req.Method, req.URL, rsp.Status)
+	}
+
+	return nil
+}
+
+func (c *client) SetDeviceStatus(ctx context.Context, tenantId string, deviceIds []string, status string) error {
+	l := log.FromContext(ctx)
+
+	if len(deviceIds) < 1 {
+		return errors.New("no devices to update")
+	}
+	body, err := json.Marshal(deviceIds)
+	if err != nil {
+		return errors.Wrapf(err, "failed to serialize device ids")
+	}
+
+	rd := bytes.NewReader(body)
+
+	url := utils.JoinURL(c.urlBase, urlUpdateDeviceStatus+status)
+	url = strings.Replace(url, ":tid", tenantId, 1)
+
+	req, err := http.NewRequest(http.MethodPost, url, rd)
+	if err != nil {
+		return errors.Wrapf(err, "failed to create request")
+	}
+
+	req.Header.Set("X-MEN-Source", "deviceauth")
+	req.Header.Set("Content-Type", "application/json")
 
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()

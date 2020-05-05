@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -223,6 +223,26 @@ func PropagateInventory(db store.DataStore, c cinv.Client, tenant string, dryrun
 	return nil
 }
 
+func PropagateStatusesInventory(db store.DataStore, c cinv.Client, tenant string, dryRun bool) error {
+	l := log.NewEmpty()
+
+	dbs, err := selectDbs(db, tenant)
+	if err != nil {
+		return errors.Wrap(err, "aborting")
+	}
+
+	for _, d := range dbs {
+		err := tryPropagateStatusesInventoryForDb(db, c, d, dryRun)
+		if err != nil {
+			l.Errorf("giving up on DB %s due to fatal error: %s", d, err.Error())
+			continue
+		}
+	}
+
+	l.Info("all DBs processed, exiting.")
+	return nil
+}
+
 func selectDbs(db store.DataStore, tenant string) ([]string, error) {
 	l := log.NewEmpty()
 
@@ -299,6 +319,71 @@ func tryPropagateInventoryForDb(db store.DataStore, c cinv.Client, dbname string
 	}
 
 	return nil
+}
+
+const (
+	devicesBatchSize = 512
+)
+
+func updateDevicesStatus(ctx context.Context, db store.DataStore, c cinv.Client, tenant string, status string, dryRun bool) error {
+	var skip uint
+
+	skip = 0
+	for {
+		devices, err := db.GetDevices(ctx, skip, devicesBatchSize, store.DeviceFilter{Status: status})
+		if err != nil {
+			return errors.Wrap(err, "failed to get devices")
+		}
+
+		if len(devices) < 1 {
+			break
+		}
+		devicesIds := make([]string, len(devices))
+		for i, d := range devices {
+			devicesIds[i] = d.Id
+		}
+
+		if !dryRun {
+			err = c.SetDeviceStatus(ctx, tenant, devicesIds, status)
+			if err != nil {
+				return err
+			}
+		}
+
+		if len(devices) < devicesBatchSize {
+			break
+		} else {
+			skip += devicesBatchSize
+		}
+	}
+	return nil
+}
+
+func tryPropagateStatusesInventoryForDb(db store.DataStore, c cinv.Client, dbname string, dryRun bool) error {
+	l := log.NewEmpty()
+
+	l.Infof("propagating device statuses to inventory from DB: %s", dbname)
+
+	tenant := mstore.TenantFromDbName(dbname, mongo.DbName)
+
+	ctx := context.Background()
+	if tenant != "" {
+		ctx = identity.WithContext(ctx, &identity.Identity{
+			Tenant: tenant,
+		})
+	}
+
+	var err error
+	for _, status := range []string{"accepted", "pending", "rejected", "preauthorized"} {
+		err = updateDevicesStatus(ctx, db, c, tenant, status, dryRun)
+		if err != nil {
+			l.Infof("Done with DB %s status=%s, but there were errors: %s.", dbname, status, err.Error())
+		} else {
+			l.Infof("Done with DB %s status=%s", dbname, status)
+		}
+	}
+
+	return err
 }
 
 func propagateSingleDevice(d model.Device, c cinv.Client, tenant string, dryrun bool) error {

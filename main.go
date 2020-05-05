@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -101,6 +101,22 @@ func doMain(args []string) {
 			},
 
 			Action: cmdPropagateInventory,
+		},
+		{
+			Name:  "propagate-inventory-statuses",
+			Usage: "Push device statuses to inventory",
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:  "tenant_id",
+					Usage: "Tenant ID (optional) - propagate for just a single tenant.",
+				},
+				cli.BoolFlag{
+					Name:  "dry-run",
+					Usage: "Do not perform any inventory modifications, just scan and print devices.",
+				},
+			},
+
+			Action: cmdPropagateStatusesInventory,
 		},
 		{
 			Name:  "maintenance",
@@ -212,6 +228,19 @@ func cmdPropagateInventory(args *cli.Context) error {
 	c := cinv.NewClient(inv, false)
 
 	err = cmd.PropagateInventory(db, c, args.String("tenant_id"), args.Bool("dry-run"))
+	if err != nil {
+		return cli.NewExitError(err, 7)
+	}
+	return nil
+}
+
+func cmdPropagateStatusesInventory(args *cli.Context) error {
+	db, err := mongo.NewDataStoreMongo(makeDataStoreConfig())
+
+	inv := config.Config.GetString(dconfig.SettingInventoryAddr)
+	c := cinv.NewClient(inv, false)
+
+	err = cmd.PropagateStatusesInventory(db, c, args.String("tenant_id"), args.Bool("dry-run"))
 	if err != nil {
 		return cli.NewExitError(err, 7)
 	}
