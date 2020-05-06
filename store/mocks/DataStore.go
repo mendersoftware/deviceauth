@@ -14,7 +14,10 @@
 
 package mocks
 
-import context "context"
+import (
+	context "context"
+	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
+)
 import mock "github.com/stretchr/testify/mock"
 import model "github.com/mendersoftware/deviceauth/model"
 import store "github.com/mendersoftware/deviceauth/store"
@@ -480,6 +483,19 @@ func (_m *DataStore) WithAutomigrate() store.DataStore {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(store.DataStore)
 		}
+	}
+
+	return r0
+}
+
+func (_m *DataStore) StoreMigrationVersion(ctx context.Context, version *migrate.Version) error {
+	ret := _m.Called(ctx, version)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *migrate.Version) error); ok {
+		r0 = rf(ctx, version)
+	} else {
+		r0 = ret.Error(0)
 	}
 
 	return r0

@@ -19,6 +19,7 @@ import (
 	"errors"
 
 	"github.com/mendersoftware/deviceauth/model"
+	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 )
 
 var (
@@ -121,4 +122,7 @@ type DataStore interface {
 
 	MigrateTenant(ctx context.Context, version string, tenant string) error
 	WithAutomigrate() DataStore
+	//call this one if you really know what you are doing. This is supposed to be called only
+	//from cmdPropagateStatusesInventory
+	StoreMigrationVersion(ctx context.Context, version *migrate.Version) error
 }

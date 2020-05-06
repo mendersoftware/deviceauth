@@ -22,6 +22,7 @@ import (
 	"github.com/mendersoftware/go-lib-micro/config"
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/log"
+	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	mstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/pkg/errors"
 
@@ -223,7 +224,7 @@ func PropagateInventory(db store.DataStore, c cinv.Client, tenant string, dryrun
 	return nil
 }
 
-func PropagateStatusesInventory(db store.DataStore, c cinv.Client, tenant string, dryRun bool) error {
+func PropagateStatusesInventory(db store.DataStore, c cinv.Client, tenant string, migrationVersion string, dryRun bool) error {
 	l := log.NewEmpty()
 
 	dbs, err := selectDbs(db, tenant)
@@ -231,16 +232,18 @@ func PropagateStatusesInventory(db store.DataStore, c cinv.Client, tenant string
 		return errors.Wrap(err, "aborting")
 	}
 
+	var errReturned error
 	for _, d := range dbs {
-		err := tryPropagateStatusesInventoryForDb(db, c, d, dryRun)
+		err := tryPropagateStatusesInventoryForDb(db, c, d, migrationVersion, dryRun)
 		if err != nil {
+			errReturned = err
 			l.Errorf("giving up on DB %s due to fatal error: %s", d, err.Error())
 			continue
 		}
 	}
 
 	l.Info("all DBs processed, exiting.")
-	return nil
+	return errReturned
 }
 
 func selectDbs(db store.DataStore, tenant string) ([]string, error) {
@@ -359,7 +362,7 @@ func updateDevicesStatus(ctx context.Context, db store.DataStore, c cinv.Client,
 	return nil
 }
 
-func tryPropagateStatusesInventoryForDb(db store.DataStore, c cinv.Client, dbname string, dryRun bool) error {
+func tryPropagateStatusesInventoryForDb(db store.DataStore, c cinv.Client, dbname string, migrationVersion string, dryRun bool) error {
 	l := log.NewEmpty()
 
 	l.Infof("propagating device statuses to inventory from DB: %s", dbname)
@@ -374,16 +377,31 @@ func tryPropagateStatusesInventoryForDb(db store.DataStore, c cinv.Client, dbnam
 	}
 
 	var err error
+	var errReturned error
 	for _, status := range []string{"accepted", "pending", "rejected", "preauthorized"} {
 		err = updateDevicesStatus(ctx, db, c, tenant, status, dryRun)
 		if err != nil {
 			l.Infof("Done with DB %s status=%s, but there were errors: %s.", dbname, status, err.Error())
+			errReturned = err
 		} else {
 			l.Infof("Done with DB %s status=%s", dbname, status)
 		}
 	}
+	if migrationVersion != "" && !dryRun {
+		if errReturned != nil {
+			l.Warnf("Will not store %s migration version in %s.migration_info due to errors.", migrationVersion, dbname)
+		} else {
+			version, err := migrate.NewVersion(migrationVersion)
+			if version == nil || err != nil {
+				l.Warnf("Will not store %s migration version in %s.migration_info due to bad version provided.", migrationVersion, dbname)
+				errReturned = err
+			} else {
+				db.StoreMigrationVersion(ctx, version)
+			}
+		}
+	}
 
-	return err
+	return errReturned
 }
 
 func propagateSingleDevice(d model.Device, c cinv.Client, tenant string, dryrun bool) error {

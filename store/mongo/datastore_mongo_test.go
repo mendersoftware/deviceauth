@@ -717,7 +717,7 @@ func TestStoreMigrate(t *testing.T) {
 		DbVersion + " no automigrate": {
 			automigrate: false,
 			version:     DbVersion,
-			err:         "failed to apply migrations: db needs migration: deviceauth has version 0.0.0, needs version 1.6.0",
+			err:         "failed to apply migrations: db needs migration: deviceauth has version 0.0.0, needs version 1.7.0",
 		},
 		DbVersion + " multitenant": {
 			automigrate: true,
@@ -729,7 +729,7 @@ func TestStoreMigrate(t *testing.T) {
 			automigrate: false,
 			tenantDbs:   []string{"deviceauth-tenant1id", "deviceauth-tenant2id"},
 			version:     DbVersion,
-			err:         "failed to apply migrations: db needs migration: deviceauth-tenant1id has version 0.0.0, needs version 1.6.0",
+			err:         "failed to apply migrations: db needs migration: deviceauth-tenant1id has version 0.0.0, needs version 1.7.0",
 		},
 		"0.1 error": {
 			automigrate: true,
@@ -842,6 +842,51 @@ func TestStoreMigrate(t *testing.T) {
 					}
 				}
 
+			} else {
+				assert.EqualError(t, err, tc.err)
+			}
+		})
+	}
+}
+
+func TestStoreMigrationVersion(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestMigrate in short mode.")
+	}
+
+	dbVersion, _ := migrate.NewVersion(DbVersion)
+	testCases := map[string]struct {
+		version *migrate.Version
+		err     string
+	}{
+		DbVersion: {
+			version: dbVersion,
+			err:     "",
+		},
+		"and what version is that, error": {
+			err: "version cant be nil.",
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(fmt.Sprintf("tc: %s", name), func(t *testing.T) {
+			db.Wipe()
+			db := NewDataStoreMongoWithClient(db.Client())
+
+			ctx := context.Background()
+			err := db.StoreMigrationVersion(ctx, tc.version)
+			if tc.err == "" {
+				assert.NoError(t, err)
+				var out []migrate.MigrationEntry
+				c := db.client.Database(DbName).Collection(migrate.DbMigrationsColl)
+				cursor, err := c.Find(ctx, bson.M{})
+				assert.NoError(t, err)
+				err = cursor.All(ctx, &out)
+				assert.NoError(t, err)
+				v := tc.version
+				assert.Equal(t, *v, out[len(out)-1].Version)
+
+				// verify that all indexes are created
 			} else {
 				assert.EqualError(t, err, tc.err)
 			}

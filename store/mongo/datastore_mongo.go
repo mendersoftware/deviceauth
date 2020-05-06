@@ -36,7 +36,7 @@ import (
 )
 
 const (
-	DbVersion     = "1.6.0"
+	DbVersion     = "1.7.0"
 	DbName        = "deviceauth"
 	DbDevicesColl = "devices"
 	DbAuthSetColl = "auth_sets"
@@ -143,6 +143,21 @@ func (db *DataStoreMongo) GetDevices(ctx context.Context, skip, limit uint, filt
 	}
 
 	return res, nil
+}
+
+func (db *DataStoreMongo) StoreMigrationVersion(ctx context.Context, version *migrate.Version) error {
+	if version == nil {
+		return errors.New("version cant be nil.")
+	}
+
+	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(migrate.DbMigrationsColl)
+
+	migrationInfo := migrate.MigrationEntry{
+		Version:   *version,
+		Timestamp: time.Now(),
+	}
+	_, err := c.InsertOne(ctx, migrationInfo)
+	return err
 }
 
 func (db *DataStoreMongo) GetDeviceById(ctx context.Context, id string) (*model.Device, error) {
@@ -385,6 +400,10 @@ func (db *DataStoreMongo) MigrateTenant(ctx context.Context, database, version s
 			ctx: ctx,
 		},
 		&migration_1_6_0{
+			ms:  db,
+			ctx: ctx,
+		},
+		&migration_1_7_0{
 			ms:  db,
 			ctx: ctx,
 		},
