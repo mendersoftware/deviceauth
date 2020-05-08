@@ -20,6 +20,7 @@ import (
 
 	"github.com/mendersoftware/go-lib-micro/config"
 	"github.com/mendersoftware/go-lib-micro/identity"
+	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	ctxstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
@@ -374,6 +375,215 @@ func TestPropagateInventory(t *testing.T) {
 			}
 
 			err := PropagateInventory(db, c, tc.cmdTenant, tc.cmdDryRun)
+			if tc.err != nil {
+				assert.EqualError(t, err, tc.err.Error())
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestPropagateStatusesInventory(t *testing.T) {
+	devSet1 := []model.Device{
+		model.Device{
+			Id: "001",
+		},
+		model.Device{
+			Id: "002",
+		},
+	}
+
+	devSet2 := []model.Device{
+		model.Device{
+			Id: "003",
+		},
+		model.Device{
+			Id: "004",
+		},
+		model.Device{
+			Id: "005",
+		},
+	}
+
+	cases := map[string]struct {
+		dbDevs        map[string][]model.Device
+		forcedVersion string
+
+		cmdTenant string
+		cmdDryRun bool
+
+		errDbTenants error
+		errDbDevices error
+		setStatus    error
+
+		err error
+	}{
+		"ok, default db, no tenant": {
+			dbDevs: map[string][]model.Device{
+				"deviceauth": devSet1,
+			},
+		},
+		"ok, default db, no tenant, dry run": {
+			dbDevs: map[string][]model.Device{
+				"deviceauth": devSet1,
+			},
+			cmdDryRun: true,
+		},
+		"ok, >1 tenant, process all": {
+			dbDevs: map[string][]model.Device{
+				"deviceauth-tenant1": devSet1,
+				"deviceauth-tenant2": devSet2,
+			},
+		},
+		"ok, >1 tenant, process selected": {
+			dbDevs: map[string][]model.Device{
+				"deviceauth-tenant1": devSet1,
+				"deviceauth-tenant2": devSet2,
+			},
+			cmdTenant: "tenant1",
+		},
+		"ok, with forced version": {
+			dbDevs: map[string][]model.Device{
+				"deviceauth-tenant1": devSet1,
+				"deviceauth-tenant2": devSet2,
+			},
+			cmdTenant:     "tenant1",
+			forcedVersion: "1.7.1",
+		},
+		"error, with bad forced version": {
+			dbDevs: map[string][]model.Device{
+				"deviceauth-tenant1": devSet1,
+				"deviceauth-tenant2": devSet2,
+			},
+			cmdTenant:     "tenant1",
+			forcedVersion: "and what this version might be",
+			err:           errors.New("failed to parse Version: expected integer"),
+		},
+		"error: store get tenant dbs, abort": {
+			dbDevs: map[string][]model.Device{
+				"deviceauth-tenant1": devSet1,
+				"deviceauth-tenant2": devSet2,
+			},
+			errDbTenants: errors.New("db failure"),
+
+			err: errors.New("aborting: failed to retrieve tenant DBs: db failure"),
+		},
+		"error: store get devices, report but don't abort": {
+			dbDevs: map[string][]model.Device{
+				"deviceauth-tenant1": devSet1,
+				"deviceauth-tenant2": devSet2,
+			},
+			errDbDevices: errors.New("db failure"),
+			err: errors.New("failed to get devices: db failure"),
+		},
+		"error: patch devices, report but don't abort": {
+			dbDevs: map[string][]model.Device{
+				"deviceauth-tenant1": devSet1,
+				"deviceauth-tenant2": devSet2,
+			},
+			setStatus: errors.New("service failure"),
+			err: errors.New("service failure"),
+		},
+	}
+
+	for k, _ := range cases {
+		tc := cases[k]
+		t.Run(fmt.Sprintf("tc %s", k), func(t *testing.T) {
+
+			db := &mstore.DataStore{}
+			v, _ := migrate.NewVersion(tc.forcedVersion)
+			db.On("StoreMigrationVersion",
+				mock.Anything,
+				v).Return(nil)
+			// setup GetTenantDbs
+			// first, infer if we're in ST or MT
+			st := len(tc.dbDevs) == 1 && tc.dbDevs["deviceauth"] != nil
+			if st {
+				db.On("GetTenantDbs").Return([]string{}, tc.errDbTenants)
+			} else {
+				dbs := []string{}
+				for k, _ := range tc.dbDevs {
+					dbs = append(dbs, k)
+				}
+				db.On("GetTenantDbs").Return(dbs, tc.errDbTenants)
+			}
+
+			// 'final' dbs to include based on ST vs MT + tenant selection
+			dbs := map[string][]model.Device{}
+			if st {
+				dbs["deviceauth"] = tc.dbDevs["deviceauth"]
+			} else {
+				if tc.cmdTenant != "" {
+					k := "deviceauth-" + tc.cmdTenant
+					dbs[k] = tc.dbDevs[k]
+				} else {
+					dbs = tc.dbDevs
+				}
+			}
+
+			// setup GetDevices
+			// only default db devs in ST, or
+			// all devs in all dbs if no tenant selected
+			// just one tenant dev set if tenant selected
+			if st {
+				for _, status := range []string{"accepted", "pending", "rejected", "preauthorized"} {
+					db.On("GetDevices",
+						context.Background(),
+						uint(0),
+						uint(512),
+						store.DeviceFilter{Status: status}).Return(
+						dbs["deviceauth"],
+						tc.errDbDevices)
+				}
+			} else {
+				for k, v := range dbs {
+					tname := ctxstore.TenantFromDbName(k, mongo.DbName)
+					m := mock.MatchedBy(func(c context.Context) bool {
+						id := identity.FromContext(c)
+						return id.Tenant == tname
+					})
+
+					for _, status := range []string{"accepted", "pending", "rejected", "preauthorized"} {
+						db.On("GetDevices",
+							m,
+							uint(0),
+							uint(512),
+							store.DeviceFilter{Status: status}).Return(
+							v,
+							tc.errDbDevices)
+					}
+				}
+			}
+
+			// setup client PatchDeviceV2
+			//(dry run, time source, no tenant/all tenants/selected tenant)
+			NowUnixMilis = func() int64 { return int64(123456) }
+
+			c := &minv.Client{}
+
+			if tc.cmdDryRun == false {
+				for n, devs := range dbs {
+					deviceIds := make([]string, len(devs))
+					for i, d := range devs {
+						deviceIds[i] = d.Id
+					}
+					tenant := ctxstore.TenantFromDbName(n, mongo.DbName)
+					for _, status := range []string{"accepted", "pending", "rejected", "preauthorized"} {
+						c.On("SetDeviceStatus",
+							mock.Anything,
+							tenant,
+							deviceIds,
+							status).Return(tc.setStatus)
+					}
+				}
+			}
+
+			if tc.cmdDryRun == true {
+				c.AssertNotCalled(t, "SetDeviceStatus")
+			}
+
+			err := PropagateStatusesInventory(db, c, tc.cmdTenant, tc.forcedVersion, tc.cmdDryRun)
 			if tc.err != nil {
 				assert.EqualError(t, err, tc.err.Error())
 			} else {

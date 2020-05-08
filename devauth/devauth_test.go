@@ -1679,8 +1679,6 @@ func TestDevAuthGetLimit(t *testing.T) {
 
 		outLimit *model.Limit
 		outErr   error
-
-		maxDevicesLimitDefaultConfig uint64
 	}{
 		"ok": {
 			inName: "other_limit",
@@ -1690,8 +1688,6 @@ func TestDevAuthGetLimit(t *testing.T) {
 
 			outLimit: &model.Limit{Name: "other_limit", Value: 123},
 			outErr:   nil,
-
-			maxDevicesLimitDefaultConfig: 456,
 		},
 		"ok max_devices": {
 			inName: model.LimitMaxDeviceCount,
@@ -1701,8 +1697,6 @@ func TestDevAuthGetLimit(t *testing.T) {
 
 			outLimit: &model.Limit{Name: model.LimitMaxDeviceCount, Value: 123},
 			outErr:   nil,
-
-			maxDevicesLimitDefaultConfig: 456,
 		},
 		"limit not found": {
 			inName: "other_limit",
@@ -1712,19 +1706,6 @@ func TestDevAuthGetLimit(t *testing.T) {
 
 			outLimit: &model.Limit{Name: "other_limit", Value: 0},
 			outErr:   nil,
-
-			maxDevicesLimitDefaultConfig: 456,
-		},
-		"limit not found max_devices": {
-			inName: model.LimitMaxDeviceCount,
-
-			dbLimit: nil,
-			dbErr:   store.ErrLimitNotFound,
-
-			outLimit: &model.Limit{Name: model.LimitMaxDeviceCount, Value: 456},
-			outErr:   nil,
-
-			maxDevicesLimitDefaultConfig: 456,
 		},
 		"generic error": {
 			inName: "max_devices",
@@ -1750,8 +1731,7 @@ func TestDevAuthGetLimit(t *testing.T) {
 				mock.AnythingOfType("model.Device"),
 				mock.AnythingOfType("model.DeviceUpdate")).Return(nil)
 
-			devauth := NewDevAuth(&db, nil, nil,
-				Config{MaxDevicesLimitDefault: tc.maxDevicesLimitDefaultConfig})
+			devauth := NewDevAuth(&db, nil, nil, Config{})
 			limit, err := devauth.GetLimit(ctx, tc.inName)
 
 			if tc.outErr != nil {
@@ -1936,7 +1916,7 @@ func TestDevAuthProvisionTenant(t *testing.T) {
 			db := mstore.DataStore{}
 			db.On("MigrateTenant", ctxMatcher,
 				mock.AnythingOfType("string"),
-				"1.6.0",
+				"1.7.0",
 			).Return(tc.datastoreError)
 			db.On("WithAutomigrate").Return(&db)
 			devauth := NewDevAuth(&db, nil, nil, Config{})

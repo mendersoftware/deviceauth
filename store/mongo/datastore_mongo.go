@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -36,7 +36,7 @@ import (
 )
 
 const (
-	DbVersion     = "1.6.0"
+	DbVersion     = "1.7.0"
 	DbName        = "deviceauth"
 	DbDevicesColl = "devices"
 	DbAuthSetColl = "auth_sets"
@@ -143,6 +143,21 @@ func (db *DataStoreMongo) GetDevices(ctx context.Context, skip, limit uint, filt
 	}
 
 	return res, nil
+}
+
+func (db *DataStoreMongo) StoreMigrationVersion(ctx context.Context, version *migrate.Version) error {
+	if version == nil {
+		return errors.New("version cant be nil.")
+	}
+
+	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(migrate.DbMigrationsColl)
+
+	migrationInfo := migrate.MigrationEntry{
+		Version:   *version,
+		Timestamp: time.Now(),
+	}
+	_, err := c.InsertOne(ctx, migrationInfo)
+	return err
 }
 
 func (db *DataStoreMongo) GetDeviceById(ctx context.Context, id string) (*model.Device, error) {
@@ -385,6 +400,10 @@ func (db *DataStoreMongo) MigrateTenant(ctx context.Context, database, version s
 			ctx: ctx,
 		},
 		&migration_1_6_0{
+			ms:  db,
+			ctx: ctx,
+		},
+		&migration_1_7_0{
 			ms:  db,
 			ctx: ctx,
 		},
@@ -832,48 +851,6 @@ func (db *DataStoreMongo) GetDeviceStatus(ctx context.Context, devId string) (st
 	}
 
 	return status, nil
-}
-
-func (db *DataStoreMongo) GetAuthSets(ctx context.Context, skip, limit int, filter store.AuthSetFilter) ([]model.DevAdmAuthSet, error) {
-	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
-
-	res := []model.AuthSet{}
-
-	pipeline := []bson.D{
-		bson.D{
-			{Key: "$match", Value: filter},
-		},
-		bson.D{
-			{Key: "$sort", Value: bson.M{"_id": 1}},
-		},
-		bson.D{
-			{Key: "$skip", Value: skip},
-		},
-	}
-
-	if limit > 0 {
-		pipeline = append(pipeline,
-			bson.D{{Key: "$limit", Value: limit}})
-	}
-
-	cursor, err := c.Aggregate(ctx, pipeline)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to fetch auth sets")
-	}
-	if err := cursor.All(ctx, &res); err != nil {
-		return nil, err
-	}
-
-	resDevAdm := make([]model.DevAdmAuthSet, len(res))
-	for i, r := range res {
-		rda, err := model.NewDevAdmAuthSet(r)
-		resDevAdm[i] = *rda
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to fetch auth sets")
-		}
-	}
-
-	return resDevAdm, nil
 }
 
 func getDeviceStatus(statuses map[string]int) (string, error) {
