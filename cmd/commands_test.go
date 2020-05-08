@@ -20,6 +20,7 @@ import (
 
 	"github.com/mendersoftware/go-lib-micro/config"
 	"github.com/mendersoftware/go-lib-micro/identity"
+	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	ctxstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
@@ -406,14 +407,15 @@ func TestPropagateStatusesInventory(t *testing.T) {
 	}
 
 	cases := map[string]struct {
-		dbDevs map[string][]model.Device
+		dbDevs        map[string][]model.Device
+		forcedVersion string
 
 		cmdTenant string
 		cmdDryRun bool
 
 		errDbTenants error
 		errDbDevices error
-		errPatch     error
+		setStatus    error
 
 		err error
 	}{
@@ -441,6 +443,23 @@ func TestPropagateStatusesInventory(t *testing.T) {
 			},
 			cmdTenant: "tenant1",
 		},
+		"ok, with forced version": {
+			dbDevs: map[string][]model.Device{
+				"deviceauth-tenant1": devSet1,
+				"deviceauth-tenant2": devSet2,
+			},
+			cmdTenant:     "tenant1",
+			forcedVersion: "1.7.1",
+		},
+		"error, with bad forced version": {
+			dbDevs: map[string][]model.Device{
+				"deviceauth-tenant1": devSet1,
+				"deviceauth-tenant2": devSet2,
+			},
+			cmdTenant:     "tenant1",
+			forcedVersion: "and what this version might be",
+			err:           errors.New("failed to parse Version: expected integer"),
+		},
 		"error: store get tenant dbs, abort": {
 			dbDevs: map[string][]model.Device{
 				"deviceauth-tenant1": devSet1,
@@ -456,15 +475,15 @@ func TestPropagateStatusesInventory(t *testing.T) {
 				"deviceauth-tenant2": devSet2,
 			},
 			errDbDevices: errors.New("db failure"),
-			//err: nil
+			err: errors.New("failed to get devices: db failure"),
 		},
 		"error: patch devices, report but don't abort": {
 			dbDevs: map[string][]model.Device{
 				"deviceauth-tenant1": devSet1,
 				"deviceauth-tenant2": devSet2,
 			},
-			errPatch: errors.New("service failure"),
-			//err: nil
+			setStatus: errors.New("service failure"),
+			err: errors.New("service failure"),
 		},
 	}
 
@@ -473,7 +492,10 @@ func TestPropagateStatusesInventory(t *testing.T) {
 		t.Run(fmt.Sprintf("tc %s", k), func(t *testing.T) {
 
 			db := &mstore.DataStore{}
-
+			v, _ := migrate.NewVersion(tc.forcedVersion)
+			db.On("StoreMigrationVersion",
+				mock.Anything,
+				v).Return(nil)
 			// setup GetTenantDbs
 			// first, infer if we're in ST or MT
 			st := len(tc.dbDevs) == 1 && tc.dbDevs["deviceauth"] != nil
@@ -552,7 +574,7 @@ func TestPropagateStatusesInventory(t *testing.T) {
 							mock.Anything,
 							tenant,
 							deviceIds,
-							status).Return(tc.errPatch)
+							status).Return(tc.setStatus)
 					}
 				}
 			}
@@ -561,7 +583,7 @@ func TestPropagateStatusesInventory(t *testing.T) {
 				c.AssertNotCalled(t, "SetDeviceStatus")
 			}
 
-			err := PropagateStatusesInventory(db, c, tc.cmdTenant, tc.cmdDryRun)
+			err := PropagateStatusesInventory(db, c, tc.cmdTenant, tc.forcedVersion, tc.cmdDryRun)
 			if tc.err != nil {
 				assert.EqualError(t, err, tc.err.Error())
 			} else {

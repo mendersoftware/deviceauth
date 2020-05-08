@@ -110,6 +110,10 @@ func doMain(args []string) {
 					Name:  "tenant_id",
 					Usage: "Tenant ID (optional) - propagate for just a single tenant.",
 				},
+				cli.StringFlag{
+					Name:  "force-set-migration",
+					Usage: "Migration version to be stored in migration_info collection.",
+				},
 				cli.BoolFlag{
 					Name:  "dry-run",
 					Usage: "Do not perform any inventory modifications, just scan and print devices.",
@@ -240,7 +244,11 @@ func cmdPropagateStatusesInventory(args *cli.Context) error {
 	inv := config.Config.GetString(dconfig.SettingInventoryAddr)
 	c := cinv.NewClient(inv, false)
 
-	err = cmd.PropagateStatusesInventory(db, c, args.String("tenant_id"), args.Bool("dry-run"))
+	err = cmd.PropagateStatusesInventory(db,
+		c,
+		args.String("tenant_id"),
+		args.String("force-set-migration"),
+		args.Bool("dry-run"))
 	if err != nil {
 		return cli.NewExitError(err, 7)
 	}
