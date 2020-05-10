@@ -63,16 +63,20 @@ func Migrate(c config.Reader, tenant string, listTenantsFlag bool) error {
 
 	db = db.WithAutomigrate().(*mongo.DataStoreMongo)
 
-	tenantCtx := identity.WithContext(context.Background(), &identity.Identity{
-		Tenant: tenant,
-	})
-
-	dbname := mstore.DbFromContext(tenantCtx, mongo.DbName)
-	if err != nil {
-		return errors.Wrap(err, "failed to decode dbname")
+	if config.Config.Get(dconfig.SettingTenantAdmAddr) != "" {
+		db = db.WithMultitenant()
 	}
 
-	err = db.MigrateTenant(tenantCtx, dbname, mongo.DbVersion)
+	ctx := context.Background()
+	if tenant == "" {
+		err = db.Migrate(ctx, mongo.DbVersion)
+	} else {
+		tenantCtx := identity.WithContext(ctx, &identity.Identity{
+			Tenant: tenant,
+		})
+		dbname := mstore.DbFromContext(tenantCtx, mongo.DbName)
+		err = db.MigrateTenant(tenantCtx, dbname, mongo.DbVersion)
+	}
 	if err != nil {
 		return errors.Wrap(err, "failed to run migrations")
 	}
