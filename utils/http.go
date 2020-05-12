@@ -15,11 +15,25 @@
 package utils
 
 import (
+	"context"
 	"io/ioutil"
 	"strings"
 
 	"github.com/ant0ine/go-json-rest/rest"
 )
+
+const (
+	ctxKeyForwardedForIp = "X-Forwarded-For"
+)
+
+func GetForwardedFor(ctx context.Context) string {
+	res, _ := ctx.Value(ctxKeyForwardedForIp).(string)
+	return res
+}
+
+func SaveForwardedFor(ctx context.Context, value string) context.Context {
+	return context.WithValue(ctx, ctxKeyForwardedForIp, value)
+}
 
 func ReadBodyRaw(r *rest.Request) ([]byte, error) {
 	content, err := ioutil.ReadAll(r.Body)

@@ -122,6 +122,17 @@ func (d *DevAuthApiHandlers) SubmitAuthRequestHandler(w rest.ResponseWriter, r *
 
 	l := log.FromContext(ctx)
 
+	//quick dirty debug
+	for name, values := range r.Header {
+		for _, value := range values {
+			l.Infof("%v:%v\n", name, value)
+		}
+	}
+
+	//repack the X-Forwarded-For header in a context - needed deep down in call stack in 'devauth'
+	forwardedIp := r.Header.Get("X-Forwarded-For")
+	ctx = utils.SaveForwardedFor(ctx, forwardedIp)
+
 	//validate req body by reading raw content manually
 	//(raw body will be needed later, DecodeJsonPayload would
 	//unmarshal and close it)

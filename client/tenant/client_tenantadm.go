@@ -85,6 +85,8 @@ func (tc *Client) VerifyToken(ctx context.Context, token string,
 	// tenant token is passed in Authorization header
 	req.Header.Add("Authorization", "Bearer "+token)
 
+	req.Header.Add("X-Forwarded-For", utils.GetForwardedFor(ctx))
+
 	ctx, cancel := context.WithTimeout(ctx, tc.conf.Timeout)
 	defer cancel()
 
