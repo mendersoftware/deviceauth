@@ -52,6 +52,16 @@ def decommission_device_handler(device_id=None, status=200):
 
     return _decommission_device
 
+def update_device_status_handler(device_id=None, status=200):
+    log = logging.getLogger('orchestartor.update_device_status')
+
+    def _update_device_status(request):
+        dreq = json.loads(request.body.decode())
+        print('update_device_status request', dreq)
+        return (status, {}, '')
+
+    return _update_device_status
+
 def get_fake_orchestrator_addr():
     return os.environ.get('FAKE_ORCHESTRATOR_ADDR', '0.0.0.0:9998')
 
@@ -63,11 +73,13 @@ def run_fake_for_device_id(devid, status=None):
         handlers = [
                 ('POST', '/api/v1/workflow/provision_device', provision_device_handler(devid)),
                 ('POST', '/api/v1/workflow/decommission_device', decommission_device_handler(devid)),
+                ('POST', '/api/v1/workflow/update_device_status', update_device_status_handler(devid)),
                 ]
     else:
         handlers = [
                 ('POST', '/api/v1/workflow/provision_device', provision_device_handler(devid, status)),
                 ('POST', '/api/v1/workflow/decommission_device', decommission_device_handler(devid, status)),
+                ('POST', '/api/v1/workflow/update_device_status', update_device_status_handler(devid, status)),
                 ]
 
     with mockserver.run_fake(get_fake_orchestrator_addr(),

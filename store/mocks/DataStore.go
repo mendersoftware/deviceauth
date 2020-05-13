@@ -20,7 +20,7 @@ import (
 	"github.com/mendersoftware/deviceauth/jwt"
 	"github.com/mendersoftware/deviceauth/model"
 	"github.com/mendersoftware/deviceauth/store"
-	"github.com/mendersoftware/go-lib-micro/mongo/uuid"
+	"github.com/mendersoftware/go-lib-micro/mongo/oid"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -114,11 +114,11 @@ func (_m *DataStore) DeleteDevice(ctx context.Context, id string) error {
 }
 
 // DeleteToken provides a mock function with given fields: ctx, jti
-func (_m *DataStore) DeleteToken(ctx context.Context, jti uuid.UUID) error {
+func (_m *DataStore) DeleteToken(ctx context.Context, jti oid.ObjectID) error {
 	ret := _m.Called(ctx, jti)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID) error); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, oid.ObjectID) error); ok {
 		r0 = rf(ctx, jti)
 	} else {
 		r0 = ret.Error(0)
@@ -128,11 +128,11 @@ func (_m *DataStore) DeleteToken(ctx context.Context, jti uuid.UUID) error {
 }
 
 // DeleteTokenByDevId provides a mock function with given fields: ctx, dev_id
-func (_m *DataStore) DeleteTokenByDevId(ctx context.Context, devID uuid.UUID) error {
+func (_m *DataStore) DeleteTokenByDevId(ctx context.Context, devID oid.ObjectID) error {
 	ret := _m.Called(ctx, devID)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID) error); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, oid.ObjectID) error); ok {
 		r0 = rf(ctx, devID)
 	} else {
 		r0 = ret.Error(0)
@@ -194,29 +194,6 @@ func (_m *DataStore) GetAuthSetByIdDataHashKey(ctx context.Context, idDataHash [
 	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, []byte, string) error); ok {
 		r1 = rf(ctx, idDataHash, key)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// GetAuthSets provides a mock function with given fields: ctx, skip, limit, filter
-func (_m *DataStore) GetAuthSets(ctx context.Context, skip int, limit int, filter store.AuthSetFilter) ([]model.DevAdmAuthSet, error) {
-	ret := _m.Called(ctx, skip, limit, filter)
-
-	var r0 []model.DevAdmAuthSet
-	if rf, ok := ret.Get(0).(func(context.Context, int, int, store.AuthSetFilter) []model.DevAdmAuthSet); ok {
-		r0 = rf(ctx, skip, limit, filter)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]model.DevAdmAuthSet)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, int, int, store.AuthSetFilter) error); ok {
-		r1 = rf(ctx, skip, limit, filter)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -405,11 +382,11 @@ func (_m *DataStore) GetTenantDbs() ([]string, error) {
 }
 
 // GetToken provides a mock function with given fields: ctx, jti
-func (_m *DataStore) GetToken(ctx context.Context, jti uuid.UUID) (*jwt.Token, error) {
+func (_m *DataStore) GetToken(ctx context.Context, jti oid.ObjectID) (*jwt.Token, error) {
 	ret := _m.Called(ctx, jti)
 
 	var r0 *jwt.Token
-	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID) *jwt.Token); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, oid.ObjectID) *jwt.Token); ok {
 		r0 = rf(ctx, jti)
 	} else {
 		if ret.Get(0) != nil {
@@ -418,7 +395,7 @@ func (_m *DataStore) GetToken(ctx context.Context, jti uuid.UUID) (*jwt.Token, e
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, uuid.UUID) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, oid.ObjectID) error); ok {
 		r1 = rf(ctx, jti)
 	} else {
 		r1 = ret.Error(1)

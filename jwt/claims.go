@@ -17,16 +17,16 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/mendersoftware/go-lib-micro/mongo/uuid"
+	"github.com/mendersoftware/go-lib-micro/mongo/oid"
 )
 
 type Claims struct {
 	// ID is the unique jwt ID, also device AuthSet UUID. (Required)
-	ID uuid.UUID `json:"jti,omitempty" bson:"_id"`
+	ID oid.ObjectID `json:"jti,omitempty" bson:"_id"`
 	// Subject claim holds the device ID. (Required)
-	Subject  uuid.UUID `json:"sub,omitempty" bson:"sub"`
-	Audience string    `json:"aud,omitempty" bson:"aud,omitempty"`
-	Scope    string    `json:"scp,omitempty" bson:"scp,omitempty"`
+	Subject  oid.ObjectID `json:"sub,omitempty" bson:"sub"`
+	Audience string       `json:"aud,omitempty" bson:"aud,omitempty"`
+	Scope    string       `json:"scp,omitempty" bson:"scp,omitempty"`
 	// Issuer holds the configurable issuer claim.
 	Issuer string `json:"iss,omitempty" bson:"iss,omitempty"`
 	// Tenant claim holds the tenant id this device belongs to.
@@ -37,6 +37,8 @@ type Claims struct {
 	NotBefore Time `json:"nbf,omitempty" bson:"nbf,omitempty"`
 	// Device claim states that this token belongs to a device
 	Device bool `json:"mender.device,omitempty" bson:"mender.device,omitempty"`
+	// Plan holds the tenant's feature plan claim.
+	Plan string `json:"mender.plan,omitempty"`
 }
 
 type Time struct {
@@ -60,10 +62,9 @@ func (t *Time) UnmarshalJSON(b []byte) error {
 // Basic checks are done here, field correctness (e.g. issuer) - at the service
 // level, where this info is available.
 func (c *Claims) Valid() error {
-	var uuidNil uuid.UUID
 	if c.Issuer == "" ||
-		c.ID == uuidNil ||
-		c.Subject == uuidNil {
+		c.ID.String() == "" ||
+		c.Subject.String() == "" {
 		return ErrTokenInvalid
 	}
 

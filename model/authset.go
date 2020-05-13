@@ -39,6 +39,11 @@ type AuthSet struct {
 	Status       string                 `json:"status" bson:"status,omitempty"`
 }
 
+type DevAuthSet struct {
+	Id       string `json:"id" bson:"_id,omitempty"`
+	DeviceId string `json:"device_id" bson:"device_id,omitempty"`
+}
+
 type AuthSetUpdate struct {
 	Id           string                 `bson:"id,omitempty"`
 	IdData       string                 `bson:"id_data,omitempty"`

@@ -29,4 +29,7 @@ profile.cov
 gover.coverprofile
 profile.coverprofile
 
+.idea
+venv
+# Emacs directory local variables
 .dir-locals.el

@@ -23,7 +23,7 @@
 //
 //	"github.com/mendersoftware/go-lib-micro/identity"
 //	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
-//	"github.com/mendersoftware/go-lib-micro/mongo/uuid"
+//	"github.com/mendersoftware/go-lib-micro/mongo/oid"
 //	ctxstore "github.com/mendersoftware/go-lib-micro/store"
 //	"github.com/pkg/errors"
 //	"github.com/stretchr/testify/assert"
@@ -90,7 +90,7 @@
 //		c = client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbTokensColl)
 //		for j := 0; j < tokens; j++ {
 //			tok := token_0_1_0{
-//				Id: uuid.NewSHA1(
+//				Id: oid.NewUUIDv5(
 //					fmt.Sprintf("jti-0.1.0-%d-%d", i, j)).
 //					String(),
 //				DevId: devid,
@@ -173,7 +173,7 @@
 //				break
 //			}
 //
-//			oldtokUUID, _ := uuid.FromString(oldtok.Id)
+//			oldtokUUID := oid.FromString(oldtok.Id)
 //			tok, err := db.GetToken(ctx, oldtokUUID)
 //			assert.NoError(t, err)
 //			assert.Equal(t, oldtokUUID, tok.ID)

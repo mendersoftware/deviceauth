@@ -25,7 +25,7 @@ import (
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
-	"github.com/mendersoftware/go-lib-micro/mongo/uuid"
+	"github.com/mendersoftware/go-lib-micro/mongo/oid"
 	ctxstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
@@ -44,18 +44,18 @@ const (
 
 // data set
 var (
-	dev1   = model.NewDevice(uuid.NewSHA1("devID1").String(), "idData1", "")
-	dev2   = model.NewDevice(uuid.NewSHA1("devID2").String(), "idData2", "")
+	dev1   = model.NewDevice(oid.NewUUIDv5("devID1").String(), "idData1", "")
+	dev2   = model.NewDevice(oid.NewUUIDv5("devID2").String(), "idData2", "")
 	token1 = &jwt.Token{Claims: jwt.Claims{
-		ID:        uuid.NewSHA1("id1"),
-		Subject:   uuid.NewSHA1("devID1"),
+		ID:        oid.NewUUIDv5("id1"),
+		Subject:   oid.NewUUIDv5("devID1"),
 		ExpiresAt: jwt.Time{Time: time.Now().Add(time.Hour * 24)},
 		IssuedAt:  jwt.Time{Time: time.Now()},
 		Issuer:    "Mender testing",
 	}}
 	token2 = &jwt.Token{Claims: jwt.Claims{
-		ID:        uuid.NewSHA1("id2"),
-		Subject:   uuid.NewSHA1("devID2"),
+		ID:        oid.NewUUIDv5("id2"),
+		Subject:   oid.NewUUIDv5("devID2"),
 		ExpiresAt: jwt.Time{Time: time.Now().Add(time.Hour * 24)},
 		IssuedAt:  jwt.Time{Time: time.Now()},
 		Issuer:    "Mender testing",
@@ -424,7 +424,7 @@ func TestStoreGetToken(t *testing.T) {
 	assert.NoError(t, err, "failed to setup input data")
 
 	testCases := []struct {
-		tokenID       uuid.UUID
+		tokenID       oid.ObjectID
 		tenant        string
 		expectedToken *jwt.Token
 	}{
@@ -442,7 +442,7 @@ func TestStoreGetToken(t *testing.T) {
 			expectedToken: token2,
 		},
 		{
-			tokenID: uuid.NewSHA1("id3"),
+			tokenID: oid.NewUUIDv5("id3"),
 			tenant:  tenant,
 		},
 	}
@@ -491,7 +491,7 @@ func TestStoreDeleteToken(t *testing.T) {
 	assert.NoError(t, err, "failed to setup input data")
 
 	testCases := []struct {
-		tokenID uuid.UUID
+		tokenID oid.ObjectID
 		tenant  string
 		err     bool
 	}{
@@ -510,7 +510,7 @@ func TestStoreDeleteToken(t *testing.T) {
 			err:     false,
 		},
 		{
-			tokenID: uuid.NewSHA1("id3"),
+			tokenID: oid.NewUUIDv5("id3"),
 			tenant:  tenant,
 			err:     true,
 		},
@@ -545,8 +545,8 @@ func TestStoreDeleteTokens(t *testing.T) {
 		token1,
 		token2,
 		&jwt.Token{Claims: jwt.Claims{
-			ID:      uuid.NewSHA1("id3"),
-			Subject: uuid.NewSHA1("devId2"),
+			ID:      oid.NewUUIDv5("id3"),
+			Subject: oid.NewUUIDv5("devId2"),
 			Issuer:  "Mender testing",
 			ExpiresAt: jwt.Time{
 				Time: time.Now().Add(time.Hour),
@@ -610,8 +610,8 @@ func TestStoreDeleteTokenByDevId(t *testing.T) {
 		token1,
 		token2,
 		&jwt.Token{Claims: jwt.Claims{
-			ID:      uuid.NewSHA1("id3"),
-			Subject: uuid.NewSHA1("devID2"),
+			ID:      oid.NewUUIDv5("id3"),
+			Subject: oid.NewUUIDv5("devID2"),
 			Issuer:  "Mender testing",
 			ExpiresAt: jwt.Time{
 				Time: time.Now().Add(time.Hour),
@@ -620,7 +620,7 @@ func TestStoreDeleteTokenByDevId(t *testing.T) {
 	}
 
 	testCases := []struct {
-		devID  uuid.UUID
+		devID  oid.ObjectID
 		tenant string
 
 		outTokens []jwt.Token
@@ -632,9 +632,9 @@ func TestStoreDeleteTokenByDevId(t *testing.T) {
 
 			outTokens: []jwt.Token{
 				*token2,
-				jwt.Token{Claims: jwt.Claims{
-					ID:      uuid.NewSHA1("id3"),
-					Subject: uuid.NewSHA1("devID2"),
+				{Claims: jwt.Claims{
+					ID:      oid.NewUUIDv5("id3"),
+					Subject: oid.NewUUIDv5("devID2"),
 					Issuer:  "Mender testing",
 					ExpiresAt: jwt.Time{
 						Time: time.Now().Add(time.Hour),
@@ -653,7 +653,7 @@ func TestStoreDeleteTokenByDevId(t *testing.T) {
 			err: nil,
 		},
 		{
-			devID: uuid.NewSHA1("devID3"),
+			devID: oid.NewUUIDv5("devID3"),
 
 			err: store.ErrTokenNotFound,
 		},
@@ -1224,8 +1224,8 @@ func TestUpdateAuthSetBson(t *testing.T) {
 		bson.M{
 			model.AuthSetKeyDeviceId: "1",
 			"$or": []bson.M{
-				bson.M{model.AuthSetKeyStatus: model.DevStatusAccepted},
-				bson.M{model.AuthSetKeyStatus: model.DevStatusPreauth},
+				{model.AuthSetKeyStatus: model.DevStatusAccepted},
+				{model.AuthSetKeyStatus: model.DevStatusPreauth},
 			},
 		},
 
@@ -1367,19 +1367,19 @@ func TestStoreDeleteAuthSetsForDevice(t *testing.T) {
 		{
 			devId: "001",
 			outAuthSets: []model.AuthSet{
-				model.AuthSet{
+				{
 					Id:       "2",
 					DeviceId: "002",
 					IdData:   "id-002",
 					PubKey:   "key-002-1",
 				},
-				model.AuthSet{
+				{
 					Id:       "4",
 					DeviceId: "002",
 					IdData:   "id-002",
 					PubKey:   "key-002-2",
 				},
-				model.AuthSet{
+				{
 					Id:       "5",
 					DeviceId: "002",
 					IdData:   "id-002",
@@ -1392,13 +1392,13 @@ func TestStoreDeleteAuthSetsForDevice(t *testing.T) {
 		{
 			devId: "002",
 			outAuthSets: []model.AuthSet{
-				model.AuthSet{
+				{
 					Id:       "1",
 					DeviceId: "001",
 					IdData:   "id-001",
 					PubKey:   "key-001-1",
 				},
-				model.AuthSet{
+				{
 					Id:       "3",
 					DeviceId: "001",
 					IdData:   "id-001",
@@ -1412,31 +1412,31 @@ func TestStoreDeleteAuthSetsForDevice(t *testing.T) {
 			devId:  "100",
 			tenant: tenant,
 			outAuthSets: []model.AuthSet{
-				model.AuthSet{
+				{
 					Id:       "1",
 					DeviceId: "001",
 					IdData:   "id-001",
 					PubKey:   "key-001-1",
 				},
-				model.AuthSet{
+				{
 					Id:       "2",
 					DeviceId: "002",
 					IdData:   "id-002",
 					PubKey:   "key-002-1",
 				},
-				model.AuthSet{
+				{
 					Id:       "3",
 					DeviceId: "001",
 					IdData:   "id-001",
 					PubKey:   "key-001-1",
 				},
-				model.AuthSet{
+				{
 					Id:       "4",
 					DeviceId: "002",
 					IdData:   "id-002",
 					PubKey:   "key-002-2",
 				},
-				model.AuthSet{
+				{
 					Id:       "5",
 					DeviceId: "002",
 					IdData:   "id-002",
@@ -2074,363 +2074,6 @@ func TestStoreGetDeviceStatus(t *testing.T) {
 				assert.NoError(t, err)
 				assert.Equal(t, tc.status, status)
 			}
-		})
-	}
-}
-
-func TestMongoGetAuthSets(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping TestMongoGetAuthSets in short mode.")
-	}
-
-	inSets := bson.A{
-		model.AuthSet{
-			DeviceId: "did1",
-			Id:       "aid11",
-			IdData:   `{"sn":"sn1"}`,
-			PubKey:   "key11",
-			Status:   "pending",
-		},
-		model.AuthSet{
-			DeviceId: "did1",
-			Id:       "aid12",
-			IdData:   `{"sn":"sn1"}`,
-			PubKey:   "key12",
-			Status:   "accepted",
-		},
-		model.AuthSet{
-			DeviceId: "did2",
-			Id:       "aid21",
-			IdData:   `{"sn":"sn2"}`,
-			PubKey:   "key21",
-			Status:   "rejected",
-		},
-		model.AuthSet{
-			DeviceId: "did3",
-			Id:       "aid31",
-			IdData:   `{"sn":"sn3"}`,
-			PubKey:   "key31",
-			Status:   "rejected",
-		},
-		model.AuthSet{
-			DeviceId: "did3",
-			Id:       "aid32",
-			IdData:   `{"sn":"sn3"}`,
-			PubKey:   "key32",
-			Status:   "pending",
-		},
-		model.AuthSet{
-			DeviceId: "did3",
-			Id:       "aid33",
-			IdData:   `{"sn":"sn3"}`,
-			PubKey:   "key33",
-			Status:   "accepted",
-		},
-		model.AuthSet{
-			DeviceId: "did4",
-			Id:       "aid41",
-			IdData:   `{"sn":"sn4"}`,
-			PubKey:   "key41",
-			Status:   "preauthorized",
-		},
-	}
-
-	testCases := []struct {
-		skip   int
-		limit  int
-		filter store.AuthSetFilter
-		tenant string
-
-		outSets []model.DevAdmAuthSet
-	}{
-		{
-			outSets: []model.DevAdmAuthSet{
-				model.DevAdmAuthSet{
-					DeviceId:       "did1",
-					Id:             "aid11",
-					DeviceIdentity: `{"sn":"sn1"}`,
-					Key:            "key11",
-					Status:         "pending",
-					Attributes: map[string]interface{}{
-						"sn": "sn1",
-					},
-				},
-				model.DevAdmAuthSet{
-					DeviceId:       "did1",
-					Id:             "aid12",
-					DeviceIdentity: `{"sn":"sn1"}`,
-					Key:            "key12",
-					Status:         "accepted",
-					Attributes: map[string]interface{}{
-						"sn": "sn1",
-					},
-				},
-				model.DevAdmAuthSet{
-					DeviceId:       "did2",
-					Id:             "aid21",
-					DeviceIdentity: `{"sn":"sn2"}`,
-					Key:            "key21",
-					Status:         "rejected",
-					Attributes: map[string]interface{}{
-						"sn": "sn2",
-					},
-				},
-				model.DevAdmAuthSet{
-					DeviceId:       "did3",
-					Id:             "aid31",
-					DeviceIdentity: `{"sn":"sn3"}`,
-					Key:            "key31",
-					Status:         "rejected",
-					Attributes: map[string]interface{}{
-						"sn": "sn3",
-					},
-				},
-				model.DevAdmAuthSet{
-					DeviceId:       "did3",
-					Id:             "aid32",
-					DeviceIdentity: `{"sn":"sn3"}`,
-					Key:            "key32",
-					Status:         "pending",
-					Attributes: map[string]interface{}{
-						"sn": "sn3",
-					},
-				},
-				model.DevAdmAuthSet{
-					DeviceId:       "did3",
-					Id:             "aid33",
-					DeviceIdentity: `{"sn":"sn3"}`,
-					Key:            "key33",
-					Status:         "accepted",
-					Attributes: map[string]interface{}{
-						"sn": "sn3",
-					},
-				},
-				model.DevAdmAuthSet{
-					DeviceId:       "did4",
-					Id:             "aid41",
-					DeviceIdentity: `{"sn":"sn4"}`,
-					Key:            "key41",
-					Status:         "preauthorized",
-					Attributes: map[string]interface{}{
-						"sn": "sn4",
-					},
-				},
-			},
-		},
-		/*basic limit*/
-		{
-			limit: 2,
-			outSets: []model.DevAdmAuthSet{
-				model.DevAdmAuthSet{
-					DeviceId:       "did1",
-					Id:             "aid11",
-					DeviceIdentity: `{"sn":"sn1"}`,
-					Key:            "key11",
-					Status:         "pending",
-					Attributes: map[string]interface{}{
-						"sn": "sn1",
-					},
-				},
-				model.DevAdmAuthSet{
-					DeviceId:       "did1",
-					Id:             "aid12",
-					DeviceIdentity: `{"sn":"sn1"}`,
-					Key:            "key12",
-					Status:         "accepted",
-					Attributes: map[string]interface{}{
-						"sn": "sn1",
-					},
-				},
-			},
-		},
-		/*basic limit+skip*/
-		{
-			limit: 2,
-			skip:  2,
-			outSets: []model.DevAdmAuthSet{
-				model.DevAdmAuthSet{
-					DeviceId:       "did2",
-					Id:             "aid21",
-					DeviceIdentity: `{"sn":"sn2"}`,
-					Key:            "key21",
-					Status:         "rejected",
-					Attributes: map[string]interface{}{
-						"sn": "sn2",
-					},
-				},
-				model.DevAdmAuthSet{
-					DeviceId:       "did3",
-					Id:             "aid31",
-					DeviceIdentity: `{"sn":"sn3"}`,
-					Key:            "key31",
-					Status:         "rejected",
-					Attributes: map[string]interface{}{
-						"sn": "sn3",
-					},
-				},
-			},
-		},
-		/*basic limit+skip, empty*/
-		{
-			limit:   2,
-			skip:    10,
-			outSets: []model.DevAdmAuthSet{},
-		},
-		/*basic skip*/
-		{
-			skip: 4,
-			outSets: []model.DevAdmAuthSet{
-				model.DevAdmAuthSet{
-					DeviceId:       "did3",
-					Id:             "aid32",
-					DeviceIdentity: `{"sn":"sn3"}`,
-					Key:            "key32",
-					Status:         "pending",
-					Attributes: map[string]interface{}{
-						"sn": "sn3",
-					},
-				},
-				model.DevAdmAuthSet{
-					DeviceId:       "did3",
-					Id:             "aid33",
-					DeviceIdentity: `{"sn":"sn3"}`,
-					Key:            "key33",
-					Status:         "accepted",
-					Attributes: map[string]interface{}{
-						"sn": "sn3",
-					},
-				},
-				model.DevAdmAuthSet{
-					DeviceId:       "did4",
-					Id:             "aid41",
-					DeviceIdentity: `{"sn":"sn4"}`,
-					Key:            "key41",
-					Status:         "preauthorized",
-					Attributes: map[string]interface{}{
-						"sn": "sn4",
-					},
-				},
-			},
-		},
-		/*filter dev id*/
-		{
-			filter: store.AuthSetFilter{
-				DeviceID: "did3",
-			},
-			outSets: []model.DevAdmAuthSet{
-				model.DevAdmAuthSet{
-					DeviceId:       "did3",
-					Id:             "aid31",
-					DeviceIdentity: `{"sn":"sn3"}`,
-					Key:            "key31",
-					Status:         "rejected",
-					Attributes: map[string]interface{}{
-						"sn": "sn3",
-					},
-				},
-				model.DevAdmAuthSet{
-					DeviceId:       "did3",
-					Id:             "aid32",
-					DeviceIdentity: `{"sn":"sn3"}`,
-					Key:            "key32",
-					Status:         "pending",
-					Attributes: map[string]interface{}{
-						"sn": "sn3",
-					},
-				},
-				model.DevAdmAuthSet{
-					DeviceId:       "did3",
-					Id:             "aid33",
-					DeviceIdentity: `{"sn":"sn3"}`,
-					Key:            "key33",
-					Status:         "accepted",
-					Attributes: map[string]interface{}{
-						"sn": "sn3",
-					},
-				},
-			},
-		},
-		/*filter status*/
-		{
-			filter: store.AuthSetFilter{
-				Status: "preauthorized",
-			},
-			outSets: []model.DevAdmAuthSet{
-				model.DevAdmAuthSet{
-					DeviceId:       "did4",
-					Id:             "aid41",
-					DeviceIdentity: `{"sn":"sn4"}`,
-					Key:            "key41",
-					Status:         "preauthorized",
-					Attributes: map[string]interface{}{
-						"sn": "sn4",
-					},
-				},
-			},
-		},
-		/*filter devid+status*/
-		{
-			filter: store.AuthSetFilter{
-				DeviceID: "did3",
-				Status:   "accepted",
-			},
-			outSets: []model.DevAdmAuthSet{
-				model.DevAdmAuthSet{
-					DeviceId:       "did3",
-					Id:             "aid33",
-					DeviceIdentity: `{"sn":"sn3"}`,
-					Key:            "key33",
-					Status:         "accepted",
-					Attributes: map[string]interface{}{
-						"sn": "sn3",
-					},
-				},
-			},
-		},
-		/*filter, skip, limit*/
-		{
-			filter: store.AuthSetFilter{
-				DeviceID: "did3",
-				Status:   "rejected",
-			},
-			limit: 1,
-			outSets: []model.DevAdmAuthSet{
-				model.DevAdmAuthSet{
-					DeviceId:       "did3",
-					Id:             "aid31",
-					DeviceIdentity: `{"sn":"sn3"}`,
-					Key:            "key31",
-					Status:         "rejected",
-					Attributes: map[string]interface{}{
-						"sn": "sn3",
-					},
-				},
-			},
-		},
-	}
-
-	for idx := range testCases {
-		tc := testCases[idx]
-		t.Run(fmt.Sprintf("tc: %v", idx), func(t *testing.T) {
-			ctx := context.Background()
-			if tc.tenant != "" {
-				ctx = identity.WithContext(ctx, &identity.Identity{
-					Tenant: tc.tenant,
-				})
-			}
-
-			db := getDb(ctx)
-
-			coll := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
-			_, err := coll.InsertMany(ctx, inSets)
-			assert.NoError(t, err)
-
-			//test
-			sets, err := db.GetAuthSets(ctx, tc.skip, tc.limit, tc.filter)
-			assert.NoError(t, err, "failed to get devices")
-
-			assert.Equal(t, tc.outSets, sets)
-
 		})
 	}
 }
