@@ -362,11 +362,11 @@ func (d *DevAuthApiHandlers) DeleteTokenHandler(w rest.ResponseWriter, r *rest.R
 
 	l := log.FromContext(ctx)
 
-	tokenId := r.PathParam("id")
-
-	err := d.devAuth.RevokeToken(ctx, tokenId)
+	tokenID := r.PathParam("id")
+	err := d.devAuth.RevokeToken(ctx, tokenID)
 	if err != nil {
-		if err == store.ErrTokenNotFound {
+		if err == store.ErrTokenNotFound ||
+			err == devauth.ErrInvalidAuthSetID {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
