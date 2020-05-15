@@ -1,4 +1,4 @@
-// Copyright 2017 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -62,7 +62,7 @@ func TestIdentityMiddlewareNoSubject(t *testing.T) {
 	handler := api.MakeHandler()
 
 	req := test.MakeSimpleRequest("GET", "http://localhost/", nil)
-	rawclaims := makeClaimsPart(identity.Subject, identity.Tenant)
+	rawclaims := makeClaimsPart(identity.Subject, identity.Tenant, identity.Plan)
 	req.Header.Set("Authorization", "Bearer foo."+rawclaims+".bar")
 
 	recorded := test.RunRequest(t, handler, req)
@@ -88,7 +88,7 @@ func TestIdentityMiddlewareNoTenant(t *testing.T) {
 	handler := api.MakeHandler()
 
 	req := test.MakeSimpleRequest("GET", "http://localhost/", nil)
-	rawclaims := makeClaimsPart(identity.Subject, identity.Tenant)
+	rawclaims := makeClaimsPart(identity.Subject, identity.Tenant, identity.Plan)
 	req.Header.Set("Authorization", "Bearer foo."+rawclaims+".bar")
 
 	recorded := test.RunRequest(t, handler, req)
@@ -104,6 +104,7 @@ func TestIdentityMiddleware(t *testing.T) {
 	identity := Identity{
 		Subject: "foo",
 		Tenant:  "bar",
+		Plan:    "os",
 	}
 
 	api.SetApp(rest.AppSimple(func(w rest.ResponseWriter, r *rest.Request) {
@@ -115,7 +116,7 @@ func TestIdentityMiddleware(t *testing.T) {
 	handler := api.MakeHandler()
 
 	req := test.MakeSimpleRequest("GET", "http://localhost/", nil)
-	rawclaims := makeClaimsPart(identity.Subject, identity.Tenant)
+	rawclaims := makeClaimsPart(identity.Subject, identity.Tenant, identity.Plan)
 	req.Header.Set("Authorization", "Bearer foo."+rawclaims+".bar")
 
 	recorded := test.RunRequest(t, handler, req)
@@ -133,6 +134,7 @@ func TestIdentityMiddlewareDevice(t *testing.T) {
 			identity: Identity{
 				Subject:  "device-1",
 				Tenant:   "bar",
+				Plan:     "os",
 				IsDevice: true,
 			},
 			mw: &IdentityMiddleware{
@@ -141,12 +143,14 @@ func TestIdentityMiddlewareDevice(t *testing.T) {
 			logFields: map[string]interface{}{
 				"device_id": "device-1",
 				"tenant_id": "bar",
+				"plan":      "os",
 			},
 		},
 		{
 			identity: Identity{
 				Subject: "user-1",
 				Tenant:  "bar",
+				Plan:    "os",
 				IsUser:  true,
 			},
 			mw: &IdentityMiddleware{
@@ -155,12 +159,14 @@ func TestIdentityMiddlewareDevice(t *testing.T) {
 			logFields: map[string]interface{}{
 				"user_id":   "user-1",
 				"tenant_id": "bar",
+				"plan":      "os",
 			},
 		},
 		{
 			identity: Identity{
 				Subject: "not-a-user-not-a-device",
 				Tenant:  "bar",
+				Plan:    "os",
 			},
 			mw: &IdentityMiddleware{
 				UpdateLogger: true,
@@ -168,6 +174,7 @@ func TestIdentityMiddlewareDevice(t *testing.T) {
 			logFields: map[string]interface{}{
 				"sub":       "not-a-user-not-a-device",
 				"tenant_id": "bar",
+				"plan":      "os",
 			},
 		},
 		{
@@ -209,7 +216,7 @@ func TestIdentityMiddlewareDevice(t *testing.T) {
 
 			req := test.MakeSimpleRequest("GET", "http://localhost/", nil)
 
-			claims := makeClaimsFull(tc.identity.Subject, tc.identity.Tenant,
+			claims := makeClaimsFull(tc.identity.Subject, tc.identity.Tenant, tc.identity.Plan,
 				tc.identity.IsDevice, tc.identity.IsUser)
 			req.Header.Set("Authorization", "Bearer foo."+claims+".bar")
 

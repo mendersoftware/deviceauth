@@ -1,4 +1,4 @@
-// Copyright 2017 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -26,15 +26,17 @@ func boolPtr(val bool) *bool {
 	return &val
 }
 
-func makeClaimsFull(sub, tenant string, device, user bool) string {
+func makeClaimsFull(sub, tenant, plan string, device, user bool) string {
 	claim := struct {
 		Subject string `json:"sub,omitempty"`
 		Tenant  string `json:"mender.tenant,omitempty"`
 		Device  *bool  `json:"mender.device,omitempty"`
 		User    *bool  `json:"mender.user,omitempty"`
+		Plan    string `json:"mender.plan,omitempty"`
 	}{
 		Subject: sub,
 		Tenant:  tenant,
+		Plan:    plan,
 	}
 
 	if device {
@@ -49,8 +51,8 @@ func makeClaimsFull(sub, tenant string, device, user bool) string {
 	return rawclaim
 }
 
-func makeClaimsPart(sub, tenant string) string {
-	return makeClaimsFull(sub, tenant, false, false)
+func makeClaimsPart(sub, tenant, plan string) string {
+	return makeClaimsFull(sub, tenant, plan, false, false)
 }
 
 func TestExtractIdentity(t *testing.T) {
@@ -64,7 +66,7 @@ func TestExtractIdentity(t *testing.T) {
 	assert.Error(t, err)
 
 	// should fail, token is malformed, missing header & signature
-	rawclaims := makeClaimsPart("foobar", "")
+	rawclaims := makeClaimsPart("foobar", "", "")
 	_, err = ExtractIdentity(rawclaims)
 	assert.Error(t, err)
 
@@ -114,7 +116,7 @@ func TestExtractIdentityFromHeaders(t *testing.T) {
 	assert.Error(t, err)
 
 	// correct cate
-	rawclaims := makeClaimsPart("foobar", "")
+	rawclaims := makeClaimsPart("foobar", "", "")
 	h.Set("Authorization", "Bearer foo."+rawclaims+".bar")
 	idata, err := ExtractIdentityFromHeaders(h)
 	assert.NoError(t, err)
@@ -133,7 +135,7 @@ func TestDecodeClaims(t *testing.T) {
 	assert.Error(t, err)
 
 	// should fail, token is malformed, missing header & signature
-	rawclaims := makeClaimsPart("foobar", "")
+	rawclaims := makeClaimsPart("foobar", "", "")
 	_, err = decodeClaims(rawclaims)
 	assert.Error(t, err)
 

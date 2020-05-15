@@ -2,7 +2,7 @@
 # Apache-2.0
 32714818ad6f98ee0185a52e23a475d89122e3efd2b2c26c733781c28e798c99  LICENSE
 32714818ad6f98ee0185a52e23a475d89122e3efd2b2c26c733781c28e798c99  vendor/github.com/mendersoftware/mendertesting/LICENSE
-c1452ea0feb52f2e6e6aaba33ae0d558626ba8c69ad7cb6866f2d4fbb7a711dc  vendor/github.com/mendersoftware/go-lib-micro/LICENSE
+d5a55eaa82e2c109b8bcadfa66139497511b80d665668264f155b5a45086b086  vendor/github.com/mendersoftware/go-lib-micro/LICENSE
 f7a4d9fa675c9347d97d6cb7b3142f733a828e8884eef461f30601f797f8248a  vendor/github.com/Azure/go-autorest/LICENSE
 5e3400b93bbb099e83e52bab885e7441750673c21f97988ca3f1240639b63283  vendor/github.com/spf13/afero/LICENSE.txt
 09e8a9bcec8067104652c168685ab0931e7868f9c8284b66f5ae6edae5f1130b  vendor/github.com/xdg/scram/LICENSE
