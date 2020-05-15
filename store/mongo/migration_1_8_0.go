@@ -23,12 +23,12 @@ import (
 	mopts "go.mongodb.org/mongo-driver/mongo/options"
 )
 
-type migration_1_7_0 struct {
+type migration_1_8_0 struct {
 	ds  *DataStoreMongo
 	ctx context.Context
 }
 
-func (m *migration_1_7_0) Up(from migrate.Version) error {
+func (m *migration_1_8_0) Up(from migrate.Version) error {
 	database := m.ds.client.Database(ctxstore.DbFromContext(m.ctx, DbName))
 	collTokens := database.Collection(DbTokensColl)
 	err := collTokens.Drop(m.ctx)
@@ -50,6 +50,6 @@ func (m *migration_1_7_0) Up(from migrate.Version) error {
 	return err
 }
 
-func (m *migration_1_7_0) Version() migrate.Version {
+func (m *migration_1_8_0) Version() migrate.Version {
 	return migrate.MakeVersion(1, 7, 0)
 }

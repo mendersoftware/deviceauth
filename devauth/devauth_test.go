@@ -37,6 +37,7 @@ import (
 	"github.com/mendersoftware/deviceauth/model"
 	"github.com/mendersoftware/deviceauth/store"
 	mstore "github.com/mendersoftware/deviceauth/store/mocks"
+	"github.com/mendersoftware/deviceauth/store/mongo"
 	mtesting "github.com/mendersoftware/deviceauth/utils/testing"
 	"github.com/pkg/errors"
 )
@@ -1954,7 +1955,7 @@ func TestDevAuthProvisionTenant(t *testing.T) {
 			db := mstore.DataStore{}
 			db.On("MigrateTenant", ctxMatcher,
 				mock.AnythingOfType("string"),
-				"1.7.0",
+				mongo.DbVersion,
 			).Return(tc.datastoreError)
 			db.On("WithAutomigrate").Return(&db)
 			devauth := NewDevAuth(&db, nil, nil, Config{})
