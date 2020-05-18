@@ -1,5 +1,5 @@
 # go-lib-micro
-[![Build Status](https://travis-ci.org/mendersoftware/go-lib-micro.svg?branch=master)](https://travis-ci.org/mendersoftware/go-lib-micro)
+[![Build Status](https://gitlab.com/Northern.tech/Mender/go-lib-micro/badges/master/pipeline.svg)](https://gitlab.com/Northern.tech/Mender/go-lib-micro/pipelines)
 [![codecov](https://codecov.io/gh/mendersoftware/go-lib-micro/branch/master/graph/badge.svg)](https://codecov.io/gh/mendersoftware/go-lib-micro)
 [![Go Report Card](https://goreportcard.com/badge/github.com/mendersoftware/go-lib-micro)](https://goreportcard.com/report/github.com/mendersoftware/go-lib-micro)
 
