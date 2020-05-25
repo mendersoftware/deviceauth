@@ -28,6 +28,7 @@ import (
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/mendersoftware/go-lib-micro/mongo/oid"
+	"github.com/mendersoftware/go-lib-micro/plan"
 	"github.com/mendersoftware/go-lib-micro/requestid"
 	mstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/pkg/errors"
@@ -343,6 +344,8 @@ func (d *DevAuth) SubmitAuthRequest(ctx context.Context, r *model.AuthReq) (stri
 				token.Claims.Tenant = ident.Tenant
 				token.Claims.Plan = tenant.Plan
 			}
+		} else {
+			token.Claims.Plan = plan.PlanEnterprise
 		}
 
 		// sign and encode as JWT
