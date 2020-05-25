@@ -351,6 +351,12 @@
 			"revisionTime": "2020-05-07T15:24:41Z"
 		},
 		{
+			"checksumSHA1": "4uiLkhZgk714ldUUWVOhwFN4mng=",
+			"path": "github.com/mendersoftware/go-lib-micro/plan",
+			"revision": "6829ff01e034e52dcc1d76b29b30818a8364ee32",
+			"revisionTime": "2020-05-07T15:24:41Z"
+		},
+		{
 			"checksumSHA1": "sve6XoM2mIBPxtjjLBy7Oq8EHQo=",
 			"path": "github.com/mendersoftware/go-lib-micro/requestid",
 			"revision": "6829ff01e034e52dcc1d76b29b30818a8364ee32",
