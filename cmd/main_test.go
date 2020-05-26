@@ -26,6 +26,9 @@ var db mtesting.TestDBRunner
 func TestMain(m *testing.M) {
 	flag.Parse()
 	var status int
+	if !flag.Parsed() {
+		flag.Parse()
+	}
 	if !testing.Short() {
 		status = mtesting.WithDB(func(dbtest mtesting.TestDBRunner) int {
 			db = dbtest

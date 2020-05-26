@@ -14,21 +14,47 @@
 package jwt
 
 import (
+	"encoding/json"
 	"time"
+
+	"github.com/mendersoftware/go-lib-micro/mongo/oid"
 )
 
 type Claims struct {
-	Audience  string `json:"aud,omitempty"`
-	ExpiresAt int64  `json:"exp,omitempty"`
-	ID        string `json:"jti,omitempty"`
-	IssuedAt  int64  `json:"iat,omitempty"`
-	Issuer    string `json:"iss,omitempty"`
-	NotBefore int64  `json:"nbf,omitempty"`
-	Subject   string `json:"sub,omitempty"`
-	Scope     string `json:"scp,omitempty"`
-	Tenant    string `json:"mender.tenant,omitempty"`
-	Plan      string `json:"mender.plan,omitempty"`
-	Device    bool   `json:"mender.device,omitempty"`
+	// ID is the unique jwt ID, also device AuthSet UUID. (Required)
+	ID oid.ObjectID `json:"jti,omitempty" bson:"_id"`
+	// Subject claim holds the device ID. (Required)
+	Subject  oid.ObjectID `json:"sub,omitempty" bson:"sub"`
+	Audience string       `json:"aud,omitempty" bson:"aud,omitempty"`
+	Scope    string       `json:"scp,omitempty" bson:"scp,omitempty"`
+	// Issuer holds the configurable issuer claim.
+	Issuer string `json:"iss,omitempty" bson:"iss,omitempty"`
+	// Tenant claim holds the tenant id this device belongs to.
+	Tenant string `json:"mender.tenant,omitempty" bson:"mender.tenant,omitempty"`
+	// ExpiresAt is the timestamp when the token becomes invalid. (Required)
+	ExpiresAt Time `json:"exp,omitempty" bson:"exp"`
+	IssuedAt  Time `json:"iat,omitempty" bson:"iat,omitempty"`
+	NotBefore Time `json:"nbf,omitempty" bson:"nbf,omitempty"`
+	// Device claim states that this token belongs to a device
+	Device bool `json:"mender.device,omitempty" bson:"mender.device,omitempty"`
+	// Plan holds the tenant's feature plan claim.
+	Plan string `json:"mender.plan,omitempty"`
+}
+
+type Time struct {
+	time.Time
+}
+
+func (t Time) MarshalJSON() ([]byte, error) {
+	unixTime := t.Unix()
+	return json.Marshal(unixTime)
+}
+
+func (t *Time) UnmarshalJSON(b []byte) error {
+	var unixTime int64
+	err := json.Unmarshal(b, &unixTime)
+	t.Time = time.Unix(unixTime, 0)
+	return err
 }
 
 // Valid checks if claims are valid. Returns error if validation fails.
@@ -37,19 +63,14 @@ type Claims struct {
 // level, where this info is available.
 func (c *Claims) Valid() error {
 	if c.Issuer == "" ||
-		c.ExpiresAt == 0 ||
-		c.Subject == "" {
+		c.ID.String() == "" ||
+		c.Subject.String() == "" {
 		return ErrTokenInvalid
 	}
 
-	if !verifyExp(c.ExpiresAt) {
+	if c.ExpiresAt.Before(time.Now()) {
 		return ErrTokenExpired
 	}
 
 	return nil
-}
-
-func verifyExp(exp int64) bool {
-	now := time.Now().Unix()
-	return now <= exp
 }

@@ -45,6 +45,7 @@ type DevAuthSet struct {
 }
 
 type AuthSetUpdate struct {
+	Id           string                 `bson:"id,omitempty"`
 	IdData       string                 `bson:"id_data,omitempty"`
 	IdDataStruct map[string]interface{} `bson:"id_data_struct,omitempty"`
 	IdDataSha256 []byte                 `bson:"id_data_sha256,omitempty"`
