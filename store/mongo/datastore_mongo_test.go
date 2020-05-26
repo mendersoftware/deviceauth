@@ -140,6 +140,7 @@ func compareDevices(expected *model.Device, actual *model.Device, t *testing.T) 
 	assert.Equal(t, expected.IdDataStruct, actual.IdDataStruct)
 	assert.Equal(t, expected.IdDataSha256, actual.IdDataSha256)
 	assert.Equal(t, expected.Status, actual.Status)
+	assert.Equal(t, expected.ApiLimits, actual.ApiLimits)
 	compareTime(expected.CreatedTs, actual.CreatedTs, t)
 	compareTime(expected.UpdatedTs, actual.UpdatedTs, t)
 }
@@ -2271,6 +2272,122 @@ func TestStoreUpdateuthSetById(t *testing.T) {
 				assert.NoError(t, err)
 
 				compareAuthSet(tc.out, &found, t)
+			}
+		})
+	}
+}
+
+func TestStoreGetDeviceById(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestStoreGetDeviceById in short mode.")
+	}
+
+	// set this to get reliable time.Time serialization
+	// (always get UTC instead of e.g. CEST)
+	time.Local = time.UTC
+
+	indescr := []struct {
+		id     string
+		idData string
+		limits model.ApiLimits
+	}{
+		{
+			id:     "dev1",
+			idData: "idData1",
+			//default limits
+		},
+		{
+			id:     "dev2",
+			idData: "idData2",
+			limits: model.ApiLimits{
+				ApiQuota: model.ApiQuota{
+					MaxCalls:    100,
+					IntervalSec: 60,
+				},
+				ApiBursts: []model.ApiBurst{
+					{
+						Action:         "POST",
+						Uri:            "/api/management/v1/deployments/device/deployments/next",
+						MinIntervalSec: 3600,
+					},
+					{
+						Action:         "PATCH",
+						Uri:            "/api/devices/v1/inventory/device/attributes",
+						MinIntervalSec: 60,
+					},
+				},
+			},
+		},
+		{
+			id:     "dev3",
+			idData: "idData4",
+			limits: model.ApiLimits{
+				ApiQuota: model.ApiQuota{
+					MaxCalls:    1000,
+					IntervalSec: 3600,
+				},
+				ApiBursts: []model.ApiBurst{},
+			},
+		},
+	}
+
+	indevs := make([]interface{}, len(indescr))
+	for i, descr := range indescr {
+		dev := model.NewDevice(oid.NewUUIDv5(descr.id).String(), descr.idData, "")
+		dev.ApiLimits = descr.limits
+		indevs[i] = dev
+	}
+
+	testCases := []struct {
+		id     string
+		expIdx int
+		err    error
+
+		tenant string
+	}{
+		{
+			id:     oid.NewUUIDv5("dev1").String(),
+			expIdx: 0,
+		},
+		{
+			id:     oid.NewUUIDv5("dev2").String(),
+			expIdx: 1,
+			tenant: "foo",
+		},
+		{
+			id:     oid.NewUUIDv5("dev3").String(),
+			expIdx: 2,
+			tenant: "bar",
+		},
+		{
+			id:  oid.NewUUIDv5("notfound").String(),
+			err: store.ErrDevNotFound,
+		},
+	}
+
+	for i, tc := range testCases {
+		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+
+			ctx := context.Background()
+			if tc.tenant != "" {
+				ctx = identity.WithContext(ctx, &identity.Identity{
+					Tenant: tc.tenant,
+				})
+			}
+
+			d := getDb(ctx)
+
+			c := d.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
+			_, err := c.InsertMany(ctx, indevs)
+			assert.NoError(t, err)
+
+			out, err := d.GetDeviceById(ctx, tc.id)
+			if tc.err != nil {
+				assert.EqualError(t, tc.err, err.Error())
+			} else {
+				exp := indevs[tc.expIdx].(*model.Device)
+				compareDevices(exp, out, t)
+				assert.NoError(t, err)
 			}
 		})
 	}
