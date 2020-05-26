@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -40,6 +40,8 @@ type Device struct {
 	CreatedTs       time.Time              `json:"created_ts" bson:"created_ts,omitempty"`
 	UpdatedTs       time.Time              `json:"updated_ts" bson:"updated_ts,omitempty"`
 	AuthSets        []AuthSet              `json:"auth_sets" bson:"-"`
+	//ApiLimits override tenant-wide quota/burst config
+	ApiLimits ApiLimits `json:"-" bson:"api_limits"`
 }
 
 type DeviceUpdate struct {
