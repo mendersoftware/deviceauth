@@ -11,30 +11,33 @@
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
-package model
+package ratelimits
 
 import (
 	"encoding/json"
 )
 
+// ApiBurst defines minimal interval (seconds) between subsequent calls to action on uri
 type ApiBurst struct {
 	Action         string `json:"action" bson:"action"`
 	Uri            string `json:"uri" bson:"uri"`
 	MinIntervalSec int    `json:"min_interval_sec" bson:"min_interval_sec"`
 }
 
+// ApiQuota defines the ratelimit quota as max number of calls in a given time interval (in seconds)
+// MaxCalls == 0 means 'no quota limit'
 type ApiQuota struct {
 	MaxCalls    int `json:"max_calls" bson:"max_calls"`
 	IntervalSec int `json:"interval_sec" bson:"interval_sec"`
 }
 
+// ApiLimits combines burst limits and usage quota limits
 type ApiLimits struct {
 	ApiBursts []ApiBurst `json:"bursts" bson:"bursts"`
 	ApiQuota  ApiQuota   `json:"quota" bson:"quota"`
 }
 
-// MarshalJSON makes sure even nil ApiBursts (default for all tenants)
-// are actually empty lists
+// MarshalJSON makes sure even defaut nil ApiLimits.ApiBursts are actually empty lists
 func (al ApiLimits) MarshalJSON() ([]byte, error) {
 	if al.ApiBursts == nil {
 		al.ApiBursts = make([]ApiBurst, 0)

@@ -15,6 +15,8 @@ package model
 
 import (
 	"time"
+
+	"github.com/mendersoftware/go-lib-micro/ratelimits"
 )
 
 const (
@@ -41,7 +43,7 @@ type Device struct {
 	UpdatedTs       time.Time              `json:"updated_ts" bson:"updated_ts,omitempty"`
 	AuthSets        []AuthSet              `json:"auth_sets" bson:"-"`
 	//ApiLimits override tenant-wide quota/burst config
-	ApiLimits ApiLimits `json:"-" bson:"api_limits"`
+	ApiLimits ratelimits.ApiLimits `json:"-" bson:"api_limits"`
 }
 
 type DeviceUpdate struct {

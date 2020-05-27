@@ -36,6 +36,7 @@ import (
 	"github.com/mendersoftware/deviceauth/model"
 	"github.com/mendersoftware/deviceauth/store"
 	uto "github.com/mendersoftware/deviceauth/utils/to"
+	"github.com/mendersoftware/go-lib-micro/ratelimits"
 )
 
 const (
@@ -2289,7 +2290,7 @@ func TestStoreGetDeviceById(t *testing.T) {
 	indescr := []struct {
 		id     string
 		idData string
-		limits model.ApiLimits
+		limits ratelimits.ApiLimits
 	}{
 		{
 			id:     "dev1",
@@ -2299,12 +2300,12 @@ func TestStoreGetDeviceById(t *testing.T) {
 		{
 			id:     "dev2",
 			idData: "idData2",
-			limits: model.ApiLimits{
-				ApiQuota: model.ApiQuota{
+			limits: ratelimits.ApiLimits{
+				ApiQuota: ratelimits.ApiQuota{
 					MaxCalls:    100,
 					IntervalSec: 60,
 				},
-				ApiBursts: []model.ApiBurst{
+				ApiBursts: []ratelimits.ApiBurst{
 					{
 						Action:         "POST",
 						Uri:            "/api/management/v1/deployments/device/deployments/next",
@@ -2321,12 +2322,12 @@ func TestStoreGetDeviceById(t *testing.T) {
 		{
 			id:     "dev3",
 			idData: "idData4",
-			limits: model.ApiLimits{
-				ApiQuota: model.ApiQuota{
+			limits: ratelimits.ApiLimits{
+				ApiQuota: ratelimits.ApiQuota{
 					MaxCalls:    1000,
 					IntervalSec: 3600,
 				},
-				ApiBursts: []model.ApiBurst{},
+				ApiBursts: []ratelimits.ApiBurst{},
 			},
 		},
 	}

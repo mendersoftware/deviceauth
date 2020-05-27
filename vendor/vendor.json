@@ -357,6 +357,12 @@
 			"revisionTime": "2020-05-07T15:24:41Z"
 		},
 		{
+			"checksumSHA1": "YoiKD7L8ZGOJ62AjnV2Rzer72sw=",
+			"path": "github.com/mendersoftware/go-lib-micro/ratelimits",
+			"revision": "266ff95a81afad4ce806453c908342b116cbd4a9",
+			"revisionTime": "2020-05-27T07:41:48Z"
+		},
+		{
 			"checksumSHA1": "sve6XoM2mIBPxtjjLBy7Oq8EHQo=",
 			"path": "github.com/mendersoftware/go-lib-micro/requestid",
 			"revision": "6829ff01e034e52dcc1d76b29b30818a8364ee32",
