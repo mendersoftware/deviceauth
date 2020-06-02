@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -637,6 +637,15 @@ func TestApiDevAuthVerifyToken(t *testing.T) {
 		},
 		{
 			req: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/internal/v1/devauth/tokens/verify", nil),
+			code: 200,
+			headers: map[string]string{
+				"authorization": "dummytoken",
+			},
+			err: nil,
+		},
+		{
+			req: test.MakeSimpleRequest("GET",
 				"http://1.2.3.4/api/internal/v1/devauth/tokens/verify", nil),
 			code: 200,
 			headers: map[string]string{
