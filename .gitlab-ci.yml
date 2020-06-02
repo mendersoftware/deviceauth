@@ -22,9 +22,9 @@ include:
     file: '.gitlab-ci-github-status-updates.yml'
 
 test:static:
-  image: golang:1.11
+  image: golang:1.14
 
 test:unit:
-  image: golang:1.11
+  image: golang:1.14
   variables:
     DEVICEAUTH_MONGO: mongo
