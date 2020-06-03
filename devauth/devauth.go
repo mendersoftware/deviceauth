@@ -35,6 +35,7 @@ import (
 	"github.com/pkg/errors"
 	"go.mongodb.org/mongo-driver/bson"
 
+	"github.com/mendersoftware/deviceauth/cache"
 	"github.com/mendersoftware/deviceauth/client/orchestrator"
 	"github.com/mendersoftware/deviceauth/client/tenant"
 	"github.com/mendersoftware/deviceauth/jwt"
@@ -128,6 +129,7 @@ type DevAuth struct {
 	clientGetter ApiClientGetter
 	verifyTenant bool
 	config       Config
+	cache        cache.Cache
 }
 
 type Config struct {
@@ -1049,6 +1051,11 @@ func (d *DevAuth) GetTenantLimit(ctx context.Context, name, tenant_id string) (*
 func (d *DevAuth) WithTenantVerification(c tenant.ClientRunner) *DevAuth {
 	d.cTenant = c
 	d.verifyTenant = true
+	return d
+}
+
+func (d *DevAuth) WithCache(c cache.Cache) *DevAuth {
+	d.cache = c
 	return d
 }
 
