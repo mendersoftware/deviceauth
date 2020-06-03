@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -87,15 +87,8 @@ func (r *preAuthReq) getDbModel() (*model.PreAuthReq, error) {
 		return nil, err
 	}
 
-	dId, err := uuid.NewV4()
-	if err != nil {
-		return nil, err
-	}
-
-	asId, err := uuid.NewV4()
-	if err != nil {
-		return nil, err
-	}
+	dId := uuid.NewV4()
+	asId := uuid.NewV4()
 
 	return &model.PreAuthReq{
 		DeviceId:  dId.String(),

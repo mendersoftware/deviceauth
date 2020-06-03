@@ -400,7 +400,7 @@ func TestApiV2DevAuthPreauthDevice(t *testing.T) {
 			checker: mt.NewJSONResponse(
 				http.StatusBadRequest,
 				nil,
-				restError("failed to decode preauth request: pubkey: non zero value required;")),
+				restError("failed to decode preauth request: pubkey: non zero value required")),
 		},
 		"invalid: no body": {
 			checker: mt.NewJSONResponse(
@@ -770,7 +770,7 @@ func TestApiV2GetDevice(t *testing.T) {
 		PubKey: "pubkey",
 		Status: model.DevStatusPending,
 		AuthSets: []model.AuthSet{
-			model.AuthSet{
+			{
 				Id:       "1",
 				DeviceId: "foo",
 				IdData:   `{"mac": "00:00:00:01"}`,

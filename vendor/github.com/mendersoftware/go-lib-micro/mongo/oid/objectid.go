@@ -52,10 +52,7 @@ func NewBSONID() ObjectID {
 // NewUUIDv4 creates a new ObjectID initialized with a UUID v4 (random).
 // In the rare event that the RNG returns an error, the null UUID is returned.
 func NewUUIDv4() ObjectID {
-	uid, err := uuid.NewV4()
-	if err != nil {
-		uid = uuid.Nil
-	}
+	uid := uuid.NewV4()
 	return ObjectID{id: uid}
 }
 
