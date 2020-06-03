@@ -30,6 +30,7 @@ import (
 	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/mendersoftware/go-lib-micro/mongo/oid"
 	"github.com/mendersoftware/go-lib-micro/plan"
+	"github.com/mendersoftware/go-lib-micro/ratelimits"
 	"github.com/mendersoftware/go-lib-micro/requestid"
 	mstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/pkg/errors"
@@ -967,6 +968,7 @@ func (d *DevAuth) VerifyToken(ctx context.Context, raw string) error {
 	if err != nil {
 		if err == jwt.ErrTokenExpired && jti.String() != "" {
 			l.Errorf("Token %s expired: %v", jti, err)
+
 			err := d.db.DeleteToken(ctx, jti)
 			if err == store.ErrTokenNotFound {
 				l.Errorf("Token %s not found", jti)
@@ -990,6 +992,28 @@ func (d *DevAuth) VerifyToken(ctx context.Context, raw string) error {
 		return err
 	}
 
+	origMethod := ctxhttpheader.FromContext(ctx, "X-Original-Method")
+	origUri := ctxhttpheader.FromContext(ctx, "X-Original-URI")
+	origUri = purgeUriArgs(origUri)
+
+	// throttle and try fetch token from cache - if cached, it was
+	// already verified against the db checks below, we trust it
+	cachedToken, err := d.cacheThrottleVerify(ctx, token, raw, origMethod, origUri)
+
+	if err == cache.ErrTooManyRequests {
+		return err
+	}
+
+	if cachedToken != "" {
+		return nil
+	}
+
+	// caching is best effort, don't fail
+	if err != nil {
+		l.Errorf("Failed to throttle for token %v: %s, continue.", token, err.Error())
+	}
+
+	// cache check was a MISS, hit the db for verification
 	// check if token is in the system
 	_, err = d.db.GetToken(ctx, jti)
 	if err != nil {
@@ -1024,7 +1048,123 @@ func (d *DevAuth) VerifyToken(ctx context.Context, raw string) error {
 		return jwt.ErrTokenInvalid
 	}
 
+	// after successful token verification - cache it (best effort)
+	_ = d.cacheSetToken(ctx, token, raw)
+
 	return nil
+}
+
+// purgeUriArgs removes query string args from an uri string
+// important for burst control (bursts are per uri without args)
+func purgeUriArgs(uri string) string {
+	return strings.Split(uri, "?")[0]
+}
+
+func (d *DevAuth) cacheThrottleVerify(ctx context.Context, token *jwt.Token, originalRaw, origMethod, origUri string) (string, error) {
+	if d.cache == nil {
+		return "", nil
+	}
+
+	// try get cached/precomputed limits
+	limits, err := d.getApiLimits(ctx,
+		token.Claims.Tenant,
+		token.Claims.Subject.String())
+
+	if err != nil {
+		return "", err
+	}
+
+	// apply throttling and fetch cached token
+	cached, err := d.cache.Throttle(ctx,
+		originalRaw,
+		*limits,
+		token.Claims.Tenant,
+		token.Claims.Subject.String(),
+		cache.IdTypeDevice,
+		origUri,
+		origMethod)
+
+	return cached, err
+}
+
+func (d *DevAuth) cacheSetToken(ctx context.Context, token *jwt.Token, raw string) error {
+	if d.cache == nil {
+		return nil
+	}
+
+	expireIn := time.Duration(token.Claims.ExpiresAt.Unix()-d.clock.Now().Unix()) * time.Second
+
+	return d.cache.CacheToken(ctx,
+		token.Claims.Tenant,
+		token.Claims.Subject.String(),
+		cache.IdTypeDevice,
+		raw,
+		expireIn)
+}
+
+func (d *DevAuth) getApiLimits(ctx context.Context, tid, did string) (*ratelimits.ApiLimits, error) {
+	limits, err := d.cache.GetLimits(ctx, tid, did, cache.IdTypeDevice)
+	if err != nil {
+		return nil, err
+	}
+
+	if limits != nil {
+		return limits, nil
+	}
+
+	dev, err := d.db.GetDeviceById(ctx, did)
+	if err != nil {
+		return nil, err
+	}
+
+	t, err := d.cTenant.GetTenant(ctx, tid, d.clientGetter())
+	if err != nil {
+		return nil, errors.Wrap(err, "request to get tenant failed")
+	}
+	if t == nil {
+		return nil, errors.New("tenant not found")
+	}
+
+	finalLimits := apiLimitsOverride(t.ApiLimits.DeviceLimits, dev.ApiLimits)
+
+	err = d.cache.CacheLimits(ctx, finalLimits, tid, did, cache.IdTypeDevice)
+
+	return &finalLimits, err
+}
+
+// TODO move to 'ratelimits', as ApiLimits methods maybe?
+func apiLimitsOverride(src, dest ratelimits.ApiLimits) ratelimits.ApiLimits {
+	// override only if not default
+	if dest.ApiQuota.MaxCalls != 0 && dest.ApiQuota.IntervalSec != 0 {
+		src.ApiQuota.MaxCalls = dest.ApiQuota.MaxCalls
+		src.ApiQuota.IntervalSec = dest.ApiQuota.IntervalSec
+	}
+
+	out := make([]ratelimits.ApiBurst, len(src.ApiBursts))
+	copy(out, src.ApiBursts)
+
+	for _, bdest := range dest.ApiBursts {
+		found := false
+		for i, bsrc := range src.ApiBursts {
+			if bdest.Action == bsrc.Action &&
+				bdest.Uri == bsrc.Uri {
+				out[i].MinIntervalSec = bdest.MinIntervalSec
+				found = true
+			}
+		}
+
+		if !found {
+			out = append(out,
+				ratelimits.ApiBurst{
+					Action:         bdest.Action,
+					Uri:            bdest.Uri,
+					MinIntervalSec: bdest.MinIntervalSec},
+			)
+		}
+	}
+
+	src.ApiBursts = out
+	return src
 }
 
 func (d *DevAuth) GetLimit(ctx context.Context, name string) (*model.Limit, error) {

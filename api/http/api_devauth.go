@@ -21,6 +21,7 @@ import (
 	"github.com/mendersoftware/go-lib-micro/identity"
 
 	"github.com/ant0ine/go-json-rest/rest"
+	ctxhttpheader "github.com/mendersoftware/go-lib-micro/context/httpheader"
 	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/mendersoftware/go-lib-micro/rest_utils"
 	"github.com/pkg/errors"
@@ -388,6 +389,11 @@ func (d *DevAuthApiHandlers) VerifyTokenHandler(w rest.ResponseWriter, r *rest.R
 		rest_utils.RestErrWithLog(w, r, l, ErrNoAuthHeader, http.StatusUnauthorized)
 		return
 	}
+
+	ctx = ctxhttpheader.WithContext(ctx,
+		r.Header,
+		"X-Original-Method",
+		"X-Original-URI")
 
 	// verify token
 	err = d.devAuth.VerifyToken(ctx, tokenStr)
