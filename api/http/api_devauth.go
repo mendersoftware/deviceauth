@@ -26,6 +26,7 @@ import (
 	"github.com/mendersoftware/go-lib-micro/rest_utils"
 	"github.com/pkg/errors"
 
+	"github.com/mendersoftware/deviceauth/cache"
 	"github.com/mendersoftware/deviceauth/devauth"
 	"github.com/mendersoftware/deviceauth/jwt"
 	"github.com/mendersoftware/deviceauth/model"
@@ -404,6 +405,8 @@ func (d *DevAuthApiHandlers) VerifyTokenHandler(w rest.ResponseWriter, r *rest.R
 			code = http.StatusForbidden
 		case store.ErrTokenNotFound, jwt.ErrTokenInvalid:
 			code = http.StatusUnauthorized
+		case cache.ErrTooManyRequests:
+			code = http.StatusTooManyRequests
 		default:
 			rest_utils.RestErrWithLogInternal(w, r, l, err)
 			return
