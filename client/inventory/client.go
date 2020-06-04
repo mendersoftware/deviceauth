@@ -172,9 +172,18 @@ type DeviceAttribute struct {
 func (c *client) SetDeviceIdentity(ctx context.Context, tenantId, deviceId string, idData map[string]interface{}) error {
 	l := log.FromContext(ctx)
 
+	if deviceId == "" {
+		return errors.New("device id is needed")
+	}
+
 	attributes := make([]DeviceAttribute, len(idData))
 	i := 0
 	for name, value := range idData {
+		if name == "status" {
+			//we have to forbid the client to override attribute status in identity scope
+			//since it stands for status of a device (as in: accepted, rejected, preauthorized)
+			continue
+		}
 		attribute := DeviceAttribute{
 			Name:        name,
 			Description: nil,
@@ -183,6 +192,14 @@ func (c *client) SetDeviceIdentity(ctx context.Context, tenantId, deviceId strin
 		}
 		attributes[i] = attribute
 		i++
+	}
+
+	if i < 1 {
+		return errors.New("no attributes to update")
+	}
+
+	if i != len(idData) {
+		attributes = attributes[:i]
 	}
 
 	body, err := json.Marshal(attributes)
