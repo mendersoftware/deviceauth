@@ -18,6 +18,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"github.com/mendersoftware/deviceauth/client/inventory"
 	"net/http"
 	"strings"
 	"time"
@@ -120,6 +121,7 @@ type App interface {
 
 type DevAuth struct {
 	db           store.DataStore
+	invClient    inventory.Client
 	cOrch        orchestrator.ClientRunner
 	cTenant      tenant.ClientRunner
 	jwt          jwt.Handler
@@ -136,6 +138,7 @@ type Config struct {
 	// Default tenant token to use when the client supplies none. Can be
 	// empty
 	DefaultTenantToken string
+	InventoryAddr      string
 }
 
 func NewDevAuth(d store.DataStore, co orchestrator.ClientRunner,
@@ -143,6 +146,7 @@ func NewDevAuth(d store.DataStore, co orchestrator.ClientRunner,
 
 	return &DevAuth{
 		db:           d,
+		invClient:    inventory.NewClient(config.InventoryAddr, false),
 		cOrch:        co,
 		jwt:          jwt,
 		clientGetter: simpleApiClientGetter,
@@ -178,6 +182,15 @@ func (d *DevAuth) getDeviceFromAuthRequest(ctx context.Context, r *model.AuthReq
 	if err != nil {
 		l.Error("failed to find device but could not add either")
 		return nil, errors.New("failed to locate device")
+	}
+
+	idData := identity.FromContext(ctx)
+	tenantId := ""
+	if idData != nil {
+		tenantId = idData.Tenant
+	}
+	if addDeviceErr != store.ErrObjectExists {
+		d.invClient.SetDeviceIdentity(ctx, tenantId, dev.Id, dev.IdDataStruct)
 	}
 
 	if addDeviceErr == store.ErrObjectExists {
@@ -874,6 +887,9 @@ func (d *DevAuth) PreauthorizeDevice(ctx context.Context, req *model.PreAuthReq)
 	if idData != nil {
 		tenantId = idData.Tenant
 	}
+
+	d.invClient.SetDeviceIdentity(ctx, tenantId, dev.Id, dev.IdDataStruct)
+
 	if err = d.cOrch.SubmitUpdateDeviceStatusJob(
 		ctx,
 		orchestrator.UpdateDeviceStatusReq{
@@ -900,6 +916,7 @@ func (d *DevAuth) PreauthorizeDevice(ctx context.Context, req *model.PreAuthReq)
 	err = d.db.AddAuthSet(ctx, authset)
 	switch err {
 	case nil:
+		d.invClient.SetDeviceIdentity(ctx, tenantId, req.DeviceId, idDataStruct)
 		return nil
 	case store.ErrObjectExists:
 		return ErrDeviceExists

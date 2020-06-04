@@ -33,12 +33,14 @@ import (
 const (
 	urlPatchAttrs         = "/api/internal/v2/inventory/devices/:id"
 	urlUpdateDeviceStatus = "/api/internal/v1/inventory/tenants/:tid/devices/"
+	urlSetDeviceAttribute = "/api/internal/v1/inventory/tenants/:tid/device/:did/attribute/scope/:scope"
 	timeout               = 10 * time.Second
 )
 
 type Client interface {
 	PatchDeviceV2(ctx context.Context, did, tid, src string, ts int64, attrs []Attribute) error
 	SetDeviceStatus(ctx context.Context, tenantId string, deviceIds []string, status string) error
+	SetDeviceIdentity(ctx context.Context, tenantId, deviceId string, idData map[string]interface{}) error
 }
 
 type client struct {
@@ -129,6 +131,90 @@ func (c *client) SetDeviceStatus(ctx context.Context, tenantId string, deviceIds
 	url = strings.Replace(url, ":tid", tenantId, 1)
 
 	req, err := http.NewRequest(http.MethodPost, url, rd)
+	if err != nil {
+		return errors.Wrapf(err, "failed to create request")
+	}
+
+	req.Header.Set("X-MEN-Source", "deviceauth")
+	req.Header.Set("Content-Type", "application/json")
+
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	rsp, err := c.client.Do(req.WithContext(ctx))
+	if err != nil {
+		return errors.Wrapf(err, "failed to submit %s %s", req.Method, req.URL)
+	}
+	defer rsp.Body.Close()
+
+	if rsp.StatusCode != http.StatusOK {
+		body, err := ioutil.ReadAll(rsp.Body)
+		if err != nil {
+			body = []byte("<failed to read>")
+		}
+		l.Errorf("request %s %s failed with status %v, response: %s",
+			req.Method, req.URL, rsp.Status, body)
+
+		return errors.Errorf(
+			"%s %s request failed with status %v", req.Method, req.URL, rsp.Status)
+	}
+
+	return nil
+}
+
+type DeviceAttribute struct {
+	Name        string      `json:"name" bson:",omitempty"`
+	Description *string     `json:"description,omitempty" bson:",omitempty"`
+	Value       interface{} `json:"value" bson:",omitempty"`
+	Scope       string      `json:"scope" bson:",omitempty"`
+}
+
+func (c *client) SetDeviceIdentity(ctx context.Context, tenantId, deviceId string, idData map[string]interface{}) error {
+	l := log.FromContext(ctx)
+
+	if deviceId == "" {
+		return errors.New("device id is needed")
+	}
+
+	attributes := make([]DeviceAttribute, len(idData))
+	i := 0
+	for name, value := range idData {
+		if name == "status" {
+			//we have to forbid the client to override attribute status in identity scope
+			//since it stands for status of a device (as in: accepted, rejected, preauthorized)
+			continue
+		}
+		attribute := DeviceAttribute{
+			Name:        name,
+			Description: nil,
+			Value:       value,
+			Scope:       "identity",
+		}
+		attributes[i] = attribute
+		i++
+	}
+
+	if i < 1 {
+		return errors.New("no attributes to update")
+	}
+
+	if i != len(idData) {
+		attributes = attributes[:i]
+	}
+
+	body, err := json.Marshal(attributes)
+	if err != nil {
+		return errors.Wrapf(err, "failed to serialize device attribute")
+	}
+
+	rd := bytes.NewReader(body)
+
+	url := utils.JoinURL(c.urlBase, urlSetDeviceAttribute)
+	url = strings.Replace(url, ":tid", tenantId, 1)
+	url = strings.Replace(url, ":did", deviceId, 1)
+	url = strings.Replace(url, ":scope", "identity", 1)
+
+	req, err := http.NewRequest(http.MethodPatch, url, rd)
 	if err != nil {
 		return errors.Wrapf(err, "failed to create request")
 	}
