@@ -185,7 +185,7 @@ func (d *DevAuth) getDeviceFromAuthRequest(ctx context.Context, r *model.AuthReq
 	}
 
 	idData := identity.FromContext(ctx)
-	tenantId:=""
+	tenantId := ""
 	if idData != nil {
 		tenantId = idData.Tenant
 	}

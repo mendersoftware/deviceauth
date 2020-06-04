@@ -123,6 +123,22 @@ func doMain(args []string) {
 			Action: cmdPropagateStatusesInventory,
 		},
 		{
+			Name:  "propagate-inventory-id-data",
+			Usage: "Push device id_data to inventory",
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:  "tenant_id",
+					Usage: "Tenant ID (optional) - propagate for just a single tenant.",
+				},
+				cli.BoolFlag{
+					Name:  "dry-run",
+					Usage: "Do not perform any inventory modifications, just scan and print devices.",
+				},
+			},
+
+			Action: cmdPropagateIdDataInventory,
+		},
+		{
 			Name:  "maintenance",
 			Usage: "Run maintenance operations and exit",
 			Flags: []cli.Flag{
@@ -248,6 +264,22 @@ func cmdPropagateStatusesInventory(args *cli.Context) error {
 		c,
 		args.String("tenant_id"),
 		args.String("force-set-migration"),
+		args.Bool("dry-run"))
+	if err != nil {
+		return cli.NewExitError(err, 7)
+	}
+	return nil
+}
+
+func cmdPropagateIdDataInventory(args *cli.Context) error {
+	db, err := mongo.NewDataStoreMongo(makeDataStoreConfig())
+
+	inv := config.Config.GetString(dconfig.SettingInventoryAddr)
+	c := cinv.NewClient(inv, false)
+
+	err = cmd.PropagateIdDataInventory(db,
+		c,
+		args.String("tenant_id"),
 		args.Bool("dry-run"))
 	if err != nil {
 		return cli.NewExitError(err, 7)
