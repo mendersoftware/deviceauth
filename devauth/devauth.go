@@ -42,6 +42,7 @@ import (
 	"github.com/mendersoftware/deviceauth/model"
 	"github.com/mendersoftware/deviceauth/store"
 	"github.com/mendersoftware/deviceauth/store/mongo"
+	"github.com/mendersoftware/deviceauth/utils"
 	uto "github.com/mendersoftware/deviceauth/utils/to"
 )
 
@@ -130,6 +131,7 @@ type DevAuth struct {
 	verifyTenant bool
 	config       Config
 	cache        cache.Cache
+	clock        utils.Clock
 }
 
 type Config struct {
@@ -154,6 +156,7 @@ func NewDevAuth(d store.DataStore, co orchestrator.ClientRunner,
 		clientGetter: simpleApiClientGetter,
 		verifyTenant: false,
 		config:       config,
+		clock:        utils.NewClock(),
 	}
 }
 
@@ -1056,6 +1059,11 @@ func (d *DevAuth) WithTenantVerification(c tenant.ClientRunner) *DevAuth {
 
 func (d *DevAuth) WithCache(c cache.Cache) *DevAuth {
 	d.cache = c
+	return d
+}
+
+func (d *DevAuth) WithClock(c utils.Clock) *DevAuth {
+	d.clock = c
 	return d
 }
 
