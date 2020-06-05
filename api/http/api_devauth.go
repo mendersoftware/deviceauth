@@ -81,6 +81,7 @@ func NewDevAuthApiHandlers(devAuth devauth.App, db store.DataStore) ApiHandler {
 func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
 	routes := []*rest.Route{
 		rest.Post(uriAuthReqs, d.SubmitAuthRequestHandler),
+		rest.Get(uriTokenVerify, d.VerifyTokenHandler),
 		rest.Post(uriTokenVerify, d.VerifyTokenHandler),
 		rest.Delete(uriTokens, d.DeleteTokensHandler),
 

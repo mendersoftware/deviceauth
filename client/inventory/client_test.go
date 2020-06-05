@@ -307,3 +307,161 @@ func TestClientSetDeviceStatus(t *testing.T) {
 		})
 	}
 }
+
+func TestClientSetDeviceIdentity(t *testing.T) {
+	cases := map[string]struct {
+		tid     string
+		did     string
+		didData map[string]interface{}
+
+		code             int
+		errCheckPrefix   bool
+		doNotStartServer bool
+		err              error
+	}{
+		"ok": {
+			did: "dsfgr32r23-dfgst34gsdf-34gs-sdgf34",
+			didData: map[string]interface{}{
+				"serial":   "vcsdfgsadt7678dfswr543",
+				"eMMC-CID": "d0 27 01 32 0f 59 03 ff f6 db ff ef 8a 40 40 00",
+				"CPUID":    "0x8000 0008",
+			},
+			tid: "tenant",
+
+			code: http.StatusOK,
+		},
+		"ok, no tenant": {
+			did: "dsfgr32r23-dfgst34gsdf-34gs-sdgf34",
+			didData: map[string]interface{}{
+				"serial":   "vcsdfgsadt7678dfswr543",
+				"eMMC-CID": "d0 27 01 32 0f 59 03 ff f6 db ff ef 8a 40 40 00",
+				"CPUID":    "0x8000 0008",
+			},
+
+			code: http.StatusOK,
+		},
+		"error: inventory": {
+			did: "dsfgr32r23-dfgst34gsdf-34gs-sdgf34",
+			didData: map[string]interface{}{
+				"serial":   "vcsdfgsadt7678dfswr543",
+				"eMMC-CID": "d0 27 01 32 0f 59 03 ff f6 db ff ef 8a 40 40 00",
+				"CPUID":    "0x8000 0008",
+			},
+
+			code: http.StatusBadRequest,
+		},
+		"error: status attribute is reserved": {
+			did: "dsfgr32r23-dfgst34gsdf-34gs-sdgf34",
+			didData: map[string]interface{}{
+				"status":   "accepted",
+			},
+
+			err: errors.New("no attributes to update"),
+		},
+		"error: no device id": {
+
+			err: errors.New("device id is needed"),
+		},
+		"error: no attributes": {
+			did: "dsfgr32r23-dfgst34gsdf-34gs-sdgf34",
+
+			err: errors.New("no attributes to update"),
+		},
+		"error: not a valid url": {
+			did: "dsfgr32r23-dfgst34gsdf-34gs-sdgf34",
+			didData: map[string]interface{}{
+				"serial":   "vcsdfgsadt7678dfswr543",
+				"eMMC-CID": "d0 27 01 32 0f 59 03 ff f6 db ff ef 8a 40 40 00",
+				"CPUID":    "0x8000 0008",
+			},
+			tid: "/well, leads to % no / good url/",
+
+			errCheckPrefix: true,
+			err:            errors.New("failed to create request: parse"),
+		},
+		"error: connection refused": {
+			did: "dsfgr32r23-dfgst34gsdf-34gs-sdgf34",
+			didData: map[string]interface{}{
+				"serial":   "vcsdfgsadt7678dfswr543",
+				"eMMC-CID": "d0 27 01 32 0f 59 03 ff f6 db ff ef 8a 40 40 00",
+				"CPUID":    "0x8000 0008",
+			},
+			tid: "tenant",
+
+			doNotStartServer: true,
+			errCheckPrefix:   true,
+			err:              errors.New("failed to create request: parse"),
+		},
+	}
+
+	for d := range cases {
+		tc := cases[d]
+		t.Run(fmt.Sprintf("case: %s", d), func(t *testing.T) {
+			t.Parallel()
+
+			if tc.doNotStartServer {
+				c := NewClient("http://this.does.not.exists/url/also/", true)
+				err := c.SetDeviceIdentity(context.TODO(),
+					tc.tid,
+					tc.did,
+					tc.didData)
+				assert.True(t, strings.HasPrefix(err.Error(), "failed to submit PATCH"))
+				return
+			}
+			s := httptest.NewServer(
+				http.HandlerFunc(
+					func(w http.ResponseWriter, r *http.Request) {
+						w.WriteHeader(tc.code)
+						if tc.code != http.StatusOK {
+							return
+						}
+
+						url := urlSetDeviceAttribute
+						url = strings.Replace(url, ":tid", tc.tid, 1)
+						url = strings.Replace(url, ":did", tc.did, 1)
+						url = strings.Replace(url, ":scope", "identity", 1)
+						assert.Equal(t,
+							r.URL.Path,
+							url)
+						assert.Equal(t, "deviceauth", r.Header.Get("X-MEN-Source"))
+
+						defer r.Body.Close()
+						_, err := ioutil.ReadAll(r.Body)
+						assert.NoError(t, err)
+					}))
+
+			c := NewClient(s.URL, true)
+			err := c.SetDeviceIdentity(context.TODO(),
+				tc.tid,
+				tc.did,
+				tc.didData)
+			if tc.err == nil {
+				if tc.code == 0 {
+					if tc.errCheckPrefix {
+						assert.True(t, strings.HasPrefix(err.Error(), tc.err.Error()))
+					} else {
+						assert.NoError(t, err)
+					}
+				}
+			} else {
+				if tc.errCheckPrefix {
+					assert.True(t, strings.HasPrefix(err.Error(), tc.err.Error()))
+				} else {
+					assert.EqualError(t, err, tc.err.Error())
+				}
+				return
+			}
+
+			if tc.code == http.StatusOK {
+				assert.NoError(t, err)
+			} else {
+				url := urlSetDeviceAttribute
+				url = strings.Replace(url, ":tid", tc.tid, 1)
+				url = strings.Replace(url, ":did", tc.did, 1)
+				url = strings.Replace(url, ":scope", "identity", 1)
+				s := fmt.Sprintf("PATCH %s request failed with status %d %s", s.URL+url, tc.code, http.StatusText(tc.code))
+				assert.EqualError(t, err, s)
+			}
+		})
+	}
+}
