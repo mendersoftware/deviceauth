@@ -688,7 +688,30 @@ func (d *DevAuth) DeleteAuthSet(ctx context.Context, devID string, authId string
 		// only delete the device if the set is 'preauthorized'
 		// otherwise device data may live in other services too,
 		// and is a case for decommissioning
-		return d.db.DeleteDevice(ctx, devID)
+		err = d.db.DeleteDevice(ctx, devID)
+		if err != nil {
+			return err
+		}
+		tenantId := ""
+		idData := identity.FromContext(ctx)
+		if idData != nil {
+			tenantId = idData.Tenant
+		}
+		b, err := json.Marshal([]string{devID})
+		if err != nil {
+			return errors.New("internal error: cannot marshal array into json")
+		}
+		if err = d.cOrch.SubmitUpdateDeviceStatusJob(
+			ctx,
+			orchestrator.UpdateDeviceStatusReq{
+				RequestId: requestid.FromContext(ctx),
+				Ids:       string(b), // []string{dev.Id},
+				TenantId:  tenantId,
+				Status:    "decommissioned",
+			}); err != nil {
+			return errors.Wrap(err, "update device status job error")
+		}
+		return err
 	}
 
 	return d.updateDeviceStatus(ctx, devID, "", authSet.Status)
