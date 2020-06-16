@@ -77,11 +77,18 @@ type Cache interface {
 	// CacheToken caches the token under designated key, with expiration
 	CacheToken(ctx context.Context, tid, id, idtype, token string, expireSec time.Duration) error
 
+	// DeleteToken deletes the token for 'id'
+	DeleteToken(ctx context.Context, tid, id, idtype string) error
+
 	// GetLimits fetches limits for 'id'
 	GetLimits(ctx context.Context, tid, id, idtype string) (*ratelimits.ApiLimits, error)
 
 	// CacheLimits saves limits for 'id'
 	CacheLimits(ctx context.Context, l ratelimits.ApiLimits, tid, id, idtype string) error
+
+	// FlushDB clears the whole db asynchronously (FLUSHDB ASYNC)
+	// TODO: replace with more fine grained key removal (per tenant)
+	FlushDB(ctx context.Context) error
 }
 
 type RedisCache struct {
@@ -261,6 +268,11 @@ func (rl *RedisCache) CacheToken(ctx context.Context, tid, id, idtype, token str
 	return res.Err()
 }
 
+func (rl *RedisCache) DeleteToken(ctx context.Context, tid, id, idtype string) error {
+	res := rl.c.Del(ctx, KeyToken(tid, id, idtype))
+	return res.Err()
+}
+
 func (rl *RedisCache) GetLimits(ctx context.Context, tid, id, idtype string) (*ratelimits.ApiLimits, error) {
 	res := rl.c.Get(ctx, KeyLimits(tid, id, idtype))
 
@@ -290,6 +302,10 @@ func (rl *RedisCache) CacheLimits(ctx context.Context, l ratelimits.ApiLimits, t
 	res := rl.c.Set(ctx, KeyLimits(tid, id, idtype), enc, time.Duration(rl.LimitsExpireSec)*time.Second)
 
 	return res.Err()
+}
+
+func (rl *RedisCache) FlushDB(ctx context.Context) error {
+	return rl.c.FlushDBAsync(ctx).Err()
 }
 
 func KeyQuota(tid, id, idtype, intvlNum string) string {

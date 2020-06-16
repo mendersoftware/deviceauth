@@ -1190,7 +1190,12 @@ func TestDevAuthRejectDevice(t *testing.T) {
 	dummyDevID := dummyDevUUID.String()
 
 	testCases := []struct {
-		aset             *model.AuthSet
+		aset *model.AuthSet
+
+		tenant         string
+		withCache      bool
+		cacheDeleteErr error
+
 		dbErr            error
 		dbDelDevTokenErr error
 
@@ -1201,7 +1206,32 @@ func TestDevAuthRejectDevice(t *testing.T) {
 				Id:       dummyAuthID,
 				DeviceId: dummyDevID,
 			},
-			dbDelDevTokenErr: nil,
+		},
+		{
+			aset: &model.AuthSet{
+				Id:       dummyAuthID,
+				DeviceId: dummyDevID,
+			},
+			withCache:      true,
+			tenant:         "acme",
+			cacheDeleteErr: errors.New("redis error"),
+			outErr:         "failed to delete token for 9c5df658-26ff-55e1-87a1-6780ca473154 from cache: redis error",
+		},
+		{
+			aset: &model.AuthSet{
+				Id:       dummyAuthID,
+				DeviceId: dummyDevID,
+			},
+			withCache: true,
+			outErr:    "failed to delete token for 9c5df658-26ff-55e1-87a1-6780ca473154 from cache: can't unpack tenant identity data from context",
+		},
+		{
+			aset: &model.AuthSet{
+				Id:       dummyAuthID,
+				DeviceId: dummyDevID,
+			},
+			withCache: true,
+			tenant:    "acme",
 		},
 		{
 			dbErr:            errors.New("failed"),
@@ -1214,7 +1244,6 @@ func TestDevAuthRejectDevice(t *testing.T) {
 				DeviceId: dummyDevID,
 			},
 			dbDelDevTokenErr: store.ErrTokenNotFound,
-			outErr:           "db delete device token error: token not found",
 		},
 		{
 			aset: &model.AuthSet{
@@ -1232,40 +1261,186 @@ func TestDevAuthRejectDevice(t *testing.T) {
 		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
 			t.Parallel()
 
+			ctx := context.Background()
+			if tc.tenant != "" {
+				id := &identity.Identity{
+					Tenant: tc.tenant,
+				}
+				ctx = identity.WithContext(ctx, id)
+			}
+
 			db := mstore.DataStore{}
-			db.On("GetAuthSetById", context.Background(),
+			db.On("GetAuthSetById", ctx,
 				dummyAuthID).
 				Return(tc.aset, tc.dbErr)
 			if tc.aset != nil {
-				db.On("UpdateAuthSetById", context.Background(), tc.aset.Id,
+				db.On("UpdateAuthSetById", ctx, tc.aset.Id,
 					model.AuthSetUpdate{Status: model.DevStatusRejected}).Return(nil)
 			}
-			db.On("DeleteTokenByDevId", context.Background(),
+			db.On("DeleteTokenByDevId", ctx,
 				dummyDevUUID).
 				Return(tc.dbDelDevTokenErr)
-			db.On("GetDeviceStatus", context.Background(),
+			db.On("GetDeviceStatus", ctx,
 				dummyDevID).
 				Return("accpted", nil)
-			db.On("UpdateDevice", context.Background(),
+			db.On("UpdateDevice", ctx,
 				mock.AnythingOfType("model.Device"),
 				mock.AnythingOfType("model.DeviceUpdate")).Return(nil)
 
 			co := morchestrator.ClientRunner{}
-			co.On("SubmitUpdateDeviceStatusJob", context.Background(),
+			co.On("SubmitUpdateDeviceStatusJob", ctx,
 				mock.AnythingOfType("orchestrator.UpdateDeviceStatusReq")).
 				Return(nil)
+
 			devauth := NewDevAuth(&db, &co, nil, Config{})
+
+			c := &mcache.Cache{}
+			if tc.withCache {
+				devauth = devauth.WithCache(c)
+				if tc.tenant != "" {
+					c.On("DeleteToken",
+						mock.MatchedBy(func(ctx context.Context) bool {
+							ident := identity.FromContext(ctx)
+							return assert.NotNil(t, ident) &&
+								assert.Equal(t, tc.tenant, ident.Tenant)
+						}),
+						tc.tenant,
+						tc.aset.DeviceId,
+						cache.IdTypeDevice).
+						Return(tc.cacheDeleteErr)
+				} else {
+					c.AssertNotCalled(t, "DeleteToken")
+				}
+			} else {
+				c.AssertNotCalled(t, "DeleteToken")
+			}
+
 			err := devauth.RejectDeviceAuth(
-				context.Background(), dummyDevID, dummyAuthID,
+				ctx, dummyDevID, dummyAuthID,
 			)
 
-			if tc.dbErr != nil || (tc.dbDelDevTokenErr != nil &&
-				tc.dbDelDevTokenErr != store.ErrTokenNotFound) {
-
+			if tc.outErr != "" {
 				assert.EqualError(t, err, tc.outErr)
 			} else {
 				assert.NoError(t, err)
 			}
+
+			c.AssertExpectations(t)
+		})
+	}
+}
+
+func TestDevAuthRevokeToken(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		tokenId string
+
+		tenant         string
+		withCache      bool
+		cacheDeleteErr error
+
+		dbToken  *jwt.Token
+		dbGetErr error
+		dbDelErr error
+
+		outErr error
+	}{
+		{
+			tokenId: "foo",
+		},
+		{
+			tokenId:  "foo",
+			dbDelErr: store.ErrTokenNotFound,
+			outErr:   store.ErrTokenNotFound,
+		},
+		{
+			tokenId:   "foo",
+			withCache: true,
+			tenant:    "acme",
+			dbToken: &jwt.Token{
+				Claims: jwt.Claims{
+					Subject: oid.NewUUIDv5("device"),
+				},
+			},
+		},
+		{
+			tokenId:   "foo",
+			withCache: true,
+			tenant:    "acme",
+			dbGetErr:  store.ErrTokenNotFound,
+			outErr:    store.ErrTokenNotFound,
+		},
+		{
+			tokenId:   "foo",
+			withCache: true,
+			tenant:    "acme",
+			dbToken: &jwt.Token{
+				Claims: jwt.Claims{
+					Subject: oid.NewUUIDv5("device"),
+				},
+			},
+			cacheDeleteErr: errors.New("redis error"),
+			outErr:         errors.New("failed to delete token for 884482f8-4b20-5b83-b674-6ca5cb3e7525 from cache: redis error"),
+		},
+	}
+
+	for i := range testCases {
+		tc := testCases[i]
+		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			t.Parallel()
+
+			ctx := context.Background()
+			if tc.tenant != "" {
+				id := &identity.Identity{
+					Tenant: tc.tenant,
+				}
+				ctx = identity.WithContext(ctx, id)
+			}
+
+			tokenOID := oid.FromString(tc.tokenId)
+
+			db := mstore.DataStore{}
+			db.On("GetToken", ctx,
+				tokenOID).
+				Return(tc.dbToken, tc.dbGetErr)
+			db.On("DeleteToken", ctx,
+				tokenOID).
+				Return(tc.dbDelErr)
+
+			c := &mcache.Cache{}
+
+			devauth := NewDevAuth(&db, nil, nil, Config{})
+
+			if tc.withCache {
+				devauth = devauth.WithCache(c)
+				if tc.tenant != "" && tc.dbToken != nil {
+					c.On("DeleteToken",
+						mock.MatchedBy(func(ctx context.Context) bool {
+							ident := identity.FromContext(ctx)
+							return assert.NotNil(t, ident) &&
+								assert.Equal(t, tc.tenant, ident.Tenant)
+						}),
+						tc.tenant,
+						tc.dbToken.Claims.Subject.String(),
+						cache.IdTypeDevice).
+						Return(tc.cacheDeleteErr)
+				} else {
+					c.AssertNotCalled(t, "DeleteToken")
+				}
+			} else {
+				c.AssertNotCalled(t, "DeleteToken")
+			}
+
+			err := devauth.RevokeToken(ctx, tc.tokenId)
+
+			if tc.outErr != nil {
+				assert.EqualError(t, err, tc.outErr.Error())
+			} else {
+				assert.NoError(t, err)
+			}
+
+			c.AssertExpectations(t)
 		})
 	}
 }
@@ -1926,12 +2101,16 @@ func TestDevAuthDecommissionDevice(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
-		devId string
+		devId  string
+		tenant string
 
 		dbUpdateDeviceErr            error
 		dbDeleteAuthSetsForDeviceErr error
 		dbDeleteTokenByDevIdErr      error
 		dbDeleteDeviceErr            error
+
+		withCache      bool
+		cacheDeleteErr error
 
 		coSubmitDeviceDecommisioningJobErr error
 		coAuthorization                    string
@@ -1972,6 +2151,31 @@ func TestDevAuthDecommissionDevice(t *testing.T) {
 			devId:           oid.NewUUIDv5("devId6").String(),
 			coAuthorization: "Bearer foobar",
 		},
+		{
+			devId:           oid.NewUUIDv5("devId6").String(),
+			withCache:       true,
+			tenant:          "acme",
+			coAuthorization: "Bearer foobar",
+		},
+		{
+			devId:          oid.NewUUIDv5("devId6").String(),
+			withCache:      true,
+			tenant:         "acme",
+			cacheDeleteErr: errors.New("redis error"),
+			outErr:         "failed to delete token for 7266c2f5-7694-569d-b493-30c728a0d650 from cache: redis error",
+		},
+		{
+			devId:          oid.NewUUIDv5("devId6").String(),
+			withCache:      true,
+			tenant:         "acme",
+			cacheDeleteErr: errors.New("redis error"),
+			outErr:         "failed to delete token for 7266c2f5-7694-569d-b493-30c728a0d650 from cache: redis error",
+		},
+		{
+			devId:     oid.NewUUIDv5("devId6").String(),
+			withCache: true,
+			outErr:    "failed to delete token for 7266c2f5-7694-569d-b493-30c728a0d650 from cache: can't unpack tenant identity data from context",
+		},
 	}
 
 	for i := range testCases {
@@ -1980,6 +2184,13 @@ func TestDevAuthDecommissionDevice(t *testing.T) {
 			t.Parallel()
 
 			ctx := context.Background()
+
+			if tc.tenant != "" {
+				id := &identity.Identity{
+					Tenant: tc.tenant,
+				}
+				ctx = identity.WithContext(ctx, id)
+			}
 
 			if tc.coAuthorization != "" {
 				ctx = ctxhttpheader.WithContext(ctx, http.Header{
@@ -2017,6 +2228,28 @@ func TestDevAuthDecommissionDevice(t *testing.T) {
 				mock.AnythingOfType("model.DeviceUpdate")).Return(nil)
 
 			devauth := NewDevAuth(&db, &co, nil, Config{})
+			c := &mcache.Cache{}
+
+			if tc.withCache {
+				devauth = devauth.WithCache(c)
+				if tc.tenant != "" {
+					c.On("DeleteToken",
+						mock.MatchedBy(func(ctx context.Context) bool {
+							ident := identity.FromContext(ctx)
+							return assert.NotNil(t, ident) &&
+								assert.Equal(t, tc.tenant, ident.Tenant)
+						}),
+						tc.tenant,
+						tc.devId,
+						cache.IdTypeDevice).
+						Return(tc.cacheDeleteErr)
+				} else {
+					c.AssertNotCalled(t, "DeleteToken")
+				}
+			} else {
+				c.AssertNotCalled(t, "DeleteToken")
+			}
+
 			err := devauth.DecommissionDevice(ctx, tc.devId)
 
 			if tc.outErr != "" {
@@ -2024,6 +2257,8 @@ func TestDevAuthDecommissionDevice(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
+
+			c.AssertExpectations(t)
 		})
 	}
 }
@@ -2359,6 +2594,10 @@ func TestDevAuthDeleteAuthSet(t *testing.T) {
 		devId  string
 		authId string
 
+		tenant         string
+		withCache      bool
+		cacheDeleteErr error
+
 		dbGetAuthSetByIdErr         error
 		dbDeleteTokenByDevIdErr     error
 		dbDeleteAuthSetForDeviceErr error
@@ -2435,6 +2674,26 @@ func TestDevAuthDeleteAuthSet(t *testing.T) {
 			devId:  oid.NewUUIDv5("devId12").String(),
 			authId: oid.NewUUIDv5("authId12").String(),
 		},
+		{
+			devId:     oid.NewUUIDv5("devId12").String(),
+			authId:    oid.NewUUIDv5("authId12").String(),
+			withCache: true,
+			tenant:    "acme",
+		},
+		{
+			devId:          oid.NewUUIDv5("devId12").String(),
+			authId:         oid.NewUUIDv5("authId12").String(),
+			withCache:      true,
+			tenant:         "acme",
+			cacheDeleteErr: errors.New("redis error"),
+			outErr:         "failed to delete token for c410d383-c9cd-5c98-9aeb-87166c5920f2 from cache: redis error",
+		},
+		{
+			devId:     oid.NewUUIDv5("devId12").String(),
+			authId:    oid.NewUUIDv5("authId12").String(),
+			withCache: true,
+			outErr:    "failed to delete token for c410d383-c9cd-5c98-9aeb-87166c5920f2 from cache: can't unpack tenant identity data from context",
+		},
 	}
 
 	for i := range testCases {
@@ -2443,6 +2702,12 @@ func TestDevAuthDeleteAuthSet(t *testing.T) {
 			t.Parallel()
 
 			ctx := context.Background()
+			if tc.tenant != "" {
+				id := &identity.Identity{
+					Tenant: tc.tenant,
+				}
+				ctx = identity.WithContext(ctx, id)
+			}
 
 			authSet := &model.AuthSet{Status: model.DevStatusPending}
 			if tc.authSet != nil {
@@ -2477,6 +2742,28 @@ func TestDevAuthDeleteAuthSet(t *testing.T) {
 				Return(nil)
 
 			devauth := NewDevAuth(&db, &co, nil, Config{})
+
+			c := &mcache.Cache{}
+			if tc.withCache {
+				devauth = devauth.WithCache(c)
+				if tc.tenant != "" {
+					c.On("DeleteToken",
+						mock.MatchedBy(func(ctx context.Context) bool {
+							ident := identity.FromContext(ctx)
+							return assert.NotNil(t, ident) &&
+								assert.Equal(t, tc.tenant, ident.Tenant)
+						}),
+						tc.tenant,
+						tc.devId,
+						cache.IdTypeDevice).
+						Return(tc.cacheDeleteErr)
+				} else {
+					c.AssertNotCalled(t, "DeleteToken")
+				}
+			} else {
+				c.AssertNotCalled(t, "DeleteToken")
+			}
+
 			err := devauth.DeleteAuthSet(ctx, tc.devId, tc.authId)
 
 			if tc.outErr != "" {
@@ -2489,6 +2776,7 @@ func TestDevAuthDeleteAuthSet(t *testing.T) {
 					db.AssertNotCalled(t, "DeleteDevice", tc.devId)
 				}
 			}
+			c.AssertExpectations(t)
 		})
 	}
 }
@@ -2499,6 +2787,8 @@ func TestDeleteTokens(t *testing.T) {
 	testCases := map[string]struct {
 		tenantId string
 		deviceId string
+
+		cacheFlushErr error
 
 		dbErrDeleteTokenById error
 		dbErrDeleteTokens    error
@@ -2530,6 +2820,11 @@ func TestDeleteTokens(t *testing.T) {
 			dbErrDeleteTokens: errors.New("db error"),
 			outErr:            errors.New("failed to delete tokens for tenant: foo, device id: : db error"),
 		},
+		"error(cache), all tenant's devs": {
+			tenantId:      "foo",
+			cacheFlushErr: errors.New("redis error"),
+			outErr:        errors.New("failed to flush cache when cleaning tokens for tenant foo: redis error"),
+		},
 	}
 
 	for n := range testCases {
@@ -2547,7 +2842,17 @@ func TestDeleteTokens(t *testing.T) {
 			db.On("DeleteTokens", ctxMatcher).
 				Return(tc.dbErrDeleteTokens)
 
+			c := &mcache.Cache{}
+			if tc.deviceId == "" {
+				c.On("FlushDB", ctxMatcher).
+					Return(tc.cacheFlushErr)
+			} else {
+				c.AssertNotCalled(t, "FlushDB")
+			}
+
 			devauth := NewDevAuth(&db, nil, nil, Config{})
+			devauth = devauth.WithCache(c)
+
 			err := devauth.DeleteTokens(ctx, tc.tenantId, tc.deviceId)
 
 			if tc.outErr != nil {

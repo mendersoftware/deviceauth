@@ -613,6 +613,11 @@ func (d *DevAuth) DecommissionDevice(ctx context.Context, devID string) error {
 
 	l.Warnf("Decommission device with id: %s", devID)
 
+	err := d.cacheDeleteToken(ctx, devID)
+	if err != nil {
+		return errors.Wrapf(err, "failed to delete token for %s from cache", devID)
+	}
+
 	// set decommissioning flag on the device
 	updev := model.DeviceUpdate{
 		Decommissioning: to.BoolPtr(true),
@@ -665,6 +670,11 @@ func (d *DevAuth) DeleteAuthSet(ctx context.Context, devID string, authId string
 	l.Warnf("Delete authentication set with id: "+
 		"%s for the device with id: %s",
 		authId, devID)
+
+	err := d.cacheDeleteToken(ctx, devID)
+	if err != nil {
+		return errors.Wrapf(err, "failed to delete token for %s from cache", devID)
+	}
 
 	// retrieve device authentication set to check its status
 	authSet, err := d.db.GetAuthSetById(ctx, authId)
@@ -854,6 +864,11 @@ func (d *DevAuth) setAuthSetStatus(
 }
 
 func (d *DevAuth) RejectDeviceAuth(ctx context.Context, device_id string, auth_id string) error {
+	err := d.cacheDeleteToken(ctx, device_id)
+	if err != nil {
+		return errors.Wrapf(err, "failed to delete token for %s from cache", device_id)
+	}
+
 	return d.setAuthSetStatus(ctx, device_id, auth_id, model.DevStatusRejected)
 }
 
@@ -958,6 +973,17 @@ func (d *DevAuth) RevokeToken(ctx context.Context, tokenID string) error {
 
 	l := log.FromContext(ctx)
 	tokenOID := oid.FromString(tokenID)
+
+	if d.cache != nil {
+		token, err := d.db.GetToken(ctx, tokenOID)
+		if err != nil {
+			return err
+		}
+		err = d.cacheDeleteToken(ctx, token.Claims.Subject.String())
+		if err != nil {
+			return errors.Wrapf(err, "failed to delete token for %s from cache", token.Claims.Subject.String())
+		}
+	}
 
 	l.Warnf("Revoke token with jti: %s", tokenID)
 	return d.db.DeleteToken(ctx, tokenOID)
@@ -1155,6 +1181,20 @@ func (d *DevAuth) getApiLimits(ctx context.Context, tid, did string) (*ratelimit
 	return &finalLimits, err
 }
 
+func (d *DevAuth) cacheDeleteToken(ctx context.Context, did string) error {
+	if d.cache == nil {
+		return nil
+	}
+
+	idData := identity.FromContext(ctx)
+	if idData == nil {
+		return errors.New("can't unpack tenant identity data from context")
+	}
+	tid := idData.Tenant
+
+	return d.cache.DeleteToken(ctx, tid, did, cache.IdTypeDevice)
+}
+
 // TODO move to 'ratelimits', as ApiLimits methods maybe?
 func apiLimitsOverride(src, dest ratelimits.ApiLimits) ratelimits.ApiLimits {
 	// override only if not default
@@ -1292,6 +1332,10 @@ func (d *DevAuth) DeleteTokens(
 		}
 		err = d.db.DeleteTokenByDevId(ctx, deviceOID)
 	} else {
+		if err := d.cacheFlush(ctx); err != nil {
+			return errors.Wrapf(err, "failed to flush cache when cleaning tokens for tenant %v", tenantID)
+		}
+
 		err = d.db.DeleteTokens(ctx)
 	}
 
@@ -1300,6 +1344,14 @@ func (d *DevAuth) DeleteTokens(
 	}
 
 	return nil
+}
+
+func (d *DevAuth) cacheFlush(ctx context.Context) error {
+	if d.cache == nil {
+		return nil
+	}
+
+	return d.cache.FlushDB(ctx)
 }
 
 func (d *DevAuth) ProvisionTenant(ctx context.Context, tenant_id string) error {
