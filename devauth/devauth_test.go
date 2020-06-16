@@ -2788,6 +2788,8 @@ func TestDeleteTokens(t *testing.T) {
 		tenantId string
 		deviceId string
 
+		cacheFlushErr error
+
 		dbErrDeleteTokenById error
 		dbErrDeleteTokens    error
 
@@ -2818,6 +2820,11 @@ func TestDeleteTokens(t *testing.T) {
 			dbErrDeleteTokens: errors.New("db error"),
 			outErr:            errors.New("failed to delete tokens for tenant: foo, device id: : db error"),
 		},
+		"error(cache), all tenant's devs": {
+			tenantId:      "foo",
+			cacheFlushErr: errors.New("redis error"),
+			outErr:        errors.New("failed to flush cache when cleaning tokens for tenant foo: redis error"),
+		},
 	}
 
 	for n := range testCases {
@@ -2835,7 +2842,17 @@ func TestDeleteTokens(t *testing.T) {
 			db.On("DeleteTokens", ctxMatcher).
 				Return(tc.dbErrDeleteTokens)
 
+			c := &mcache.Cache{}
+			if tc.deviceId == "" {
+				c.On("FlushDB", ctxMatcher).
+					Return(tc.cacheFlushErr)
+			} else {
+				c.AssertNotCalled(t, "FlushDB")
+			}
+
 			devauth := NewDevAuth(&db, nil, nil, Config{})
+			devauth = devauth.WithCache(c)
+
 			err := devauth.DeleteTokens(ctx, tc.tenantId, tc.deviceId)
 
 			if tc.outErr != nil {
