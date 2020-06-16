@@ -33,6 +33,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
+	"github.com/mendersoftware/deviceauth/cache"
 	"github.com/mendersoftware/deviceauth/client/tenant"
 	"github.com/mendersoftware/deviceauth/devauth"
 	"github.com/mendersoftware/deviceauth/devauth/mocks"
@@ -656,6 +657,17 @@ func TestApiDevAuthVerifyToken(t *testing.T) {
 		{
 			req: test.MakeSimpleRequest("POST",
 				"http://1.2.3.4/api/internal/v1/devauth/tokens/verify", nil),
+			code: 429,
+			headers: map[string]string{
+				"authorization":     "dummytoken",
+				"X-Original-Method": "POST",
+				"X-Original-URI":    "/deployments/next",
+			},
+			err: cache.ErrTooManyRequests,
+		},
+		{
+			req: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/internal/v1/devauth/tokens/verify", nil),
 			code: http.StatusForbidden,
 			headers: map[string]string{
 				"authorization": "dummytoken",
@@ -698,6 +710,7 @@ func TestApiDevAuthVerifyToken(t *testing.T) {
 			if len(tc.headers) > 0 {
 				tc.req.Header.Set("authorization", tc.headers["authorization"])
 			}
+
 			runTestRequest(t, apih, tc.req, tc.code, tc.body)
 		})
 	}

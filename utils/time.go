@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -17,4 +17,32 @@ import "time"
 
 func UnixMilis() int64 {
 	return time.Now().UnixNano() / 1000000
+}
+
+type Clock interface {
+	Now() time.Time
+}
+
+type clock struct{}
+
+func NewClock() *clock {
+	return &clock{}
+}
+
+func (c *clock) Now() time.Time {
+	return time.Now()
+}
+
+type mockClock struct {
+	unixNow int64
+}
+
+func NewMockClock(unixNow int64) *mockClock {
+	return &mockClock{
+		unixNow: unixNow,
+	}
+}
+
+func (mc *mockClock) Now() time.Time {
+	return time.Unix(mc.unixNow, 0)
 }
