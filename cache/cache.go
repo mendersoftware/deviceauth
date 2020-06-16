@@ -85,6 +85,10 @@ type Cache interface {
 
 	// CacheLimits saves limits for 'id'
 	CacheLimits(ctx context.Context, l ratelimits.ApiLimits, tid, id, idtype string) error
+
+	// FlushDB clears the whole db asynchronously (FLUSHDB ASYNC)
+	// TODO: replace with more fine grained key removal (per tenant)
+	FlushDB(ctx context.Context) error
 }
 
 type RedisCache struct {
@@ -298,6 +302,10 @@ func (rl *RedisCache) CacheLimits(ctx context.Context, l ratelimits.ApiLimits, t
 	res := rl.c.Set(ctx, KeyLimits(tid, id, idtype), enc, time.Duration(rl.LimitsExpireSec)*time.Second)
 
 	return res.Err()
+}
+
+func (rl *RedisCache) FlushDB(ctx context.Context) error {
+	return rl.c.FlushDBAsync(ctx).Err()
 }
 
 func KeyQuota(tid, id, idtype, intvlNum string) string {

@@ -203,6 +203,63 @@ func TestRedisCacheTokenDelete(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestRedisCacheFlushDB(t *testing.T) {
+	ctx := context.TODO()
+
+	r := miniredis.NewMiniRedis()
+	err := r.Start()
+	assert.NoError(t, err)
+	defer r.Close()
+
+	rcache, err := NewRedisCache(r.Addr(), "", "", 0, 5, 1800)
+
+	// cache 2 tokens and immediately flush
+	rcache.CacheToken(ctx,
+		"tenant-foo",
+		"device-1",
+		IdTypeDevice,
+		"tokenstr-1",
+		time.Duration(10*time.Second))
+
+	rcache.CacheToken(ctx,
+		"tenant-foo",
+		"device-2",
+		IdTypeDevice,
+		"tokenstr-2",
+		time.Duration(10*time.Second))
+
+	err = rcache.FlushDB(ctx)
+	assert.NoError(t, err)
+
+	// no hits after flush
+	tok1, err := rcache.Throttle(ctx,
+		"tokenstr-1",
+		ratelimits.ApiLimits{},
+		"tenant-foo",
+		"device-1",
+		IdTypeDevice,
+		"/some/url",
+		"GET")
+	assert.NoError(t, err)
+	assert.Equal(t, "", tok1)
+
+	tok2, err := rcache.Throttle(ctx,
+		"tokenstr-2",
+		ratelimits.ApiLimits{},
+		"tenant-foo",
+		"device-2",
+		IdTypeDevice,
+		"/some/url",
+		"GET")
+
+	assert.NoError(t, err)
+	assert.Equal(t, "", tok2)
+
+	// second delete (no token) doesn't trigger an error
+	err = rcache.DeleteToken(ctx, "tenant-foo", "device-1", IdTypeDevice)
+	assert.NoError(t, err)
+}
+
 func TestRedisCacheLimitsQuota(t *testing.T) {
 	r := miniredis.NewMiniRedis()
 	err := r.Start()
