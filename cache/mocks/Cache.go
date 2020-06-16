@@ -56,6 +56,20 @@ func (_m *Cache) CacheToken(ctx context.Context, tid string, id string, idtype s
 	return r0
 }
 
+// DeleteToken provides a mock function with given fields: ctx, tid, id, idtype
+func (_m *Cache) DeleteToken(ctx context.Context, tid string, id string, idtype string) error {
+	ret := _m.Called(ctx, tid, id, idtype)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) error); ok {
+		r0 = rf(ctx, tid, id, idtype)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // GetLimits provides a mock function with given fields: ctx, tid, id, idtype
 func (_m *Cache) GetLimits(ctx context.Context, tid string, id string, idtype string) (*ratelimits.ApiLimits, error) {
 	ret := _m.Called(ctx, tid, id, idtype)

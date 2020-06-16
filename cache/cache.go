@@ -77,6 +77,9 @@ type Cache interface {
 	// CacheToken caches the token under designated key, with expiration
 	CacheToken(ctx context.Context, tid, id, idtype, token string, expireSec time.Duration) error
 
+	// DeleteToken deletes the token for 'id'
+	DeleteToken(ctx context.Context, tid, id, idtype string) error
+
 	// GetLimits fetches limits for 'id'
 	GetLimits(ctx context.Context, tid, id, idtype string) (*ratelimits.ApiLimits, error)
 
@@ -258,6 +261,11 @@ func (rl *RedisCache) CacheToken(ctx context.Context, tid, id, idtype, token str
 	res := rl.c.Set(ctx, KeyToken(tid, id, idtype),
 		token,
 		expire)
+	return res.Err()
+}
+
+func (rl *RedisCache) DeleteToken(ctx context.Context, tid, id, idtype string) error {
+	res := rl.c.Del(ctx, KeyToken(tid, id, idtype))
 	return res.Err()
 }
 
