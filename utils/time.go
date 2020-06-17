@@ -21,6 +21,7 @@ func UnixMilis() int64 {
 
 type Clock interface {
 	Now() time.Time
+	Forward(secs int64)
 }
 
 type clock struct{}
@@ -31,6 +32,10 @@ func NewClock() *clock {
 
 func (c *clock) Now() time.Time {
 	return time.Now()
+}
+
+func (c *clock) Forward(secs int64) {
+	//noop
 }
 
 type mockClock struct {
@@ -45,4 +50,8 @@ func NewMockClock(unixNow int64) *mockClock {
 
 func (mc *mockClock) Now() time.Time {
 	return time.Unix(mc.unixNow, 0)
+}
+
+func (mc *mockClock) Forward(secs int64) {
+	mc.unixNow += secs
 }
