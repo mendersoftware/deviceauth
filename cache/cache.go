@@ -240,10 +240,12 @@ func (rl *RedisCache) pipeBurst(ctx context.Context,
 		if b.Action == action &&
 			b.Uri == url &&
 			b.MinIntervalSec != 0 {
-			keyBurst := KeyBurst(tid, id, idtype, url, action)
+
+			intvl := int64(now / int64(b.MinIntervalSec))
+			keyBurst := KeyBurst(tid, id, idtype, url, action, strconv.FormatInt(intvl, 10))
+
 			get = pipe.Get(ctx, keyBurst)
 			set = pipe.Set(ctx, keyBurst, now, time.Duration(b.MinIntervalSec)*time.Second)
-
 		}
 	}
 
@@ -320,8 +322,8 @@ func KeyQuota(tid, id, idtype, intvlNum string) string {
 	return fmt.Sprintf("tenant:%s:%s:%s:quota:%s", tid, idtype, id, intvlNum)
 }
 
-func KeyBurst(tid, id, idtype, url, action string) string {
-	return fmt.Sprintf("tenant:%s:%s:%s:burst:%s:%s", tid, idtype, id, url, action)
+func KeyBurst(tid, id, idtype, url, action, intvlNum string) string {
+	return fmt.Sprintf("tenant:%s:%s:%s:burst:%s:%s:%s", tid, idtype, id, url, action, intvlNum)
 }
 
 func KeyToken(tid, id, idtype string) string {

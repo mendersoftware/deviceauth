@@ -20,9 +20,10 @@ import (
 	"time"
 
 	"github.com/alicebob/miniredis"
-
 	"github.com/mendersoftware/go-lib-micro/ratelimits"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/mendersoftware/deviceauth/utils"
 )
 
 func init() {
@@ -311,6 +312,9 @@ func TestRedisCacheLimitsBurst(t *testing.T) {
 	rcache, err := NewRedisCache(r.Addr(), "", "", 0, 5, 1800)
 	assert.NoError(t, err)
 
+	clock := utils.NewMockClock(1590105600)
+	rcache = rcache.WithClock(clock)
+
 	// apply burst
 	l := ratelimits.ApiLimits{
 		ApiBursts: []ratelimits.ApiBurst{
@@ -322,19 +326,21 @@ func TestRedisCacheLimitsBurst(t *testing.T) {
 		},
 	}
 
-	// client too quick
-	for i := 0; i < 10; i++ {
+	// client too quick - succeeds only every 10 secs
+	for i := 0; i < 30; i++ {
 		tok, err := testThrottle(rcache, l)
-		if i > 0 {
+		if i%10 == 0 {
+			assert.NoError(t, err)
+		} else {
 			assert.EqualError(t, err, ErrTooManyRequests.Error())
 			assert.Equal(t, "", tok)
 		}
-		r.FastForward(time.Duration(1 * time.Second))
+		fastForward(r, clock, 1)
 	}
 
-	// well behaved client
+	// well behaved client - succeeds every time
 	for i := 0; i < 10; i++ {
-		r.FastForward(time.Duration(11 * time.Second))
+		fastForward(r, clock, 11)
 		tok, err := testThrottle(rcache, l)
 		assert.NoError(t, err)
 		assert.Equal(t, "", tok)
@@ -470,4 +476,11 @@ func testThrottle(c Cache, limits ratelimits.ApiLimits) (string, error) {
 		IdTypeDevice,
 		"/some/url",
 		"GET")
+}
+
+// fastForward moves time forward consistently in a given miniredis instance,
+// and a given mock clock
+func fastForward(r *miniredis.Miniredis, c utils.Clock, secs int64) {
+	r.FastForward(time.Duration(secs) * time.Second)
+	c.Forward(secs)
 }
