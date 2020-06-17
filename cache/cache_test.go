@@ -356,6 +356,9 @@ func TestRedisCacheLimitsQuotaBurst(t *testing.T) {
 	rcache, err := NewRedisCache(r.Addr(), "", "", 0, 5, 1800)
 	assert.NoError(t, err)
 
+	clock := utils.NewMockClock(1590105600)
+	rcache = rcache.WithClock(clock)
+
 	// apply burst + quota
 	l := ratelimits.ApiLimits{
 		ApiQuota: ratelimits.ApiQuota{
@@ -366,39 +369,42 @@ func TestRedisCacheLimitsQuotaBurst(t *testing.T) {
 			{
 				Action:         "GET",
 				Uri:            "/some/url",
-				MinIntervalSec: 5,
+				MinIntervalSec: 3,
 			},
 		},
 	}
 
-	// client respects burst, but not quota
-	for i := 0; i < 15; i++ {
+	// client respects burst, but exceeds quota for a time
+	for i := 0; i < 20; i++ {
 		tok, err := testThrottle(rcache, l)
-		if i < 10 {
+		if i < 10 || i > 14 {
 			assert.NoError(t, err)
 			assert.Equal(t, "", tok)
 		} else {
 			assert.EqualError(t, err, ErrTooManyRequests.Error())
 			assert.Equal(t, "", tok)
 		}
-		r.FastForward(time.Duration(6 * time.Second))
+
+		fastForward(r, clock, 4)
 	}
 
 	// fully reset limits
-	r.FastForward(time.Duration(61 * time.Second))
+	fastForward(r, clock, 61)
 
-	// client is well within quota, but abuses burst
-	for i := 0; i < 15; i++ {
+	// client is within quota, but abuses burst
+	for i := 0; i < 9; i++ {
 		tok, err := testThrottle(rcache, l)
-		if i > 0 {
+		if i%3 == 0 {
+			assert.NoError(t, err)
+		} else {
 			assert.EqualError(t, err, ErrTooManyRequests.Error())
-			assert.Equal(t, "", tok)
 		}
-		r.FastForward(time.Duration(4 * time.Second))
+		assert.Equal(t, "", tok)
+		fastForward(r, clock, 1)
 	}
 
 	// fully reset limits
-	r.FastForward(time.Duration(61 * time.Second))
+	fastForward(r, clock, 61)
 
 	// quota applies on any url, but burst doesn't
 	for i := 0; i < 15; i++ {
@@ -417,7 +423,7 @@ func TestRedisCacheLimitsQuotaBurst(t *testing.T) {
 			assert.EqualError(t, err, ErrTooManyRequests.Error())
 			assert.Equal(t, "", tok)
 		}
-		r.FastForward(time.Duration(1 * time.Second))
+		fastForward(r, clock, 1)
 	}
 }
 
