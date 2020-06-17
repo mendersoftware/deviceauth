@@ -54,6 +54,8 @@ import (
 
 	"github.com/go-redis/redis/v8"
 	"github.com/mendersoftware/go-lib-micro/ratelimits"
+
+	"github.com/mendersoftware/deviceauth/utils"
 )
 
 const (
@@ -63,7 +65,6 @@ const (
 
 var (
 	ErrTooManyRequests = errors.New("too many requests")
-	Now                = time.Now
 )
 
 type Cache interface {
@@ -94,6 +95,7 @@ type Cache interface {
 type RedisCache struct {
 	c               *redis.Client
 	LimitsExpireSec int
+	clock           utils.Clock
 }
 
 func NewRedisCache(addr, user, pass string, db int, timeoutSec, limitsExpireSec int) (*RedisCache, error) {
@@ -110,11 +112,17 @@ func NewRedisCache(addr, user, pass string, db int, timeoutSec, limitsExpireSec 
 	return &RedisCache{
 		c:               c,
 		LimitsExpireSec: limitsExpireSec,
+		clock:           utils.NewClock(),
 	}, err
 }
 
+func (rl *RedisCache) WithClock(c utils.Clock) *RedisCache {
+	rl.clock = c
+	return rl
+}
+
 func (rl *RedisCache) Throttle(ctx context.Context, rawToken string, l ratelimits.ApiLimits, tid, id, idtype, url, action string) (string, error) {
-	now := Now().UTC().Unix()
+	now := rl.clock.Now().Unix()
 
 	var tokenGet *redis.StringCmd
 	var quotaInc *redis.IntCmd
