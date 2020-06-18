@@ -84,6 +84,7 @@ func RunServer(c config.Reader) error {
 			Issuer:             c.GetString(dconfig.SettingJWTIssuer),
 			ExpirationTime:     int64(c.GetInt(dconfig.SettingJWTExpirationTimeout)),
 			DefaultTenantToken: c.GetString(dconfig.SettingDefaultTenantToken),
+			InventoryAddr:      config.Config.GetString(dconfig.SettingInventoryAddr),
 		})
 
 	if tadmAddr := c.GetString(dconfig.SettingTenantAdmAddr); tadmAddr != "" {

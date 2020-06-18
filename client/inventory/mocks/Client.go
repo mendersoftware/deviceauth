@@ -49,3 +49,16 @@ func (_m *Client) SetDeviceStatus(ctx context.Context, tenantId string, deviceId
 
 	return r0
 }
+
+func (_m *Client) SetDeviceIdentity(ctx context.Context, tenantId, deviceId string, idData map[string]interface{}) error {
+	ret := _m.Called(ctx, tenantId, deviceId, idData)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, map[string]interface{}) error); ok {
+		r0 = rf(ctx, tenantId, deviceId, idData)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
