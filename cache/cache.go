@@ -54,6 +54,8 @@ import (
 
 	"github.com/go-redis/redis/v8"
 	"github.com/mendersoftware/go-lib-micro/ratelimits"
+
+	"github.com/mendersoftware/deviceauth/utils"
 )
 
 const (
@@ -63,7 +65,6 @@ const (
 
 var (
 	ErrTooManyRequests = errors.New("too many requests")
-	Now                = time.Now
 )
 
 type Cache interface {
@@ -94,6 +95,7 @@ type Cache interface {
 type RedisCache struct {
 	c               *redis.Client
 	LimitsExpireSec int
+	clock           utils.Clock
 }
 
 func NewRedisCache(addr, user, pass string, db int, timeoutSec, limitsExpireSec int) (*RedisCache, error) {
@@ -110,11 +112,17 @@ func NewRedisCache(addr, user, pass string, db int, timeoutSec, limitsExpireSec 
 	return &RedisCache{
 		c:               c,
 		LimitsExpireSec: limitsExpireSec,
+		clock:           utils.NewClock(),
 	}, err
 }
 
+func (rl *RedisCache) WithClock(c utils.Clock) *RedisCache {
+	rl.clock = c
+	return rl
+}
+
 func (rl *RedisCache) Throttle(ctx context.Context, rawToken string, l ratelimits.ApiLimits, tid, id, idtype, url, action string) (string, error) {
-	now := Now().UTC().Unix()
+	now := rl.clock.Now().Unix()
 
 	var tokenGet *redis.StringCmd
 	var quotaInc *redis.IntCmd
@@ -232,10 +240,12 @@ func (rl *RedisCache) pipeBurst(ctx context.Context,
 		if b.Action == action &&
 			b.Uri == url &&
 			b.MinIntervalSec != 0 {
-			keyBurst := KeyBurst(tid, id, idtype, url, action)
+
+			intvl := int64(now / int64(b.MinIntervalSec))
+			keyBurst := KeyBurst(tid, id, idtype, url, action, strconv.FormatInt(intvl, 10))
+
 			get = pipe.Get(ctx, keyBurst)
 			set = pipe.Set(ctx, keyBurst, now, time.Duration(b.MinIntervalSec)*time.Second)
-
 		}
 	}
 
@@ -312,8 +322,8 @@ func KeyQuota(tid, id, idtype, intvlNum string) string {
 	return fmt.Sprintf("tenant:%s:%s:%s:quota:%s", tid, idtype, id, intvlNum)
 }
 
-func KeyBurst(tid, id, idtype, url, action string) string {
-	return fmt.Sprintf("tenant:%s:%s:%s:burst:%s:%s", tid, idtype, id, url, action)
+func KeyBurst(tid, id, idtype, url, action, intvlNum string) string {
+	return fmt.Sprintf("tenant:%s:%s:%s:burst:%s:%s:%s", tid, idtype, id, url, action, intvlNum)
 }
 
 func KeyToken(tid, id, idtype string) string {
