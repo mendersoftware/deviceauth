@@ -8,7 +8,7 @@ info:
 basePath: '/api/management/v2/devauth/'
 host: 'mender-device-auth:8080'
 schemes:
-  - http
+  - https
 
 paths:
   /devices:
