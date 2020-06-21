@@ -643,6 +643,22 @@ func (db *DataStoreMongo) PutLimit(ctx context.Context, lim model.Limit) error {
 	return nil
 }
 
+func (db *DataStoreMongo) DeleteLimit(ctx context.Context, lim string) error {
+	if lim == "" {
+		return errors.New("empty limit name")
+	}
+
+	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbLimitsColl)
+
+	query := bson.M{"_id": lim}
+
+	if _, err := c.DeleteOne(ctx, query); err != nil {
+		return errors.Wrap(err, "failed to delete limit")
+	}
+
+	return nil
+}
+
 func (db *DataStoreMongo) GetLimit(ctx context.Context, name string) (*model.Limit, error) {
 	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbLimitsColl)
 

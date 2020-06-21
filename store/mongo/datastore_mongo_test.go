@@ -1531,7 +1531,7 @@ func TestStoreDeleteAuthSetsForDevice(t *testing.T) {
 
 func TestPutLimit(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping TestStoreDeleteAuthSetsForDevice in short mode.")
+		t.Skip("skipping TestPutLimit in short mode.")
 	}
 
 	lim1 := model.Limit{
@@ -1594,6 +1594,51 @@ func TestPutLimit(t *testing.T) {
 	assert.NoError(t, coll.FindOne(dbCtx, bson.M{"_id": "bar"}).Decode(&lim))
 	assert.EqualValues(t, lim2, lim)
 
+}
+
+func TestDeleteLimit(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestDeleteLimit in short mode.")
+	}
+
+	lim1 := model.Limit{
+		Name:  "foo",
+		Value: 123,
+	}
+	lim2 := model.Limit{
+		Name:  "bar",
+		Value: 456,
+	}
+
+	dbCtx := identity.WithContext(context.Background(), &identity.Identity{
+		Tenant: tenant,
+	})
+	db := getDb(dbCtx)
+
+	coll := db.client.Database(ctxstore.DbFromContext(dbCtx, DbName)).Collection(DbLimitsColl)
+	_, err := coll.InsertMany(dbCtx, bson.A{lim1, lim2})
+	assert.NoError(t, err)
+
+	dbCtxOtherTenant := identity.WithContext(context.Background(), &identity.Identity{
+		Tenant: "other-" + tenant,
+	})
+	collOtherTenant := db.client.Database(ctxstore.DbFromContext(dbCtxOtherTenant, DbName)).Collection(DbLimitsColl)
+	_, err = collOtherTenant.InsertMany(dbCtx, bson.A{lim1, lim2})
+	assert.NoError(t, err)
+
+	var lim model.Limit
+	assert.NoError(t, coll.FindOne(dbCtx, bson.M{"_id": lim1.Name}).Decode(&lim))
+
+	// delete the limit
+	err = db.DeleteLimit(dbCtx, lim.Name)
+	assert.NoError(t, err)
+
+	// limit not found
+	assert.Error(t, coll.FindOne(dbCtx, bson.M{"_id": lim1.Name}).Decode(&lim))
+
+	// the other-tenant limit 'foo' was not modified
+	assert.NoError(t, collOtherTenant.FindOne(dbCtx, bson.M{"_id": lim1.Name}).Decode(&lim))
+	assert.EqualValues(t, lim1, lim)
 }
 
 func TestGetLimit(t *testing.T) {
