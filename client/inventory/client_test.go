@@ -353,7 +353,7 @@ func TestClientSetDeviceIdentity(t *testing.T) {
 		"error: status attribute is reserved": {
 			did: "dsfgr32r23-dfgst34gsdf-34gs-sdgf34",
 			didData: map[string]interface{}{
-				"status":   "accepted",
+				"status": "accepted",
 			},
 
 			err: errors.New("no attributes to update"),

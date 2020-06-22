@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/mendersoftware/go-lib-micro/apiclient"
@@ -25,6 +26,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	ct "github.com/mendersoftware/deviceauth/client/testing"
+	"github.com/mendersoftware/go-lib-micro/ratelimits"
 )
 
 func TestClientGet(t *testing.T) {
@@ -34,7 +36,7 @@ func TestClientGet(t *testing.T) {
 	assert.NotNil(t, c)
 }
 
-func TestClient(t *testing.T) {
+func TestClientVerifyToken(t *testing.T) {
 	t.Parallel()
 
 	tcs := []struct {
@@ -62,12 +64,28 @@ func TestClient(t *testing.T) {
 				Name:   "foo-name",
 				Status: "active",
 				Plan:   "enterprise",
+				ApiLimits: TenantApiLimits{
+					MgmtLimits: ratelimits.ApiLimits{
+						ApiBursts: []ratelimits.ApiBurst{},
+					},
+					DeviceLimits: ratelimits.ApiLimits{
+						ApiBursts: []ratelimits.ApiBurst{},
+					},
+				},
 			},
 			tenant: &Tenant{
 				ID:     "foo",
 				Name:   "foo-name",
 				Status: "active",
 				Plan:   "enterprise",
+				ApiLimits: TenantApiLimits{
+					MgmtLimits: ratelimits.ApiLimits{
+						ApiBursts: []ratelimits.ApiBurst{},
+					},
+					DeviceLimits: ratelimits.ApiLimits{
+						ApiBursts: []ratelimits.ApiBurst{},
+					},
+				},
 			},
 		},
 		{
@@ -99,6 +117,113 @@ func TestClient(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 				assert.Equal(t, TenantVerifyUri, rd.Url.Path)
+				assert.Equal(t, tc.tenant, tenant)
+			}
+			s.Close()
+		})
+	}
+}
+
+func TestClientGetTenant(t *testing.T) {
+	t.Parallel()
+
+	tcs := []struct {
+		tid        string
+		tadmStatus int
+		tadmBody   interface{}
+		token      string
+
+		tenant *Tenant
+		err    error
+	}{
+		{
+			tid:        "foo",
+			tadmStatus: http.StatusOK,
+			tadmBody: &Tenant{
+				ID:     "foo",
+				Name:   "tenant-foo",
+				Status: "active",
+				Plan:   "enterprise",
+				ApiLimits: TenantApiLimits{
+					MgmtLimits: ratelimits.ApiLimits{
+						ApiBursts: []ratelimits.ApiBurst{},
+					},
+					DeviceLimits: ratelimits.ApiLimits{
+						ApiQuota: ratelimits.ApiQuota{
+							MaxCalls:    100,
+							IntervalSec: 60,
+						},
+						ApiBursts: []ratelimits.ApiBurst{
+							ratelimits.ApiBurst{
+								Uri:            "/foo",
+								MinIntervalSec: 5,
+							},
+						},
+					},
+				},
+			},
+			tenant: &Tenant{
+				ID:     "foo",
+				Name:   "tenant-foo",
+				Status: "active",
+				Plan:   "enterprise",
+				ApiLimits: TenantApiLimits{
+					MgmtLimits: ratelimits.ApiLimits{
+						ApiBursts: []ratelimits.ApiBurst{},
+					},
+					DeviceLimits: ratelimits.ApiLimits{
+						ApiQuota: ratelimits.ApiQuota{
+							MaxCalls:    100,
+							IntervalSec: 60,
+						},
+						ApiBursts: []ratelimits.ApiBurst{
+							ratelimits.ApiBurst{
+								Uri:            "/foo",
+								MinIntervalSec: 5,
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			tadmStatus: http.StatusNotFound,
+			tadmBody:   restError(""),
+			tenant:     nil,
+			err:        nil,
+		},
+		{
+			tadmStatus: http.StatusInternalServerError,
+			tadmBody:   restError("internal error"),
+			tenant:     nil,
+			err:        errors.New("getting tenant resulted in unexpected code: 500"),
+		},
+	}
+
+	for i := range tcs {
+		tc := tcs[i]
+		t.Run(fmt.Sprintf("status %v", tc.tadmStatus), func(t *testing.T) {
+			t.Parallel()
+
+			var body []byte
+
+			body, err := json.Marshal(tc.tadmBody)
+			assert.NoError(t, err)
+
+			s, rd := ct.NewMockServer(tc.tadmStatus, body)
+
+			c := NewClient(Config{
+				TenantAdmAddr: s.URL,
+			})
+
+			tenant, err := c.GetTenant(context.Background(), tc.tid, &apiclient.HttpApi{})
+			if tc.err != nil {
+				assert.EqualError(t, err, tc.err.Error())
+			} else {
+				assert.NoError(t, err)
+				repl := strings.NewReplacer(":tid", tc.tid)
+				uri := repl.Replace(TenantGetUri)
+				assert.Equal(t, uri, rd.Url.Path)
 				assert.Equal(t, tc.tenant, tenant)
 			}
 			s.Close()

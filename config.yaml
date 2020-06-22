@@ -80,3 +80,40 @@
 # Defaults to: "604800" (one week)
 
 # jwt_exp_timeout: 604800
+
+
+# Redis address
+# Defaults to: "", which disables the Redis cache
+# Overwrite with environment variable: DEVICEAUTH_REDIS_ADDR
+
+# redis_addr: ""
+
+# Redis username
+# Defaults to: "", which disables the Redis authentication
+# Overwrite with environment variable: DEVICEAUTH_REDIS_USERNAME
+
+# redis_username: ""
+
+# Redis password
+# Defaults to: "", which disables the Redis authentication
+# Overwrite with environment variable: DEVICEAUTH_REDIS_PASSWORD
+
+# redis_password: ""
+
+# Redis DB
+# Defaults to: 0
+# Overwrite with environment variable: DEVICEAUTH_REDIS_DB
+
+# redis_db: "0"
+
+# Redis client timeout (sec)
+# Defaults to: 1
+# Overwrite with environment variable: DEVICEAUTH_REDIS_TIMEOUT_SEC
+
+# redis_timeout_sec: "5"
+
+# Redis tenant/device limits expiration(sec)
+# Defaults to: 1600 (30mins)
+# Overwrite with environment variable: DEVICEAUTH_REDIS_LIMITS_EXPIRE_SEC
+
+# redis_limits_expire_sec: "1800"

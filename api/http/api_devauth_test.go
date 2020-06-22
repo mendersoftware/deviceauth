@@ -33,6 +33,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
+	"github.com/mendersoftware/deviceauth/cache"
 	"github.com/mendersoftware/deviceauth/client/tenant"
 	"github.com/mendersoftware/deviceauth/devauth"
 	"github.com/mendersoftware/deviceauth/devauth/mocks"
@@ -400,7 +401,7 @@ func TestApiV2DevAuthPreauthDevice(t *testing.T) {
 			checker: mt.NewJSONResponse(
 				http.StatusBadRequest,
 				nil,
-				restError("failed to decode preauth request: pubkey: non zero value required;")),
+				restError("failed to decode preauth request: pubkey: non zero value required")),
 		},
 		"invalid: no body": {
 			checker: mt.NewJSONResponse(
@@ -656,6 +657,17 @@ func TestApiDevAuthVerifyToken(t *testing.T) {
 		{
 			req: test.MakeSimpleRequest("POST",
 				"http://1.2.3.4/api/internal/v1/devauth/tokens/verify", nil),
+			code: 429,
+			headers: map[string]string{
+				"authorization":     "dummytoken",
+				"X-Original-Method": "POST",
+				"X-Original-URI":    "/deployments/next",
+			},
+			err: cache.ErrTooManyRequests,
+		},
+		{
+			req: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/internal/v1/devauth/tokens/verify", nil),
 			code: http.StatusForbidden,
 			headers: map[string]string{
 				"authorization": "dummytoken",
@@ -698,6 +710,7 @@ func TestApiDevAuthVerifyToken(t *testing.T) {
 			if len(tc.headers) > 0 {
 				tc.req.Header.Set("authorization", tc.headers["authorization"])
 			}
+
 			runTestRequest(t, apih, tc.req, tc.code, tc.body)
 		})
 	}
@@ -770,7 +783,7 @@ func TestApiV2GetDevice(t *testing.T) {
 		PubKey: "pubkey",
 		Status: model.DevStatusPending,
 		AuthSets: []model.AuthSet{
-			model.AuthSet{
+			{
 				Id:       "1",
 				DeviceId: "foo",
 				IdData:   `{"mac": "00:00:00:01"}`,

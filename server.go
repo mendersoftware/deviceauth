@@ -23,6 +23,7 @@ import (
 	"github.com/pkg/errors"
 
 	api_http "github.com/mendersoftware/deviceauth/api/http"
+	"github.com/mendersoftware/deviceauth/cache"
 	"github.com/mendersoftware/deviceauth/client/orchestrator"
 	"github.com/mendersoftware/deviceauth/client/tenant"
 	dconfig "github.com/mendersoftware/deviceauth/config"
@@ -95,6 +96,24 @@ func RunServer(c config.Reader) error {
 		})
 
 		devauth = devauth.WithTenantVerification(tc)
+	}
+
+	if cacheAddr := c.GetString(dconfig.SettingRedisAddr); cacheAddr != "" {
+		l.Infof("setting up redis cache")
+
+		cache, err := cache.NewRedisCache(cacheAddr,
+			c.GetString(dconfig.SettingRedisUsername),
+			c.GetString(dconfig.SettingRedisPassword),
+			c.GetInt(dconfig.SettingRedisDb),
+			c.GetInt(dconfig.SettingRedisTimeoutSec),
+			c.GetInt(dconfig.SettingRedisLimitsExpSec),
+		)
+
+		if err != nil {
+			return err
+		}
+
+		devauth = devauth.WithCache(cache)
 	}
 
 	api, err := SetupAPI(c.GetString(dconfig.SettingMiddleware))

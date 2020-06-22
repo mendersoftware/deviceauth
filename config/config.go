@@ -59,6 +59,24 @@ const (
 
 	SettingJWTExpirationTimeout        = "jwt_exp_timeout"
 	SettingJWTExpirationTimeoutDefault = "604800" //one week
+
+	SettingRedisAddr        = "redis_addr"
+	SettingRedisAddrDefault = ""
+
+	SettingRedisUsername        = "redis_username"
+	SettingRedisUsernameDefault = ""
+
+	SettingRedisPassword        = "redis_password"
+	SettingRedisPasswordDefault = ""
+
+	SettingRedisDb        = "redis_db"
+	SettingRedisDbDefault = "0"
+
+	SettingRedisTimeoutSec        = "redis_timeout_sec"
+	SettingRedisTimeoutSecDefault = "1"
+
+	SettingRedisLimitsExpSec        = "redis_limits_expire_sec"
+	SettingRedisLimitsExpSecDefault = "1800"
 )
 
 var (
@@ -77,5 +95,12 @@ var (
 		{Key: SettingJWTExpirationTimeout, Value: SettingJWTExpirationTimeoutDefault},
 		{Key: SettingDbSSL, Value: SettingDbSSLDefault},
 		{Key: SettingDbSSLSkipVerify, Value: SettingDbSSLSkipVerifyDefault},
+		{Key: SettingRedisAddr, Value: SettingRedisAddrDefault},
+		{Key: SettingRedisUsername, Value: SettingRedisUsernameDefault},
+		{Key: SettingRedisPassword, Value: SettingRedisPasswordDefault},
+		{Key: SettingRedisDb, Value: SettingRedisDbDefault},
+		{Key: SettingRedisTimeoutSec, Value: SettingRedisTimeoutSecDefault},
+		{Key: SettingRedisDb, Value: SettingRedisDbDefault},
+		{Key: SettingRedisLimitsExpSec, Value: SettingRedisLimitsExpSecDefault},
 	}
 )
