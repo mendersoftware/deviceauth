@@ -31,6 +31,7 @@ import (
 const (
 	// devices endpoint
 	TenantVerifyUri = "/api/internal/v1/tenantadm/tenants/verify"
+	TenantGetUri    = "/api/internal/v1/tenantadm/tenants/:tid"
 	// default request timeout, 10s?
 	defaultReqTimeout = time.Duration(10) * time.Second
 )
@@ -58,6 +59,8 @@ type Config struct {
 // ClientRunner is an interface of inventory client
 type ClientRunner interface {
 	VerifyToken(ctx context.Context, token string, client apiclient.HttpRunner) (*Tenant, error)
+	GetTenant(ctx context.Context, tid string,
+		client apiclient.HttpRunner) (*Tenant, error)
 }
 
 // Client is an opaque implementation of tenant administrator client. Implements
@@ -113,6 +116,48 @@ func (tc *Client) VerifyToken(ctx context.Context, token string,
 		return &tenant, nil
 	default:
 		return nil, errors.Errorf("token verification request returned unexpected status %v",
+			rsp.StatusCode)
+	}
+}
+
+// GetTenant will retrieve a single tenant
+// verification. Returns nil if verification was successful.
+func (tc *Client) GetTenant(ctx context.Context, tid string,
+	client apiclient.HttpRunner) (*Tenant, error) {
+
+	l := log.FromContext(ctx)
+
+	repl := strings.NewReplacer(":tid", tid)
+	uri := repl.Replace(TenantGetUri)
+
+	req, err := http.NewRequest(http.MethodGet,
+		utils.JoinURL(tc.conf.TenantAdmAddr, uri),
+		nil)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create request to tenantadm")
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, tc.conf.Timeout)
+	defer cancel()
+
+	rsp, err := client.Do(req.WithContext(ctx))
+	if err != nil {
+		l.Errorf("tenantadm request failed: %v", err)
+		return nil, errors.Wrap(err, "request to get tenant failed")
+	}
+	defer rsp.Body.Close()
+
+	switch rsp.StatusCode {
+	case http.StatusNotFound:
+		return nil, nil
+	case http.StatusOK:
+		tenant := Tenant{}
+		if err := json.NewDecoder(rsp.Body).Decode(&tenant); err != nil {
+			return nil, errors.Wrap(err, "error parsing tenant")
+		}
+		return &tenant, nil
+	default:
+		return nil, errors.Errorf("getting tenant resulted in unexpected code: %v",
 			rsp.StatusCode)
 	}
 }

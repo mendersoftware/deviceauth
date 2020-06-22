@@ -13,10 +13,20 @@
 //    limitations under the License.
 package tenant
 
+import (
+	"github.com/mendersoftware/go-lib-micro/ratelimits"
+)
+
 //Tenant is a tenantadm-specific API struct
 type Tenant struct {
-	ID     string `json:"id"`
-	Name   string `json:"name"`
-	Status string `json:"status"`
-	Plan   string `json:"plan"`
+	ID        string          `json:"id"`
+	Name      string          `json:"name"`
+	Status    string          `json:"status"`
+	Plan      string          `json:"plan"`
+	ApiLimits TenantApiLimits `json:"api_limits"`
+}
+
+type TenantApiLimits struct {
+	MgmtLimits   ratelimits.ApiLimits `json:"management"`
+	DeviceLimits ratelimits.ApiLimits `json:"devices"`
 }

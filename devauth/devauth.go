@@ -30,17 +30,20 @@ import (
 	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/mendersoftware/go-lib-micro/mongo/oid"
 	"github.com/mendersoftware/go-lib-micro/plan"
+	"github.com/mendersoftware/go-lib-micro/ratelimits"
 	"github.com/mendersoftware/go-lib-micro/requestid"
 	mstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/pkg/errors"
 	"go.mongodb.org/mongo-driver/bson"
 
+	"github.com/mendersoftware/deviceauth/cache"
 	"github.com/mendersoftware/deviceauth/client/orchestrator"
 	"github.com/mendersoftware/deviceauth/client/tenant"
 	"github.com/mendersoftware/deviceauth/jwt"
 	"github.com/mendersoftware/deviceauth/model"
 	"github.com/mendersoftware/deviceauth/store"
 	"github.com/mendersoftware/deviceauth/store/mongo"
+	"github.com/mendersoftware/deviceauth/utils"
 	uto "github.com/mendersoftware/deviceauth/utils/to"
 )
 
@@ -128,6 +131,8 @@ type DevAuth struct {
 	clientGetter ApiClientGetter
 	verifyTenant bool
 	config       Config
+	cache        cache.Cache
+	clock        utils.Clock
 }
 
 type Config struct {
@@ -152,6 +157,7 @@ func NewDevAuth(d store.DataStore, co orchestrator.ClientRunner,
 		clientGetter: simpleApiClientGetter,
 		verifyTenant: false,
 		config:       config,
+		clock:        utils.NewClock(),
 	}
 }
 
@@ -607,6 +613,11 @@ func (d *DevAuth) DecommissionDevice(ctx context.Context, devID string) error {
 
 	l.Warnf("Decommission device with id: %s", devID)
 
+	err := d.cacheDeleteToken(ctx, devID)
+	if err != nil {
+		return errors.Wrapf(err, "failed to delete token for %s from cache", devID)
+	}
+
 	// set decommissioning flag on the device
 	updev := model.DeviceUpdate{
 		Decommissioning: to.BoolPtr(true),
@@ -660,6 +671,11 @@ func (d *DevAuth) DeleteAuthSet(ctx context.Context, devID string, authId string
 		"%s for the device with id: %s",
 		authId, devID)
 
+	err := d.cacheDeleteToken(ctx, devID)
+	if err != nil {
+		return errors.Wrapf(err, "failed to delete token for %s from cache", devID)
+	}
+
 	// retrieve device authentication set to check its status
 	authSet, err := d.db.GetAuthSetById(ctx, authId)
 	if err != nil {
@@ -688,7 +704,30 @@ func (d *DevAuth) DeleteAuthSet(ctx context.Context, devID string, authId string
 		// only delete the device if the set is 'preauthorized'
 		// otherwise device data may live in other services too,
 		// and is a case for decommissioning
-		return d.db.DeleteDevice(ctx, devID)
+		err = d.db.DeleteDevice(ctx, devID)
+		if err != nil {
+			return err
+		}
+		tenantId := ""
+		idData := identity.FromContext(ctx)
+		if idData != nil {
+			tenantId = idData.Tenant
+		}
+		b, err := json.Marshal([]string{devID})
+		if err != nil {
+			return errors.New("internal error: cannot marshal array into json")
+		}
+		if err = d.cOrch.SubmitUpdateDeviceStatusJob(
+			ctx,
+			orchestrator.UpdateDeviceStatusReq{
+				RequestId: requestid.FromContext(ctx),
+				Ids:       string(b), // []string{dev.Id},
+				TenantId:  tenantId,
+				Status:    "decommissioned",
+			}); err != nil {
+			return errors.Wrap(err, "update device status job error")
+		}
+		return err
 	}
 
 	return d.updateDeviceStatus(ctx, devID, "", authSet.Status)
@@ -825,6 +864,11 @@ func (d *DevAuth) setAuthSetStatus(
 }
 
 func (d *DevAuth) RejectDeviceAuth(ctx context.Context, device_id string, auth_id string) error {
+	err := d.cacheDeleteToken(ctx, device_id)
+	if err != nil {
+		return errors.Wrapf(err, "failed to delete token for %s from cache", device_id)
+	}
+
 	return d.setAuthSetStatus(ctx, device_id, auth_id, model.DevStatusRejected)
 }
 
@@ -930,6 +974,17 @@ func (d *DevAuth) RevokeToken(ctx context.Context, tokenID string) error {
 	l := log.FromContext(ctx)
 	tokenOID := oid.FromString(tokenID)
 
+	if d.cache != nil {
+		token, err := d.db.GetToken(ctx, tokenOID)
+		if err != nil {
+			return err
+		}
+		err = d.cacheDeleteToken(ctx, token.Claims.Subject.String())
+		if err != nil {
+			return errors.Wrapf(err, "failed to delete token for %s from cache", token.Claims.Subject.String())
+		}
+	}
+
 	l.Warnf("Revoke token with jti: %s", tokenID)
 	return d.db.DeleteToken(ctx, tokenOID)
 }
@@ -962,6 +1017,7 @@ func (d *DevAuth) VerifyToken(ctx context.Context, raw string) error {
 	if err != nil {
 		if err == jwt.ErrTokenExpired && jti.String() != "" {
 			l.Errorf("Token %s expired: %v", jti, err)
+
 			err := d.db.DeleteToken(ctx, jti)
 			if err == store.ErrTokenNotFound {
 				l.Errorf("Token %s not found", jti)
@@ -985,6 +1041,28 @@ func (d *DevAuth) VerifyToken(ctx context.Context, raw string) error {
 		return err
 	}
 
+	origMethod := ctxhttpheader.FromContext(ctx, "X-Original-Method")
+	origUri := ctxhttpheader.FromContext(ctx, "X-Original-URI")
+	origUri = purgeUriArgs(origUri)
+
+	// throttle and try fetch token from cache - if cached, it was
+	// already verified against the db checks below, we trust it
+	cachedToken, err := d.cacheThrottleVerify(ctx, token, raw, origMethod, origUri)
+
+	if err == cache.ErrTooManyRequests {
+		return err
+	}
+
+	if cachedToken != "" {
+		return nil
+	}
+
+	// caching is best effort, don't fail
+	if err != nil {
+		l.Errorf("Failed to throttle for token %v: %s, continue.", token, err.Error())
+	}
+
+	// cache check was a MISS, hit the db for verification
 	// check if token is in the system
 	_, err = d.db.GetToken(ctx, jti)
 	if err != nil {
@@ -1019,7 +1097,137 @@ func (d *DevAuth) VerifyToken(ctx context.Context, raw string) error {
 		return jwt.ErrTokenInvalid
 	}
 
+	// after successful token verification - cache it (best effort)
+	_ = d.cacheSetToken(ctx, token, raw)
+
 	return nil
+}
+
+// purgeUriArgs removes query string args from an uri string
+// important for burst control (bursts are per uri without args)
+func purgeUriArgs(uri string) string {
+	return strings.Split(uri, "?")[0]
+}
+
+func (d *DevAuth) cacheThrottleVerify(ctx context.Context, token *jwt.Token, originalRaw, origMethod, origUri string) (string, error) {
+	if d.cache == nil {
+		return "", nil
+	}
+
+	// try get cached/precomputed limits
+	limits, err := d.getApiLimits(ctx,
+		token.Claims.Tenant,
+		token.Claims.Subject.String())
+
+	if err != nil {
+		return "", err
+	}
+
+	// apply throttling and fetch cached token
+	cached, err := d.cache.Throttle(ctx,
+		originalRaw,
+		*limits,
+		token.Claims.Tenant,
+		token.Claims.Subject.String(),
+		cache.IdTypeDevice,
+		origUri,
+		origMethod)
+
+	return cached, err
+}
+
+func (d *DevAuth) cacheSetToken(ctx context.Context, token *jwt.Token, raw string) error {
+	if d.cache == nil {
+		return nil
+	}
+
+	expireIn := time.Duration(token.Claims.ExpiresAt.Unix()-d.clock.Now().Unix()) * time.Second
+
+	return d.cache.CacheToken(ctx,
+		token.Claims.Tenant,
+		token.Claims.Subject.String(),
+		cache.IdTypeDevice,
+		raw,
+		expireIn)
+}
+
+func (d *DevAuth) getApiLimits(ctx context.Context, tid, did string) (*ratelimits.ApiLimits, error) {
+	limits, err := d.cache.GetLimits(ctx, tid, did, cache.IdTypeDevice)
+	if err != nil {
+		return nil, err
+	}
+
+	if limits != nil {
+		return limits, nil
+	}
+
+	dev, err := d.db.GetDeviceById(ctx, did)
+	if err != nil {
+		return nil, err
+	}
+
+	t, err := d.cTenant.GetTenant(ctx, tid, d.clientGetter())
+	if err != nil {
+		return nil, errors.Wrap(err, "request to get tenant failed")
+	}
+	if t == nil {
+		return nil, errors.New("tenant not found")
+	}
+
+	finalLimits := apiLimitsOverride(t.ApiLimits.DeviceLimits, dev.ApiLimits)
+
+	err = d.cache.CacheLimits(ctx, finalLimits, tid, did, cache.IdTypeDevice)
+
+	return &finalLimits, err
+}
+
+func (d *DevAuth) cacheDeleteToken(ctx context.Context, did string) error {
+	if d.cache == nil {
+		return nil
+	}
+
+	idData := identity.FromContext(ctx)
+	if idData == nil {
+		return errors.New("can't unpack tenant identity data from context")
+	}
+	tid := idData.Tenant
+
+	return d.cache.DeleteToken(ctx, tid, did, cache.IdTypeDevice)
+}
+
+// TODO move to 'ratelimits', as ApiLimits methods maybe?
+func apiLimitsOverride(src, dest ratelimits.ApiLimits) ratelimits.ApiLimits {
+	// override only if not default
+	if dest.ApiQuota.MaxCalls != 0 && dest.ApiQuota.IntervalSec != 0 {
+		src.ApiQuota.MaxCalls = dest.ApiQuota.MaxCalls
+		src.ApiQuota.IntervalSec = dest.ApiQuota.IntervalSec
+	}
+
+	out := make([]ratelimits.ApiBurst, len(src.ApiBursts))
+	copy(out, src.ApiBursts)
+
+	for _, bdest := range dest.ApiBursts {
+		found := false
+		for i, bsrc := range src.ApiBursts {
+			if bdest.Action == bsrc.Action &&
+				bdest.Uri == bsrc.Uri {
+				out[i].MinIntervalSec = bdest.MinIntervalSec
+				found = true
+			}
+		}
+
+		if !found {
+			out = append(out,
+				ratelimits.ApiBurst{
+					Action:         bdest.Action,
+					Uri:            bdest.Uri,
+					MinIntervalSec: bdest.MinIntervalSec},
+			)
+		}
+	}
+
+	src.ApiBursts = out
+	return src
 }
 
 func (d *DevAuth) GetLimit(ctx context.Context, name string) (*model.Limit, error) {
@@ -1049,6 +1257,16 @@ func (d *DevAuth) GetTenantLimit(ctx context.Context, name, tenant_id string) (*
 func (d *DevAuth) WithTenantVerification(c tenant.ClientRunner) *DevAuth {
 	d.cTenant = c
 	d.verifyTenant = true
+	return d
+}
+
+func (d *DevAuth) WithCache(c cache.Cache) *DevAuth {
+	d.cache = c
+	return d
+}
+
+func (d *DevAuth) WithClock(c utils.Clock) *DevAuth {
+	d.clock = c
 	return d
 }
 
@@ -1114,6 +1332,10 @@ func (d *DevAuth) DeleteTokens(
 		}
 		err = d.db.DeleteTokenByDevId(ctx, deviceOID)
 	} else {
+		if err := d.cacheFlush(ctx); err != nil {
+			return errors.Wrapf(err, "failed to flush cache when cleaning tokens for tenant %v", tenantID)
+		}
+
 		err = d.db.DeleteTokens(ctx)
 	}
 
@@ -1122,6 +1344,14 @@ func (d *DevAuth) DeleteTokens(
 	}
 
 	return nil
+}
+
+func (d *DevAuth) cacheFlush(ctx context.Context) error {
+	if d.cache == nil {
+		return nil
+	}
+
+	return d.cache.FlushDB(ctx)
 }
 
 func (d *DevAuth) ProvisionTenant(ctx context.Context, tenant_id string) error {

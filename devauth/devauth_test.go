@@ -24,10 +24,13 @@ import (
 	ctxhttpheader "github.com/mendersoftware/go-lib-micro/context/httpheader"
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/mongo/oid"
+	"github.com/mendersoftware/go-lib-micro/ratelimits"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"go.mongodb.org/mongo-driver/bson"
 
+	"github.com/mendersoftware/deviceauth/cache"
+	mcache "github.com/mendersoftware/deviceauth/cache/mocks"
 	"github.com/mendersoftware/deviceauth/client/orchestrator"
 	morchestrator "github.com/mendersoftware/deviceauth/client/orchestrator/mocks"
 	"github.com/mendersoftware/deviceauth/client/tenant"
@@ -38,6 +41,7 @@ import (
 	"github.com/mendersoftware/deviceauth/store"
 	mstore "github.com/mendersoftware/deviceauth/store/mocks"
 	"github.com/mendersoftware/deviceauth/store/mongo"
+	"github.com/mendersoftware/deviceauth/utils"
 	mtesting "github.com/mendersoftware/deviceauth/utils/testing"
 	"github.com/pkg/errors"
 )
@@ -1186,7 +1190,12 @@ func TestDevAuthRejectDevice(t *testing.T) {
 	dummyDevID := dummyDevUUID.String()
 
 	testCases := []struct {
-		aset             *model.AuthSet
+		aset *model.AuthSet
+
+		tenant         string
+		withCache      bool
+		cacheDeleteErr error
+
 		dbErr            error
 		dbDelDevTokenErr error
 
@@ -1197,7 +1206,32 @@ func TestDevAuthRejectDevice(t *testing.T) {
 				Id:       dummyAuthID,
 				DeviceId: dummyDevID,
 			},
-			dbDelDevTokenErr: nil,
+		},
+		{
+			aset: &model.AuthSet{
+				Id:       dummyAuthID,
+				DeviceId: dummyDevID,
+			},
+			withCache:      true,
+			tenant:         "acme",
+			cacheDeleteErr: errors.New("redis error"),
+			outErr:         "failed to delete token for 9c5df658-26ff-55e1-87a1-6780ca473154 from cache: redis error",
+		},
+		{
+			aset: &model.AuthSet{
+				Id:       dummyAuthID,
+				DeviceId: dummyDevID,
+			},
+			withCache: true,
+			outErr:    "failed to delete token for 9c5df658-26ff-55e1-87a1-6780ca473154 from cache: can't unpack tenant identity data from context",
+		},
+		{
+			aset: &model.AuthSet{
+				Id:       dummyAuthID,
+				DeviceId: dummyDevID,
+			},
+			withCache: true,
+			tenant:    "acme",
 		},
 		{
 			dbErr:            errors.New("failed"),
@@ -1210,7 +1244,6 @@ func TestDevAuthRejectDevice(t *testing.T) {
 				DeviceId: dummyDevID,
 			},
 			dbDelDevTokenErr: store.ErrTokenNotFound,
-			outErr:           "db delete device token error: token not found",
 		},
 		{
 			aset: &model.AuthSet{
@@ -1228,40 +1261,186 @@ func TestDevAuthRejectDevice(t *testing.T) {
 		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
 			t.Parallel()
 
+			ctx := context.Background()
+			if tc.tenant != "" {
+				id := &identity.Identity{
+					Tenant: tc.tenant,
+				}
+				ctx = identity.WithContext(ctx, id)
+			}
+
 			db := mstore.DataStore{}
-			db.On("GetAuthSetById", context.Background(),
+			db.On("GetAuthSetById", ctx,
 				dummyAuthID).
 				Return(tc.aset, tc.dbErr)
 			if tc.aset != nil {
-				db.On("UpdateAuthSetById", context.Background(), tc.aset.Id,
+				db.On("UpdateAuthSetById", ctx, tc.aset.Id,
 					model.AuthSetUpdate{Status: model.DevStatusRejected}).Return(nil)
 			}
-			db.On("DeleteTokenByDevId", context.Background(),
+			db.On("DeleteTokenByDevId", ctx,
 				dummyDevUUID).
 				Return(tc.dbDelDevTokenErr)
-			db.On("GetDeviceStatus", context.Background(),
+			db.On("GetDeviceStatus", ctx,
 				dummyDevID).
 				Return("accpted", nil)
-			db.On("UpdateDevice", context.Background(),
+			db.On("UpdateDevice", ctx,
 				mock.AnythingOfType("model.Device"),
 				mock.AnythingOfType("model.DeviceUpdate")).Return(nil)
 
 			co := morchestrator.ClientRunner{}
-			co.On("SubmitUpdateDeviceStatusJob", context.Background(),
+			co.On("SubmitUpdateDeviceStatusJob", ctx,
 				mock.AnythingOfType("orchestrator.UpdateDeviceStatusReq")).
 				Return(nil)
+
 			devauth := NewDevAuth(&db, &co, nil, Config{})
+
+			c := &mcache.Cache{}
+			if tc.withCache {
+				devauth = devauth.WithCache(c)
+				if tc.tenant != "" {
+					c.On("DeleteToken",
+						mock.MatchedBy(func(ctx context.Context) bool {
+							ident := identity.FromContext(ctx)
+							return assert.NotNil(t, ident) &&
+								assert.Equal(t, tc.tenant, ident.Tenant)
+						}),
+						tc.tenant,
+						tc.aset.DeviceId,
+						cache.IdTypeDevice).
+						Return(tc.cacheDeleteErr)
+				} else {
+					c.AssertNotCalled(t, "DeleteToken")
+				}
+			} else {
+				c.AssertNotCalled(t, "DeleteToken")
+			}
+
 			err := devauth.RejectDeviceAuth(
-				context.Background(), dummyDevID, dummyAuthID,
+				ctx, dummyDevID, dummyAuthID,
 			)
 
-			if tc.dbErr != nil || (tc.dbDelDevTokenErr != nil &&
-				tc.dbDelDevTokenErr != store.ErrTokenNotFound) {
-
+			if tc.outErr != "" {
 				assert.EqualError(t, err, tc.outErr)
 			} else {
 				assert.NoError(t, err)
 			}
+
+			c.AssertExpectations(t)
+		})
+	}
+}
+
+func TestDevAuthRevokeToken(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		tokenId string
+
+		tenant         string
+		withCache      bool
+		cacheDeleteErr error
+
+		dbToken  *jwt.Token
+		dbGetErr error
+		dbDelErr error
+
+		outErr error
+	}{
+		{
+			tokenId: "foo",
+		},
+		{
+			tokenId:  "foo",
+			dbDelErr: store.ErrTokenNotFound,
+			outErr:   store.ErrTokenNotFound,
+		},
+		{
+			tokenId:   "foo",
+			withCache: true,
+			tenant:    "acme",
+			dbToken: &jwt.Token{
+				Claims: jwt.Claims{
+					Subject: oid.NewUUIDv5("device"),
+				},
+			},
+		},
+		{
+			tokenId:   "foo",
+			withCache: true,
+			tenant:    "acme",
+			dbGetErr:  store.ErrTokenNotFound,
+			outErr:    store.ErrTokenNotFound,
+		},
+		{
+			tokenId:   "foo",
+			withCache: true,
+			tenant:    "acme",
+			dbToken: &jwt.Token{
+				Claims: jwt.Claims{
+					Subject: oid.NewUUIDv5("device"),
+				},
+			},
+			cacheDeleteErr: errors.New("redis error"),
+			outErr:         errors.New("failed to delete token for 884482f8-4b20-5b83-b674-6ca5cb3e7525 from cache: redis error"),
+		},
+	}
+
+	for i := range testCases {
+		tc := testCases[i]
+		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			t.Parallel()
+
+			ctx := context.Background()
+			if tc.tenant != "" {
+				id := &identity.Identity{
+					Tenant: tc.tenant,
+				}
+				ctx = identity.WithContext(ctx, id)
+			}
+
+			tokenOID := oid.FromString(tc.tokenId)
+
+			db := mstore.DataStore{}
+			db.On("GetToken", ctx,
+				tokenOID).
+				Return(tc.dbToken, tc.dbGetErr)
+			db.On("DeleteToken", ctx,
+				tokenOID).
+				Return(tc.dbDelErr)
+
+			c := &mcache.Cache{}
+
+			devauth := NewDevAuth(&db, nil, nil, Config{})
+
+			if tc.withCache {
+				devauth = devauth.WithCache(c)
+				if tc.tenant != "" && tc.dbToken != nil {
+					c.On("DeleteToken",
+						mock.MatchedBy(func(ctx context.Context) bool {
+							ident := identity.FromContext(ctx)
+							return assert.NotNil(t, ident) &&
+								assert.Equal(t, tc.tenant, ident.Tenant)
+						}),
+						tc.tenant,
+						tc.dbToken.Claims.Subject.String(),
+						cache.IdTypeDevice).
+						Return(tc.cacheDeleteErr)
+				} else {
+					c.AssertNotCalled(t, "DeleteToken")
+				}
+			} else {
+				c.AssertNotCalled(t, "DeleteToken")
+			}
+
+			err := devauth.RevokeToken(ctx, tc.tokenId)
+
+			if tc.outErr != nil {
+				assert.EqualError(t, err, tc.outErr.Error())
+			} else {
+				assert.NoError(t, err)
+			}
+
+			c.AssertExpectations(t)
 		})
 	}
 }
@@ -1543,16 +1722,395 @@ func TestDevAuthVerifyToken(t *testing.T) {
 	}
 }
 
+func TestDevAuthVerifyTokenWithCache(t *testing.T) {
+	t.Parallel()
+
+	nowUnix := int64(1590105600)
+	mclock := utils.NewMockClock(nowUnix)
+	token := &jwt.Token{
+		Claims: jwt.Claims{
+			Subject: oid.NewUUIDv5("device"),
+			Tenant:  "tenant",
+			Device:  true,
+			ExpiresAt: jwt.Time{
+				Time: time.Unix(nowUnix+1000, 0),
+			},
+		},
+	}
+
+	// assume valid input jwt token always
+	testCases := map[string]struct {
+		tokenString string
+
+		cacheGetLimits    *ratelimits.ApiLimits
+		cacheGetLimitsErr error
+
+		cachedToken string
+		throttleErr error
+
+		getTokenErr error
+
+		auth       *model.AuthSet
+		getAuthErr error
+
+		dev          *model.Device
+		getDeviceErr error
+
+		tenant       *tenant.Tenant
+		getTenantErr error
+
+		cacheTokenErr  error
+		cacheLimitsErr error
+
+		willCallThrottle bool
+		willVerifyDb     bool
+		willCacheToken   bool
+		willFetchLimits  bool
+
+		outErr error
+	}{
+		"token cached, no limiting err - db not called for verification, success": {
+			tokenString: "valid",
+			cachedToken: "valid",
+
+			cacheGetLimits:    &ratelimits.ApiLimits{},
+			cacheGetLimitsErr: nil,
+
+			willCallThrottle: true,
+		},
+		"token cached, but limits exceeded - early return": {
+			tokenString: "valid",
+			cachedToken: "valid",
+			throttleErr: cache.ErrTooManyRequests,
+
+			cacheGetLimits:    &ratelimits.ApiLimits{},
+			cacheGetLimitsErr: nil,
+
+			willVerifyDb:   false,
+			willCacheToken: false,
+
+			outErr: cache.ErrTooManyRequests,
+
+			willCallThrottle: true,
+		},
+		"throttle transient error - swallow error, proceed with standard db verification flow: success, cache token": {
+			tokenString: "valid",
+			cachedToken: "",
+			throttleErr: errors.New("redis error"),
+
+			cacheGetLimits:    &ratelimits.ApiLimits{},
+			cacheGetLimitsErr: nil,
+
+			auth: &model.AuthSet{
+				Id:     oid.NewUUIDv5("foo").String(),
+				Status: model.DevStatusAccepted,
+			},
+
+			dev: &model.Device{
+				Id:              oid.NewUUIDv5("device").String(),
+				Decommissioning: false,
+			},
+
+			willCallThrottle: true,
+			willVerifyDb:     true,
+			willCacheToken:   true,
+		},
+		"throttle transient error - swallow error, proceed with standard db verification flow: success, cache token: error (don't fail)": {
+			tokenString: "valid",
+			cachedToken: "",
+			throttleErr: errors.New("redis error"),
+
+			cacheGetLimits:    &ratelimits.ApiLimits{},
+			cacheGetLimitsErr: nil,
+
+			auth: &model.AuthSet{
+				Id:     oid.NewUUIDv5("foo").String(),
+				Status: model.DevStatusAccepted,
+			},
+
+			dev: &model.Device{
+				Id:              oid.NewUUIDv5("device").String(),
+				Decommissioning: false,
+			},
+
+			willCallThrottle: true,
+			willVerifyDb:     true,
+			willCacheToken:   true,
+		},
+		"token not cached - verify against db, failed": {
+			tokenString: "valid",
+			getTokenErr: store.ErrTokenNotFound,
+
+			cacheGetLimits:    &ratelimits.ApiLimits{},
+			cacheGetLimitsErr: nil,
+
+			willVerifyDb:   true,
+			willCacheToken: false,
+
+			outErr: store.ErrTokenNotFound,
+
+			willCallThrottle: true,
+		},
+		"limits not in cache, db/service hit for limits (success)": {
+			tokenString: "valid",
+			cachedToken: "valid",
+
+			cacheGetLimits:    nil,
+			cacheGetLimitsErr: nil,
+
+			dev: &model.Device{
+				ApiLimits: ratelimits.ApiLimits{
+					ApiBursts: []ratelimits.ApiBurst{},
+				},
+			},
+			tenant: &tenant.Tenant{
+				ApiLimits: tenant.TenantApiLimits{
+					DeviceLimits: ratelimits.ApiLimits{
+						ApiBursts: []ratelimits.ApiBurst{},
+					},
+				},
+			},
+
+			willCallThrottle: true,
+			willVerifyDb:     false,
+			willCacheToken:   false,
+			willFetchLimits:  true,
+		},
+		"limits mgmt errors won't stop processing - 'get cached limits' failed": {
+			tokenString: "valid",
+
+			cacheGetLimits:    nil,
+			cacheGetLimitsErr: errors.New("internal"),
+
+			auth: &model.AuthSet{
+				Id:     oid.NewUUIDv5("foo").String(),
+				Status: model.DevStatusAccepted,
+			},
+
+			dev: &model.Device{
+				ApiLimits: ratelimits.ApiLimits{
+					ApiBursts: []ratelimits.ApiBurst{},
+				},
+			},
+
+			tenant: &tenant.Tenant{
+				ApiLimits: tenant.TenantApiLimits{
+					DeviceLimits: ratelimits.ApiLimits{
+						ApiBursts: []ratelimits.ApiBurst{},
+					},
+				},
+			},
+
+			willCallThrottle: false,
+			willVerifyDb:     true,
+			willCacheToken:   true,
+			willFetchLimits:  false,
+		},
+		"limits mgmt errors won't stop processing - 'get tenant' failed": {
+			tokenString: "valid",
+
+			cacheGetLimits:    nil,
+			cacheGetLimitsErr: nil,
+
+			auth: &model.AuthSet{
+				Id:     oid.NewUUIDv5("foo").String(),
+				Status: model.DevStatusAccepted,
+			},
+
+			dev: &model.Device{
+				ApiLimits: ratelimits.ApiLimits{
+					ApiBursts: []ratelimits.ApiBurst{},
+				},
+			},
+
+			getTenantErr: errors.New("internal error"),
+
+			willCallThrottle: false,
+			willVerifyDb:     true,
+			willCacheToken:   true,
+			willFetchLimits:  true,
+		},
+		"limits mgmt errors won't stop processing - tenant not found": {
+			tokenString: "valid",
+
+			cacheGetLimits:    nil,
+			cacheGetLimitsErr: nil,
+
+			auth: &model.AuthSet{
+				Id:     oid.NewUUIDv5("foo").String(),
+				Status: model.DevStatusAccepted,
+			},
+
+			dev: &model.Device{
+				ApiLimits: ratelimits.ApiLimits{
+					ApiBursts: []ratelimits.ApiBurst{},
+				},
+			},
+
+			getTenantErr: errors.New("internal error"),
+
+			willCallThrottle: false,
+			willVerifyDb:     true,
+			willCacheToken:   true,
+			willFetchLimits:  true,
+		},
+		"limits mgmt errors won't stop processing - 'cache limits' failed": {
+			tokenString: "valid",
+
+			cacheGetLimits:    nil,
+			cacheGetLimitsErr: nil,
+
+			auth: &model.AuthSet{
+				Id:     oid.NewUUIDv5("foo").String(),
+				Status: model.DevStatusAccepted,
+			},
+
+			dev: &model.Device{
+				ApiLimits: ratelimits.ApiLimits{
+					ApiBursts: []ratelimits.ApiBurst{},
+				},
+			},
+
+			tenant: &tenant.Tenant{
+				ApiLimits: tenant.TenantApiLimits{
+					DeviceLimits: ratelimits.ApiLimits{
+						ApiBursts: []ratelimits.ApiBurst{},
+					},
+				},
+			},
+
+			cacheLimitsErr: errors.New("redis error"),
+
+			willCallThrottle: false,
+			willVerifyDb:     true,
+			willCacheToken:   true,
+			willFetchLimits:  true,
+		},
+	}
+
+	for n, tc := range testCases {
+		tc := tc
+		t.Run(fmt.Sprintf("tc %s", n), func(t *testing.T) {
+			t.Parallel()
+
+			ctx := context.Background()
+
+			db := &mstore.DataStore{}
+			ja := &mjwt.Handler{}
+			c := &mcache.Cache{}
+
+			devauth := NewDevAuth(db, nil, ja, Config{})
+			devauth = devauth.WithCache(c)
+			tclient := &mtenant.ClientRunner{}
+
+			devauth = devauth.WithTenantVerification(tclient)
+			devauth = devauth.WithClock(mclock)
+
+			ja.On("FromJWT", tc.tokenString).Return(
+				func(s string) *jwt.Token {
+					t.Logf("string: %v return %+v", s, token)
+					return token
+				}, nil)
+
+			c.On("GetLimits",
+				ctx,
+				token.Claims.Tenant,
+				token.Claims.Subject.String(),
+				cache.IdTypeDevice).Return(tc.cacheGetLimits, tc.cacheGetLimitsErr)
+
+			if tc.willCallThrottle {
+				c.On("Throttle",
+					ctx,
+					tc.tokenString,
+					mock.AnythingOfType("ratelimits.ApiLimits"),
+					token.Claims.Tenant,
+					token.Claims.Subject.String(),
+					cache.IdTypeDevice,
+					"",
+					"").Return(tc.cachedToken, tc.throttleErr)
+			}
+
+			if tc.willVerifyDb {
+				db.On("GetToken", ctx,
+					token.Claims.ID).
+					Return(token, tc.getTokenErr)
+				if tc.getTokenErr == nil {
+					db.On("GetAuthSetById", ctx,
+						token.ID.String()).
+						Return(tc.auth, tc.getAuthErr)
+					db.On("GetDeviceById", ctx,
+						tc.auth.DeviceId).Return(tc.dev, tc.getDeviceErr)
+				}
+			} else {
+				db.AssertNotCalled(t, "GetToken")
+			}
+
+			if tc.willCacheToken {
+				expireIn := time.Duration(token.Claims.ExpiresAt.Unix()-nowUnix) * time.Second
+				c.On("CacheToken",
+					ctx,
+					token.Claims.Tenant,
+					token.Claims.Subject.String(),
+					cache.IdTypeDevice,
+					tc.tokenString,
+					expireIn).Return(tc.cacheTokenErr)
+			} else {
+				c.AssertNotCalled(t, "CacheToken")
+			}
+
+			if tc.willFetchLimits {
+				db.On("GetDeviceById", ctx,
+					token.Claims.Subject.String()).Return(tc.dev, tc.getDeviceErr)
+
+				if tc.getDeviceErr == nil {
+					tclient.On("GetTenant",
+						ctx,
+						token.Claims.Tenant, mock.AnythingOfType("*apiclient.HttpApi")).Return(tc.tenant, tc.getTenantErr)
+				}
+
+				if tc.getDeviceErr == nil && tc.getTenantErr == nil {
+					c.On("CacheLimits",
+						ctx,
+						apiLimitsOverride(tc.dev.ApiLimits, tc.tenant.ApiLimits.DeviceLimits),
+						token.Claims.Tenant,
+						token.Claims.Subject.String(),
+						cache.IdTypeDevice).Return(tc.cacheLimitsErr)
+				} else {
+					c.AssertNotCalled(t, "CacheLimits")
+				}
+			} else {
+				db.AssertNotCalled(t, "GetDeviceById")
+				tclient.AssertNotCalled(t, "GetTenant")
+				c.AssertNotCalled(t, "CacheLimits")
+			}
+
+			err := devauth.VerifyToken(context.Background(), tc.tokenString)
+			if tc.outErr != nil {
+				assert.EqualError(t, err, tc.outErr.Error())
+			} else {
+				assert.NoError(t, err)
+			}
+
+			db.AssertExpectations(t)
+			c.AssertExpectations(t)
+		})
+	}
+}
+
 func TestDevAuthDecommissionDevice(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
-		devId string
+		devId  string
+		tenant string
 
 		dbUpdateDeviceErr            error
 		dbDeleteAuthSetsForDeviceErr error
 		dbDeleteTokenByDevIdErr      error
 		dbDeleteDeviceErr            error
+
+		withCache      bool
+		cacheDeleteErr error
 
 		coSubmitDeviceDecommisioningJobErr error
 		coAuthorization                    string
@@ -1593,6 +2151,31 @@ func TestDevAuthDecommissionDevice(t *testing.T) {
 			devId:           oid.NewUUIDv5("devId6").String(),
 			coAuthorization: "Bearer foobar",
 		},
+		{
+			devId:           oid.NewUUIDv5("devId6").String(),
+			withCache:       true,
+			tenant:          "acme",
+			coAuthorization: "Bearer foobar",
+		},
+		{
+			devId:          oid.NewUUIDv5("devId6").String(),
+			withCache:      true,
+			tenant:         "acme",
+			cacheDeleteErr: errors.New("redis error"),
+			outErr:         "failed to delete token for 7266c2f5-7694-569d-b493-30c728a0d650 from cache: redis error",
+		},
+		{
+			devId:          oid.NewUUIDv5("devId6").String(),
+			withCache:      true,
+			tenant:         "acme",
+			cacheDeleteErr: errors.New("redis error"),
+			outErr:         "failed to delete token for 7266c2f5-7694-569d-b493-30c728a0d650 from cache: redis error",
+		},
+		{
+			devId:     oid.NewUUIDv5("devId6").String(),
+			withCache: true,
+			outErr:    "failed to delete token for 7266c2f5-7694-569d-b493-30c728a0d650 from cache: can't unpack tenant identity data from context",
+		},
 	}
 
 	for i := range testCases {
@@ -1601,6 +2184,13 @@ func TestDevAuthDecommissionDevice(t *testing.T) {
 			t.Parallel()
 
 			ctx := context.Background()
+
+			if tc.tenant != "" {
+				id := &identity.Identity{
+					Tenant: tc.tenant,
+				}
+				ctx = identity.WithContext(ctx, id)
+			}
 
 			if tc.coAuthorization != "" {
 				ctx = ctxhttpheader.WithContext(ctx, http.Header{
@@ -1638,6 +2228,28 @@ func TestDevAuthDecommissionDevice(t *testing.T) {
 				mock.AnythingOfType("model.DeviceUpdate")).Return(nil)
 
 			devauth := NewDevAuth(&db, &co, nil, Config{})
+			c := &mcache.Cache{}
+
+			if tc.withCache {
+				devauth = devauth.WithCache(c)
+				if tc.tenant != "" {
+					c.On("DeleteToken",
+						mock.MatchedBy(func(ctx context.Context) bool {
+							ident := identity.FromContext(ctx)
+							return assert.NotNil(t, ident) &&
+								assert.Equal(t, tc.tenant, ident.Tenant)
+						}),
+						tc.tenant,
+						tc.devId,
+						cache.IdTypeDevice).
+						Return(tc.cacheDeleteErr)
+				} else {
+					c.AssertNotCalled(t, "DeleteToken")
+				}
+			} else {
+				c.AssertNotCalled(t, "DeleteToken")
+			}
+
 			err := devauth.DecommissionDevice(ctx, tc.devId)
 
 			if tc.outErr != "" {
@@ -1645,6 +2257,8 @@ func TestDevAuthDecommissionDevice(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
+
+			c.AssertExpectations(t)
 		})
 	}
 }
@@ -1980,6 +2594,10 @@ func TestDevAuthDeleteAuthSet(t *testing.T) {
 		devId  string
 		authId string
 
+		tenant         string
+		withCache      bool
+		cacheDeleteErr error
+
 		dbGetAuthSetByIdErr         error
 		dbDeleteTokenByDevIdErr     error
 		dbDeleteAuthSetForDeviceErr error
@@ -2056,6 +2674,26 @@ func TestDevAuthDeleteAuthSet(t *testing.T) {
 			devId:  oid.NewUUIDv5("devId12").String(),
 			authId: oid.NewUUIDv5("authId12").String(),
 		},
+		{
+			devId:     oid.NewUUIDv5("devId12").String(),
+			authId:    oid.NewUUIDv5("authId12").String(),
+			withCache: true,
+			tenant:    "acme",
+		},
+		{
+			devId:          oid.NewUUIDv5("devId12").String(),
+			authId:         oid.NewUUIDv5("authId12").String(),
+			withCache:      true,
+			tenant:         "acme",
+			cacheDeleteErr: errors.New("redis error"),
+			outErr:         "failed to delete token for c410d383-c9cd-5c98-9aeb-87166c5920f2 from cache: redis error",
+		},
+		{
+			devId:     oid.NewUUIDv5("devId12").String(),
+			authId:    oid.NewUUIDv5("authId12").String(),
+			withCache: true,
+			outErr:    "failed to delete token for c410d383-c9cd-5c98-9aeb-87166c5920f2 from cache: can't unpack tenant identity data from context",
+		},
 	}
 
 	for i := range testCases {
@@ -2064,6 +2702,12 @@ func TestDevAuthDeleteAuthSet(t *testing.T) {
 			t.Parallel()
 
 			ctx := context.Background()
+			if tc.tenant != "" {
+				id := &identity.Identity{
+					Tenant: tc.tenant,
+				}
+				ctx = identity.WithContext(ctx, id)
+			}
 
 			authSet := &model.AuthSet{Status: model.DevStatusPending}
 			if tc.authSet != nil {
@@ -2098,6 +2742,28 @@ func TestDevAuthDeleteAuthSet(t *testing.T) {
 				Return(nil)
 
 			devauth := NewDevAuth(&db, &co, nil, Config{})
+
+			c := &mcache.Cache{}
+			if tc.withCache {
+				devauth = devauth.WithCache(c)
+				if tc.tenant != "" {
+					c.On("DeleteToken",
+						mock.MatchedBy(func(ctx context.Context) bool {
+							ident := identity.FromContext(ctx)
+							return assert.NotNil(t, ident) &&
+								assert.Equal(t, tc.tenant, ident.Tenant)
+						}),
+						tc.tenant,
+						tc.devId,
+						cache.IdTypeDevice).
+						Return(tc.cacheDeleteErr)
+				} else {
+					c.AssertNotCalled(t, "DeleteToken")
+				}
+			} else {
+				c.AssertNotCalled(t, "DeleteToken")
+			}
+
 			err := devauth.DeleteAuthSet(ctx, tc.devId, tc.authId)
 
 			if tc.outErr != "" {
@@ -2110,6 +2776,7 @@ func TestDevAuthDeleteAuthSet(t *testing.T) {
 					db.AssertNotCalled(t, "DeleteDevice", tc.devId)
 				}
 			}
+			c.AssertExpectations(t)
 		})
 	}
 }
@@ -2120,6 +2787,8 @@ func TestDeleteTokens(t *testing.T) {
 	testCases := map[string]struct {
 		tenantId string
 		deviceId string
+
+		cacheFlushErr error
 
 		dbErrDeleteTokenById error
 		dbErrDeleteTokens    error
@@ -2151,6 +2820,11 @@ func TestDeleteTokens(t *testing.T) {
 			dbErrDeleteTokens: errors.New("db error"),
 			outErr:            errors.New("failed to delete tokens for tenant: foo, device id: : db error"),
 		},
+		"error(cache), all tenant's devs": {
+			tenantId:      "foo",
+			cacheFlushErr: errors.New("redis error"),
+			outErr:        errors.New("failed to flush cache when cleaning tokens for tenant foo: redis error"),
+		},
 	}
 
 	for n := range testCases {
@@ -2168,7 +2842,17 @@ func TestDeleteTokens(t *testing.T) {
 			db.On("DeleteTokens", ctxMatcher).
 				Return(tc.dbErrDeleteTokens)
 
+			c := &mcache.Cache{}
+			if tc.deviceId == "" {
+				c.On("FlushDB", ctxMatcher).
+					Return(tc.cacheFlushErr)
+			} else {
+				c.AssertNotCalled(t, "FlushDB")
+			}
+
 			devauth := NewDevAuth(&db, nil, nil, Config{})
+			devauth = devauth.WithCache(c)
+
 			err := devauth.DeleteTokens(ctx, tc.tenantId, tc.deviceId)
 
 			if tc.outErr != nil {
@@ -2251,4 +2935,233 @@ func TestGetTenantDeviceStatus(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestApiLimitsOverride(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		base     ratelimits.ApiLimits
+		override ratelimits.ApiLimits
+
+		out ratelimits.ApiLimits
+	}{
+		{
+			// some values over defaults - all overriden
+			base: ratelimits.ApiLimits{
+				ApiQuota:  ratelimits.ApiQuota{},
+				ApiBursts: []ratelimits.ApiBurst{},
+			},
+			override: ratelimits.ApiLimits{
+				ApiQuota: ratelimits.ApiQuota{
+					MaxCalls:    100,
+					IntervalSec: 60,
+				},
+				ApiBursts: []ratelimits.ApiBurst{
+					ratelimits.ApiBurst{
+						Action:         "POST",
+						Uri:            "deployments/next",
+						MinIntervalSec: 10,
+					},
+				},
+			},
+			out: ratelimits.ApiLimits{
+				ApiQuota: ratelimits.ApiQuota{
+					MaxCalls:    100,
+					IntervalSec: 60,
+				},
+				ApiBursts: []ratelimits.ApiBurst{
+					ratelimits.ApiBurst{
+						Action:         "POST",
+						Uri:            "deployments/next",
+						MinIntervalSec: 10,
+					},
+				},
+			},
+		},
+		{
+			// defaults over some values - none overriden
+			base: ratelimits.ApiLimits{
+				ApiQuota: ratelimits.ApiQuota{
+					MaxCalls:    100,
+					IntervalSec: 60,
+				},
+				ApiBursts: []ratelimits.ApiBurst{
+					ratelimits.ApiBurst{
+						Action:         "POST",
+						Uri:            "deployments/next",
+						MinIntervalSec: 10,
+					},
+				},
+			},
+			override: ratelimits.ApiLimits{
+				ApiQuota:  ratelimits.ApiQuota{},
+				ApiBursts: []ratelimits.ApiBurst{},
+			},
+			out: ratelimits.ApiLimits{
+				ApiQuota: ratelimits.ApiQuota{
+					MaxCalls:    100,
+					IntervalSec: 60,
+				},
+				ApiBursts: []ratelimits.ApiBurst{
+					ratelimits.ApiBurst{
+						Action:         "POST",
+						Uri:            "deployments/next",
+						MinIntervalSec: 10,
+					},
+				},
+			},
+		},
+		{
+			// override particular burst
+			base: ratelimits.ApiLimits{
+				ApiQuota: ratelimits.ApiQuota{
+					MaxCalls:    10,
+					IntervalSec: 3600,
+				},
+				ApiBursts: []ratelimits.ApiBurst{
+					ratelimits.ApiBurst{
+						Action:         "POST",
+						Uri:            "deployments/next",
+						MinIntervalSec: 10,
+					},
+				},
+			},
+			override: ratelimits.ApiLimits{
+				ApiBursts: []ratelimits.ApiBurst{
+					ratelimits.ApiBurst{
+						Action:         "POST",
+						Uri:            "deployments/next",
+						MinIntervalSec: 100,
+					},
+				},
+			},
+			out: ratelimits.ApiLimits{
+				ApiQuota: ratelimits.ApiQuota{
+					MaxCalls:    10,
+					IntervalSec: 3600,
+				},
+				ApiBursts: []ratelimits.ApiBurst{
+					ratelimits.ApiBurst{
+						Action:         "POST",
+						Uri:            "deployments/next",
+						MinIntervalSec: 100,
+					},
+				},
+			},
+		},
+		{
+			// add burst
+			base: ratelimits.ApiLimits{
+				ApiQuota: ratelimits.ApiQuota{
+					MaxCalls:    10,
+					IntervalSec: 3600,
+				},
+				ApiBursts: []ratelimits.ApiBurst{
+					ratelimits.ApiBurst{
+						Action:         "POST",
+						Uri:            "deployments/next",
+						MinIntervalSec: 10,
+					},
+				},
+			},
+			override: ratelimits.ApiLimits{
+				ApiBursts: []ratelimits.ApiBurst{
+					ratelimits.ApiBurst{
+						Action:         "PATCH",
+						Uri:            "inventory/attributes",
+						MinIntervalSec: 60,
+					},
+				},
+			},
+			out: ratelimits.ApiLimits{
+				ApiQuota: ratelimits.ApiQuota{
+					MaxCalls:    10,
+					IntervalSec: 3600,
+				},
+				ApiBursts: []ratelimits.ApiBurst{
+					ratelimits.ApiBurst{
+						Action:         "POST",
+						Uri:            "deployments/next",
+						MinIntervalSec: 10,
+					},
+					ratelimits.ApiBurst{
+						Action:         "PATCH",
+						Uri:            "inventory/attributes",
+						MinIntervalSec: 60,
+					},
+				},
+			},
+		},
+		{
+			// override and add burst
+			base: ratelimits.ApiLimits{
+				ApiQuota: ratelimits.ApiQuota{
+					MaxCalls:    10,
+					IntervalSec: 3600,
+				},
+				ApiBursts: []ratelimits.ApiBurst{
+					ratelimits.ApiBurst{
+						Action:         "POST",
+						Uri:            "deployments/next",
+						MinIntervalSec: 10,
+					},
+				},
+			},
+			override: ratelimits.ApiLimits{
+				ApiQuota: ratelimits.ApiQuota{
+					MaxCalls:    100,
+					IntervalSec: 60,
+				},
+				ApiBursts: []ratelimits.ApiBurst{
+					ratelimits.ApiBurst{
+						Action:         "POST",
+						Uri:            "deployments/next",
+						MinIntervalSec: 100,
+					},
+					ratelimits.ApiBurst{
+						Action:         "PATCH",
+						Uri:            "inventory/attributes",
+						MinIntervalSec: 60,
+					},
+				},
+			},
+			out: ratelimits.ApiLimits{
+				ApiQuota: ratelimits.ApiQuota{
+					MaxCalls:    100,
+					IntervalSec: 60,
+				},
+				ApiBursts: []ratelimits.ApiBurst{
+					ratelimits.ApiBurst{
+						Action:         "POST",
+						Uri:            "deployments/next",
+						MinIntervalSec: 100,
+					},
+					ratelimits.ApiBurst{
+						Action:         "PATCH",
+						Uri:            "inventory/attributes",
+						MinIntervalSec: 60,
+					},
+				},
+			},
+		},
+	}
+
+	for n := range testCases {
+		tc := testCases[n]
+		t.Run(fmt.Sprintf("tc %d", n), func(t *testing.T) {
+			t.Parallel()
+
+			out := apiLimitsOverride(tc.base, tc.override)
+			assert.Equal(t, tc.out, out)
+		})
+	}
+}
+
+func TestPurgeUriArgs(t *testing.T) {
+	out := purgeUriArgs("/api/devices/v1/deployments/device/deployments/next?artifact_name=release-v1&device_type=foo")
+	assert.Equal(t, "/api/devices/v1/deployments/device/deployments/next", out)
+
+	out = purgeUriArgs("/api/devices/v1/deployments/device/deployments/next")
+	assert.Equal(t, "/api/devices/v1/deployments/device/deployments/next", out)
 }

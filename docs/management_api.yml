@@ -6,9 +6,9 @@ info:
       An API for device authentication handling.
 
 basePath: '/api/management/v2/devauth/'
-host: 'mender-device-auth:8080'
+host: 'hosted.mender.io'
 schemes:
-  - http
+  - https
 
 paths:
   /devices:
