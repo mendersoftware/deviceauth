@@ -111,6 +111,7 @@ type App interface {
 	DeleteTokens(ctx context.Context, tenantID, deviceID string) error
 
 	SetTenantLimit(ctx context.Context, tenant_id string, limit model.Limit) error
+	DeleteTenantLimit(ctx context.Context, tenant_id string, limit string) error
 
 	GetLimit(ctx context.Context, name string) (*model.Limit, error)
 	GetTenantLimit(ctx context.Context, name, tenant_id string) (*model.Limit, error)
@@ -1283,6 +1284,24 @@ func (d *DevAuth) SetTenantLimit(ctx context.Context, tenant_id string, limit mo
 		l.Errorf("failed to save limit %v for tenant %v to database: %v",
 			limit, tenant_id, err)
 		return errors.Wrapf(err, "failed to save limit %v for tenant %v to database",
+			limit, tenant_id)
+	}
+	return nil
+}
+
+func (d *DevAuth) DeleteTenantLimit(ctx context.Context, tenant_id string, limit string) error {
+	l := log.FromContext(ctx)
+
+	ctx = identity.WithContext(ctx, &identity.Identity{
+		Tenant: tenant_id,
+	})
+
+	l.Infof("removing limit %v for tenant %v", limit, tenant_id)
+
+	if err := d.db.DeleteLimit(ctx, limit); err != nil {
+		l.Errorf("failed to delete limit %v for tenant %v to database: %v",
+			limit, tenant_id, err)
+		return errors.Wrapf(err, "failed to delete limit %v for tenant %v to database",
 			limit, tenant_id)
 	}
 	return nil

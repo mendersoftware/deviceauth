@@ -120,6 +120,21 @@ paths:
           description: Internal server error.
           schema:
             $ref: "#/definitions/Error"
+    delete:
+      summary: Delete max device count limit
+      parameters:
+        - name: tenant_id
+          in: path
+          type: string
+          description: Tenant ID.
+          required: true
+      responses:
+        204:
+          description: Limit information deleted.
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/Error"
 
   /tenants:
     post:

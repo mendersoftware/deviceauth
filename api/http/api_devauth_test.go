@@ -1088,6 +1088,65 @@ func TestApiDevAuthPutTenantLimit(t *testing.T) {
 	}
 }
 
+func TestApiDevAuthDeleteTenantLimit(t *testing.T) {
+	t.Parallel()
+
+	// enforce specific field naming in errors returned by API
+	updateRestErrorFieldName()
+
+	tcases := []struct {
+		req    *http.Request
+		code   int
+		body   string
+		tenant string
+		limit  string
+		err    error
+	}{
+		{
+			req: test.MakeSimpleRequest("DELETE",
+				"http://1.2.3.4/api/internal/v1/devauth/tenant/foo/limits/max_devices",
+				nil),
+			limit:  model.LimitMaxDeviceCount,
+			tenant: "foo",
+			code:   http.StatusNoContent,
+		},
+		{
+			req: test.MakeSimpleRequest("DELETE",
+				"http://1.2.3.4/api/internal/v1/devauth/tenant/foo/limits/bogus-limit",
+				nil),
+			code: http.StatusBadRequest,
+			body: RestError("unsupported limit bogus-limit"),
+		},
+		{
+			req: test.MakeSimpleRequest("DELETE",
+				"http://1.2.3.4/api/internal/v1/devauth/tenant/foo/limits/max_devices",
+				nil),
+			tenant: "foo",
+			limit:  model.LimitMaxDeviceCount,
+			code:   http.StatusInternalServerError,
+			err:    errors.New("failed"),
+			body:   RestError("internal error"),
+		},
+	}
+
+	for i := range tcases {
+		tc := tcases[i]
+		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			t.Parallel()
+
+			da := &mocks.App{}
+			da.On("DeleteTenantLimit",
+				mtest.ContextMatcher(),
+				tc.tenant,
+				tc.limit).
+				Return(tc.err)
+
+			apih := makeMockApiHandler(t, da, nil)
+			runTestRequest(t, apih, tc.req, tc.code, tc.body)
+		})
+	}
+}
+
 func TestApiV2DevAuthGetLimit(t *testing.T) {
 	t.Parallel()
 
