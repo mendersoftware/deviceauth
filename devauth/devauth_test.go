@@ -2321,6 +2321,58 @@ func TestDevAuthSetTenantLimit(t *testing.T) {
 	}
 }
 
+func TestDevAuthDeleteTenantLimit(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		tenantId string
+
+		dbPutLimitErr error
+		limit         string
+
+		outErr string
+	}{
+		{
+			tenantId:      "tenant1",
+			dbPutLimitErr: errors.New("DeleteLimit error"),
+			outErr:        "failed to delete limit foobar for tenant tenant1 to database: DeleteLimit error",
+			limit:         "foobar",
+		},
+		{
+			tenantId: "tenant2",
+			limit:    "foobar2",
+		},
+	}
+
+	for i := range testCases {
+		tc := testCases[i]
+		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			t.Parallel()
+
+			ctx := context.Background()
+
+			db := mstore.DataStore{}
+			db.On("DeleteLimit",
+				mock.MatchedBy(func(ctx context.Context) bool {
+					ident := identity.FromContext(ctx)
+					return assert.NotNil(t, ident) &&
+						assert.Equal(t, tc.tenantId, ident.Tenant)
+				}),
+				tc.limit).
+				Return(tc.dbPutLimitErr)
+
+			devauth := NewDevAuth(&db, nil, nil, Config{})
+			err := devauth.DeleteTenantLimit(ctx, tc.tenantId, tc.limit)
+
+			if tc.outErr != "" {
+				assert.EqualError(t, err, tc.outErr)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestDevAuthGetLimit(t *testing.T) {
 	t.Parallel()
 

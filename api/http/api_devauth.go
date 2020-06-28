@@ -89,6 +89,7 @@ func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
 
 		rest.Put(uriTenantLimit, d.PutTenantLimitHandler),
 		rest.Get(uriTenantLimit, d.GetTenantLimitHandler),
+		rest.Delete(uriTenantLimit, d.DeleteTenantLimitHandler),
 
 		rest.Post(uriTenants, d.ProvisionTenantHandler),
 		rest.Get(uriTenantDeviceStatus, d.GetTenantDeviceStatus),
@@ -496,6 +497,29 @@ func (d *DevAuthApiHandlers) PutTenantLimitHandler(w rest.ResponseWriter, r *res
 	}
 
 	if err := d.devAuth.SetTenantLimit(ctx, tenantId, limit); err != nil {
+		rest_utils.RestErrWithLogInternal(w, r, l, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (d *DevAuthApiHandlers) DeleteTenantLimitHandler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+
+	l := log.FromContext(ctx)
+
+	tenantId := r.PathParam("id")
+	reqLimitName := r.PathParam("name")
+
+	if !model.IsValidLimit(reqLimitName) {
+		rest_utils.RestErrWithLog(w, r, l,
+			errors.Errorf("unsupported limit %v", reqLimitName),
+			http.StatusBadRequest)
+		return
+	}
+
+	if err := d.devAuth.DeleteTenantLimit(ctx, tenantId, reqLimitName); err != nil {
 		rest_utils.RestErrWithLogInternal(w, r, l, err)
 		return
 	}

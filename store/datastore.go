@@ -110,6 +110,9 @@ type DataStore interface {
 	// put limit information into data store
 	PutLimit(ctx context.Context, lim model.Limit) error
 
+	// delete limit information from data store
+	DeleteLimit(ctx context.Context, lim string) error
+
 	// fetch limit information from data store
 	GetLimit(ctx context.Context, name string) (*model.Limit, error)
 
