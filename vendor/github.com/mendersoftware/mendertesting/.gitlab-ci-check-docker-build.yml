@@ -42,7 +42,7 @@ stages:
   export DOCKER_PUBLISH_COMMIT_TAG=${CI_COMMIT_REF_NAME}_${CI_COMMIT_SHA}
 
 .get_release_tool_alpine: &get_release_tool_alpine |
-  apk add git python3
+  apk add git python3 py3-pip
   pip3 install pyyaml
   git clone https://github.com/mendersoftware/integration.git mender-integration
   alias release_tool=$(realpath mender-integration/extra/release_tool.py)
@@ -174,8 +174,6 @@ trigger:saas:sync-staging-component:
     -  echo "Repository $CI_PROJECT_NAME not found in release_tool. Exiting"
     -  exit 0
     - fi
-    # Mender SaaS uses Docker Hub images, so remove registry.mender.io prefix
-    - DOCKER_REPOSITORY=${DOCKER_REPOSITORY#registry.mender.io/}
     # Trigger the sync once per container in this repo
     - for container in $(release_tool -m git ${CI_PROJECT_NAME} container); do
     -   echo "Triggering saas staging sync for container $container version ${DOCKER_PUBLISH_COMMIT_TAG}"
