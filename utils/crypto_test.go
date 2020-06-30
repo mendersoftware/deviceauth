@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -11,12 +11,14 @@
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
+
 package utils
 
 import (
+	"crypto"
+	"crypto/dsa"
+	"crypto/rand"
 	"crypto/rsa"
-	"crypto/x509"
-	"encoding/pem"
 	"fmt"
 	"testing"
 
@@ -29,52 +31,182 @@ import (
 func TestVerifyAuthReqSign(t *testing.T) {
 	t.Parallel()
 
+	/* Initialize a DSA key-pair for testing */
+	var DSATestKey = &dsa.PrivateKey{}
+	err := dsa.GenerateParameters(
+		&DSATestKey.Parameters, rand.Reader, dsa.L1024N160,
+	)
+	if err != nil {
+		panic(err)
+	}
+	err = dsa.GenerateKey(DSATestKey, rand.Reader)
+	if err != nil {
+		panic(err)
+	}
+
 	testCases := []struct {
-		content   string
-		pubkeyStr string
-		privkey   *rsa.PrivateKey
-		err       string
+		Name      string
+		Content   string
+		PrivKey   crypto.PrivateKey
+		PubKey    crypto.PublicKey
+		Signature []byte
+		Err       string
 	}{
 		{
+			Name: "OK, RSA",
 			//correctly signed, matching keypair
-			`{
+			Content: `{
 				"id_data": {"mac": "deadbeef"},
 				"tenant_token": "token"
 				"seq_no": 1
 			}`,
-			test.LoadPubKeyStr("testdata/public.pem", t),
-			test.LoadPrivKey("testdata/private.pem", t),
-			"",
+			PrivKey: test.DecodePrivKey([]byte(TestRSAPrivate)),
 		},
 		{
+			Name: "Error: key-pair mismatch",
 			//mismatched keypair
-			`{
+			Content: `{
 				"id_data": {"mac": "deadbeef"},
 				"tenant_token": "token"
 				"seq_no": 1
 			}`,
-			test.LoadPubKeyStr("testdata/public.pem", t),
-			test.LoadPrivKey("testdata/private_invalid.pem", t),
-			"verification failed: crypto/rsa: verification error",
+			PrivKey: test.DecodePrivKey([]byte(TestRSAPrivatInvalid)),
+			PubKey:  test.DecodePubKey([]byte(TestRSAPublic)),
+			Err:     "verification failed: crypto/rsa: verification error",
+		},
+		{
+			Name: "Error: invalid RSA signature",
+			Content: `{
+				"id_data": {"mac": "deadbeef"},
+				"tenant_token": "token"
+				"seq_no": 1
+			}`,
+			PrivKey: test.DecodePrivKey([]byte(TestRSAPrivate)),
+			Signature: []byte(`
+bVvcxjp9xckT33yYzyxE2ozX5Be8fwa7CobC8/0QJfbvJTwvxQm8GCU9bDLaE2Mr50LJj8YkXOPz
+3mHize+CGrxBcf5vTSfySuDx4fnoybhyYSJBIyoJsmo0fghk7Bb1PgVV0UY8NVcAS0ziKzTxR4m4
+DOrbMJKQIAUYYnX1xy4LX0EUUYGWFHZvOmH0L2tzLKlo9lQu+28PpaDVVp75ygn/yGNZ4mJeVsq0
+e6qbGJPhLYhn4hC8euK//NvLWKbTokVJ9hvVWjY/so4jWaI3zWukcfkjYWzxv6lNY+hhfph413G3
+5UDTlT6pt8iIknNKRwkYnODoeJ36AStisE+Byg==
+`),
+			Err: ErrMsgVerify + ": crypto/rsa: verification error",
+		},
+		{
+			Name: "OK, ecdsa",
+			Content: `{
+				"id_data": {"mac": "deadbeef"},
+				"tenant_token": "token"
+				"seq_no": 1
+			}`,
+			PrivKey: test.DecodePrivKey([]byte(TestECDSAPrivate)),
+		},
+		{
+			Name: "Error: invalid ECDSA signature",
+			Content: `{
+				"id_data": {"mac": "deadbeef"},
+				"tenant_token": "token"
+				"seq_no": 1
+			}`,
+			PrivKey: test.DecodePrivKey([]byte(TestECDSAPrivate)),
+			Signature: []byte(`
+MIGIAkIBpTxA1RZXcprHprcBNamyAK8/pvY6ZssbRaHSkdQp5WTqRY5QmSr3/Y86u7xAWYNjJeRY
+C2lW2/fQafXcV+nJyJsCQgCDL/4r8S6ekh75Tx1EAKlEjXKbRzsABDIMTORVTk7f0ShGpWBbpSjH
+1M2w7bpwWnLjq4FAodttsdooMzNqeOZxng==
+`),
+			Err: ErrMsgVerify,
+		},
+		{
+			Name: "Error: invalid ECDSA signature format",
+			Content: `{
+				"id_data": {"mac": "deadbeef"},
+				"tenant_token": "token"
+				"seq_no": 1
+			}`,
+			PrivKey:   test.DecodePrivKey([]byte(TestECDSAPrivate)),
+			Signature: []byte(`Zm9vYmFyYmF6`),
+			Err: ErrMsgVerify + ": asn1: structure error: " +
+				"tags don't match (16 vs {class:1 tag:6 " +
+				"length:111 isCompound:true}) {optional:false " +
+				"explicit:false application:false " +
+				"private:false defaultValue:<nil> tag:<nil> " +
+				"stringType:0 timeType:0 set:false " +
+				"omitEmpty:false}  @2",
+		},
+		{
+			Name: "OK, ed25519",
+			Content: `{
+				"id_data": {"mac": "deadbeef"},
+				"tenant_token": "token"
+				"seq_no": 1
+			}`,
+			PrivKey: test.DecodePrivKey([]byte(TestED25519Private)),
+		},
+		{
+			Name: "Error: invalid ED25519 signature",
+			Content: `{
+				"id_data": {"mac": "deadbeef"},
+				"tenant_token": "token"
+				"seq_no": 1
+			}`,
+			PrivKey: test.DecodePrivKey([]byte(TestED25519Private)),
+			Signature: []byte(`
+MIGIAkIBpTxA1RZXcprHprcBNamyAK8/pvY6ZssbRaHSkdQp5WTqRY5QmSr3/Y86u7xAWYNjJeRY
+C2lW2/fQafXcV+nJyJsCQgCDL/4r8S6ekh75Tx1EAKlEjXKbRzsABDIMTORVTk7f0ShGpWBbpSjH
+1M2w7bpwWnLjq4FAodttsdooMzNqeOZxng==
+`),
+			Err: ErrMsgVerify,
+		},
+		{
+			Name: "Error: signature not PEM",
+			Content: `{
+				"id_data": {"mac": "deadbeef"},
+				"tenant_token": "token"
+				"seq_no": 1
+			}`,
+			PrivKey:   test.DecodePrivKey([]byte(TestRSAPrivate)),
+			Signature: []byte(`føøbårbæz`),
+			Err:       ErrMsgVerify + ": illegal base64 data at input byte 1",
+		},
+		{
+			Name: "Error: public key algorithm not supported",
+			Content: `{
+				"id_data": {"mac": "deadbeef"},
+				"tenant_token": "token"
+				"seq_no": 1
+			}`,
+			PrivKey: DSATestKey,
+			PubKey:  DSATestKey.PublicKey,
+			Signature: []byte(`
+MIGIAkIBpTxA1RZXcprHprcBNamyAK8/pvY6ZssbRaHSkdQp5WTqRY5QmSr3/Y86u7xAWYNjJeRY
+C2lW2/fQafXcV+nJyJsCQgCDL/4r8S6ekh75Tx1EAKlEjXKbRzsABDIMTORVTk7f0ShGpWBbpSjH
+1M2w7bpwWnLjq4FAodttsdooMzNqeOZxng==
+`),
+			Err: ErrMsgVerify + ": public key algorithm (dsa.PublicKey) not supported",
 		},
 	}
 
 	for i := range testCases {
 		tc := testCases[i]
-		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+		t.Run(tc.Name, func(t *testing.T) {
 			t.Parallel()
 
-			signed := test.AuthReqSign([]byte(tc.content), tc.privkey, t)
+			if tc.Signature == nil {
+				tc.Signature = test.AuthReqSign(
+					[]byte(tc.Content), tc.PrivKey, t,
+				)
+			}
+			if tc.PubKey == nil {
+				tc.PubKey = tc.PrivKey.(interface{ Public() crypto.PublicKey }).Public()
+			}
 
-			pubkey, err := ParsePubKey(tc.pubkeyStr)
-			assert.NoError(t, err)
+			err := VerifyAuthReqSign(
+				string(tc.Signature),
+				tc.PubKey,
+				[]byte(tc.Content),
+			)
 
-			err = VerifyAuthReqSign(string(signed),
-				pubkey,
-				[]byte(tc.content))
-
-			if tc.err != "" {
-				assert.EqualError(t, err, tc.err)
+			if tc.Err != "" {
+				assert.EqualError(t, err, tc.Err)
 			} else {
 				assert.NoError(t, err)
 			}
@@ -86,19 +218,31 @@ func TestParsePubKey(t *testing.T) {
 	t.Parallel()
 
 	testCases := map[string]struct {
-		pubkey string
-		err    error
+		pubkey     string
+		errMatcher func(t *testing.T, theErr error)
 	}{
 		"ok": {
-			pubkey: test.LoadPubKeyStr("testdata/public.pem", t),
+			pubkey: TestRSAPublic,
 		},
 		"error, bad pem block": {
-			pubkey: test.LoadPubKeyStr("testdata/public_bad_pem.pem", t),
-			err:    errors.New("cannot decode public key"),
+			pubkey: TestRSAPublicBadPEM,
+			errMatcher: func(t *testing.T, err error) {
+				if assert.Error(t, err) {
+					assert.EqualError(t, err, "cannot decode public key")
+				}
+			},
 		},
 		"error, pem ok, but bad key content": {
-			pubkey: test.LoadPubKeyStr("testdata/public_bad_key_content.pem", t),
-			err:    errors.New("cannot decode public key"),
+			pubkey: TestRSAPublicBadContent,
+			errMatcher: func(t *testing.T, err error) {
+				if assert.Error(t, err) {
+					assert.Contains(t, err.Error(),
+						"cannot decode public key: "+
+							"asn1: structure "+
+							"error: tags don't match",
+					)
+				}
+			},
 		},
 	}
 
@@ -109,9 +253,8 @@ func TestParsePubKey(t *testing.T) {
 
 			key, err := ParsePubKey(tc.pubkey)
 
-			if tc.err != nil {
-				assert.EqualError(t, err, tc.err.Error())
-				assert.Nil(t, key)
+			if tc.errMatcher != nil {
+				tc.errMatcher(t, err)
 			} else {
 				assert.NoError(t, err)
 				assert.NotNil(t, key)
@@ -124,40 +267,29 @@ func TestSerializePubKey(t *testing.T) {
 	t.Parallel()
 
 	testCases := map[string]struct {
-		keyPath string
-		out     string
-		err     error
+		pubKey crypto.PublicKey
+		out    string
+		err    error
 	}{
 		"ok": {
-			keyPath: "testdata/public.pem",
-			out: `-----BEGIN PUBLIC KEY-----
-MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAzogVU7RGDilbsoUt/DdH
-VJvcepl0A5+xzGQ50cq1VE/Dyyy8Zp0jzRXCnnu9nu395mAFSZGotZVr+sWEpO3c
-yC3VmXdBZmXmQdZqbdD/GuixJOYfqta2ytbIUPRXFN7/I7sgzxnXWBYXYmObYvdP
-okP0mQanY+WKxp7Q16pt1RoqoAd0kmV39g13rFl35muSHbSBoAW3GBF3gO+mF5Ty
-1ddp/XcgLOsmvNNjY+2HOD5F/RX0fs07mWnbD7x+xz7KEKjF+H7ZpkqCwmwCXaf0
-iyYyh1852rti3Afw4mDxuVSD7sd9ggvYMc0QHIpQNkD4YWOhNiE1AB0zH57VbUYG
-UwIDAQAB
------END PUBLIC KEY-----
-`,
+			pubKey: test.DecodePubKey([]byte(TestRSAPublic)),
+			out:    TestRSAPublic,
+		},
+		"error, unrecognized key": {
+			pubKey: test.DecodePubKey([]byte(TestDSAPublic)),
+			err:    errors.New("unrecognized public key type"),
+		},
+		"error, corrupt public key struct": {
+			pubKey: &rsa.PublicKey{},
+			err:    errors.New("asn1: structure error: empty integer"),
 		},
 	}
-
 	for i := range testCases {
 		tc := testCases[i]
 		t.Run(fmt.Sprintf("tc %s", i), func(t *testing.T) {
 			t.Parallel()
 
-			pubkey := test.LoadPubKeyStr(tc.keyPath, t)
-
-			block, _ := pem.Decode([]byte(pubkey))
-			assert.NotNil(t, block)
-			assert.Equal(t, PubKeyBlockType, block.Type)
-
-			key, err := x509.ParsePKIXPublicKey(block.Bytes)
-			assert.NoError(t, err)
-
-			out, err := SerializePubKey(key)
+			out, err := SerializePubKey(tc.pubKey)
 
 			if tc.err != nil {
 				assert.EqualError(t, err, tc.err.Error())
