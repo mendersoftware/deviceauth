@@ -14,15 +14,16 @@
 package utils
 
 import (
-	"bytes"
 	"crypto"
-	"crypto/dsa"
 	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
+	"encoding/asn1"
 	"encoding/base64"
 	"encoding/pem"
+	"math/big"
 
 	"github.com/pkg/errors"
 )
@@ -35,33 +36,64 @@ const (
 	PubKeyBlockType = "PUBLIC KEY"
 )
 
-func VerifyAuthReqSign(signature string, pubkey interface{}, content []byte) error {
-	hash := sha256.New()
-	_, err := bytes.NewReader(content).WriteTo(hash)
-	if err != nil {
-		return errors.Wrap(err, ErrMsgVerify)
-	}
+// VerifyAuthReqSign verifies a SHA256 digested signature for a given public
+// key. The current asymmetric crypto algorithms supported are RSA (PKCS 1.5
+// signature), ED25519 and ECDSA (DSA is considered obsolete). The signature
+// is fixed to the SHA256 hash algorithm.
+func VerifyAuthReqSign(signature string, pubkey crypto.PublicKey, content []byte) error {
+	var digest []byte = content
 
 	decodedSig, err := base64.StdEncoding.DecodeString(string(signature))
 	if err != nil {
 		return errors.Wrap(err, ErrMsgVerify)
 	}
 
-	key, ok := pubkey.(*rsa.PublicKey)
-	if !ok {
-		return errors.Wrap(err, ErrMsgVerify)
+	switch pubkey.(type) {
+	case *rsa.PublicKey, *ecdsa.PublicKey:
+		hash := sha256.Sum256(content)
+		digest = hash[:]
 	}
 
-	err = rsa.VerifyPKCS1v15(key, crypto.SHA256, hash.Sum(nil), decodedSig)
-	if err != nil {
-		return errors.Wrap(err, ErrMsgVerify)
+	switch key := pubkey.(type) {
+	case *rsa.PublicKey:
+		err = rsa.VerifyPKCS1v15(
+			key, crypto.SHA256, digest, decodedSig,
+		)
+		if err != nil {
+			return errors.Wrap(err, ErrMsgVerify)
+		}
+
+	case *ecdsa.PublicKey:
+		var signInts struct {
+			R *big.Int
+			S *big.Int
+		}
+		_, err := asn1.Unmarshal(decodedSig, &signInts)
+		if err != nil {
+			return errors.Wrap(err, ErrMsgVerify)
+		}
+		valid := ecdsa.Verify(key, digest, signInts.R, signInts.S)
+		if !valid {
+			return errors.New(ErrMsgVerify)
+		}
+
+	case ed25519.PublicKey:
+		valid := ed25519.Verify(key, digest, decodedSig)
+		if !valid {
+			return errors.New(ErrMsgVerify)
+		}
+
+	default:
+		return errors.Wrap(errors.Errorf(
+			"public key algorithm (%T) not supported", pubkey,
+		), ErrMsgVerify)
 	}
 
 	return nil
 }
 
 //ParsePubKey
-func ParsePubKey(pubkey string) (interface{}, error) {
+func ParsePubKey(pubkey string) (crypto.PublicKey, error) {
 	block, _ := pem.Decode([]byte(pubkey))
 	if block == nil || block.Type != PubKeyBlockType {
 		return nil, errors.New("cannot decode public key")
@@ -75,13 +107,13 @@ func ParsePubKey(pubkey string) (interface{}, error) {
 	return key, nil
 }
 
-func SerializePubKey(key interface{}) (string, error) {
+func SerializePubKey(key crypto.PublicKey) (string, error) {
 
 	switch key.(type) {
-	case *rsa.PublicKey, *dsa.PublicKey, *ecdsa.PublicKey:
+	case *rsa.PublicKey, *ecdsa.PublicKey, ed25519.PublicKey:
 		break
 	default:
-		return "", errors.New("unrecognizable public key type")
+		return "", errors.New("unrecognized public key type")
 	}
 
 	asn1, err := x509.MarshalPKIXPublicKey(key)
@@ -93,10 +125,6 @@ func SerializePubKey(key interface{}) (string, error) {
 		Type:  "PUBLIC KEY",
 		Bytes: asn1,
 	})
-
-	if out == nil {
-		return "", err
-	}
 
 	return string(out), nil
 }
