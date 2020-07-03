@@ -14,7 +14,6 @@
 package http
 
 import (
-	"crypto/rsa"
 	"encoding/json"
 	"io"
 
@@ -66,12 +65,7 @@ func (r *preAuthReq) validate() error {
 		return err
 	}
 
-	keyStruct, ok := key.(*rsa.PublicKey)
-	if !ok {
-		return errors.New("cannot decode public key")
-	}
-
-	serialized, err := utils.SerializePubKey(keyStruct)
+	serialized, err := utils.SerializePubKey(key)
 	if err != nil {
 		return err
 	}
