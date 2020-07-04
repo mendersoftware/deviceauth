@@ -47,6 +47,7 @@ const (
 
 	// management API v2
 	v2uriDevices             = "/api/management/v2/devauth/devices"
+	v2uriDevicesById         = "/api/management/v2/devauth/devices/byid"
 	v2uriDevicesCount        = "/api/management/v2/devauth/devices/count"
 	v2uriDevice              = "/api/management/v2/devauth/devices/:id"
 	v2uriDeviceAuthSet       = "/api/management/v2/devauth/devices/:id/auth/:aid"
@@ -98,6 +99,7 @@ func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
 		// API v2
 		rest.Get(v2uriDevicesCount, d.GetDevicesCountHandler),
 		rest.Get(v2uriDevices, d.GetDevicesV2Handler),
+		rest.Post(v2uriDevicesById, d.GetDevicesByIdV2Handler),
 		rest.Post(v2uriDevices, d.PostDevicesV2Handler),
 		rest.Get(v2uriDevice, d.GetDeviceV2Handler),
 		rest.Delete(v2uriDevice, d.DeleteDeviceHandler),
@@ -264,6 +266,47 @@ func (d *DevAuthApiHandlers) GetDevicesV2Handler(w rest.ResponseWriter, r *rest.
 		w.Header().Add("Link", l)
 	}
 
+	outDevs, err := devicesV2FromDbModel(devs[:len])
+	if err != nil {
+		rest_utils.RestErrWithLogInternal(w, r, l, err)
+		return
+	}
+
+	w.WriteJson(outDevs)
+}
+
+func (d *DevAuthApiHandlers) GetDevicesByIdV2Handler(w rest.ResponseWriter, r *rest.Request) {
+
+	ctx := r.Context()
+
+	l := log.FromContext(ctx)
+
+	//validate req body by reading raw content manually
+	//(raw body will be needed later, DecodeJsonPayload would
+	//unmarshal and close it)
+	body, err := utils.ReadBodyRaw(r)
+	if err != nil {
+		err = errors.Wrap(err, "failed to decode device ids array")
+		rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		return
+	}
+
+	var ids []string
+	err = json.Unmarshal(body, &ids)
+	if err != nil {
+		err = errors.Wrap(err, "failed to decode auth request")
+		rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		return
+	}
+
+	devs, err := d.db.GetDevicesById(ctx, ids)
+	if err != nil {
+		rest_utils.RestErrWithLogInternal(w, r, l, err)
+		return
+	}
+
+	d.devAuth.FillDevicesAuthSets(ctx, devs)
+	len := len(devs)
 	outDevs, err := devicesV2FromDbModel(devs[:len])
 	if err != nil {
 		rest_utils.RestErrWithLogInternal(w, r, l, err)

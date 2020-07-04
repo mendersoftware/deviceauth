@@ -63,6 +63,7 @@ type DataStore interface {
 
 	// list devices
 	GetDevices(ctx context.Context, skip, limit uint, filter DeviceFilter) ([]model.Device, error)
+	GetDevicesById(ctx context.Context, ids []string) ([]model.Device, error)
 
 	AddDevice(ctx context.Context, d model.Device) error
 

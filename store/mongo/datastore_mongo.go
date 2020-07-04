@@ -146,6 +146,22 @@ func (db *DataStoreMongo) GetDevices(ctx context.Context, skip, limit uint, filt
 	return res, nil
 }
 
+func (db *DataStoreMongo) GetDevicesById(ctx context.Context, ids []string) ([]model.Device, error) {
+	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
+
+	cursor, err := c.Find(ctx, bson.M{"_id": bson.M{"$in": ids}})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to fetch device list")
+	}
+
+	res := []model.Device{}
+	if err := cursor.All(ctx, &res); err != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
+
 func (db *DataStoreMongo) StoreMigrationVersion(ctx context.Context, version *migrate.Version) error {
 	if version == nil {
 		return errors.New("version cant be nil.")
