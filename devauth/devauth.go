@@ -100,6 +100,7 @@ type App interface {
 	SubmitAuthRequest(ctx context.Context, r *model.AuthReq) (string, error)
 
 	GetDevices(ctx context.Context, skip, limit uint, filter store.DeviceFilter) ([]model.Device, error)
+	FillDevicesAuthSets(ctx context.Context, devices []model.Device) ([]model.Device, error)
 	GetDevice(ctx context.Context, dev_id string) (*model.Device, error)
 	DecommissionDevice(ctx context.Context, dev_id string) error
 	DeleteAuthSet(ctx context.Context, dev_id string, auth_id string) error
@@ -595,6 +596,17 @@ func (d *DevAuth) processAuthRequest(ctx context.Context, r *model.AuthReq) (*mo
 	}
 
 	return areq, nil
+}
+
+func (d *DevAuth) FillDevicesAuthSets(ctx context.Context, devices []model.Device) ([]model.Device, error) {
+	var err error
+	for i := range devices {
+		devices[i].AuthSets, err = d.db.GetAuthSetsForDevice(ctx, devices[i].Id)
+		if err != nil && err != store.ErrAuthSetNotFound {
+			return nil, errors.Wrap(err, "db get auth sets error")
+		}
+	}
+	return devices, err
 }
 
 func (d *DevAuth) GetDevices(ctx context.Context, skip, limit uint, filter store.DeviceFilter) ([]model.Device, error) {
