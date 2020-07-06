@@ -10,6 +10,15 @@ host: 'hosted.mender.io'
 schemes:
   - https
 
+securityDefinitions:
+  DeviceJWT:
+    type: apiKey
+    in: header
+    name: Authorization
+    description: |
+      API token issued by Device Authentication service.
+      Format: 'Authorization: Bearer [JWT]'
+
 consumes:
   - application/json
 produces:
@@ -19,8 +28,10 @@ paths:
   /auth_requests:
     post:
       operationId: Authenticate Device
+      security:
+        - DeviceJWT: []
       tags:
-        - Devices API
+        - Device API
       summary: Submit an authentication request
       description: |
         The device presents its unique identity data and public key, and signs the request with its private key.
@@ -127,5 +138,5 @@ definitions:
         description: Request ID (same as in X-MEN-RequestID header).
         type: string
     example:
-      error: "internal error"
+      error: "error description goes here"
       request_id: "f7881e82-0492-49fb-b459-795654e71877"

@@ -14,42 +14,48 @@ schemes:
 paths:
   /tokens/verify:
     post:
-     summary: Check the validity of a token
-     description: |
+      operationId: Verify JWT
+      tags:
+        - Internal API
+      summary: Check the validity of a token
+      description: |
         Besides the basic validity check, checks the token expiration time and
         user-initiated token revocation. Services which intend to use it should
         be correctly set up in the gateway\'s configuration.
-     parameters:
-       - name: Authorization
-         in: header
-         description: The token in base64-encoded form.
-         required: true
-         type: string
-     responses:
+      parameters:
+        - name: Authorization
+          in: header
+          description: The token in base64-encoded form.
+          required: true
+          type: string
+      responses:
         200:
-            description: The token is valid.
+          description: The token is valid.
         400:
-            description: Missing or malformed request parameters.
+          description: Missing or malformed request parameters.
         401:
-            description: Verification failed, authentication should not be granted.
+          description: Verification failed, authentication should not be granted.
         403:
-            description: Token has expired - apply for a new one.
+          description: Token has expired - apply for a new one.
         500:
-            description: Unexpected error.
-            schema:
-              $ref: '#/definitions/Error'
+          description: Unexpected error.
+          schema:
+            $ref: '#/definitions/Error'
   /tokens:
     delete:
+      operationId: Revoke Device Tokens
+      tags:
+        - Internal API
       summary: Delete device tokens
       description: |
-         This endpoint is designed to be used for device decommissionning
-         and tenant account suspension purpose.
-         For device decommissioning purpose both tenant_id and device_id parameters
-         must be set. When both tenant_id and device_id parameters are set,
-         all tokens will be deleted for device with given device_id.
-         For tenant account suspension purpose only tenant_id parameter
-         must be set. When device_id parameter is not set (only tenant_id parameter is set)
-         all tokens for all tenant devices will be deleted.
+        This endpoint is designed to be used for device decommissionning
+        and tenant account suspension purpose.
+        For device decommissioning purpose both tenant_id and device_id parameters
+        must be set. When both tenant_id and device_id parameters are set,
+        all tokens will be deleted for device with given device_id.
+        For tenant account suspension purpose only tenant_id parameter
+        must be set. When device_id parameter is not set (only tenant_id parameter is set)
+        all tokens for all tenant devices will be deleted.
       parameters:
         - name: tenant_id
           in: query
@@ -74,6 +80,9 @@ paths:
             $ref: "#/definitions/Error"
   /tenant/{tenant_id}/limits/max_devices:
     get:
+      operationId: Get Device Limit
+      tags:
+        - Internal API
       summary: Max device count limit
       parameters:
         - name: tenant_id
@@ -96,6 +105,9 @@ paths:
           schema:
             $ref: "#/definitions/Error"
     put:
+      operationId: Update Device Limit
+      tags:
+        - Internal API
       summary: Update max device count limit
       parameters:
         - name: tenant_id
@@ -121,7 +133,10 @@ paths:
           schema:
             $ref: "#/definitions/Error"
     delete:
-      summary: Delete max device count limit
+      operationId: Clear Device Limit
+      tags:
+        - Internal API
+      summary: Remove max device count limit
       parameters:
         - name: tenant_id
           in: path
@@ -138,6 +153,9 @@ paths:
 
   /tenants:
     post:
+      operationId: Create Tenant
+      tags:
+        - Internal API
       summary: Provision a new tenant
       description: |
           Sets up all tenant-related infrastructure, e.g. a migrated tenant's database.
@@ -160,6 +178,9 @@ paths:
 
   /tenants/{tid}/devices/{did}/status:
     get:
+      operationId: Device Status
+      tags:
+        - Internal API
       summary: Get the status of a tenant's device
       description: |
           Returns the overall status of the device, computed over the statuses of its various authsets.
@@ -193,6 +214,9 @@ paths:
             $ref: "#/definitions/Error"
   /tenants/{tid}/devices:
     get:
+      operationId: List Devices
+      tags:
+        - Internal API
       summary: Get a list of tenant's devices.
       description: |
         Provides a list of tenant's devices, sorted by creation date, with optional device status filter.
@@ -217,15 +241,13 @@ paths:
           in: query
           description: Results page number
           required: false
-          type: number
-          format: integer
+          type: integer
           default: 1
         - name: per_page
           in: query
           description: Maximum number of results per page.
           required: false
-          type: number
-          format: integer
+          type: integer
           default: 20
           maximum: 500
       responses:
@@ -257,8 +279,7 @@ definitions:
         description: New tenant's ID.
         type: string
     example:
-      application/json:
-          tenant_id: "58be8208dd77460001fe0d78"
+      tenant_id: "58be8208dd77460001fe0d78"
   Limit:
     description: Tenant account limit.
     type: object
@@ -268,8 +289,7 @@ definitions:
     required:
       - limit
     example:
-      application/json:
-        limit: 123
+      limit: 123
   Error:
     description: Error descriptor.
     type: object
@@ -281,9 +301,8 @@ definitions:
         description: Request ID (same as in X-MEN-RequestID header).
         type: string
     example:
-      application/json:
-          error: "failed to decode device group data: JSON payload is empty"
-          request_id: "f7881e82-0492-49fb-b459-795654e7188a"
+      error: "failed to decode request body: JSON payload is empty"
+      request_id: "f7881e82-0492-49fb-b459-795654e7188a"
   Status:
     description: Admission status of the device.
     type: object
@@ -298,8 +317,7 @@ definitions:
     required:
       - status
     example:
-      application/json:
-          status: "accepted"
+      status: "accepted"
   Device:
     type: object
     properties:
@@ -375,8 +393,7 @@ definitions:
         description: Serial number.
         type: string
     example:
-      application/json:
-        mac: "00:01:02:03:04:05"
-        sku: "My Device 1"
-        sn:  "SN1234567890"
+      mac: "00:01:02:03:04:05"
+      sku: "My Device 1"
+      sn:  "SN1234567890"
 
