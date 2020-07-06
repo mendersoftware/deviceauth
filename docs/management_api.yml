@@ -15,20 +15,25 @@ consumes:
 produces:
   - application/json
 
+securityDefinitions:
+  ManagementJWT:
+    type: apiKey
+    in: header
+    name: Authorization
+    description: |
+      API token issued by User Authentication service.
+      Format: 'Bearer [JWT]'
+
 paths:
   /devices:
     get:
       operationId: List Devices
+      security:
+        - ManagementJWT: []
       summary: List devices sorted by age and optionally filter on device status.
       tags:
         - Management API
       parameters:
-        - name: Authorization
-          in: header
-          required: true
-          type: string
-          format: Bearer [token]
-          description: Management API token (JWT) from login
         - name: status
           in: query
           description: |
@@ -44,15 +49,13 @@ paths:
           in: query
           description: Results page number
           required: false
-          type: number
-          format: integer
+          type: integer
           default: 1
         - name: per_page
           in: query
           description: Maximum number of results per page.
           required: false
-          type: number
-          format: integer
+          type: integer
           default: 20
           maximum: 500
       responses:
@@ -76,6 +79,8 @@ paths:
             $ref: '#/definitions/Error'
     post:
       operationId: Preauthorize
+      security:
+        - ManagementJWT: []
       summary: Submit a preauthorized device.
       description: |
         Authorize a device identity with the server backend. On success the
@@ -85,13 +90,6 @@ paths:
       tags:
         - Management API
       parameters:
-        - name: Authorization
-          in: header
-          required: true
-          type: string
-          format: Bearer [token]
-          description: |
-            API token (JWT) issued by the User Administration and Authentication Service.
         - name: pre_auth_request
           in: body
           description: Preauthentication request.
@@ -121,16 +119,12 @@ paths:
   /devices/{id}:
     get:
       operationId: Get Device
+      security:
+        - ManagementJWT: []
       summary: Get a particular device.
       tags:
         - Management API
       parameters:
-        - name: Authorization
-          in: header
-          required: true
-          type: string
-          format: Bearer [token]
-          description: Management API token (JWT) from login
         - name: id
           in: path
           description: Device identifier
@@ -151,16 +145,12 @@ paths:
             $ref: '#/definitions/Error'
     delete:
       operationId: Decommission device
+      security:
+        - ManagementJWT: []
       summary: Remove device and associated authentication set
       tags:
         - Management API
       parameters:
-        - name: Authorization
-          in: header
-          required: true
-          type: string
-          format: Bearer [token]
-          description: Management API token (JWT) from login
         - name: id
           in: path
           description: Device identifier.
@@ -180,6 +170,8 @@ paths:
   /devices/{id}/auth/{aid}:
     delete:
       operationId: Reject authentication
+      security:
+        - ManagementJWT: []
       summary: Remove the device authentication set
       description: |
         Removes the device authentication set.
@@ -191,12 +183,6 @@ paths:
       tags:
         - Management API
       parameters:
-        - name: Authorization
-          in: header
-          required: true
-          type: string
-          format: Bearer [token]
-          description: Management API token (JWT) from login
         - name: id
           in: path
           description: Device identifier.
@@ -221,6 +207,8 @@ paths:
   /devices/{id}/auth/{aid}/status:
     put:
       operationId: Set Authentication Status
+      security:
+        - ManagementJWT: []
       summary: Update the device authentication set status
       description: |
         Sets the status of a authentication data set of selected value.
@@ -232,12 +220,6 @@ paths:
       tags:
         - Management API
       parameters:
-        - name: Authorization
-          in: header
-          required: true
-          type: string
-          format: Bearer [token]
-          description: Management API token (JWT) from login
         - name: id
           in: path
           description: Device identifier.
@@ -275,16 +257,12 @@ paths:
             $ref: "#/definitions/Error"
     get:
       operationId: Get Authentication Status
+      security:
+        - ManagementJWT: []
       summary: Get the device authentication set status
       tags:
         - Management API
       parameters:
-        - name: Authorization
-          in: header
-          required: true
-          type: string
-          format: Bearer [token]
-          description: Management API token (JWT) from login
         - name: id
           in: path
           description: Device identifier.
@@ -315,16 +293,12 @@ paths:
   /devices/count:
     get:
       operationId: Count Devices
+      security:
+        - ManagementJWT: []
       summary: Count number of devices, optionally filtered by status.
       tags:
         - Management API
       parameters:
-        - name: Authorization
-          in: header
-          required: true
-          type: string
-          format: Bearer [token]
-          description: Management API token (JWT) from login
         - name: status
           in: query
           description: |
@@ -347,6 +321,8 @@ paths:
   /tokens/{id}:
     delete:
       operationId: Revoke API Token
+      security:
+        - ManagementJWT: []
       summary: Revoke JWT with given id
       description: |
         Deletes the token, effectively revoking it. The device must
@@ -375,18 +351,11 @@ paths:
   /limits/max_devices:
     get:
       operationId: Get Device Limit
+      security:
+        - ManagementJWT: []
       summary: Obtain limit of accepted devices.
       tags:
         - Management API
-      parameters:
-        - name: Authorization
-          in: header
-          required: true
-          type: string
-          format: Bearer [token]
-          description: |
-            Contains the JWT token issued by the User Administration and
-            Authentication Service.
       responses:
         200:
           description: Usage statistics and limits.
@@ -439,11 +408,11 @@ definitions:
           - preauthorized
       created_ts:
         type: string
-        format: datetime
+        format: date-time
         description: Created timestamp
       updated_ts:
         type: string
-        format: datetime
+        format: date-time
         description: Updated timestamp
       auth_sets:
         type: array
@@ -476,7 +445,7 @@ definitions:
           - preauthorized
       ts:
         type: string
-        format: datetime
+        format: date-time
         description: Created timestamp
   Count:
     description: Counter type
