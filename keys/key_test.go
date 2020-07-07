@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -11,10 +11,11 @@
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
+
 package keys
 
 import (
-	"crypto/rsa"
+	"crypto"
 	"fmt"
 	"testing"
 
@@ -28,12 +29,12 @@ func TestLoadRsaPrivateKey(t *testing.T) {
 
 	testCases := []struct {
 		privKeyPath string
-		privKey     *rsa.PrivateKey
+		privKey     crypto.PrivateKey
 		err         string
 	}{
 		{
 			privKeyPath: "testdata/private.pem",
-			privKey:     test.LoadPrivKey("testdata/private.pem", t),
+			privKey:     test.LoadPrivKey("testdata/private.pem"),
 			err:         "",
 		},
 		{

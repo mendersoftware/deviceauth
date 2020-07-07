@@ -12,11 +12,12 @@ require (
 	github.com/go-redis/redis/v8 v8.0.0-beta.2
 	github.com/gomodule/redigo v1.8.1 // indirect
 	github.com/mendersoftware/go-lib-micro v0.0.0-20200529072844-ecc6d0b89fa6
-	github.com/mendersoftware/mendertesting v0.0.0-20200528113222-083aca144cb7
+	github.com/mendersoftware/mendertesting v0.0.1
 	github.com/pkg/errors v0.9.1
 	github.com/satori/go.uuid v1.2.0
-	github.com/stretchr/testify v1.6.0
+	github.com/stretchr/testify v1.6.1
 	github.com/urfave/cli v1.22.4
 	github.com/yuin/gopher-lua v0.0.0-20200603152657-dc2b0ca8b37e // indirect
 	go.mongodb.org/mongo-driver v1.3.3
+	gopkg.in/yaml.v3 v3.0.0-20200615113413-eeeca48fe776 // indirect
 )

@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -16,63 +16,112 @@ package testing
 import (
 	"bytes"
 	"crypto"
+	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
+	"encoding/asn1"
 	"encoding/base64"
 	"encoding/pem"
 	"io/ioutil"
+	"math/big"
 	"testing"
+
+	"github.com/pkg/errors"
 )
 
-const (
-	PrivKeyBlockType = "RSA PRIVATE KEY"
-)
+func AuthReqSign(data []byte, privkey crypto.PrivateKey, t *testing.T) []byte {
 
-func AuthReqSign(data []byte, privkey *rsa.PrivateKey, t *testing.T) []byte {
-	hash := sha256.New()
-	if _, err := bytes.NewReader(data).WriteTo(hash); err != nil {
-		t.Fatal(err)
+	var (
+		digest    []byte
+		signature []byte
+		err       error
+	)
+
+	switch privkey.(type) {
+	case *rsa.PrivateKey, *ecdsa.PrivateKey:
+		hash := sha256.New()
+		if _, err = bytes.NewReader(data).WriteTo(hash); err != nil {
+			t.Fatal(err)
+		}
+		digest = hash.Sum(nil)
+
+	case ed25519.PrivateKey:
+		digest = data
+
+	default:
+		panic("private key not understood")
+	}
+	switch pkey := privkey.(type) {
+	case *rsa.PrivateKey:
+		signature, err = rsa.SignPKCS1v15(
+			rand.Reader, pkey, crypto.SHA256, digest,
+		)
+
+	case *ecdsa.PrivateKey:
+		r, s, err := ecdsa.Sign(rand.Reader, pkey, digest)
+		if err != nil {
+			panic(err)
+		}
+		signature, err = asn1.Marshal([]*big.Int{r, s})
+		if err != nil {
+			panic(err)
+		}
+	case ed25519.PrivateKey:
+		signature = ed25519.Sign(pkey, digest)
 	}
 
-	sig, err := rsa.SignPKCS1v15(rand.Reader, privkey, crypto.SHA256, hash.Sum(nil))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	b64 := make([]byte, base64.StdEncoding.EncodedLen(len(sig)))
-	base64.StdEncoding.Encode(b64, sig)
+	b64 := make([]byte, base64.StdEncoding.EncodedLen(len(signature)))
+	base64.StdEncoding.Encode(b64, signature)
 
 	return b64
 }
 
-func LoadPrivKey(path string, t *testing.T) *rsa.PrivateKey {
-	pem_data, err := ioutil.ReadFile(path)
+func LoadPrivKey(path string) crypto.PrivateKey {
+	PEMData, err := ioutil.ReadFile(path)
 	if err != nil {
-		t.Fatal(err)
+		panic(err)
+	}
+	return DecodePrivKey(PEMData)
+}
+
+func DecodePrivKey(priv []byte) crypto.PrivateKey {
+	block, _ := pem.Decode(priv)
+
+	if block == nil {
+		panic("error decoding private key (empty PEM block)")
 	}
 
-	block, _ := pem.Decode(pem_data)
-
-	if block == nil ||
-		block.Type != PrivKeyBlockType {
-		t.Fatal(err)
-	}
-
-	key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
 	if err != nil {
-		t.Fatal(err)
+		var e error
+		key, e = x509.ParsePKCS1PrivateKey(block.Bytes)
+		if e != nil {
+			panic(err)
+		}
 	}
-
 	return key
 }
 
-func LoadPubKeyStr(path string, t *testing.T) string {
+func LoadPubKeyStr(path string) string {
 	pem_data, err := ioutil.ReadFile(path)
 	if err != nil {
-		t.Fatal(err)
+		panic(err)
 	}
 
 	return string(pem_data)
+}
+
+func DecodePubKey(pub []byte) crypto.PublicKey {
+	block, _ := pem.Decode(pub)
+	if block == nil {
+		panic("error decoding private key (empty PEM block)")
+	}
+	pubKey, err := x509.ParsePKIXPublicKey(block.Bytes)
+	if err != nil {
+		panic(errors.Wrapf(err, "PEM: %s", string(pub)))
+	}
+	return pubKey
 }

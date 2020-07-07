@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
 package model
 
 import (
-	"crypto/rsa"
+	"crypto"
 	"errors"
 
 	"github.com/mendersoftware/deviceauth/utils"
@@ -28,7 +28,7 @@ type AuthReq struct {
 	PubKey      string `json:"pubkey"`
 
 	//helpers, not serialized
-	PubKeyStruct *rsa.PublicKey `json:"-" bson:"-"`
+	PubKeyStruct crypto.PublicKey `json:"-" bson:"-"`
 }
 
 func (r *AuthReq) Validate() error {
@@ -47,7 +47,7 @@ func (r *AuthReq) Validate() error {
 		return err
 	}
 
-	keyStruct, ok := key.(*rsa.PublicKey)
+	keyStruct, ok := key.(crypto.PublicKey)
 	if !ok {
 		return errors.New("cannot decode public key")
 	}
