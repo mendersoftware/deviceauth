@@ -95,6 +95,7 @@ func simpleApiClientGetter() apiclient.HttpRunner {
 
 // this device auth service interface
 type App interface {
+	HealthCheck(ctx context.Context) error
 	SubmitAuthRequest(ctx context.Context, r *model.AuthReq) (string, error)
 
 	GetDevices(ctx context.Context, skip, limit uint, filter store.DeviceFilter) ([]model.Device, error)
@@ -160,6 +161,28 @@ func NewDevAuth(d store.DataStore, co orchestrator.ClientRunner,
 		config:       config,
 		clock:        utils.NewClock(),
 	}
+}
+
+func (d *DevAuth) HealthCheck(ctx context.Context) error {
+	err := d.db.Ping(ctx)
+	if err != nil {
+		return errors.Wrap(err, "error reaching MongoDB")
+	}
+	err = d.invClient.CheckHealth(ctx)
+	if err != nil {
+		return errors.Wrap(err, "Inventory service unhealthy")
+	}
+	err = d.cOrch.CheckHealth(ctx)
+	if err != nil {
+		return errors.Wrap(err, "Workflows service unhealthy")
+	}
+	if d.verifyTenant {
+		err = d.cTenant.CheckHealth(ctx)
+		if err != nil {
+			return errors.Wrap(err, "Tenantadm service unhealthy")
+		}
+	}
+	return nil
 }
 
 func (d *DevAuth) getDeviceFromAuthRequest(ctx context.Context, r *model.AuthReq, currentStatus *string) (*model.Device, error) {

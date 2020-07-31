@@ -29,6 +29,7 @@ import (
 )
 
 const (
+	TenantHealthURI = "/api/internal/v1/tenantadm/health"
 	// devices endpoint
 	TenantVerifyUri = "/api/internal/v1/tenantadm/tenants/verify"
 	TenantGetUri    = "/api/internal/v1/tenantadm/tenants/:tid"
@@ -58,6 +59,7 @@ type Config struct {
 
 // ClientRunner is an interface of inventory client
 type ClientRunner interface {
+	CheckHealth(ctx context.Context) error
 	VerifyToken(ctx context.Context, token string, client apiclient.HttpRunner) (*Tenant, error)
 	GetTenant(ctx context.Context, tid string,
 		client apiclient.HttpRunner) (*Tenant, error)
@@ -67,6 +69,50 @@ type ClientRunner interface {
 // ClientRunner interface
 type Client struct {
 	conf Config
+}
+
+// NewClient creates a client with given config.
+func NewClient(c Config) *Client {
+	if c.Timeout == 0 {
+		c.Timeout = defaultReqTimeout
+	}
+
+	return &Client{
+		conf: c,
+	}
+}
+
+func (c *Client) CheckHealth(ctx context.Context) error {
+	var (
+		apiErr rest_utils.ApiError
+		client http.Client
+	)
+
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if _, ok := ctx.Deadline(); !ok {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, c.conf.Timeout)
+		defer cancel()
+	}
+	req, _ := http.NewRequestWithContext(
+		ctx, "GET", c.conf.TenantAdmAddr+TenantHealthURI, nil,
+	)
+
+	rsp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	if rsp.StatusCode >= http.StatusOK && rsp.StatusCode < 300 {
+		return nil
+	}
+	decoder := json.NewDecoder(rsp.Body)
+	err = decoder.Decode(&apiErr)
+	if err != nil {
+		return errors.Errorf("health check HTTP error: %s", rsp.Status)
+	}
+	return &apiErr
 }
 
 // VerifyToken will execute a request to tenenatadm's endpoint for token
@@ -159,16 +205,5 @@ func (tc *Client) GetTenant(ctx context.Context, tid string,
 	default:
 		return nil, errors.Errorf("getting tenant resulted in unexpected code: %v",
 			rsp.StatusCode)
-	}
-}
-
-// NewClient creates a client with given config.
-func NewClient(c Config) *Client {
-	if c.Timeout == 0 {
-		c.Timeout = defaultReqTimeout
-	}
-
-	return &Client{
-		conf: c,
 	}
 }
