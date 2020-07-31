@@ -58,6 +58,7 @@ type Config struct {
 }
 
 // ClientRunner is an interface of inventory client
+//go:generate ../../utils/mockgen.sh
 type ClientRunner interface {
 	CheckHealth(ctx context.Context) error
 	VerifyToken(ctx context.Context, token string, client apiclient.HttpRunner) (*Tenant, error)

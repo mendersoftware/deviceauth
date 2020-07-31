@@ -39,6 +39,7 @@ const (
 	defaultTimeout        = 10 * time.Second
 )
 
+//go:generate ../../utils/mockgen.sh
 type Client interface {
 	CheckHealth(ctx context.Context) error
 	PatchDeviceV2(ctx context.Context, did, tid, src string, ts int64, attrs []Attribute) error

@@ -67,6 +67,7 @@ var (
 	ErrTooManyRequests = errors.New("too many requests")
 )
 
+//go:generate ../utils/mockgen.sh
 type Cache interface {
 	// Throttle applies desired api limits and retrieves a cached token.
 	// These ops are bundled because the implementation will pipeline them for a single network roundtrip for max performance.

@@ -52,6 +52,7 @@ type DeviceFilter struct {
 	Status string `bson:"status,omitempty"`
 }
 
+//go:generate ../utils/mockgen.sh
 type DataStore interface {
 	Ping(ctx context.Context) error
 	// retrieve device by Mender-assigned device ID
