@@ -155,6 +155,17 @@ func compareTime(expected time.Time, actual time.Time, t *testing.T) {
 	assert.Equal(t, expected.Unix(), actual.Unix())
 }
 
+func TestPing(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestPing in short mode")
+	}
+	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	defer cancel()
+	ds := NewDataStoreMongoWithClient(db.Client())
+	err := ds.Ping(ctx)
+	assert.NoError(t, err)
+}
+
 func TestStoreGetDeviceByIdentityDataHash(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping TestGetDeviceByIdentityDataHash in short mode.")
