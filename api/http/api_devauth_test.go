@@ -1324,6 +1324,19 @@ func TestApiV2DevAuthGetDevicesCount(t *testing.T) {
 			)),
 		},
 		{
+			status: "noauth",
+
+			daCnt: 5,
+			daErr: nil,
+
+			code: http.StatusOK,
+			body: string(asJSON(
+				model.Count{
+					Count: 5,
+				},
+			)),
+		},
+		{
 			status: "accepted",
 
 			daCnt: 0,
@@ -1379,7 +1392,7 @@ func TestApiV2DevAuthGetDevicesCount(t *testing.T) {
 			status: "bogus",
 
 			code: http.StatusBadRequest,
-			body: RestError("status must be one of: pending, accepted, rejected, preauthorized"),
+			body: RestError("status must be one of: pending, accepted, rejected, preauthorized, noauth"),
 		},
 		{
 			status: "accepted",
