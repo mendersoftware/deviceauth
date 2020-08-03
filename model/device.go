@@ -24,6 +24,7 @@ const (
 	DevStatusRejected = "rejected"
 	DevStatusPending  = "pending"
 	DevStatusPreauth  = "preauthorized"
+	DevStatusNoAuth   = "noauth"
 
 	DevKeyIdData = "id_data"
 	DevKeyStatus = "status"
