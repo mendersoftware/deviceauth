@@ -200,6 +200,7 @@ class TestDevice:
         TestDevice.verify_device_count(management_api, 'pending', 13)
         TestDevice.verify_device_count(management_api, 'accepted', 1)
         TestDevice.verify_device_count(management_api, 'rejected', 1)
+        TestDevice.verify_device_count(management_api, 'noauth', 0)
 
     @staticmethod
     def verify_device_count(management_api, status, expected_count):
@@ -209,7 +210,7 @@ class TestDevice:
     @pytest.mark.parametrize('devices', ['5'], indirect=True)
     def test_device_count_multiple_auth_sets(self, devices, management_api, device_api):
         """"Verify that auth sets are properly counted. Take a device, make sure it has
-        2 auth sets, switch each auth sets between accepted/rejected/pending
+        2 auth sets, switch each auth sets between accepted/rejected/pending/noauth
         states
         """
 
@@ -236,24 +237,45 @@ class TestDevice:
             TestDevice.verify_device_count(management_api, 'pending', 4)
             TestDevice.verify_device_count(management_api, 'accepted', 1)
             TestDevice.verify_device_count(management_api, 'rejected', 0)
+            TestDevice.verify_device_count(management_api, 'noauth', 0)
 
             # reject the other
             management_api.reject_device(devid, second_aid)
             TestDevice.verify_device_count(management_api, 'pending', 4)
             TestDevice.verify_device_count(management_api, 'accepted', 1)
             TestDevice.verify_device_count(management_api, 'rejected', 0)
+            TestDevice.verify_device_count(management_api, 'noauth', 0)
 
             # reject both
             management_api.reject_device(devid, first_aid)
             TestDevice.verify_device_count(management_api, 'pending', 4)
             TestDevice.verify_device_count(management_api, 'accepted', 0)
             TestDevice.verify_device_count(management_api, 'rejected', 1)
+            TestDevice.verify_device_count(management_api, 'noauth', 0)
 
             # switch the first back to pending, 2nd remains rejected
             management_api.put_device_status(devid, first_aid, 'pending')
             TestDevice.verify_device_count(management_api, 'pending', 5)
             TestDevice.verify_device_count(management_api, 'accepted', 0)
             TestDevice.verify_device_count(management_api, 'rejected', 0)
+            TestDevice.verify_device_count(management_api, 'noauth', 0)
+
+            # delete device authsets, becomes 'noauth'
+            for a in found_dev.auth_sets:
+                management_api.delete_authset(devid, a.id)
+
+            TestDevice.verify_device_count(management_api, "pending", 4)
+            TestDevice.verify_device_count(management_api, "accepted", 0)
+            TestDevice.verify_device_count(management_api, "rejected", 0)
+            TestDevice.verify_device_count(management_api, "noauth", 1)
+
+            # device can come back from noauth
+            device_auth_req(device_api.auth_requests_url, dauth, dev)
+            TestDevice.verify_device_count(management_api, 'pending', 5)
+            TestDevice.verify_device_count(management_api, 'accepted', 0)
+            TestDevice.verify_device_count(management_api, 'rejected', 0)
+            TestDevice.verify_device_count(management_api, 'noauth', 0)
+
 
 class TestDeviceEnterprise:
     @pytest.mark.parametrize('tenant_foobar_devices', ['5'], indirect=True)
