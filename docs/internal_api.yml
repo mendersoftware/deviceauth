@@ -237,6 +237,7 @@ paths:
             - accepted
             - rejected
             - preauthorized
+            - noauth
         - name: page
           in: query
           description: Results page number
@@ -314,6 +315,7 @@ definitions:
           - accepted
           - rejected
           - preauthorized
+          - noauth
     required:
       - status
     example:
@@ -333,6 +335,7 @@ definitions:
           - accepted
           - rejected
           - preauthorized
+          - noauth
       created_ts:
         type: string
         format: datetime

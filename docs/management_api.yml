@@ -45,6 +45,7 @@ paths:
             - accepted
             - rejected
             - preauthorized
+            - noauth
         - name: page
           in: query
           description: Results page number
@@ -302,7 +303,7 @@ paths:
         - name: status
           in: query
           description: |
-            Device status filter, one of 'pending', 'accepted', 'rejected'. Default is 'all devices'.
+            Device status filter, one of 'pending', 'accepted', 'rejected', 'noauth'. Default is 'all devices'.
           required: false
           type: string
       responses:
@@ -377,6 +378,7 @@ definitions:
           - pending
           - accepted
           - rejected
+          - preauthorized
     required:
       - status
     example:
@@ -406,6 +408,7 @@ definitions:
           - accepted
           - rejected
           - preauthorized
+          - noauth
       created_ts:
         type: string
         format: date-time
@@ -443,6 +446,7 @@ definitions:
           - accepted
           - rejected
           - preauthorized
+          - noauth
       ts:
         type: string
         format: date-time
