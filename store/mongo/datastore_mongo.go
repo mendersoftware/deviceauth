@@ -37,7 +37,7 @@ import (
 )
 
 const (
-	DbVersion     = "1.8.0"
+	DbVersion     = "1.9.0"
 	DbName        = "deviceauth"
 	DbDevicesColl = "devices"
 	DbAuthSetColl = "auth_sets"
@@ -47,6 +47,7 @@ const (
 
 var (
 	indexDevices_IdentityData                       = "devices:IdentityData"
+	indexDevices_IdentityDataSha256                 = "devices:IdentityDataSha256"
 	indexAuthSet_DeviceId_IdentityData_PubKey       = "auth_sets:DeviceId:IdData:PubKey"
 	indexAuthSet_DeviceId_IdentityDataSha256_PubKey = "auth_sets:IdDataSha256:PubKey"
 	indexAuthSet_IdentityDataSha256_PubKey          = "auth_sets:NoDeviceId:IdDataSha256:PubKey"
@@ -425,6 +426,10 @@ func (db *DataStoreMongo) MigrateTenant(ctx context.Context, database, version s
 			ctx: ctx,
 		},
 		&migration_1_8_0{
+			ds:  db,
+			ctx: ctx,
+		},
+		&migration_1_9_0{
 			ds:  db,
 			ctx: ctx,
 		},

@@ -831,29 +831,17 @@ func TestStoreMigrate(t *testing.T) {
 						verifyIndexes(t, db.client.Database(d).Collection(DbDevicesColl),
 							[]mongo.IndexModel{{
 								Keys: bson.D{
-									{Key: model.DevKeyIdData, Value: 1},
+									{Key: model.DevKeyIdDataSha256, Value: 1},
 								},
 								Options: &options.IndexOptions{
 									Background: &_false,
-									Name:       &indexDevices_IdentityData,
+									Name:       &indexDevices_IdentityDataSha256,
 									Unique:     &_true,
 								},
 							}},
 						)
 						verifyIndexes(t, db.client.Database(d).Collection(DbAuthSetColl),
 							[]mongo.IndexModel{
-								{
-									Keys: bson.D{
-										{Key: model.AuthSetKeyDeviceId, Value: 1},
-										{Key: model.AuthSetKeyIdData, Value: 1},
-										{Key: model.AuthSetKeyPubKey, Value: 1},
-									},
-									Options: &options.IndexOptions{
-										Background: &_false,
-										Name:       &indexAuthSet_DeviceId_IdentityData_PubKey,
-										Unique:     &_true,
-									},
-								},
 								{
 									Keys: bson.D{
 										{Key: model.AuthSetKeyDeviceId, Value: 1},
