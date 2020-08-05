@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -21,6 +21,8 @@ import (
 	ctxstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/pkg/errors"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	mopts "go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/mendersoftware/deviceauth/model"
 )
@@ -51,7 +53,7 @@ func (m *migration_1_1_0) Up(from migrate.Version) error {
 	asColl := m.ms.client.Database(ctxstore.DbFromContext(m.ctx, DbName)).Collection(DbAuthSetColl)
 	tColl := m.ms.client.Database(ctxstore.DbFromContext(m.ctx, DbName)).Collection(DbTokensColl)
 
-	if err := m.ms.EnsureIndexes(m.ctx); err != nil {
+	if err := m.ensureIndexes(m.ctx); err != nil {
 		return errors.Wrap(err, "database indexing failed")
 	}
 
@@ -112,4 +114,46 @@ func (m *migration_1_1_0) Up(from migrate.Version) error {
 
 func (m *migration_1_1_0) Version() migrate.Version {
 	return migrate.MakeVersion(1, 1, 0)
+}
+
+func (m *migration_1_1_0) ensureIndexes(ctx context.Context) error {
+	_false := false
+	_true := true
+
+	devIdDataUniqueIndex := mongo.IndexModel{
+		Keys: bson.D{
+			{Key: model.DevKeyIdData, Value: 1},
+		},
+		Options: &mopts.IndexOptions{
+			Background: &_false,
+			Name:       &indexDevices_IdentityData,
+			Unique:     &_true,
+		},
+	}
+
+	authSetUniqueIndex := mongo.IndexModel{
+		Keys: bson.D{
+			{Key: model.AuthSetKeyDeviceId, Value: 1},
+			{Key: model.AuthSetKeyIdData, Value: 1},
+			{Key: model.AuthSetKeyPubKey, Value: 1},
+		},
+		Options: &mopts.IndexOptions{
+			Background: &_false,
+			Name:       &indexAuthSet_DeviceId_IdentityData_PubKey,
+			Unique:     &_true,
+		},
+	}
+
+	cDevs := m.ms.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
+	devIndexes := cDevs.Indexes()
+	_, err := devIndexes.CreateOne(ctx, devIdDataUniqueIndex)
+	if err != nil {
+		return err
+	}
+
+	cAuthSets := m.ms.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
+	authSetIndexes := cAuthSets.Indexes()
+	_, err = authSetIndexes.CreateOne(ctx, authSetUniqueIndex)
+
+	return err
 }

@@ -586,48 +586,6 @@ func (db *DataStoreMongo) WithAutomigrate() store.DataStore {
 	}
 }
 
-func (db *DataStoreMongo) EnsureIndexes(ctx context.Context) error {
-	_false := false
-	_true := true
-
-	devIdDataUniqueIndex := mongo.IndexModel{
-		Keys: bson.D{
-			{Key: model.DevKeyIdData, Value: 1},
-		},
-		Options: &mopts.IndexOptions{
-			Background: &_false,
-			Name:       &indexDevices_IdentityData,
-			Unique:     &_true,
-		},
-	}
-
-	authSetUniqueIndex := mongo.IndexModel{
-		Keys: bson.D{
-			{Key: model.AuthSetKeyDeviceId, Value: 1},
-			{Key: model.AuthSetKeyIdData, Value: 1},
-			{Key: model.AuthSetKeyPubKey, Value: 1},
-		},
-		Options: &mopts.IndexOptions{
-			Background: &_false,
-			Name:       &indexAuthSet_DeviceId_IdentityData_PubKey,
-			Unique:     &_true,
-		},
-	}
-
-	cDevs := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
-	devIndexes := cDevs.Indexes()
-	_, err := devIndexes.CreateOne(ctx, devIdDataUniqueIndex)
-	if err != nil {
-		return err
-	}
-
-	cAuthSets := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
-	authSetIndexes := cAuthSets.Indexes()
-	_, err = authSetIndexes.CreateOne(ctx, authSetUniqueIndex)
-
-	return err
-}
-
 func (db *DataStoreMongo) PutLimit(ctx context.Context, lim model.Limit) error {
 	if lim.Name == "" {
 		return errors.New("empty limit name")
