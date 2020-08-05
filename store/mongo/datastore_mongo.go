@@ -112,6 +112,10 @@ func NewDataStoreMongo(config DataStoreMongoConfig) (*DataStoreMongo, error) {
 	return NewDataStoreMongoWithClient(client), nil
 }
 
+func (db *DataStoreMongo) Ping(ctx context.Context) error {
+	return db.client.Ping(ctx, nil)
+}
+
 func (db *DataStoreMongo) GetDevices(ctx context.Context, skip, limit uint, filter store.DeviceFilter) ([]model.Device, error) {
 
 	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)

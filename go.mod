@@ -11,7 +11,7 @@ require (
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/go-redis/redis/v8 v8.0.0-beta.2
 	github.com/gomodule/redigo v1.8.1 // indirect
-	github.com/mendersoftware/go-lib-micro v0.0.0-20200529072844-ecc6d0b89fa6
+	github.com/mendersoftware/go-lib-micro v0.0.0-20200731125022-f9ec108d29b7
 	github.com/mendersoftware/mendertesting v0.0.1
 	github.com/pkg/errors v0.9.1
 	github.com/satori/go.uuid v1.2.0

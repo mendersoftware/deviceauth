@@ -31,6 +31,7 @@ import (
 
 	"github.com/mendersoftware/deviceauth/cache"
 	mcache "github.com/mendersoftware/deviceauth/cache/mocks"
+	minv "github.com/mendersoftware/deviceauth/client/inventory/mocks"
 	"github.com/mendersoftware/deviceauth/client/orchestrator"
 	morchestrator "github.com/mendersoftware/deviceauth/client/orchestrator/mocks"
 	"github.com/mendersoftware/deviceauth/client/tenant"
@@ -45,6 +46,105 @@ import (
 	mtesting "github.com/mendersoftware/deviceauth/utils/testing"
 	"github.com/pkg/errors"
 )
+
+func TestHealthCheck(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		Name string
+
+		MultiTenant bool
+
+		DataStoreError error
+		InventoryError error
+		WorkflowsError error
+		TenantAdmError error
+	}{{
+		Name: "ok",
+	}, {
+		Name:        "ok, multitenant",
+		MultiTenant: true,
+	}, {
+		Name:           "error, datastore",
+		DataStoreError: errors.New("connection error"),
+	}, {
+		Name:           "error, inventory",
+		InventoryError: errors.New("connection error"),
+	}, {
+		Name:           "error, workflows",
+		WorkflowsError: errors.New("connection error"),
+	}, {
+		Name:           "error, tenantadm",
+		MultiTenant:    true,
+		TenantAdmError: errors.New("connection error"),
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.TODO(), time.Second*5)
+			defer cancel()
+
+			db := &mstore.DataStore{}
+			ta := &mtenant.ClientRunner{}
+			wf := &morchestrator.ClientRunner{}
+			inv := &minv.Client{}
+			devauth := NewDevAuth(db, wf, nil, Config{})
+			devauth.invClient = inv
+			switch {
+			default:
+				fallthrough
+			case tc.TenantAdmError != nil:
+				if tc.MultiTenant {
+					ta.On("CheckHealth", ctx).
+						Return(tc.TenantAdmError)
+					devauth.WithTenantVerification(ta)
+				}
+				fallthrough
+			case tc.WorkflowsError != nil:
+				wf.On("CheckHealth", ctx).
+					Return(tc.WorkflowsError)
+				fallthrough
+			case tc.InventoryError != nil:
+				inv.On("CheckHealth", ctx).
+					Return(tc.InventoryError)
+				fallthrough
+			case tc.DataStoreError != nil:
+				db.On("Ping", ctx).
+					Return(tc.DataStoreError)
+			}
+
+			err := devauth.HealthCheck(ctx)
+			switch {
+			case tc.DataStoreError != nil:
+				assert.EqualError(t, err,
+					"error reaching MongoDB: "+
+						tc.DataStoreError.Error(),
+				)
+			case tc.InventoryError != nil:
+				assert.EqualError(t, err,
+					"Inventory service unhealthy: "+
+						tc.InventoryError.Error(),
+				)
+			case tc.WorkflowsError != nil:
+				assert.EqualError(t, err,
+					"Workflows service unhealthy: "+
+						tc.WorkflowsError.Error(),
+				)
+			case tc.TenantAdmError != nil:
+				assert.EqualError(t, err,
+					"Tenantadm service unhealthy: "+
+						tc.TenantAdmError.Error(),
+				)
+			default:
+				assert.NoError(t, err)
+			}
+			db.AssertExpectations(t)
+			inv.AssertExpectations(t)
+			wf.AssertExpectations(t)
+			ta.AssertExpectations(t)
+		})
+	}
+}
 
 func TestDevAuthSubmitAuthRequest(t *testing.T) {
 	t.Parallel()
@@ -3010,7 +3110,7 @@ func TestApiLimitsOverride(t *testing.T) {
 					IntervalSec: 60,
 				},
 				ApiBursts: []ratelimits.ApiBurst{
-					ratelimits.ApiBurst{
+					{
 						Action:         "POST",
 						Uri:            "deployments/next",
 						MinIntervalSec: 10,
@@ -3023,7 +3123,7 @@ func TestApiLimitsOverride(t *testing.T) {
 					IntervalSec: 60,
 				},
 				ApiBursts: []ratelimits.ApiBurst{
-					ratelimits.ApiBurst{
+					{
 						Action:         "POST",
 						Uri:            "deployments/next",
 						MinIntervalSec: 10,
@@ -3039,7 +3139,7 @@ func TestApiLimitsOverride(t *testing.T) {
 					IntervalSec: 60,
 				},
 				ApiBursts: []ratelimits.ApiBurst{
-					ratelimits.ApiBurst{
+					{
 						Action:         "POST",
 						Uri:            "deployments/next",
 						MinIntervalSec: 10,
@@ -3056,7 +3156,7 @@ func TestApiLimitsOverride(t *testing.T) {
 					IntervalSec: 60,
 				},
 				ApiBursts: []ratelimits.ApiBurst{
-					ratelimits.ApiBurst{
+					{
 						Action:         "POST",
 						Uri:            "deployments/next",
 						MinIntervalSec: 10,
@@ -3072,7 +3172,7 @@ func TestApiLimitsOverride(t *testing.T) {
 					IntervalSec: 3600,
 				},
 				ApiBursts: []ratelimits.ApiBurst{
-					ratelimits.ApiBurst{
+					{
 						Action:         "POST",
 						Uri:            "deployments/next",
 						MinIntervalSec: 10,
@@ -3081,7 +3181,7 @@ func TestApiLimitsOverride(t *testing.T) {
 			},
 			override: ratelimits.ApiLimits{
 				ApiBursts: []ratelimits.ApiBurst{
-					ratelimits.ApiBurst{
+					{
 						Action:         "POST",
 						Uri:            "deployments/next",
 						MinIntervalSec: 100,
@@ -3094,7 +3194,7 @@ func TestApiLimitsOverride(t *testing.T) {
 					IntervalSec: 3600,
 				},
 				ApiBursts: []ratelimits.ApiBurst{
-					ratelimits.ApiBurst{
+					{
 						Action:         "POST",
 						Uri:            "deployments/next",
 						MinIntervalSec: 100,
@@ -3110,7 +3210,7 @@ func TestApiLimitsOverride(t *testing.T) {
 					IntervalSec: 3600,
 				},
 				ApiBursts: []ratelimits.ApiBurst{
-					ratelimits.ApiBurst{
+					{
 						Action:         "POST",
 						Uri:            "deployments/next",
 						MinIntervalSec: 10,
@@ -3119,7 +3219,7 @@ func TestApiLimitsOverride(t *testing.T) {
 			},
 			override: ratelimits.ApiLimits{
 				ApiBursts: []ratelimits.ApiBurst{
-					ratelimits.ApiBurst{
+					{
 						Action:         "PATCH",
 						Uri:            "inventory/attributes",
 						MinIntervalSec: 60,
@@ -3132,12 +3232,12 @@ func TestApiLimitsOverride(t *testing.T) {
 					IntervalSec: 3600,
 				},
 				ApiBursts: []ratelimits.ApiBurst{
-					ratelimits.ApiBurst{
+					{
 						Action:         "POST",
 						Uri:            "deployments/next",
 						MinIntervalSec: 10,
 					},
-					ratelimits.ApiBurst{
+					{
 						Action:         "PATCH",
 						Uri:            "inventory/attributes",
 						MinIntervalSec: 60,
@@ -3153,7 +3253,7 @@ func TestApiLimitsOverride(t *testing.T) {
 					IntervalSec: 3600,
 				},
 				ApiBursts: []ratelimits.ApiBurst{
-					ratelimits.ApiBurst{
+					{
 						Action:         "POST",
 						Uri:            "deployments/next",
 						MinIntervalSec: 10,
@@ -3166,12 +3266,12 @@ func TestApiLimitsOverride(t *testing.T) {
 					IntervalSec: 60,
 				},
 				ApiBursts: []ratelimits.ApiBurst{
-					ratelimits.ApiBurst{
+					{
 						Action:         "POST",
 						Uri:            "deployments/next",
 						MinIntervalSec: 100,
 					},
-					ratelimits.ApiBurst{
+					{
 						Action:         "PATCH",
 						Uri:            "inventory/attributes",
 						MinIntervalSec: 60,
@@ -3184,12 +3284,12 @@ func TestApiLimitsOverride(t *testing.T) {
 					IntervalSec: 60,
 				},
 				ApiBursts: []ratelimits.ApiBurst{
-					ratelimits.ApiBurst{
+					{
 						Action:         "POST",
 						Uri:            "deployments/next",
 						MinIntervalSec: 100,
 					},
-					ratelimits.ApiBurst{
+					{
 						Action:         "PATCH",
 						Uri:            "inventory/attributes",
 						MinIntervalSec: 60,
