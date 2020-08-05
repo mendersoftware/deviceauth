@@ -422,8 +422,8 @@ func (d *DevAuthApiHandlers) VerifyTokenHandler(w rest.ResponseWriter, r *rest.R
 
 	ctx = ctxhttpheader.WithContext(ctx,
 		r.Header,
-		"X-Original-Method",
-		"X-Original-URI")
+		"X-Forwarded-Method",
+		"X-Forwarded-Uri")
 
 	// verify token
 	err = d.devAuth.VerifyToken(ctx, tokenStr)

@@ -1066,8 +1066,8 @@ func (d *DevAuth) VerifyToken(ctx context.Context, raw string) error {
 		return err
 	}
 
-	origMethod := ctxhttpheader.FromContext(ctx, "X-Original-Method")
-	origUri := ctxhttpheader.FromContext(ctx, "X-Original-URI")
+	origMethod := ctxhttpheader.FromContext(ctx, "X-Forwarded-Method")
+	origUri := ctxhttpheader.FromContext(ctx, "X-Forwarded-Uri")
 	origUri = purgeUriArgs(origUri)
 
 	// throttle and try fetch token from cache - if cached, it was
