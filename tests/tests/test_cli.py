@@ -80,6 +80,7 @@ class TestMigration:
 
         mi = db[DB_MIGRATION_COLLECTION].find_one(version)
         print('found migration:', mi)
+
         assert mi
 
     @staticmethod
@@ -118,7 +119,7 @@ class TestCliMigrate:
         cli.migrate()
         TestMigration.verify(cli, mongo, DB_NAME, DB_VERSION)
 
-    @pytest.mark.parametrize('fake_migrated_db', ["1.1.0"], indirect=True)
+    @pytest.mark.parametrize('fake_migrated_db', ["1.0.0"], indirect=True)
     def test_ok_current_db(self, cli, fake_migrated_db, mongo):
         cli.migrate()
         TestMigration.verify(cli, mongo, DB_NAME, DB_VERSION)
