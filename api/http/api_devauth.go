@@ -312,9 +312,10 @@ func (d *DevAuthApiHandlers) GetDevicesCountHandler(w rest.ResponseWriter, r *re
 		model.DevStatusRejected,
 		model.DevStatusPending,
 		model.DevStatusPreauth,
+		model.DevStatusNoAuth,
 		"":
 	default:
-		rest_utils.RestErrWithLog(w, r, l, errors.New("status must be one of: pending, accepted, rejected, preauthorized"), http.StatusBadRequest)
+		rest_utils.RestErrWithLog(w, r, l, errors.New("status must be one of: pending, accepted, rejected, preauthorized, noauth"), http.StatusBadRequest)
 		return
 	}
 

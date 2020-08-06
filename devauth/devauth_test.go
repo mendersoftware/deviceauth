@@ -15,6 +15,7 @@ package devauth
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"testing"
@@ -2755,6 +2756,7 @@ func TestDevAuthDeleteAuthSet(t *testing.T) {
 		dbDeleteAuthSetForDeviceErr error
 		dbGetAuthSetsForDeviceErr   error
 		dbDeleteDeviceErr           error
+		dbGetDeviceStatus           string
 		dbGetDeviceStatusErr        error
 		dbUpdateDeviceErr           error
 
@@ -2823,14 +2825,21 @@ func TestDevAuthDeleteAuthSet(t *testing.T) {
 			outErr:            "failed to update device status: Update Device Error",
 		},
 		{
-			devId:  oid.NewUUIDv5("devId12").String(),
-			authId: oid.NewUUIDv5("authId12").String(),
+			devId:             oid.NewUUIDv5("devId12").String(),
+			authId:            oid.NewUUIDv5("authId12").String(),
+			dbGetDeviceStatus: "accepted",
 		},
 		{
-			devId:     oid.NewUUIDv5("devId12").String(),
-			authId:    oid.NewUUIDv5("authId12").String(),
-			withCache: true,
-			tenant:    "acme",
+			devId:             oid.NewUUIDv5("devId12").String(),
+			authId:            oid.NewUUIDv5("authId12").String(),
+			withCache:         true,
+			tenant:            "acme",
+			dbGetDeviceStatus: "accepted",
+		},
+		{
+			devId:                oid.NewUUIDv5("devId12").String(),
+			authId:               oid.NewUUIDv5("authId12").String(),
+			dbGetDeviceStatusErr: store.ErrAuthSetNotFound,
 		},
 		{
 			devId:          oid.NewUUIDv5("devId12").String(),
@@ -2883,15 +2892,24 @@ func TestDevAuthDeleteAuthSet(t *testing.T) {
 				tc.dbDeleteDeviceErr)
 			db.On("GetDeviceStatus", ctx,
 				tc.devId).Return(
-				"accpted", tc.dbGetDeviceStatusErr)
+				tc.dbGetDeviceStatus,
+				tc.dbGetDeviceStatusErr)
 			db.On("UpdateDevice", ctx,
 				mock.AnythingOfType("model.Device"),
 				mock.AnythingOfType("model.DeviceUpdate")).Return(tc.dbUpdateDeviceErr)
 
 			co := morchestrator.ClientRunner{}
 			co.On("SubmitUpdateDeviceStatusJob", ctx,
-				mock.AnythingOfType("orchestrator.UpdateDeviceStatusReq")).
-				Return(nil)
+				mock.MatchedBy(
+					func(req orchestrator.UpdateDeviceStatusReq) bool {
+						id, err := json.Marshal([]string{tc.devId})
+						assert.NoError(t, err)
+						if tc.dbGetDeviceStatusErr == store.ErrAuthSetNotFound {
+							return req.Ids == string(id) && req.Status == "noauth"
+						} else {
+							return req.Ids == string(id) && req.Status == tc.dbGetDeviceStatus
+						}
+					})).Return(nil)
 
 			devauth := NewDevAuth(&db, &co, nil, Config{})
 

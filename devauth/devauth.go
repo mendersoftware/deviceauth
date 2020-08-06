@@ -502,7 +502,7 @@ func (d *DevAuth) updateDeviceStatus(ctx context.Context, devId, status string, 
 		case nil:
 			status = newStatus
 		case store.ErrAuthSetNotFound:
-			status = model.DevStatusRejected
+			status = model.DevStatusNoAuth
 		default:
 			return errors.Wrap(err, "Cannot determine device status")
 		}
