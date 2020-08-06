@@ -98,7 +98,8 @@ func (c *Client) CheckHealth(ctx context.Context) error {
 		defer cancel()
 	}
 	req, _ := http.NewRequestWithContext(
-		ctx, "GET", c.conf.TenantAdmAddr+TenantHealthURI, nil,
+		ctx, "GET",
+		utils.JoinURL(c.conf.TenantAdmAddr, TenantHealthURI), nil,
 	)
 
 	rsp, err := client.Do(req)

@@ -34,7 +34,7 @@ const (
 	DeviceDecommissioningOrchestratorUri = "/api/v1/workflow/decommission_device"
 	ProvisionDeviceOrchestratorUri       = "/api/v1/workflow/provision_device"
 	UpdateDeviceStatusOrchestratorUri    = "/api/v1/workflow/update_device_status"
-	HealthURI                            = "/api/v1/workflow/health"
+	HealthURI                            = "/api/v1/health"
 	// default request timeout, 10s?
 	defaultReqTimeout = time.Duration(10) * time.Second
 )
@@ -122,7 +122,8 @@ func (c *Client) CheckHealth(ctx context.Context) error {
 		defer cancel()
 	}
 	req, _ := http.NewRequestWithContext(
-		ctx, "GET", c.conf.OrchestratorAddr+HealthURI, nil,
+		ctx, "GET",
+		utils.JoinURL(c.conf.OrchestratorAddr, HealthURI), nil,
 	)
 
 	rsp, err := client.Do(req)

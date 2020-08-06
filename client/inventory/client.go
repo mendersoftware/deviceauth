@@ -77,7 +77,10 @@ func (c *client) CheckHealth(ctx context.Context) error {
 		ctx, cancel = context.WithTimeout(ctx, defaultTimeout)
 		defer cancel()
 	}
-	req, _ := http.NewRequestWithContext(ctx, "GET", c.urlBase, nil)
+	req, _ := http.NewRequestWithContext(
+		ctx, "GET",
+		utils.JoinURL(c.urlBase, urlHealth), nil,
+	)
 
 	rsp, err := c.client.Do(req)
 	if err != nil {
