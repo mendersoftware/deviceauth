@@ -279,8 +279,9 @@ func TestStoreAddDevice(t *testing.T) {
 
 	// add device with identical identity data
 	err = d.AddDevice(ctx, model.Device{
-		Id:     "foobar",
-		IdData: "iddata",
+		Id:           "foobar",
+		IdData:       "iddata",
+		IdDataSha256: getIdDataHash("iddata"),
 	})
 	assert.EqualError(t, err, store.ErrObjectExists.Error())
 
@@ -831,29 +832,17 @@ func TestStoreMigrate(t *testing.T) {
 						verifyIndexes(t, db.client.Database(d).Collection(DbDevicesColl),
 							[]mongo.IndexModel{{
 								Keys: bson.D{
-									{Key: model.DevKeyIdData, Value: 1},
+									{Key: model.DevKeyIdDataSha256, Value: 1},
 								},
 								Options: &options.IndexOptions{
 									Background: &_false,
-									Name:       &indexDevices_IdentityData,
+									Name:       &indexDevices_IdentityDataSha256,
 									Unique:     &_true,
 								},
 							}},
 						)
 						verifyIndexes(t, db.client.Database(d).Collection(DbAuthSetColl),
 							[]mongo.IndexModel{
-								{
-									Keys: bson.D{
-										{Key: model.AuthSetKeyDeviceId, Value: 1},
-										{Key: model.AuthSetKeyIdData, Value: 1},
-										{Key: model.AuthSetKeyPubKey, Value: 1},
-									},
-									Options: &options.IndexOptions{
-										Background: &_false,
-										Name:       &indexAuthSet_DeviceId_IdentityData_PubKey,
-										Unique:     &_true,
-									},
-								},
 								{
 									Keys: bson.D{
 										{Key: model.AuthSetKeyDeviceId, Value: 1},
@@ -2385,18 +2374,21 @@ func TestStoreGetDeviceById(t *testing.T) {
 	time.Local = time.UTC
 
 	indescr := []struct {
-		id     string
-		idData string
-		limits ratelimits.ApiLimits
+		id           string
+		idData       string
+		idDataSha256 []byte
+		limits       ratelimits.ApiLimits
 	}{
 		{
-			id:     "dev1",
-			idData: "idData1",
+			id:           "dev1",
+			idData:       "idData1",
+			idDataSha256: getIdDataHash("idData1"),
 			//default limits
 		},
 		{
-			id:     "dev2",
-			idData: "idData2",
+			id:           "dev2",
+			idData:       "idData2",
+			idDataSha256: getIdDataHash("idData2"),
 			limits: ratelimits.ApiLimits{
 				ApiQuota: ratelimits.ApiQuota{
 					MaxCalls:    100,
@@ -2417,8 +2409,9 @@ func TestStoreGetDeviceById(t *testing.T) {
 			},
 		},
 		{
-			id:     "dev3",
-			idData: "idData4",
+			id:           "dev3",
+			idData:       "idData4",
+			idDataSha256: getIdDataHash("idData4"),
 			limits: ratelimits.ApiLimits{
 				ApiQuota: ratelimits.ApiQuota{
 					MaxCalls:    1000,
@@ -2432,6 +2425,7 @@ func TestStoreGetDeviceById(t *testing.T) {
 	indevs := make([]interface{}, len(indescr))
 	for i, descr := range indescr {
 		dev := model.NewDevice(oid.NewUUIDv5(descr.id).String(), descr.idData, "")
+		dev.IdDataSha256 = descr.idDataSha256
 		dev.ApiLimits = descr.limits
 		indevs[i] = dev
 	}

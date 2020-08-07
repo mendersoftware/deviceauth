@@ -37,7 +37,7 @@ import (
 )
 
 const (
-	DbVersion     = "1.8.0"
+	DbVersion     = "1.9.0"
 	DbName        = "deviceauth"
 	DbDevicesColl = "devices"
 	DbAuthSetColl = "auth_sets"
@@ -47,6 +47,7 @@ const (
 
 var (
 	indexDevices_IdentityData                       = "devices:IdentityData"
+	indexDevices_IdentityDataSha256                 = "devices:IdentityDataSha256"
 	indexAuthSet_DeviceId_IdentityData_PubKey       = "auth_sets:DeviceId:IdData:PubKey"
 	indexAuthSet_DeviceId_IdentityDataSha256_PubKey = "auth_sets:IdDataSha256:PubKey"
 	indexAuthSet_IdentityDataSha256_PubKey          = "auth_sets:NoDeviceId:IdDataSha256:PubKey"
@@ -428,6 +429,10 @@ func (db *DataStoreMongo) MigrateTenant(ctx context.Context, database, version s
 			ds:  db,
 			ctx: ctx,
 		},
+		&migration_1_9_0{
+			ds:  db,
+			ctx: ctx,
+		},
 	}
 
 	ver, err := migrate.NewVersion(version)
@@ -584,48 +589,6 @@ func (db *DataStoreMongo) WithAutomigrate() store.DataStore {
 		client:      db.client,
 		automigrate: true,
 	}
-}
-
-func (db *DataStoreMongo) EnsureIndexes(ctx context.Context) error {
-	_false := false
-	_true := true
-
-	devIdDataUniqueIndex := mongo.IndexModel{
-		Keys: bson.D{
-			{Key: model.DevKeyIdData, Value: 1},
-		},
-		Options: &mopts.IndexOptions{
-			Background: &_false,
-			Name:       &indexDevices_IdentityData,
-			Unique:     &_true,
-		},
-	}
-
-	authSetUniqueIndex := mongo.IndexModel{
-		Keys: bson.D{
-			{Key: model.AuthSetKeyDeviceId, Value: 1},
-			{Key: model.AuthSetKeyIdData, Value: 1},
-			{Key: model.AuthSetKeyPubKey, Value: 1},
-		},
-		Options: &mopts.IndexOptions{
-			Background: &_false,
-			Name:       &indexAuthSet_DeviceId_IdentityData_PubKey,
-			Unique:     &_true,
-		},
-	}
-
-	cDevs := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
-	devIndexes := cDevs.Indexes()
-	_, err := devIndexes.CreateOne(ctx, devIdDataUniqueIndex)
-	if err != nil {
-		return err
-	}
-
-	cAuthSets := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
-	authSetIndexes := cAuthSets.Indexes()
-	_, err = authSetIndexes.CreateOne(ctx, authSetUniqueIndex)
-
-	return err
 }
 
 func (db *DataStoreMongo) PutLimit(ctx context.Context, lim model.Limit) error {
