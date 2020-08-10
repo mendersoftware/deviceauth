@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ var (
 )
 
 // Handler jwt generator/verifier
+//go:generate ../utils/mockgen.sh
 type Handler interface {
 	ToJWT(t *Token) (string, error)
 	// FromJWT parses the token and does basic validity checks (Claims.Valid().

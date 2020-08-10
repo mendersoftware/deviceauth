@@ -72,7 +72,7 @@ github.com/klauspost/compress/zstd/internal/xxhash
 github.com/konsorten/go-windows-terminal-sequences
 # github.com/magiconair/properties v1.8.1
 github.com/magiconair/properties
-# github.com/mendersoftware/go-lib-micro v0.0.0-20200529072844-ecc6d0b89fa6
+# github.com/mendersoftware/go-lib-micro v0.0.0-20200731125022-f9ec108d29b7
 ## explicit
 github.com/mendersoftware/go-lib-micro/accesslog
 github.com/mendersoftware/go-lib-micro/apiclient

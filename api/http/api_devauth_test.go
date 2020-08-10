@@ -107,6 +107,69 @@ func makeAuthReq(payload interface{}, key crypto.PrivateKey, signature string, t
 	return r
 }
 
+func TestAliveHandler(t *testing.T) {
+	da := &mocks.App{}
+	apih := makeMockApiHandler(t, da, nil)
+	req, _ := http.NewRequest("GET", "http://localhost"+uriAlive, nil)
+	recorded := test.RunRequest(t, apih, req)
+	recorded.CodeIs(http.StatusNoContent)
+}
+
+func TestHealthCheck(t *testing.T) {
+	testCases := []struct {
+		Name string
+
+		AppError     error
+		ResponseCode int
+		ResponseBody interface{}
+	}{{
+		Name:         "ok",
+		ResponseCode: http.StatusNoContent,
+	}, {
+		Name: "error, service unhealthy",
+
+		AppError:     errors.New("connection error"),
+		ResponseCode: http.StatusServiceUnavailable,
+		ResponseBody: rest_utils.ApiError{
+			Err:   "connection error",
+			ReqId: "test",
+		},
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			uadm := &mocks.App{}
+			uadm.On("HealthCheck", mock.MatchedBy(
+				func(ctx interface{}) bool {
+					if _, ok := ctx.(context.Context); ok {
+						return true
+					}
+					return false
+				},
+			)).Return(tc.AppError)
+
+			api := makeMockApiHandler(t, uadm, nil)
+			req, _ := http.NewRequest(
+				"GET",
+				"http://localhost"+uriHealth,
+				nil,
+			)
+			req.Header.Set("X-MEN-RequestID", "test")
+			recorded := test.RunRequest(t, api, req)
+			recorded.CodeIs(tc.ResponseCode)
+			if tc.ResponseBody != nil {
+				b, _ := json.Marshal(tc.ResponseBody)
+				assert.JSONEq(t,
+					recorded.Recorder.Body.String(),
+					string(b),
+				)
+			} else {
+				recorded.BodyIs("")
+			}
+		})
+	}
+}
+
 func TestApiDevAuthSubmitAuthReq(t *testing.T) {
 	t.Parallel()
 
@@ -1324,6 +1387,19 @@ func TestApiV2DevAuthGetDevicesCount(t *testing.T) {
 			)),
 		},
 		{
+			status: "noauth",
+
+			daCnt: 5,
+			daErr: nil,
+
+			code: http.StatusOK,
+			body: string(asJSON(
+				model.Count{
+					Count: 5,
+				},
+			)),
+		},
+		{
 			status: "accepted",
 
 			daCnt: 0,
@@ -1379,7 +1455,7 @@ func TestApiV2DevAuthGetDevicesCount(t *testing.T) {
 			status: "bogus",
 
 			code: http.StatusBadRequest,
-			body: RestError("status must be one of: pending, accepted, rejected, preauthorized"),
+			body: RestError("status must be one of: pending, accepted, rejected, preauthorized, noauth"),
 		},
 		{
 			status: "accepted",

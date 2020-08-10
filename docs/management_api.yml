@@ -10,19 +10,30 @@ host: 'hosted.mender.io'
 schemes:
   - https
 
+consumes:
+  - application/json
+produces:
+  - application/json
+
+securityDefinitions:
+  ManagementJWT:
+    type: apiKey
+    in: header
+    name: Authorization
+    description: |
+      API token issued by User Authentication service.
+      Format: 'Bearer [JWT]'
+
 paths:
   /devices:
     get:
-      summary: Get a list of tenant's devices.
-      description: |
-        Provides a list of tenant's devices, sorted by creation date, with optional device status filter.
+      operationId: List Devices
+      security:
+        - ManagementJWT: []
+      summary: List devices sorted by age and optionally filter on device status.
+      tags:
+        - Management API
       parameters:
-        - name: Authorization
-          in: header
-          required: true
-          type: string
-          format: Bearer [token]
-          description: Contains the JWT token issued by the User Administration and Authentication Service.
         - name: status
           in: query
           description: |
@@ -34,19 +45,18 @@ paths:
             - accepted
             - rejected
             - preauthorized
+            - noauth
         - name: page
           in: query
           description: Results page number
           required: false
-          type: number
-          format: integer
+          type: integer
           default: 1
         - name: per_page
           in: query
           description: Maximum number of results per page.
           required: false
-          type: number
-          format: integer
+          type: integer
           default: 20
           maximum: 500
       responses:
@@ -69,18 +79,18 @@ paths:
           schema:
             $ref: '#/definitions/Error'
     post:
+      operationId: Preauthorize
+      security:
+        - ManagementJWT: []
       summary: Submit a preauthorized device.
       description: |
-          Adds a given device/authentication data set in the 'preauthorized' state. The device identity data set must not yet exist in the DB (regardless of status).
-
-          When the device requests authentication from deviceauth the next time, it will be issued a token without further user intervention.
+        Authorize a device identity with the server backend. On success the
+        device identity is marked as 'preauthorized', and once the device
+        connects and sends it's first authentication request the device
+        automatically become 'accepted' without explicit user intervention.
+      tags:
+        - Management API
       parameters:
-        - name: Authorization
-          in: header
-          required: true
-          type: string
-          format: Bearer [token]
-          description: Contains the JWT token issued by the User Administration and Authentication Service.
         - name: pre_auth_request
           in: body
           description: Preauthentication request.
@@ -109,14 +119,13 @@ paths:
 
   /devices/{id}:
     get:
+      operationId: Get Device
+      security:
+        - ManagementJWT: []
       summary: Get a particular device.
+      tags:
+        - Management API
       parameters:
-        - name: Authorization
-          in: header
-          required: true
-          type: string
-          format: Bearer [token]
-          description: Contains the JWT token issued by the User Administration and Authentication Service.
         - name: id
           in: path
           description: Device identifier
@@ -136,14 +145,13 @@ paths:
           schema:
             $ref: '#/definitions/Error'
     delete:
-      summary: Decommission device
+      operationId: Decommission device
+      security:
+        - ManagementJWT: []
+      summary: Remove device and associated authentication set
+      tags:
+        - Management API
       parameters:
-        - name: Authorization
-          in: header
-          required: true
-          type: string
-          format: Bearer [token]
-          description: Contains the JWT token issued by the User Administration and Authentication Service.
         - name: id
           in: path
           description: Device identifier.
@@ -162,6 +170,9 @@ paths:
             $ref: "#/definitions/Error"
   /devices/{id}/auth/{aid}:
     delete:
+      operationId: Reject authentication
+      security:
+        - ManagementJWT: []
       summary: Remove the device authentication set
       description: |
         Removes the device authentication set.
@@ -170,13 +181,9 @@ paths:
         If there is only one authentication set for the device
         and the device is 'preauthorized' then the device
         will also be deleted.
+      tags:
+        - Management API
       parameters:
-        - name: Authorization
-          in: header
-          required: true
-          type: string
-          format: Bearer [token]
-          description: Contains the JWT token issued by the User Administration and Authentication Service.
         - name: id
           in: path
           description: Device identifier.
@@ -200,6 +207,9 @@ paths:
             $ref: "#/definitions/Error"
   /devices/{id}/auth/{aid}/status:
     put:
+      operationId: Set Authentication Status
+      security:
+        - ManagementJWT: []
       summary: Update the device authentication set status
       description: |
         Sets the status of a authentication data set of selected value.
@@ -208,13 +218,9 @@ paths:
         - 'pending' -> 'rejected'
         - 'rejected' -> 'accepted'
         - 'accepted' -> 'rejected'
+      tags:
+        - Management API
       parameters:
-        - name: Authorization
-          in: header
-          required: true
-          type: string
-          format: Bearer [token]
-          description: Contains the JWT token issued by the User Administration and Authentication Service.
         - name: id
           in: path
           description: Device identifier.
@@ -251,16 +257,13 @@ paths:
           schema:
             $ref: "#/definitions/Error"
     get:
+      operationId: Get Authentication Status
+      security:
+        - ManagementJWT: []
       summary: Get the device authentication set status
-      description: |
-        Returns the status of a particular device authentication data set.
+      tags:
+        - Management API
       parameters:
-        - name: Authorization
-          in: header
-          required: true
-          type: string
-          format: Bearer [token]
-          description: Contains the JWT token issued by the User Administration and Authentication Service.
         - name: id
           in: path
           description: Device identifier.
@@ -290,20 +293,17 @@ paths:
             $ref: "#/definitions/Error"
   /devices/count:
     get:
-      summary: Get a count of devices, optionally filtered by status.
-      description: |
-        Provides a list of devices, optionally filtered by status.
+      operationId: Count Devices
+      security:
+        - ManagementJWT: []
+      summary: Count number of devices, optionally filtered by status.
+      tags:
+        - Management API
       parameters:
-        - name: Authorization
-          in: header
-          required: true
-          type: string
-          format: Bearer [token]
-          description: Contains the JWT token issued by the User Administration and Authentication Service.
         - name: status
           in: query
           description: |
-            Device status filter, one of 'pending', 'accepted', 'rejected'. Default is 'all devices'.
+            Device status filter, one of 'pending', 'accepted', 'rejected', 'noauth'. Default is 'all devices'.
           required: false
           type: string
       responses:
@@ -321,11 +321,16 @@ paths:
             $ref: '#/definitions/Error'
   /tokens/{id}:
     delete:
-      summary: Delete device token
+      operationId: Revoke API Token
+      security:
+        - ManagementJWT: []
+      summary: Revoke JWT with given id
       description: |
         Deletes the token, effectively revoking it. The device must
         apply for a new one with a new authentication request.
         The token 'id' corresponds to the standard 'jti' claim.
+      tags:
+        - Management API
       parameters:
         - name: id
           in: path
@@ -346,16 +351,12 @@ paths:
 
   /limits/max_devices:
     get:
+      operationId: Get Device Limit
+      security:
+        - ManagementJWT: []
       summary: Obtain limit of accepted devices.
-      parameters:
-        - name: Authorization
-          in: header
-          required: true
-          type: string
-          format: Bearer [token]
-          description: |
-            Contains the JWT token issued by the User Administration and
-            Authentication Service.
+      tags:
+        - Management API
       responses:
         200:
           description: Usage statistics and limits.
@@ -377,11 +378,11 @@ definitions:
           - pending
           - accepted
           - rejected
+          - preauthorized
     required:
       - status
     example:
-      application/json:
-          status: "accepted"
+      status: "accepted"
   Limit:
     description: Limit definition
     type: object
@@ -391,8 +392,7 @@ definitions:
     required:
       - limit
     example:
-      application/json:
-        limit: 123
+      limit: 123
   Device:
     type: object
     properties:
@@ -408,13 +408,14 @@ definitions:
           - accepted
           - rejected
           - preauthorized
+          - noauth
       created_ts:
         type: string
-        format: datetime
+        format: date-time
         description: Created timestamp
       updated_ts:
         type: string
-        format: datetime
+        format: date-time
         description: Updated timestamp
       auth_sets:
         type: array
@@ -445,9 +446,10 @@ definitions:
           - accepted
           - rejected
           - preauthorized
+          - noauth
       ts:
         type: string
-        format: datetime
+        format: date-time
         description: Created timestamp
   Count:
     description: Counter type
@@ -457,7 +459,7 @@ definitions:
         description: The count of requested items.
         type: integer
     example:
-      count: "42"
+      count: 42
   Error:
     description: Error descriptor
     type: object
@@ -480,12 +482,11 @@ definitions:
       - identity_data
       - pubkey
     example:
-      application/json:
-        identity_data:
-          mac: "00:01:02:03:04:05"
-          sku: "My Device 1"
-          sn:  "SN1234567890"
-        pubkey: "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAzogVU7RGDilbsoUt/DdH\nVJvcepl0A5+xzGQ50cq1VE/Dyyy8Zp0jzRXCnnu9nu395mAFSZGotZVr+sWEpO3c\nyC3VmXdBZmXmQdZqbdD/GuixJOYfqta2ytbIUPRXFN7/I7sgzxnXWBYXYmObYvdP\nokP0mQanY+WKxp7Q16pt1RoqoAd0kmV39g13rFl35muSHbSBoAW3GBF3gO+mF5Ty\n1ddp/XcgLOsmvNNjY+2HOD5F/RX0fs07mWnbD7x+xz7KEKjF+H7ZpkqCwmwCXaf0\niyYyh1852rti3Afw4mDxuVSD7sd9ggvYMc0QHIpQNkD4YWOhNiE1AB0zH57VbUYG\nUwIDAQAB\n-----END PUBLIC KEY-----\n"
+      identity_data:
+        mac: "00:01:02:03:04:05"
+        sku: "My Device 1"
+        sn:  "SN1234567890"
+      pubkey: "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAzogVU7RGDilbsoUt/DdH\nVJvcepl0A5+xzGQ50cq1VE/Dyyy8Zp0jzRXCnnu9nu395mAFSZGotZVr+sWEpO3c\nyC3VmXdBZmXmQdZqbdD/GuixJOYfqta2ytbIUPRXFN7/I7sgzxnXWBYXYmObYvdP\nokP0mQanY+WKxp7Q16pt1RoqoAd0kmV39g13rFl35muSHbSBoAW3GBF3gO+mF5Ty\n1ddp/XcgLOsmvNNjY+2HOD5F/RX0fs07mWnbD7x+xz7KEKjF+H7ZpkqCwmwCXaf0\niyYyh1852rti3Afw4mDxuVSD7sd9ggvYMc0QHIpQNkD4YWOhNiE1AB0zH57VbUYG\nUwIDAQAB\n-----END PUBLIC KEY-----\n"
   IdentityData:
     description: |
       Device identity attributes, in the form of a JSON structure.
@@ -505,7 +506,6 @@ definitions:
         description: Serial number.
         type: string
     example:
-      application/json:
-        mac: "00:01:02:03:04:05"
-        sku: "My Device 1"
-        sn:  "SN1234567890"
+      mac: "00:01:02:03:04:05"
+      sku: "My Device 1"
+      sn:  "SN1234567890"

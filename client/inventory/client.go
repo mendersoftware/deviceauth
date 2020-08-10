@@ -25,19 +25,23 @@ import (
 	"time"
 
 	"github.com/mendersoftware/go-lib-micro/log"
+	"github.com/mendersoftware/go-lib-micro/rest_utils"
 	"github.com/pkg/errors"
 
 	"github.com/mendersoftware/deviceauth/utils"
 )
 
 const (
+	urlHealth             = "/api/internal/v1/inventory/health"
 	urlPatchAttrs         = "/api/internal/v2/inventory/devices/:id"
 	urlUpdateDeviceStatus = "/api/internal/v1/inventory/tenants/:tid/devices/"
 	urlSetDeviceAttribute = "/api/internal/v1/inventory/tenants/:tid/device/:did/attribute/scope/:scope"
-	timeout               = 10 * time.Second
+	defaultTimeout        = 10 * time.Second
 )
 
+//go:generate ../../utils/mockgen.sh
 type Client interface {
+	CheckHealth(ctx context.Context) error
 	PatchDeviceV2(ctx context.Context, did, tid, src string, ts int64, attrs []Attribute) error
 	SetDeviceStatus(ctx context.Context, tenantId string, deviceIds []string, status string) error
 	SetDeviceIdentity(ctx context.Context, tenantId, deviceId string, idData map[string]interface{}) error
@@ -60,6 +64,37 @@ func NewClient(urlBase string, skipVerify bool) *client {
 		},
 		urlBase: urlBase,
 	}
+}
+
+func (c *client) CheckHealth(ctx context.Context) error {
+	var apiErr rest_utils.ApiError
+
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if _, ok := ctx.Deadline(); !ok {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, defaultTimeout)
+		defer cancel()
+	}
+	req, _ := http.NewRequestWithContext(
+		ctx, "GET",
+		utils.JoinURL(c.urlBase, urlHealth), nil,
+	)
+
+	rsp, err := c.client.Do(req)
+	if err != nil {
+		return err
+	}
+	if rsp.StatusCode >= http.StatusOK && rsp.StatusCode < 300 {
+		return nil
+	}
+	decoder := json.NewDecoder(rsp.Body)
+	err = decoder.Decode(&apiErr)
+	if err != nil {
+		return errors.Errorf("health check HTTP error: %s", rsp.Status)
+	}
+	return &apiErr
 }
 
 func (c *client) PatchDeviceV2(ctx context.Context, did, tid, src string, ts int64, attrs []Attribute) error {
@@ -90,7 +125,7 @@ func (c *client) PatchDeviceV2(ctx context.Context, did, tid, src string, ts int
 		req.URL.RawQuery = q.Encode()
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, timeout)
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	defer cancel()
 
 	rsp, err := c.client.Do(req.WithContext(ctx))
@@ -138,7 +173,7 @@ func (c *client) SetDeviceStatus(ctx context.Context, tenantId string, deviceIds
 	req.Header.Set("X-MEN-Source", "deviceauth")
 	req.Header.Set("Content-Type", "application/json")
 
-	ctx, cancel := context.WithTimeout(ctx, timeout)
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	defer cancel()
 
 	rsp, err := c.client.Do(req.WithContext(ctx))
@@ -222,7 +257,7 @@ func (c *client) SetDeviceIdentity(ctx context.Context, tenantId, deviceId strin
 	req.Header.Set("X-MEN-Source", "deviceauth")
 	req.Header.Set("Content-Type", "application/json")
 
-	ctx, cancel := context.WithTimeout(ctx, timeout)
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	defer cancel()
 
 	rsp, err := c.client.Do(req.WithContext(ctx))

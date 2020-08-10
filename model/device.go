@@ -24,9 +24,11 @@ const (
 	DevStatusRejected = "rejected"
 	DevStatusPending  = "pending"
 	DevStatusPreauth  = "preauthorized"
+	DevStatusNoAuth   = "noauth"
 
-	DevKeyIdData = "id_data"
-	DevKeyStatus = "status"
+	DevKeyIdData       = "id_data"
+	DevKeyIdDataSha256 = "id_data_sha256"
+	DevKeyStatus       = "status"
 )
 
 // note: fields with underscores need the 'bson' decorator

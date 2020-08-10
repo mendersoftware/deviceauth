@@ -14,9 +14,11 @@
 package http
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/mendersoftware/go-lib-micro/identity"
 
@@ -38,6 +40,8 @@ const (
 	uriAuthReqs = "/api/devices/v1/authentication/auth_requests"
 
 	// internal API
+	uriAlive              = "/api/internal/v1/devauth/alive"
+	uriHealth             = "/api/internal/v1/devauth/health"
 	uriTokenVerify        = "/api/internal/v1/devauth/tokens/verify"
 	uriTenantLimit        = "/api/internal/v1/devauth/tenant/:id/limits/:name"
 	uriTokens             = "/api/internal/v1/devauth/tokens"
@@ -55,6 +59,10 @@ const (
 	v2uriDevicesLimit        = "/api/management/v2/devauth/limits/:name"
 
 	HdrAuthReqSign = "X-MEN-Signature"
+)
+
+const (
+	defaultTimeout = time.Second * 5
 )
 
 var (
@@ -82,6 +90,8 @@ func NewDevAuthApiHandlers(devAuth devauth.App, db store.DataStore) ApiHandler {
 
 func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
 	routes := []*rest.Route{
+		rest.Get(uriAlive, d.AliveHandler),
+		rest.Get(uriHealth, d.HealthCheckHandler),
 		rest.Post(uriAuthReqs, d.SubmitAuthRequestHandler),
 		rest.Get(uriTokenVerify, d.VerifyTokenHandler),
 		rest.Post(uriTokenVerify, d.VerifyTokenHandler),
@@ -117,6 +127,24 @@ func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
 	}
 
 	return app, nil
+}
+
+func (d *DevAuthApiHandlers) AliveHandler(w rest.ResponseWriter, r *rest.Request) {
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (d *DevAuthApiHandlers) HealthCheckHandler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+	l := log.FromContext(ctx)
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	defer cancel()
+
+	err := d.devAuth.HealthCheck(ctx)
+	if err != nil {
+		rest_utils.RestErrWithLog(w, r, l, err, http.StatusServiceUnavailable)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (d *DevAuthApiHandlers) SubmitAuthRequestHandler(w rest.ResponseWriter, r *rest.Request) {
@@ -284,9 +312,10 @@ func (d *DevAuthApiHandlers) GetDevicesCountHandler(w rest.ResponseWriter, r *re
 		model.DevStatusRejected,
 		model.DevStatusPending,
 		model.DevStatusPreauth,
+		model.DevStatusNoAuth,
 		"":
 	default:
-		rest_utils.RestErrWithLog(w, r, l, errors.New("status must be one of: pending, accepted, rejected, preauthorized"), http.StatusBadRequest)
+		rest_utils.RestErrWithLog(w, r, l, errors.New("status must be one of: pending, accepted, rejected, preauthorized, noauth"), http.StatusBadRequest)
 		return
 	}
 
