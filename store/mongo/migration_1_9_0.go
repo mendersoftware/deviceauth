@@ -15,6 +15,7 @@ package mongo
 
 import (
 	"context"
+	"strings"
 
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	ctxstore "github.com/mendersoftware/go-lib-micro/store"
@@ -56,17 +57,17 @@ func (m *migration_1_9_0) Up(from migrate.Version) error {
 		return errors.Wrap(err, "failed to create unique index containing IdDataSha256 on devices")
 	}
 
-	// drop device index on raw identity data
+	// drop device index on raw identity data, if exists
 	_, err = devIndexes.DropOne(m.ctx, indexDevices_IdentityData)
-	if err != nil {
+	if err != nil && !isIndexNotFound(err) {
 		return errors.Wrap(err, "failed to drop index devices:IdentityData")
 	}
 
-	// drop authset index on raw identity data
+	// drop authset index on raw identity data, if exists
 	cAuthsets := m.ds.client.Database(ctxstore.DbFromContext(m.ctx, DbName)).Collection(DbAuthSetColl)
 	asetIndexes := cAuthsets.Indexes()
 	_, err = asetIndexes.DropOne(m.ctx, indexAuthSet_DeviceId_IdentityData_PubKey)
-	if err != nil {
+	if err != nil && !isIndexNotFound(err) {
 		return errors.Wrap(err, "failed to drop index auth_sets:DeviceId:IdData:PubKey")
 	}
 
@@ -75,4 +76,9 @@ func (m *migration_1_9_0) Up(from migrate.Version) error {
 
 func (m *migration_1_9_0) Version() migrate.Version {
 	return migrate.MakeVersion(1, 9, 0)
+}
+
+func isIndexNotFound(e error) bool {
+	return strings.HasPrefix(e.Error(), "(IndexNotFound) index not found with name") ||
+		e.Error() == "(NamespaceNotFound) ns not found"
 }
