@@ -161,6 +161,22 @@ func TestMigration_1_9_0(t *testing.T) {
 	assert.EqualError(t, err, "object exists")
 }
 
+func TestMigration_1_9_0_NoFailDelete(t *testing.T) {
+	ctx := identity.WithContext(context.Background(), &identity.Identity{
+		Tenant: "foo",
+	})
+	db.Wipe()
+	db := NewDataStoreMongoWithClient(db.Client())
+
+	// no previous indexes to delete
+	mig190 := migration_1_9_0{
+		ds:  db,
+		ctx: ctx,
+	}
+	err := mig190.Up(migrate.MakeVersion(1, 9, 0))
+	assert.NoError(t, err)
+}
+
 func prep_1_8_0(t *testing.T, ctx context.Context, db *DataStoreMongo) {
 
 	mig110 := migration_1_1_0{
