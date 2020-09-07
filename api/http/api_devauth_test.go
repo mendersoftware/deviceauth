@@ -2061,3 +2061,171 @@ func TestGetTenantDevicesByID(t *testing.T) {
 		})
 	}
 }
+
+func TestGetDevicesByIDV2(t *testing.T) {
+	testCases := []struct {
+		Name string
+
+		TenantID    string
+		RequestBody interface{}
+
+		APIError     error
+		AppError     error
+		StoreError   error
+		StoreDevices []model.Device
+		HTTPCode     int
+	}{{
+		Name:     "ok",
+		TenantID: "d6154f40-4ba5-4033-b0a5-3379baf322e2",
+		RequestBody: []string{
+			"d6154f40-4ba5-4033-b0a5-3379baf322e3",
+			"d6154f40-4ba5-4033-b0a5-3379baf322e4",
+		},
+		StoreDevices: []model.Device{{
+			Id:     "d6154f40-4ba5-4033-b0a5-3379baf322e3",
+			IdData: `{"mac": "00:11:22:33:44:55"}`,
+			IdDataStruct: map[string]interface{}{
+				"mac": "00:11:22:33:44:55",
+			},
+		}, {
+			Id:     "d6154f40-4ba5-4033-b0a5-3379baf322e4",
+			IdData: `{"sn": "1234567890"}`,
+			IdDataStruct: map[string]interface{}{
+				"sn": "1234567890",
+			},
+		}},
+		HTTPCode: http.StatusOK,
+	}, {
+		Name:     "error, bad request",
+		TenantID: "d6154f40-4ba5-4033-b0a5-3379baf322e2",
+		RequestBody: struct {
+			Foo string
+			Bar int
+		}{
+			Foo: "baz",
+			Bar: 123,
+		},
+		APIError: errors.New(
+			`api: error parsing JSON payload: json: cannot ` +
+				`unmarshal object into Go value of type ` +
+				`[]string`,
+		),
+		HTTPCode: http.StatusBadRequest,
+	}, {
+		Name:     "error, internal data-store error",
+		TenantID: "d6154f40-4ba5-4033-b0a5-3379baf322e2",
+		RequestBody: []string{
+			"d6154f40-4ba5-4033-b0a5-3379baf322e3",
+		},
+		StoreError: errors.New(`internal error`),
+		HTTPCode:   http.StatusInternalServerError,
+	}, {
+		Name:     "error, internal app error",
+		TenantID: "d6154f40-4ba5-4033-b0a5-3379baf322e2",
+		RequestBody: []string{
+			"d6154f40-4ba5-4033-b0a5-3379baf322e3",
+		},
+		StoreDevices: []model.Device{{
+			Id:     "d6154f40-4ba5-4033-b0a5-3379baf322e4",
+			IdData: `{"sn": "1234567890"}`,
+			IdDataStruct: map[string]interface{}{
+				"sn": "1234567890",
+			},
+		}},
+		AppError: errors.New(`internal error`),
+		HTTPCode: http.StatusInternalServerError,
+	}}
+
+	contextMatcher := mock.MatchedBy(func(v interface{}) bool {
+		_, ok := v.(context.Context)
+		return ok
+	})
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			var (
+				ctx          context.Context
+				body         = &bytes.Buffer{}
+				devApp       = &mocks.App{}
+				devStore     = &mstore.DataStore{}
+				httpResponse interface{}
+			)
+			defer devApp.AssertExpectations(t)
+			defer devStore.AssertExpectations(t)
+
+			ctx = context.Background()
+			ctx = identity.WithContext(ctx, &identity.Identity{
+				Tenant: tc.TenantID,
+			})
+
+			// Prepare HTTP request
+			enc := json.NewEncoder(body)
+			err := enc.Encode(tc.RequestBody)
+			if !assert.NoError(t, err,
+				"[TEST ERROR] failed to prepare test case",
+			) {
+				t.FailNow()
+			}
+			URI := "http://localhost" + v2uriDevicesById
+			req, _ := http.NewRequestWithContext(ctx, "POST", URI, body)
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("X-MEN-RequestID", "test")
+
+			// Prepare mocked responses
+			if tc.APIError != nil {
+				httpResponse = &rest_utils.ApiError{
+					Err:   tc.APIError.Error(),
+					ReqId: "test",
+				}
+			} else if tc.StoreError != nil {
+				devs, ok := tc.RequestBody.([]string)
+				if !ok {
+					panic("[TEST ERROR] bad test case!")
+				}
+				devStore.On("GetDevicesById",
+					contextMatcher, devs).
+					Return(nil, tc.StoreError)
+				httpResponse = &rest_utils.ApiError{
+					Err:   tc.StoreError.Error(),
+					ReqId: "test",
+				}
+			} else if tc.AppError != nil {
+				devs, ok := tc.RequestBody.([]string)
+				if !ok {
+					panic("[TEST ERROR] bad test case!")
+				}
+				devStore.On("GetDevicesById",
+					contextMatcher, devs).
+					Return(tc.StoreDevices, tc.StoreError)
+				devApp.On("FillDevicesAuthSets",
+					contextMatcher, tc.StoreDevices).
+					Return(nil, tc.AppError)
+				httpResponse = &rest_utils.ApiError{
+					Err:   tc.AppError.Error(),
+					ReqId: "test",
+				}
+			} else {
+				devs, ok := tc.RequestBody.([]string)
+				if !ok {
+					panic("[TEST ERROR] bad test case!")
+				}
+				devStore.On("GetDevicesById",
+					contextMatcher, devs).
+					Return(tc.StoreDevices, nil)
+				devApp.On("FillDevicesAuthSets",
+					contextMatcher, tc.StoreDevices).
+					Return(tc.StoreDevices, nil)
+				devicesV2, _ := devicesV2FromDbModel(tc.StoreDevices)
+				httpResponse = devicesV2
+			}
+
+			w := httptest.NewRecorder()
+			handler := makeMockApiHandler(t, devApp, devStore)
+			handler.ServeHTTP(w, req)
+
+			assert.Equal(t, tc.HTTPCode, w.Code)
+			b, _ := json.Marshal(httpResponse)
+			assert.JSONEq(t, string(b), w.Body.String())
+		})
+	}
+}
