@@ -101,6 +101,29 @@ func (_m *App) DeleteTokens(ctx context.Context, tenantID string, deviceID strin
 	return r0
 }
 
+// FillDevicesAuthSets provides a mock function with given fields: ctx, devices
+func (_m *App) FillDevicesAuthSets(ctx context.Context, devices []model.Device) ([]model.Device, error) {
+	ret := _m.Called(ctx, devices)
+
+	var r0 []model.Device
+	if rf, ok := ret.Get(0).(func(context.Context, []model.Device) []model.Device); ok {
+		r0 = rf(ctx, devices)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]model.Device)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, []model.Device) error); ok {
+		r1 = rf(ctx, devices)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetDevCountByStatus provides a mock function with given fields: ctx, status
 func (_m *App) GetDevCountByStatus(ctx context.Context, status string) (int, error) {
 	ret := _m.Called(ctx, status)

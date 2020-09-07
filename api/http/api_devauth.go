@@ -48,10 +48,11 @@ const (
 	uriTenants            = "/api/internal/v1/devauth/tenants"
 	uriTenantDeviceStatus = "/api/internal/v1/devauth/tenants/:tid/devices/:did/status"
 	uriTenantDevices      = "/api/internal/v1/devauth/tenants/:tid/devices"
+	uriTenantDevicesByID  = "/api/internal/v1/devauth/tenants/:tid/devices/by/id"
 
 	// management API v2
 	v2uriDevices             = "/api/management/v2/devauth/devices"
-	v2uriDevicesById         = "/api/management/v2/devauth/devices/byid"
+	v2uriDevicesById         = "/api/management/v2/devauth/devices/by/id"
 	v2uriDevicesCount        = "/api/management/v2/devauth/devices/count"
 	v2uriDevice              = "/api/management/v2/devauth/devices/:id"
 	v2uriDeviceAuthSet       = "/api/management/v2/devauth/devices/:id/auth/:aid"
@@ -105,6 +106,7 @@ func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
 		rest.Post(uriTenants, d.ProvisionTenantHandler),
 		rest.Get(uriTenantDeviceStatus, d.GetTenantDeviceStatus),
 		rest.Get(uriTenantDevices, d.GetTenantDevicesHandler),
+		rest.Post(uriTenantDevicesByID, d.GetTenantDevicesByID),
 
 		// API v2
 		rest.Get(v2uriDevicesCount, d.GetDevicesCountHandler),
@@ -303,6 +305,35 @@ func (d *DevAuthApiHandlers) GetDevicesV2Handler(w rest.ResponseWriter, r *rest.
 	w.WriteJson(outDevs)
 }
 
+// GetTenantDevicesByID returns the full (v1) device model from the given IDs.
+func (d *DevAuthApiHandlers) GetTenantDevicesByID(w rest.ResponseWriter, r *rest.Request) {
+	var (
+		deviceIDs []string
+	)
+	defer r.Body.Close()
+	ctx := r.Context()
+	l := log.FromContext(ctx)
+
+	decoder := json.NewDecoder(r.Body)
+	err := decoder.Decode(&deviceIDs)
+	if err != nil {
+		err = errors.Wrap(err, "api: error parsing JSON payload")
+		rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		return
+	}
+
+	devs, err := d.db.GetDevicesById(ctx, deviceIDs)
+	if err != nil {
+		rest_utils.RestErrWithLogInternal(w, r, l, err)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	w.WriteJson(devs)
+}
+
+// GetDevicesByIdV2Handler retrieves the devices and fills in the respective
+// auth sets for all the devices with the given IDs. The returned model fulfills
+// the v2 device model.
 func (d *DevAuthApiHandlers) GetDevicesByIdV2Handler(w rest.ResponseWriter, r *rest.Request) {
 
 	ctx := r.Context()
@@ -341,6 +372,7 @@ func (d *DevAuthApiHandlers) GetDevicesByIdV2Handler(w rest.ResponseWriter, r *r
 		return
 	}
 
+	w.WriteHeader(http.StatusOK)
 	w.WriteJson(outDevs)
 }
 

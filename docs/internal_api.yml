@@ -323,6 +323,46 @@ paths:
           schema:
             $ref: '#/definitions/Error'  
 
+  /tenants/{tid}/devices/by/id:
+    post:
+      operationId: List Devices by ID
+      tags:
+        - Internal API
+      summary: Retrieve the full device description from the given IDs.
+      parameters:
+        - name: tid
+          in: path
+          description: Tenant identifier.
+          required: true
+          type: string
+        - name: deviceIDs
+          in: body
+          description: |
+            Device status filter. If not specified, all devices are listed.
+          required: true
+          schema:
+            type: array
+            description: List of device IDs to expand.
+            items:
+              type: string
+      responses:
+        200:
+          description: >
+            Expanded list of input devices - input ordering is not preserved
+            and non-existing devices are silently ignored.
+          schema:
+            type: array
+            items:
+                $ref: '#/definitions/Device'
+        400:
+          description: Missing/malformed request params.
+          schema:
+            $ref: '#/definitions/Error'
+        500:
+          description: Unexpected error
+          schema:
+            $ref: '#/definitions/Error'  
+
 definitions:
   NewTenant:
     description: New tenant descriptor.
