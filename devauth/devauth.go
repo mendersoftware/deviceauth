@@ -94,7 +94,9 @@ func simpleApiClientGetter() apiclient.HttpRunner {
 }
 
 // this device auth service interface
+//go:generate ../utils/mockgen.sh
 type App interface {
+	HealthCheck(ctx context.Context) error
 	SubmitAuthRequest(ctx context.Context, r *model.AuthReq) (string, error)
 
 	GetDevices(ctx context.Context, skip, limit uint, filter store.DeviceFilter) ([]model.Device, error)
@@ -161,6 +163,28 @@ func NewDevAuth(d store.DataStore, co orchestrator.ClientRunner,
 		config:       config,
 		clock:        utils.NewClock(),
 	}
+}
+
+func (d *DevAuth) HealthCheck(ctx context.Context) error {
+	err := d.db.Ping(ctx)
+	if err != nil {
+		return errors.Wrap(err, "error reaching MongoDB")
+	}
+	err = d.invClient.CheckHealth(ctx)
+	if err != nil {
+		return errors.Wrap(err, "Inventory service unhealthy")
+	}
+	err = d.cOrch.CheckHealth(ctx)
+	if err != nil {
+		return errors.Wrap(err, "Workflows service unhealthy")
+	}
+	if d.verifyTenant {
+		err = d.cTenant.CheckHealth(ctx)
+		if err != nil {
+			return errors.Wrap(err, "Tenantadm service unhealthy")
+		}
+	}
+	return nil
 }
 
 func (d *DevAuth) getDeviceFromAuthRequest(ctx context.Context, r *model.AuthReq, currentStatus *string) (*model.Device, error) {
@@ -479,7 +503,7 @@ func (d *DevAuth) updateDeviceStatus(ctx context.Context, devId, status string, 
 		case nil:
 			status = newStatus
 		case store.ErrAuthSetNotFound:
-			status = model.DevStatusRejected
+			status = model.DevStatusNoAuth
 		default:
 			return errors.Wrap(err, "Cannot determine device status")
 		}
@@ -582,7 +606,7 @@ func (d *DevAuth) FillDevicesAuthSets(ctx context.Context, devices []model.Devic
 			return nil, errors.Wrap(err, "db get auth sets error")
 		}
 	}
-	return devices, err
+	return devices, nil
 }
 
 func (d *DevAuth) GetDevices(ctx context.Context, skip, limit uint, filter store.DeviceFilter) ([]model.Device, error) {

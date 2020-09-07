@@ -22,7 +22,7 @@ Each subsequent device-specific API call is then internally routed to this servi
 At any time, the administrator can also revoke the JWT in case it was compromised.
 
 
-![Mender logo](https://mender.io/user/pages/04.resources/_logos/logoS.png)
+![Mender logo](https://hosted.mender.io/ui/assets/img/loginlogo.png)
 
 
 ## Getting started

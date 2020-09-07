@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/mendersoftware/go-lib-micro/log"
+	"github.com/mendersoftware/go-lib-micro/rest_utils"
 	"github.com/pkg/errors"
 
 	"github.com/mendersoftware/deviceauth/model"
@@ -33,6 +34,7 @@ const (
 	DeviceDecommissioningOrchestratorUri = "/api/v1/workflow/decommission_device"
 	ProvisionDeviceOrchestratorUri       = "/api/v1/workflow/provision_device"
 	UpdateDeviceStatusOrchestratorUri    = "/api/v1/workflow/update_device_status"
+	HealthURI                            = "/api/v1/health"
 	// default request timeout, 10s?
 	defaultReqTimeout = time.Duration(10) * time.Second
 )
@@ -81,7 +83,9 @@ type Config struct {
 }
 
 // ClientRunner is an interface of orchestrator client
+//go:generate ../../utils/mockgen.sh
 type ClientRunner interface {
+	CheckHealth(ctx context.Context) error
 	SubmitDeviceDecommisioningJob(ctx context.Context, req DecommissioningReq) error
 	SubmitProvisionDeviceJob(ctx context.Context, req ProvisionDeviceReq) error
 	SubmitUpdateDeviceStatusJob(ctx context.Context, req UpdateDeviceStatusReq) error
@@ -91,6 +95,50 @@ type ClientRunner interface {
 // ClientRunner interface
 type Client struct {
 	conf Config
+}
+
+func NewClient(c Config) *Client {
+	if c.Timeout == 0 {
+		c.Timeout = defaultReqTimeout
+	}
+
+	return &Client{
+		conf: c,
+	}
+}
+
+func (c *Client) CheckHealth(ctx context.Context) error {
+	var (
+		apiErr rest_utils.ApiError
+		client http.Client
+	)
+
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if _, ok := ctx.Deadline(); !ok {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, c.conf.Timeout)
+		defer cancel()
+	}
+	req, _ := http.NewRequestWithContext(
+		ctx, "GET",
+		utils.JoinURL(c.conf.OrchestratorAddr, HealthURI), nil,
+	)
+
+	rsp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	if rsp.StatusCode >= http.StatusOK && rsp.StatusCode < 300 {
+		return nil
+	}
+	decoder := json.NewDecoder(rsp.Body)
+	err = decoder.Decode(&apiErr)
+	if err != nil {
+		return errors.Errorf("health check HTTP error: %s", rsp.Status)
+	}
+	return &apiErr
 }
 
 func (co *Client) SubmitDeviceDecommisioningJob(ctx context.Context, decommissioningReq DecommissioningReq) error {
@@ -234,14 +282,4 @@ func (co *Client) SubmitUpdateDeviceStatusJob(ctx context.Context, updateDeviceS
 			"submit update device status request failed with status %v", rsp.Status)
 	}
 	return nil
-}
-
-func NewClient(c Config) *Client {
-	if c.Timeout == 0 {
-		c.Timeout = defaultReqTimeout
-	}
-
-	return &Client{
-		conf: c,
-	}
 }

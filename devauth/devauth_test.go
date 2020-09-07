@@ -15,6 +15,7 @@ package devauth
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"testing"
@@ -31,6 +32,7 @@ import (
 
 	"github.com/mendersoftware/deviceauth/cache"
 	mcache "github.com/mendersoftware/deviceauth/cache/mocks"
+	minv "github.com/mendersoftware/deviceauth/client/inventory/mocks"
 	"github.com/mendersoftware/deviceauth/client/orchestrator"
 	morchestrator "github.com/mendersoftware/deviceauth/client/orchestrator/mocks"
 	"github.com/mendersoftware/deviceauth/client/tenant"
@@ -45,6 +47,105 @@ import (
 	mtesting "github.com/mendersoftware/deviceauth/utils/testing"
 	"github.com/pkg/errors"
 )
+
+func TestHealthCheck(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		Name string
+
+		MultiTenant bool
+
+		DataStoreError error
+		InventoryError error
+		WorkflowsError error
+		TenantAdmError error
+	}{{
+		Name: "ok",
+	}, {
+		Name:        "ok, multitenant",
+		MultiTenant: true,
+	}, {
+		Name:           "error, datastore",
+		DataStoreError: errors.New("connection error"),
+	}, {
+		Name:           "error, inventory",
+		InventoryError: errors.New("connection error"),
+	}, {
+		Name:           "error, workflows",
+		WorkflowsError: errors.New("connection error"),
+	}, {
+		Name:           "error, tenantadm",
+		MultiTenant:    true,
+		TenantAdmError: errors.New("connection error"),
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.TODO(), time.Second*5)
+			defer cancel()
+
+			db := &mstore.DataStore{}
+			ta := &mtenant.ClientRunner{}
+			wf := &morchestrator.ClientRunner{}
+			inv := &minv.Client{}
+			devauth := NewDevAuth(db, wf, nil, Config{})
+			devauth.invClient = inv
+			switch {
+			default:
+				fallthrough
+			case tc.TenantAdmError != nil:
+				if tc.MultiTenant {
+					ta.On("CheckHealth", ctx).
+						Return(tc.TenantAdmError)
+					devauth.WithTenantVerification(ta)
+				}
+				fallthrough
+			case tc.WorkflowsError != nil:
+				wf.On("CheckHealth", ctx).
+					Return(tc.WorkflowsError)
+				fallthrough
+			case tc.InventoryError != nil:
+				inv.On("CheckHealth", ctx).
+					Return(tc.InventoryError)
+				fallthrough
+			case tc.DataStoreError != nil:
+				db.On("Ping", ctx).
+					Return(tc.DataStoreError)
+			}
+
+			err := devauth.HealthCheck(ctx)
+			switch {
+			case tc.DataStoreError != nil:
+				assert.EqualError(t, err,
+					"error reaching MongoDB: "+
+						tc.DataStoreError.Error(),
+				)
+			case tc.InventoryError != nil:
+				assert.EqualError(t, err,
+					"Inventory service unhealthy: "+
+						tc.InventoryError.Error(),
+				)
+			case tc.WorkflowsError != nil:
+				assert.EqualError(t, err,
+					"Workflows service unhealthy: "+
+						tc.WorkflowsError.Error(),
+				)
+			case tc.TenantAdmError != nil:
+				assert.EqualError(t, err,
+					"Tenantadm service unhealthy: "+
+						tc.TenantAdmError.Error(),
+				)
+			default:
+				assert.NoError(t, err)
+			}
+			db.AssertExpectations(t)
+			inv.AssertExpectations(t)
+			wf.AssertExpectations(t)
+			ta.AssertExpectations(t)
+		})
+	}
+}
 
 func TestDevAuthSubmitAuthRequest(t *testing.T) {
 	t.Parallel()
@@ -2655,6 +2756,7 @@ func TestDevAuthDeleteAuthSet(t *testing.T) {
 		dbDeleteAuthSetForDeviceErr error
 		dbGetAuthSetsForDeviceErr   error
 		dbDeleteDeviceErr           error
+		dbGetDeviceStatus           string
 		dbGetDeviceStatusErr        error
 		dbUpdateDeviceErr           error
 
@@ -2723,14 +2825,21 @@ func TestDevAuthDeleteAuthSet(t *testing.T) {
 			outErr:            "failed to update device status: Update Device Error",
 		},
 		{
-			devId:  oid.NewUUIDv5("devId12").String(),
-			authId: oid.NewUUIDv5("authId12").String(),
+			devId:             oid.NewUUIDv5("devId12").String(),
+			authId:            oid.NewUUIDv5("authId12").String(),
+			dbGetDeviceStatus: "accepted",
 		},
 		{
-			devId:     oid.NewUUIDv5("devId12").String(),
-			authId:    oid.NewUUIDv5("authId12").String(),
-			withCache: true,
-			tenant:    "acme",
+			devId:             oid.NewUUIDv5("devId12").String(),
+			authId:            oid.NewUUIDv5("authId12").String(),
+			withCache:         true,
+			tenant:            "acme",
+			dbGetDeviceStatus: "accepted",
+		},
+		{
+			devId:                oid.NewUUIDv5("devId12").String(),
+			authId:               oid.NewUUIDv5("authId12").String(),
+			dbGetDeviceStatusErr: store.ErrAuthSetNotFound,
 		},
 		{
 			devId:          oid.NewUUIDv5("devId12").String(),
@@ -2783,15 +2892,24 @@ func TestDevAuthDeleteAuthSet(t *testing.T) {
 				tc.dbDeleteDeviceErr)
 			db.On("GetDeviceStatus", ctx,
 				tc.devId).Return(
-				"accpted", tc.dbGetDeviceStatusErr)
+				tc.dbGetDeviceStatus,
+				tc.dbGetDeviceStatusErr)
 			db.On("UpdateDevice", ctx,
 				mock.AnythingOfType("model.Device"),
 				mock.AnythingOfType("model.DeviceUpdate")).Return(tc.dbUpdateDeviceErr)
 
 			co := morchestrator.ClientRunner{}
 			co.On("SubmitUpdateDeviceStatusJob", ctx,
-				mock.AnythingOfType("orchestrator.UpdateDeviceStatusReq")).
-				Return(nil)
+				mock.MatchedBy(
+					func(req orchestrator.UpdateDeviceStatusReq) bool {
+						id, err := json.Marshal([]string{tc.devId})
+						assert.NoError(t, err)
+						if tc.dbGetDeviceStatusErr == store.ErrAuthSetNotFound {
+							return req.Ids == string(id) && req.Status == "noauth"
+						} else {
+							return req.Ids == string(id) && req.Status == tc.dbGetDeviceStatus
+						}
+					})).Return(nil)
 
 			devauth := NewDevAuth(&db, &co, nil, Config{})
 
@@ -3010,7 +3128,7 @@ func TestApiLimitsOverride(t *testing.T) {
 					IntervalSec: 60,
 				},
 				ApiBursts: []ratelimits.ApiBurst{
-					ratelimits.ApiBurst{
+					{
 						Action:         "POST",
 						Uri:            "deployments/next",
 						MinIntervalSec: 10,
@@ -3023,7 +3141,7 @@ func TestApiLimitsOverride(t *testing.T) {
 					IntervalSec: 60,
 				},
 				ApiBursts: []ratelimits.ApiBurst{
-					ratelimits.ApiBurst{
+					{
 						Action:         "POST",
 						Uri:            "deployments/next",
 						MinIntervalSec: 10,
@@ -3039,7 +3157,7 @@ func TestApiLimitsOverride(t *testing.T) {
 					IntervalSec: 60,
 				},
 				ApiBursts: []ratelimits.ApiBurst{
-					ratelimits.ApiBurst{
+					{
 						Action:         "POST",
 						Uri:            "deployments/next",
 						MinIntervalSec: 10,
@@ -3056,7 +3174,7 @@ func TestApiLimitsOverride(t *testing.T) {
 					IntervalSec: 60,
 				},
 				ApiBursts: []ratelimits.ApiBurst{
-					ratelimits.ApiBurst{
+					{
 						Action:         "POST",
 						Uri:            "deployments/next",
 						MinIntervalSec: 10,
@@ -3072,7 +3190,7 @@ func TestApiLimitsOverride(t *testing.T) {
 					IntervalSec: 3600,
 				},
 				ApiBursts: []ratelimits.ApiBurst{
-					ratelimits.ApiBurst{
+					{
 						Action:         "POST",
 						Uri:            "deployments/next",
 						MinIntervalSec: 10,
@@ -3081,7 +3199,7 @@ func TestApiLimitsOverride(t *testing.T) {
 			},
 			override: ratelimits.ApiLimits{
 				ApiBursts: []ratelimits.ApiBurst{
-					ratelimits.ApiBurst{
+					{
 						Action:         "POST",
 						Uri:            "deployments/next",
 						MinIntervalSec: 100,
@@ -3094,7 +3212,7 @@ func TestApiLimitsOverride(t *testing.T) {
 					IntervalSec: 3600,
 				},
 				ApiBursts: []ratelimits.ApiBurst{
-					ratelimits.ApiBurst{
+					{
 						Action:         "POST",
 						Uri:            "deployments/next",
 						MinIntervalSec: 100,
@@ -3110,7 +3228,7 @@ func TestApiLimitsOverride(t *testing.T) {
 					IntervalSec: 3600,
 				},
 				ApiBursts: []ratelimits.ApiBurst{
-					ratelimits.ApiBurst{
+					{
 						Action:         "POST",
 						Uri:            "deployments/next",
 						MinIntervalSec: 10,
@@ -3119,7 +3237,7 @@ func TestApiLimitsOverride(t *testing.T) {
 			},
 			override: ratelimits.ApiLimits{
 				ApiBursts: []ratelimits.ApiBurst{
-					ratelimits.ApiBurst{
+					{
 						Action:         "PATCH",
 						Uri:            "inventory/attributes",
 						MinIntervalSec: 60,
@@ -3132,12 +3250,12 @@ func TestApiLimitsOverride(t *testing.T) {
 					IntervalSec: 3600,
 				},
 				ApiBursts: []ratelimits.ApiBurst{
-					ratelimits.ApiBurst{
+					{
 						Action:         "POST",
 						Uri:            "deployments/next",
 						MinIntervalSec: 10,
 					},
-					ratelimits.ApiBurst{
+					{
 						Action:         "PATCH",
 						Uri:            "inventory/attributes",
 						MinIntervalSec: 60,
@@ -3153,7 +3271,7 @@ func TestApiLimitsOverride(t *testing.T) {
 					IntervalSec: 3600,
 				},
 				ApiBursts: []ratelimits.ApiBurst{
-					ratelimits.ApiBurst{
+					{
 						Action:         "POST",
 						Uri:            "deployments/next",
 						MinIntervalSec: 10,
@@ -3166,12 +3284,12 @@ func TestApiLimitsOverride(t *testing.T) {
 					IntervalSec: 60,
 				},
 				ApiBursts: []ratelimits.ApiBurst{
-					ratelimits.ApiBurst{
+					{
 						Action:         "POST",
 						Uri:            "deployments/next",
 						MinIntervalSec: 100,
 					},
-					ratelimits.ApiBurst{
+					{
 						Action:         "PATCH",
 						Uri:            "inventory/attributes",
 						MinIntervalSec: 60,
@@ -3184,12 +3302,12 @@ func TestApiLimitsOverride(t *testing.T) {
 					IntervalSec: 60,
 				},
 				ApiBursts: []ratelimits.ApiBurst{
-					ratelimits.ApiBurst{
+					{
 						Action:         "POST",
 						Uri:            "deployments/next",
 						MinIntervalSec: 100,
 					},
-					ratelimits.ApiBurst{
+					{
 						Action:         "PATCH",
 						Uri:            "inventory/attributes",
 						MinIntervalSec: 60,
@@ -3216,4 +3334,114 @@ func TestPurgeUriArgs(t *testing.T) {
 
 	out = purgeUriArgs("/api/devices/v1/deployments/device/deployments/next")
 	assert.Equal(t, "/api/devices/v1/deployments/device/deployments/next", out)
+}
+
+func TestFillDevicesAuthSets(t *testing.T) {
+	testCases := []struct {
+		Name string
+
+		Devices []model.Device
+
+		StoreAuthSets []model.AuthSet
+		StoreError    error
+	}{{
+		Name: "ok",
+		Devices: []model.Device{{
+			Id:     "d6154f40-4ba5-4033-b0a5-3379baf322e3",
+			IdData: `{"mac": "00:11:22:33:44:55"}`,
+			IdDataStruct: map[string]interface{}{
+				"mac": "00:11:22:33:44:55",
+			},
+		}, {
+			Id:     "d6154f40-4ba5-4033-b0a5-3379baf322e4",
+			IdData: `{"sn": "1234567890"}`,
+			IdDataStruct: map[string]interface{}{
+				"sn": "1234567890",
+			},
+		}},
+
+		StoreAuthSets: []model.AuthSet{{
+			Id:     "d6154f40-4ba5-4033-b0a5-3379baf322e5",
+			IdData: `{"mac": "00:11:22:33:44:55"}`,
+			IdDataStruct: map[string]interface{}{
+				"mac": "00:11:22:33:44:55",
+			},
+			DeviceId: "d6154f40-4ba5-4033-b0a5-3379baf322e3",
+		}},
+	}, {
+		Name: "ok, no authsets found",
+		Devices: []model.Device{{
+			Id:     "d6154f40-4ba5-4033-b0a5-3379baf322e3",
+			IdData: `{"mac": "00:11:22:33:44:55"}`,
+			IdDataStruct: map[string]interface{}{
+				"mac": "00:11:22:33:44:55",
+			},
+		}, {
+			Id:     "d6154f40-4ba5-4033-b0a5-3379baf322e4",
+			IdData: `{"sn": "1234567890"}`,
+			IdDataStruct: map[string]interface{}{
+				"sn": "1234567890",
+			},
+		}},
+		StoreError: store.ErrAuthSetNotFound,
+	}, {
+		Name: "error, internal datastore error",
+		Devices: []model.Device{{
+			Id:     "d6154f40-4ba5-4033-b0a5-3379baf322e3",
+			IdData: `{"mac": "00:11:22:33:44:55"}`,
+			IdDataStruct: map[string]interface{}{
+				"mac": "00:11:22:33:44:55",
+			},
+		}, {
+			Id:     "d6154f40-4ba5-4033-b0a5-3379baf322e4",
+			IdData: `{"sn": "1234567890"}`,
+			IdDataStruct: map[string]interface{}{
+				"sn": "1234567890",
+			},
+		}},
+		StoreError: errors.New("store: internal error"),
+	}}
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			ds := &mstore.DataStore{}
+			devauth := NewDevAuth(ds, nil, nil, Config{})
+			defer ds.AssertExpectations(t)
+
+			if tc.StoreError != nil &&
+				tc.StoreError != store.ErrAuthSetNotFound {
+				ds.On("GetAuthSetsForDevice",
+					mtesting.ContextMatcher(),
+					tc.Devices[0].Id,
+				).Return(nil, tc.StoreError)
+			} else {
+				for i := range tc.Devices {
+					ds.On("GetAuthSetsForDevice",
+						mtesting.ContextMatcher(),
+						tc.Devices[i].Id,
+					).Return(tc.StoreAuthSets, tc.StoreError)
+				}
+			}
+
+			devsIn := make([]model.Device, len(tc.Devices))
+			copy(devsIn, tc.Devices)
+			devs, err := devauth.FillDevicesAuthSets(
+				context.TODO(), devsIn,
+			)
+			if tc.StoreError != nil &&
+				tc.StoreError != store.ErrAuthSetNotFound {
+				assert.EqualError(t, err,
+					"db get auth sets error: "+
+						tc.StoreError.Error(),
+				)
+				assert.Nil(t, devs)
+			} else {
+				assert.NoError(t, err)
+				devices := tc.Devices
+				for i := range devices {
+					devices[i].AuthSets = tc.StoreAuthSets
+				}
+				assert.Equal(t, devices, devs)
+			}
+		})
+	}
 }

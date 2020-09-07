@@ -18,14 +18,14 @@ import pytest
 
 DB_NAME = "deviceauth"
 DB_MIGRATION_COLLECTION = "migration_info"
-DB_VERSION = "1.1.0"
+DB_VERSION = "1.9.0"
 
 
 MIGRATED_TENANT_DBS={
     "tenant-stale-1": "0.0.1",
     "tenant-stale-2": "0.2.0",
     "tenant-stale-3": "1.0.0",
-    "tenant-current": "1.1.0",
+    "tenant-current": "1.9.0",
     "tenant-future": "2.0.0",
 }
 
@@ -80,6 +80,7 @@ class TestMigration:
 
         mi = db[DB_MIGRATION_COLLECTION].find_one(version)
         print('found migration:', mi)
+
         assert mi
 
     @staticmethod
@@ -118,7 +119,7 @@ class TestCliMigrate:
         cli.migrate()
         TestMigration.verify(cli, mongo, DB_NAME, DB_VERSION)
 
-    @pytest.mark.parametrize('fake_migrated_db', ["1.1.0"], indirect=True)
+    @pytest.mark.parametrize('fake_migrated_db', ["1.9.0"], indirect=True)
     def test_ok_current_db(self, cli, fake_migrated_db, mongo):
         cli.migrate()
         TestMigration.verify(cli, mongo, DB_NAME, DB_VERSION)

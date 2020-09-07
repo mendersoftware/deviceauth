@@ -45,6 +45,7 @@ func TestGetDevicesBeingDecommissioned(t *testing.T) {
 					PubKey:          "001",
 					Status:          model.DevStatusPending,
 					Decommissioning: false,
+					IdDataSha256:    getIdDataHash("001"),
 				},
 				model.Device{
 					Id:              "002",
@@ -52,6 +53,7 @@ func TestGetDevicesBeingDecommissioned(t *testing.T) {
 					PubKey:          "002",
 					Status:          model.DevStatusPending,
 					Decommissioning: true,
+					IdDataSha256:    getIdDataHash("002"),
 				},
 			},
 			outDevices: []model.Device{
@@ -61,6 +63,7 @@ func TestGetDevicesBeingDecommissioned(t *testing.T) {
 					PubKey:          "002",
 					Status:          model.DevStatusPending,
 					Decommissioning: true,
+					IdDataSha256:    getIdDataHash("002"),
 				},
 			},
 		},
@@ -72,6 +75,7 @@ func TestGetDevicesBeingDecommissioned(t *testing.T) {
 					PubKey:          "001",
 					Status:          model.DevStatusPending,
 					Decommissioning: false,
+					IdDataSha256:    getIdDataHash("001"),
 				},
 				model.Device{
 					Id:              "002",
@@ -79,11 +83,13 @@ func TestGetDevicesBeingDecommissioned(t *testing.T) {
 					PubKey:          "002",
 					Status:          model.DevStatusPending,
 					Decommissioning: true,
+					IdDataSha256:    getIdDataHash("002"),
 				},
 			},
 			outDevices: []model.Device{
 				model.Device{
-					Id: "002",
+					Id:           "002",
+					IdDataSha256: getIdDataHash("002"),
 				},
 			},
 			tenant: tenant,
@@ -134,6 +140,7 @@ func TestDeleteDevicesBeingDecommissioned(t *testing.T) {
 					PubKey:          "001",
 					Status:          model.DevStatusPending,
 					Decommissioning: false,
+					IdDataSha256:    getIdDataHash("001"),
 				},
 				model.Device{
 					Id:              "002",
@@ -141,6 +148,7 @@ func TestDeleteDevicesBeingDecommissioned(t *testing.T) {
 					PubKey:          "002",
 					Status:          model.DevStatusPending,
 					Decommissioning: true,
+					IdDataSha256:    getIdDataHash("002"),
 				},
 			},
 		},
@@ -152,6 +160,7 @@ func TestDeleteDevicesBeingDecommissioned(t *testing.T) {
 					PubKey:          "001",
 					Status:          model.DevStatusPending,
 					Decommissioning: false,
+					IdDataSha256:    getIdDataHash("001"),
 				},
 				model.Device{
 					Id:              "002",
@@ -159,6 +168,7 @@ func TestDeleteDevicesBeingDecommissioned(t *testing.T) {
 					PubKey:          "002",
 					Status:          model.DevStatusPending,
 					Decommissioning: true,
+					IdDataSha256:    getIdDataHash("002"),
 				},
 			},
 			tenant: tenant,
@@ -231,6 +241,7 @@ func TestGetBrokenAuthSets(t *testing.T) {
 					PubKey:          "001",
 					Status:          model.DevStatusPending,
 					Decommissioning: false,
+					IdDataSha256:    getIdDataHash("001"),
 				},
 				model.Device{
 					Id:              "002",
@@ -238,6 +249,7 @@ func TestGetBrokenAuthSets(t *testing.T) {
 					PubKey:          "002",
 					Status:          model.DevStatusPending,
 					Decommissioning: false,
+					IdDataSha256:    getIdDataHash("002"),
 				},
 			},
 			outAuthSetsIds: []string{"002"},
@@ -382,6 +394,7 @@ func TestDeleteBrokenAuthSets(t *testing.T) {
 					PubKey:          "001",
 					Status:          model.DevStatusPending,
 					Decommissioning: false,
+					IdDataSha256:    getIdDataHash("001"),
 				},
 				model.Device{
 					Id:              "002",
@@ -389,6 +402,7 @@ func TestDeleteBrokenAuthSets(t *testing.T) {
 					PubKey:          "002",
 					Status:          model.DevStatusPending,
 					Decommissioning: false,
+					IdDataSha256:    getIdDataHash("002"),
 				},
 			},
 		},
@@ -414,6 +428,7 @@ func TestDeleteBrokenAuthSets(t *testing.T) {
 					PubKey:          "001",
 					Status:          model.DevStatusPending,
 					Decommissioning: false,
+					IdDataSha256:    getIdDataHash("001"),
 				},
 				model.Device{
 					Id:              "002",
@@ -421,6 +436,7 @@ func TestDeleteBrokenAuthSets(t *testing.T) {
 					PubKey:          "002",
 					Status:          model.DevStatusPending,
 					Decommissioning: false,
+					IdDataSha256:    getIdDataHash("002"),
 				},
 			},
 			tenant: tenant,
@@ -447,6 +463,7 @@ func TestDeleteBrokenAuthSets(t *testing.T) {
 					PubKey:          "001",
 					Status:          model.DevStatusPending,
 					Decommissioning: false,
+					IdDataSha256:    getIdDataHash("001"),
 				},
 				model.Device{
 					Id:              "002",
@@ -454,6 +471,7 @@ func TestDeleteBrokenAuthSets(t *testing.T) {
 					PubKey:          "002",
 					Status:          model.DevStatusPending,
 					Decommissioning: true,
+					IdDataSha256:    getIdDataHash("002"),
 				},
 			},
 			tenant: tenant,

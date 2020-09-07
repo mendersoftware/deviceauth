@@ -155,6 +155,17 @@ func compareTime(expected time.Time, actual time.Time, t *testing.T) {
 	assert.Equal(t, expected.Unix(), actual.Unix())
 }
 
+func TestPing(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestPing in short mode")
+	}
+	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	defer cancel()
+	ds := NewDataStoreMongoWithClient(db.Client())
+	err := ds.Ping(ctx)
+	assert.NoError(t, err)
+}
+
 func TestStoreGetDeviceByIdentityDataHash(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping TestGetDeviceByIdentityDataHash in short mode.")
@@ -268,8 +279,9 @@ func TestStoreAddDevice(t *testing.T) {
 
 	// add device with identical identity data
 	err = d.AddDevice(ctx, model.Device{
-		Id:     "foobar",
-		IdData: "iddata",
+		Id:           "foobar",
+		IdData:       "iddata",
+		IdDataSha256: getIdDataHash("iddata"),
 	})
 	assert.EqualError(t, err, store.ErrObjectExists.Error())
 
@@ -820,29 +832,17 @@ func TestStoreMigrate(t *testing.T) {
 						verifyIndexes(t, db.client.Database(d).Collection(DbDevicesColl),
 							[]mongo.IndexModel{{
 								Keys: bson.D{
-									{Key: model.DevKeyIdData, Value: 1},
+									{Key: model.DevKeyIdDataSha256, Value: 1},
 								},
 								Options: &options.IndexOptions{
 									Background: &_false,
-									Name:       &indexDevices_IdentityData,
+									Name:       &indexDevices_IdentityDataSha256,
 									Unique:     &_true,
 								},
 							}},
 						)
 						verifyIndexes(t, db.client.Database(d).Collection(DbAuthSetColl),
 							[]mongo.IndexModel{
-								{
-									Keys: bson.D{
-										{Key: model.AuthSetKeyDeviceId, Value: 1},
-										{Key: model.AuthSetKeyIdData, Value: 1},
-										{Key: model.AuthSetKeyPubKey, Value: 1},
-									},
-									Options: &options.IndexOptions{
-										Background: &_false,
-										Name:       &indexAuthSet_DeviceId_IdentityData_PubKey,
-										Unique:     &_true,
-									},
-								},
 								{
 									Keys: bson.D{
 										{Key: model.AuthSetKeyDeviceId, Value: 1},
@@ -1709,72 +1709,105 @@ func TestStoreGetDevCountByStatus(t *testing.T) {
 		preauthorized int
 		pending       int
 		rejected      int
+		noauth        int
 	}{
 		{
 			accepted:      0,
 			preauthorized: 0,
 			pending:       4,
 			rejected:      0,
+			noauth:        0,
 		},
 		{
 			accepted:      5,
 			preauthorized: 0,
 			pending:       0,
 			rejected:      0,
+			noauth:        0,
 		},
 		{
 			accepted:      0,
 			preauthorized: 0,
 			pending:       0,
 			rejected:      6,
+			noauth:        0,
 		},
 		{
 			accepted:      0,
 			preauthorized: 9,
 			pending:       0,
 			rejected:      0,
+			noauth:        0,
 		},
 		{
 			accepted:      4,
 			preauthorized: 3,
 			pending:       2,
 			rejected:      1,
+			noauth:        0,
 		},
 		{
 			accepted:      1,
 			preauthorized: 4,
 			pending:       4,
 			rejected:      2,
+			noauth:        0,
 		},
 		{
 			accepted:      10,
 			preauthorized: 22,
 			pending:       30,
 			rejected:      12,
+			noauth:        0,
 		},
 		{
 			accepted:      10,
 			preauthorized: 1,
 			pending:       30,
 			rejected:      0,
+			noauth:        0,
 		},
 		{
 			accepted:      0,
 			preauthorized: 0,
 			pending:       30,
 			rejected:      12,
+			noauth:        0,
 		},
 		{
 			accepted:      10,
 			preauthorized: 7,
 			pending:       0,
 			rejected:      12,
+			noauth:        0,
 		},
 		{
 			accepted:      0,
 			preauthorized: 0,
 			pending:       0,
 			rejected:      0,
+			noauth:        0,
+		},
+		{
+			accepted:      0,
+			preauthorized: 0,
+			pending:       0,
+			rejected:      0,
+			noauth:        2,
+		},
+		{
+			accepted:      1,
+			preauthorized: 0,
+			pending:       0,
+			rejected:      0,
+			noauth:        2,
+		},
+		{
+			accepted:      1,
+			preauthorized: 0,
+			pending:       3,
+			rejected:      0,
+			noauth:        2,
 		},
 	}
 
@@ -1782,7 +1815,7 @@ func TestStoreGetDevCountByStatus(t *testing.T) {
 		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
 			db := getDb(ctx)
 
-			devs := getDevsWithStatuses(tc.accepted, tc.preauthorized, tc.pending, tc.rejected)
+			devs := getDevsWithStatuses(tc.accepted, tc.preauthorized, tc.pending, tc.rejected, tc.noauth)
 
 			// populate DB with a set of devices
 			for d, set := range devs {
@@ -1799,6 +1832,7 @@ func TestStoreGetDevCountByStatus(t *testing.T) {
 			cntPre, err := db.GetDevCountByStatus(ctx, "preauthorized")
 			cntPen, err := db.GetDevCountByStatus(ctx, "pending")
 			cntRej, err := db.GetDevCountByStatus(ctx, "rejected")
+			cntNoauth, err := db.GetDevCountByStatus(ctx, "noauth")
 			cntAll, err := db.GetDevCountByStatus(ctx, "")
 
 			assert.NoError(t, err)
@@ -1806,15 +1840,16 @@ func TestStoreGetDevCountByStatus(t *testing.T) {
 			assert.Equal(t, tc.preauthorized, cntPre)
 			assert.Equal(t, tc.pending, cntPen)
 			assert.Equal(t, tc.rejected, cntRej)
-			assert.Equal(t, tc.rejected+tc.accepted+tc.pending+tc.preauthorized, cntAll)
+			assert.Equal(t, tc.noauth, cntNoauth)
+			assert.Equal(t, tc.rejected+tc.accepted+tc.pending+tc.preauthorized+tc.noauth, cntAll)
 		})
 	}
 }
 
-// generate a list of devices having the desired number of total accepted/preauthorized/pending/rejected devices
+// generate a list of devices having the desired number of total accepted/preauthorized/pending/rejected/noauth devices
 // auth sets for these devs will generated semi-randomly to aggregate to a given device's target status
-func getDevsWithStatuses(accepted, preauthorized, pending, rejected int) map[*model.Device][]model.AuthSet {
-	total := accepted + preauthorized + pending + rejected
+func getDevsWithStatuses(accepted, preauthorized, pending, rejected, noauth int) map[*model.Device][]model.AuthSet {
+	total := accepted + preauthorized + pending + rejected + noauth
 
 	res := make(map[*model.Device][]model.AuthSet)
 
@@ -1826,6 +1861,8 @@ func getDevsWithStatuses(accepted, preauthorized, pending, rejected int) map[*mo
 			status = "rejected"
 		} else if i < (accepted + rejected + preauthorized) {
 			status = "preauthorized"
+		} else if i < (accepted + rejected + preauthorized + noauth) {
+			status = "noauth"
 		}
 		dev, sets := getDevWithStatus(i, status)
 		res[dev] = sets
@@ -1842,9 +1879,13 @@ func getDevWithStatus(id int, status string) (*model.Device, []model.AuthSet) {
 		Id:     fmt.Sprintf("%d", id),
 		IdData: iddata,
 		PubKey: pubkey,
+		Status: status,
 	}
 
-	asets := getAuthSetsForStatus(&dev, status)
+	var asets []model.AuthSet
+	if status != "noauth" {
+		asets = getAuthSetsForStatus(&dev, status)
+	}
 
 	return &dev, asets
 }
@@ -2333,18 +2374,21 @@ func TestStoreGetDeviceById(t *testing.T) {
 	time.Local = time.UTC
 
 	indescr := []struct {
-		id     string
-		idData string
-		limits ratelimits.ApiLimits
+		id           string
+		idData       string
+		idDataSha256 []byte
+		limits       ratelimits.ApiLimits
 	}{
 		{
-			id:     "dev1",
-			idData: "idData1",
+			id:           "dev1",
+			idData:       "idData1",
+			idDataSha256: getIdDataHash("idData1"),
 			//default limits
 		},
 		{
-			id:     "dev2",
-			idData: "idData2",
+			id:           "dev2",
+			idData:       "idData2",
+			idDataSha256: getIdDataHash("idData2"),
 			limits: ratelimits.ApiLimits{
 				ApiQuota: ratelimits.ApiQuota{
 					MaxCalls:    100,
@@ -2365,8 +2409,9 @@ func TestStoreGetDeviceById(t *testing.T) {
 			},
 		},
 		{
-			id:     "dev3",
-			idData: "idData4",
+			id:           "dev3",
+			idData:       "idData4",
+			idDataSha256: getIdDataHash("idData4"),
 			limits: ratelimits.ApiLimits{
 				ApiQuota: ratelimits.ApiQuota{
 					MaxCalls:    1000,
@@ -2380,6 +2425,7 @@ func TestStoreGetDeviceById(t *testing.T) {
 	indevs := make([]interface{}, len(indescr))
 	for i, descr := range indescr {
 		dev := model.NewDevice(oid.NewUUIDv5(descr.id).String(), descr.idData, "")
+		dev.IdDataSha256 = descr.idDataSha256
 		dev.ApiLimits = descr.limits
 		indevs[i] = dev
 	}
@@ -2434,6 +2480,137 @@ func TestStoreGetDeviceById(t *testing.T) {
 				exp := indevs[tc.expIdx].(*model.Device)
 				compareDevices(exp, out, t)
 				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestGetDevicesById(t *testing.T) {
+	testCases := []struct {
+		Name string
+		CTX  context.Context
+
+		DeviceIDs []string
+		Devices   []model.Device
+
+		ExpectedCount int
+		Error         error
+	}{{
+		Name: "ok",
+
+		CTX: context.Background(),
+
+		DeviceIDs: []string{"d6154f40-4ba5-4033-b0a5-3379baf322e3"},
+		Devices: []model.Device{{
+			Id:     "d6154f40-4ba5-4033-b0a5-3379baf322e3",
+			IdData: `{"mac": "00:11:22:33:44:55"}`,
+			IdDataStruct: map[string]interface{}{
+				"mac": "00:11:22:33:44:55",
+			},
+			IdDataSha256: []byte("c715e514a804d9a61106dd605e393940" +
+				"d0e10b890cd6f057c9312e3ebe5ff1d8"),
+		}, {
+			Id:     "d6154f40-4ba5-4033-b0a5-3379baf322e4",
+			IdData: `{"sn": "1234567890"}`,
+			IdDataStruct: map[string]interface{}{
+				"sn": "1234567890",
+			},
+			IdDataSha256: []byte("a73524cff4e03b802a02f3a8d517caab" +
+				"7fd8dac1ba752ff469d136a55ecb0ba7"),
+		}},
+		ExpectedCount: 1,
+	}, {
+		Name: "ok, with tenant",
+
+		CTX: identity.WithContext(
+			context.Background(),
+			&identity.Identity{
+				Tenant: oid.NewBSONID().String(),
+			},
+		),
+
+		DeviceIDs: []string{"d6154f40-4ba5-4033-b0a5-3379baf322e3"},
+		Devices: []model.Device{{
+			Id:     "d6154f40-4ba5-4033-b0a5-3379baf322e3",
+			IdData: `{"mac": "00:11:22:33:44:55"}`,
+			IdDataStruct: map[string]interface{}{
+				"mac": "00:11:22:33:44:55",
+			},
+			IdDataSha256: []byte("c715e514a804d9a61106dd605e393940" +
+				"d0e10b890cd6f057c9312e3ebe5ff1d8"),
+		}, {
+			Id:     "d6154f40-4ba5-4033-b0a5-3379baf322e4",
+			IdData: `{"sn": "1234567890"}`,
+			IdDataStruct: map[string]interface{}{
+				"sn": "1234567890",
+			},
+			IdDataSha256: []byte("a73524cff4e03b802a02f3a8d517caab" +
+				"7fd8dac1ba752ff469d136a55ecb0ba7"),
+		}},
+		ExpectedCount: 1,
+	}, {
+		Name: "error, context canceled",
+
+		CTX: func() context.Context {
+			ctx, cancel := context.WithCancel(context.TODO())
+			cancel()
+			return ctx
+		}(),
+
+		DeviceIDs: []string{"d6154f40-4ba5-4033-b0a5-3379baf322e3"},
+		Devices: []model.Device{{
+			Id:     "d6154f40-4ba5-4033-b0a5-3379baf322e3",
+			IdData: `{"mac": "00:11:22:33:44:55"}`,
+			IdDataStruct: map[string]interface{}{
+				"mac": "00:11:22:33:44:55",
+			},
+			IdDataSha256: []byte("c715e514a804d9a61106dd605e393940" +
+				"d0e10b890cd6f057c9312e3ebe5ff1d8"),
+		}, {
+			Id:     "d6154f40-4ba5-4033-b0a5-3379baf322e4",
+			IdData: `{"sn": "1234567890"}`,
+			IdDataStruct: map[string]interface{}{
+				"sn": "1234567890",
+			},
+			IdDataSha256: []byte("a73524cff4e03b802a02f3a8d517caab" +
+				"7fd8dac1ba752ff469d136a55ecb0ba7"),
+		}},
+		Error: context.Canceled,
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			db.Wipe()
+			ds := &DataStoreMongo{
+				client:      db.Client(),
+				multitenant: true,
+			}
+			collDevs := db.Client().
+				Database(ctxstore.DbFromContext(tc.CTX, DbName)).
+				Collection(DbDevicesColl)
+			ins := make([]interface{}, len(tc.Devices))
+			for i, dev := range tc.Devices {
+				ins[i] = dev
+			}
+			res, err := collDevs.InsertMany(context.Background(), ins)
+			if !assert.NoError(t, err) ||
+				!assert.Len(t, res.InsertedIDs, len(ins)) {
+				panic("[TEST ERROR] Failed to initialize test case")
+			}
+
+			devs, err := ds.GetDevicesById(tc.CTX, tc.DeviceIDs)
+			if tc.Error != nil {
+				if assert.Error(t, err) {
+					assert.Contains(t,
+						err.Error(),
+						tc.Error.Error(),
+					)
+				}
+			} else {
+				assert.Len(t, devs, tc.ExpectedCount)
+				for _, dev := range devs {
+					assert.Contains(t, tc.DeviceIDs, dev.Id)
+				}
 			}
 		})
 	}

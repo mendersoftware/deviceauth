@@ -14,9 +14,11 @@
 package http
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/mendersoftware/go-lib-micro/identity"
 
@@ -38,16 +40,19 @@ const (
 	uriAuthReqs = "/api/devices/v1/authentication/auth_requests"
 
 	// internal API
+	uriAlive              = "/api/internal/v1/devauth/alive"
+	uriHealth             = "/api/internal/v1/devauth/health"
 	uriTokenVerify        = "/api/internal/v1/devauth/tokens/verify"
 	uriTenantLimit        = "/api/internal/v1/devauth/tenant/:id/limits/:name"
 	uriTokens             = "/api/internal/v1/devauth/tokens"
 	uriTenants            = "/api/internal/v1/devauth/tenants"
 	uriTenantDeviceStatus = "/api/internal/v1/devauth/tenants/:tid/devices/:did/status"
 	uriTenantDevices      = "/api/internal/v1/devauth/tenants/:tid/devices"
+	uriTenantDevicesByID  = "/api/internal/v1/devauth/tenants/:tid/devices/by/id"
 
 	// management API v2
 	v2uriDevices             = "/api/management/v2/devauth/devices"
-	v2uriDevicesById         = "/api/management/v2/devauth/devices/byid"
+	v2uriDevicesById         = "/api/management/v2/devauth/devices/by/id"
 	v2uriDevicesCount        = "/api/management/v2/devauth/devices/count"
 	v2uriDevice              = "/api/management/v2/devauth/devices/:id"
 	v2uriDeviceAuthSet       = "/api/management/v2/devauth/devices/:id/auth/:aid"
@@ -56,6 +61,10 @@ const (
 	v2uriDevicesLimit        = "/api/management/v2/devauth/limits/:name"
 
 	HdrAuthReqSign = "X-MEN-Signature"
+)
+
+const (
+	defaultTimeout = time.Second * 5
 )
 
 var (
@@ -83,6 +92,8 @@ func NewDevAuthApiHandlers(devAuth devauth.App, db store.DataStore) ApiHandler {
 
 func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
 	routes := []*rest.Route{
+		rest.Get(uriAlive, d.AliveHandler),
+		rest.Get(uriHealth, d.HealthCheckHandler),
 		rest.Post(uriAuthReqs, d.SubmitAuthRequestHandler),
 		rest.Get(uriTokenVerify, d.VerifyTokenHandler),
 		rest.Post(uriTokenVerify, d.VerifyTokenHandler),
@@ -95,6 +106,7 @@ func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
 		rest.Post(uriTenants, d.ProvisionTenantHandler),
 		rest.Get(uriTenantDeviceStatus, d.GetTenantDeviceStatus),
 		rest.Get(uriTenantDevices, d.GetTenantDevicesHandler),
+		rest.Post(uriTenantDevicesByID, d.GetTenantDevicesByID),
 
 		// API v2
 		rest.Get(v2uriDevicesCount, d.GetDevicesCountHandler),
@@ -119,6 +131,24 @@ func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
 	}
 
 	return app, nil
+}
+
+func (d *DevAuthApiHandlers) AliveHandler(w rest.ResponseWriter, r *rest.Request) {
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (d *DevAuthApiHandlers) HealthCheckHandler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+	l := log.FromContext(ctx)
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	defer cancel()
+
+	err := d.devAuth.HealthCheck(ctx)
+	if err != nil {
+		rest_utils.RestErrWithLog(w, r, l, err, http.StatusServiceUnavailable)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (d *DevAuthApiHandlers) SubmitAuthRequestHandler(w rest.ResponseWriter, r *rest.Request) {
@@ -275,26 +305,46 @@ func (d *DevAuthApiHandlers) GetDevicesV2Handler(w rest.ResponseWriter, r *rest.
 	w.WriteJson(outDevs)
 }
 
-func (d *DevAuthApiHandlers) GetDevicesByIdV2Handler(w rest.ResponseWriter, r *rest.Request) {
-
+// GetTenantDevicesByID returns the full (v1) device model from the given IDs.
+func (d *DevAuthApiHandlers) GetTenantDevicesByID(w rest.ResponseWriter, r *rest.Request) {
+	var (
+		deviceIDs []string
+	)
+	defer r.Body.Close()
 	ctx := r.Context()
-
 	l := log.FromContext(ctx)
 
-	//validate req body by reading raw content manually
-	//(raw body will be needed later, DecodeJsonPayload would
-	//unmarshal and close it)
-	body, err := utils.ReadBodyRaw(r)
+	decoder := json.NewDecoder(r.Body)
+	err := decoder.Decode(&deviceIDs)
 	if err != nil {
-		err = errors.Wrap(err, "failed to decode device ids array")
+		err = errors.Wrap(err, "api: error parsing JSON payload")
 		rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
 		return
 	}
 
-	var ids []string
-	err = json.Unmarshal(body, &ids)
+	devs, err := d.db.GetDevicesById(ctx, deviceIDs)
 	if err != nil {
-		err = errors.Wrap(err, "failed to decode auth request")
+		rest_utils.RestErrWithLogInternal(w, r, l, err)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	w.WriteJson(devs)
+}
+
+// GetDevicesByIdV2Handler retrieves the devices and fills in the respective
+// auth sets for all the devices with the given IDs. The returned model fulfills
+// the v2 device model.
+func (d *DevAuthApiHandlers) GetDevicesByIdV2Handler(w rest.ResponseWriter, r *rest.Request) {
+	var ids []string
+
+	defer r.Body.Close()
+	ctx := r.Context()
+	l := log.FromContext(ctx)
+
+	decoder := json.NewDecoder(r.Body)
+	err := decoder.Decode(&ids)
+	if err != nil {
+		err = errors.Wrap(err, "api: error parsing JSON payload")
 		rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
 		return
 	}
@@ -305,14 +355,16 @@ func (d *DevAuthApiHandlers) GetDevicesByIdV2Handler(w rest.ResponseWriter, r *r
 		return
 	}
 
-	d.devAuth.FillDevicesAuthSets(ctx, devs)
-	len := len(devs)
-	outDevs, err := devicesV2FromDbModel(devs[:len])
+	_, err = d.devAuth.FillDevicesAuthSets(ctx, devs)
 	if err != nil {
 		rest_utils.RestErrWithLogInternal(w, r, l, err)
 		return
 	}
 
+	// NOTE: devicesV2FromDbModel cannot return an error
+	outDevs, _ := devicesV2FromDbModel(devs)
+
+	w.WriteHeader(http.StatusOK)
 	w.WriteJson(outDevs)
 }
 
@@ -327,9 +379,10 @@ func (d *DevAuthApiHandlers) GetDevicesCountHandler(w rest.ResponseWriter, r *re
 		model.DevStatusRejected,
 		model.DevStatusPending,
 		model.DevStatusPreauth,
+		model.DevStatusNoAuth,
 		"":
 	default:
-		rest_utils.RestErrWithLog(w, r, l, errors.New("status must be one of: pending, accepted, rejected, preauthorized"), http.StatusBadRequest)
+		rest_utils.RestErrWithLog(w, r, l, errors.New("status must be one of: pending, accepted, rejected, preauthorized, noauth"), http.StatusBadRequest)
 		return
 	}
 

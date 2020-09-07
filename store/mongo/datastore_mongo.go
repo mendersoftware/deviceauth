@@ -37,7 +37,7 @@ import (
 )
 
 const (
-	DbVersion     = "1.8.0"
+	DbVersion     = "1.9.0"
 	DbName        = "deviceauth"
 	DbDevicesColl = "devices"
 	DbAuthSetColl = "auth_sets"
@@ -47,6 +47,7 @@ const (
 
 var (
 	indexDevices_IdentityData                       = "devices:IdentityData"
+	indexDevices_IdentityDataSha256                 = "devices:IdentityDataSha256"
 	indexAuthSet_DeviceId_IdentityData_PubKey       = "auth_sets:DeviceId:IdData:PubKey"
 	indexAuthSet_DeviceId_IdentityDataSha256_PubKey = "auth_sets:IdDataSha256:PubKey"
 	indexAuthSet_IdentityDataSha256_PubKey          = "auth_sets:NoDeviceId:IdDataSha256:PubKey"
@@ -110,6 +111,10 @@ func NewDataStoreMongo(config DataStoreMongoConfig) (*DataStoreMongo, error) {
 	}
 
 	return NewDataStoreMongoWithClient(client), nil
+}
+
+func (db *DataStoreMongo) Ping(ctx context.Context) error {
+	return db.client.Ping(ctx, nil)
 }
 
 func (db *DataStoreMongo) GetDevices(ctx context.Context, skip, limit uint, filter store.DeviceFilter) ([]model.Device, error) {
@@ -440,6 +445,10 @@ func (db *DataStoreMongo) MigrateTenant(ctx context.Context, database, version s
 			ds:  db,
 			ctx: ctx,
 		},
+		&migration_1_9_0{
+			ds:  db,
+			ctx: ctx,
+		},
 	}
 
 	ver, err := migrate.NewVersion(version)
@@ -598,48 +607,6 @@ func (db *DataStoreMongo) WithAutomigrate() store.DataStore {
 	}
 }
 
-func (db *DataStoreMongo) EnsureIndexes(ctx context.Context) error {
-	_false := false
-	_true := true
-
-	devIdDataUniqueIndex := mongo.IndexModel{
-		Keys: bson.D{
-			{Key: model.DevKeyIdData, Value: 1},
-		},
-		Options: &mopts.IndexOptions{
-			Background: &_false,
-			Name:       &indexDevices_IdentityData,
-			Unique:     &_true,
-		},
-	}
-
-	authSetUniqueIndex := mongo.IndexModel{
-		Keys: bson.D{
-			{Key: model.AuthSetKeyDeviceId, Value: 1},
-			{Key: model.AuthSetKeyIdData, Value: 1},
-			{Key: model.AuthSetKeyPubKey, Value: 1},
-		},
-		Options: &mopts.IndexOptions{
-			Background: &_false,
-			Name:       &indexAuthSet_DeviceId_IdentityData_PubKey,
-			Unique:     &_true,
-		},
-	}
-
-	cDevs := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
-	devIndexes := cDevs.Indexes()
-	_, err := devIndexes.CreateOne(ctx, devIdDataUniqueIndex)
-	if err != nil {
-		return err
-	}
-
-	cAuthSets := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
-	authSetIndexes := cAuthSets.Indexes()
-	_, err = authSetIndexes.CreateOne(ctx, authSetUniqueIndex)
-
-	return err
-}
-
 func (db *DataStoreMongo) PutLimit(ctx context.Context, lim model.Limit) error {
 	if lim.Name == "" {
 		return errors.New("empty limit name")
@@ -694,7 +661,7 @@ func (db *DataStoreMongo) GetLimit(ctx context.Context, name string) (*model.Lim
 }
 
 func (db *DataStoreMongo) GetDevCountByStatus(ctx context.Context, status string) (int, error) {
-	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
+	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
 
 	// if status == "", fallback to a simple count of all devices
 	if status == "" {
@@ -707,126 +674,12 @@ func (db *DataStoreMongo) GetDevCountByStatus(ctx context.Context, status string
 	}
 
 	// compose aggregation pipeline
-
-	// group by dev id and auth set status, count status occurences:
-	// {_id: {"devid": "dev1", "status": "accepted"}, count: 1}
-	// {_id: {"devid": "dev1", "status": "preauthorized"}, count: 3}
-	// {_id: {"devid": "dev1", "status": "pending"}, count: 2}
-	// {_id: {"devid": "dev1", "status": "rejected"}, count: 0}
-	// etc. for all devs
-	grp := bson.D{
-		{Key: "$group", Value: bson.D{
-			{Key: "_id", Value: bson.M{
-				"devid":  "$device_id",
-				"status": "$status",
-			}},
-			{Key: "count", Value: bson.M{
-				"$sum": 1,
-			}},
-		},
-		},
-	}
-
-	// project to:
-	// {device_id: "1", accepted: 1}
-	// {device_id: "1", preauthorized: 3}
-	// {device_id: "1", pending: 2}
-	// {device_id: "1", rejected: 0}
-	// clunky - no easy way to transform values into fields
-	proj := bson.D{
-		{Key: "$project", Value: bson.M{
-			"devid": "$_id.devid",
-			"res": bson.M{
-				"$cond": []bson.M{
-					{"$eq": []string{"$_id.status", "accepted"}},
-					{"accepted": "$count"},
-					{"$cond": []bson.M{
-						{"$eq": []string{"$_id.status", "preauthorized"}},
-						{"preauthorized": "$count"},
-						{"$cond": []bson.M{
-							{"$eq": []string{"$_id.status", "pending"}},
-							{"pending": "$count"},
-							{"rejected": "$count"},
-						},
-						},
-					},
-					},
-				},
-			},
-		},
-		},
-	}
-
-	// group again to get aggregate per-status counts
-	// {device_id: "1", accepted: 1, preauthorized: 3, pending: 2, rejected: 0}
-	sum := bson.D{
-		{Key: "$group", Value: bson.M{
-			"_id":           "$devid",
-			"accepted":      bson.M{"$sum": "$res.accepted"},
-			"preauthorized": bson.M{"$sum": "$res.preauthorized"},
-			"pending":       bson.M{"$sum": "$res.pending"},
-			"rejected":      bson.M{"$sum": "$res.rejected"},
-		}}}
-
-	// actually filter devices according to status
-	var filt bson.D
-
-	// single accepted auth set = device accepted
-	if status == "accepted" {
-		filt = bson.D{
-			{Key: "$match", Value: bson.M{
-				"accepted": bson.M{"$gt": 0},
-			}},
-		}
-	}
-
-	// device is pending if it has no accepted and no preauthorized sets and
-	// has pending sets
-	if status == "pending" {
-		filt = bson.D{
-			{Key: "$match", Value: bson.M{
-				"$and": []bson.M{
-					{"accepted": bson.M{"$eq": 0}},
-					{"preauthorized": bson.M{"$eq": 0}},
-					{"pending": bson.M{"$gt": 0}},
-				},
-			}},
-		}
-	}
-
-	// device is preauthorized if it has no accepted and
-	// has preauthorized sets
-	if status == "preauthorized" {
-		filt = bson.D{
-			{Key: "$match", Value: bson.M{
-				"$and": []bson.M{
-					{"accepted": bson.M{"$eq": 0}},
-					{"preauthorized": bson.M{"$gt": 0}},
-				},
-			}},
-		}
-	}
-
-	// device is rejected if all its sets are rejected
-	if status == "rejected" {
-		filt = bson.D{
-			{Key: "$match", Value: bson.M{
-				"$and": []bson.M{
-					{"accepted": bson.M{"$eq": 0}},
-					{"preauthorized": bson.M{"$eq": 0}},
-					{"pending": bson.M{"$eq": 0}},
-					{"rejected": bson.M{"$gt": 0}},
-				},
-			}},
-		}
-	}
-
-	cnt := bson.D{
-		{Key: "$count", Value: "count"}}
+	match := bson.D{{Key: "$match", Value: bson.D{{Key: "status", Value: status}}}}
+	count := bson.D{{Key: "$count", Value: "count"}}
 
 	var resp []bson.M
 
-	cursor, err := c.Aggregate(ctx, []bson.D{grp, proj, sum, filt, cnt})
+	cursor, err := c.Aggregate(ctx, []bson.D{match, count})
 	if err != nil {
 		return 0, err
 	}

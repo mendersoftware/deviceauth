@@ -12,11 +12,9 @@ d5a55eaa82e2c109b8bcadfa66139497511b80d665668264f155b5a45086b086  vendor/github.
 c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4  vendor/go.mongodb.org/mongo-driver/LICENSE
 f6918bd93ffe07f4b2c61b8287c32cb3122e08aed0be50f1c7d0eddc87877a8f  vendor/gopkg.in/ini.v1/LICENSE
 f7a4d9fa675c9347d97d6cb7b3142f733a828e8884eef461f30601f797f8248a  vendor/github.com/Azure/go-autorest/autorest/to/LICENSE
-f7a4d9fa675c9347d97d6cb7b3142f733a828e8884eef461f30601f797f8248a  vendor/github.com/Azure/go-autorest/autorest/LICENSE
-f7a4d9fa675c9347d97d6cb7b3142f733a828e8884eef461f30601f797f8248a  vendor/github.com/Azure/go-autorest/autorest/adal/LICENSE
-f7a4d9fa675c9347d97d6cb7b3142f733a828e8884eef461f30601f797f8248a  vendor/github.com/Azure/go-autorest/autorest/date/LICENSE
-f7a4d9fa675c9347d97d6cb7b3142f733a828e8884eef461f30601f797f8248a  vendor/github.com/Azure/go-autorest/logger/LICENSE
-f7a4d9fa675c9347d97d6cb7b3142f733a828e8884eef461f30601f797f8248a  vendor/github.com/Azure/go-autorest/tracing/LICENSE
+f7a4d9fa675c9347d97d6cb7b3142f733a828e8884eef461f30601f797f8248a  vendor/github.com/Azure/go-autorest/LICENSE
+03cfaf331a260694d06227a589cdd2b5fcfab474697b72e250736696c313655a  vendor/github.com/jmespath/go-jmespath/LICENSE
+cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30  vendor/github.com/aws/aws-sdk-go/LICENSE.txt
 #
 # BSD-2-Clause
 e45788cee53174eee4d7938484bedca0e66dcac6e92bec354b410273bdb5f6e7  vendor/github.com/magiconair/properties/LICENSE
@@ -38,6 +36,7 @@ f69f157b0be75da373605dbc8bbf142e8924ee82d8f44f11bcaf351335bf98cf  vendor/github.
 2d36597f7117c38b006835ae7f537487207d8ec407aa9d9980794b2030cbc067  vendor/golang.org/x/sync/LICENSE
 2d36597f7117c38b006835ae7f537487207d8ec407aa9d9980794b2030cbc067  vendor/golang.org/x/net/LICENSE
 75e1ca97a84a9da6051dee0114333388216f2c4a5a028296b882ff3d57274735  vendor/github.com/russross/blackfriday/v2/LICENSE.txt
+2d36597f7117c38b006835ae7f537487207d8ec407aa9d9980794b2030cbc067  vendor/github.com/aws/aws-sdk-go/internal/sync/singleflight/LICENSE
 #
 # MIT
 9964909ed0def8840643886cdc465b063b5978827bac01b886b15a47488064d4  vendor/github.com/alicebob/miniredis/LICENSE
@@ -74,4 +73,3 @@ bef1747eda88b9ed46e94830b0d978c3499dad5dfe38d364971760881901dadd  vendor/github.
 # ISC
 1b93a317849ee09d3d7e4f1d20c2b78ddb230b4becb12d7c224c927b9d470251  vendor/github.com/davecgh/go-spew/LICENSE
 7e12e5df4bae12cb21581ba157ced20e1986a0508dd10d0e8a4ab9a4cf94e85c  vendor/github.com/alicebob/gopher-json/LICENSE
-
