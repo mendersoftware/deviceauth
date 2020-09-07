@@ -335,25 +335,16 @@ func (d *DevAuthApiHandlers) GetTenantDevicesByID(w rest.ResponseWriter, r *rest
 // auth sets for all the devices with the given IDs. The returned model fulfills
 // the v2 device model.
 func (d *DevAuthApiHandlers) GetDevicesByIdV2Handler(w rest.ResponseWriter, r *rest.Request) {
+	var ids []string
 
+	defer r.Body.Close()
 	ctx := r.Context()
-
 	l := log.FromContext(ctx)
 
-	//validate req body by reading raw content manually
-	//(raw body will be needed later, DecodeJsonPayload would
-	//unmarshal and close it)
-	body, err := utils.ReadBodyRaw(r)
+	decoder := json.NewDecoder(r.Body)
+	err := decoder.Decode(&ids)
 	if err != nil {
-		err = errors.Wrap(err, "failed to decode device ids array")
-		rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
-		return
-	}
-
-	var ids []string
-	err = json.Unmarshal(body, &ids)
-	if err != nil {
-		err = errors.Wrap(err, "failed to decode auth request")
+		err = errors.Wrap(err, "api: error parsing JSON payload")
 		rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
 		return
 	}
@@ -364,13 +355,14 @@ func (d *DevAuthApiHandlers) GetDevicesByIdV2Handler(w rest.ResponseWriter, r *r
 		return
 	}
 
-	d.devAuth.FillDevicesAuthSets(ctx, devs)
-	len := len(devs)
-	outDevs, err := devicesV2FromDbModel(devs[:len])
+	_, err = d.devAuth.FillDevicesAuthSets(ctx, devs)
 	if err != nil {
 		rest_utils.RestErrWithLogInternal(w, r, l, err)
 		return
 	}
+
+	// NOTE: devicesV2FromDbModel cannot return an error
+	outDevs, _ := devicesV2FromDbModel(devs)
 
 	w.WriteHeader(http.StatusOK)
 	w.WriteJson(outDevs)
