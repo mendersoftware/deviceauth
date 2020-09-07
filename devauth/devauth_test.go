@@ -3335,3 +3335,113 @@ func TestPurgeUriArgs(t *testing.T) {
 	out = purgeUriArgs("/api/devices/v1/deployments/device/deployments/next")
 	assert.Equal(t, "/api/devices/v1/deployments/device/deployments/next", out)
 }
+
+func TestFillDevicesAuthSets(t *testing.T) {
+	testCases := []struct {
+		Name string
+
+		Devices []model.Device
+
+		StoreAuthSets []model.AuthSet
+		StoreError    error
+	}{{
+		Name: "ok",
+		Devices: []model.Device{{
+			Id:     "d6154f40-4ba5-4033-b0a5-3379baf322e3",
+			IdData: `{"mac": "00:11:22:33:44:55"}`,
+			IdDataStruct: map[string]interface{}{
+				"mac": "00:11:22:33:44:55",
+			},
+		}, {
+			Id:     "d6154f40-4ba5-4033-b0a5-3379baf322e4",
+			IdData: `{"sn": "1234567890"}`,
+			IdDataStruct: map[string]interface{}{
+				"sn": "1234567890",
+			},
+		}},
+
+		StoreAuthSets: []model.AuthSet{{
+			Id:     "d6154f40-4ba5-4033-b0a5-3379baf322e5",
+			IdData: `{"mac": "00:11:22:33:44:55"}`,
+			IdDataStruct: map[string]interface{}{
+				"mac": "00:11:22:33:44:55",
+			},
+			DeviceId: "d6154f40-4ba5-4033-b0a5-3379baf322e3",
+		}},
+	}, {
+		Name: "ok, no authsets found",
+		Devices: []model.Device{{
+			Id:     "d6154f40-4ba5-4033-b0a5-3379baf322e3",
+			IdData: `{"mac": "00:11:22:33:44:55"}`,
+			IdDataStruct: map[string]interface{}{
+				"mac": "00:11:22:33:44:55",
+			},
+		}, {
+			Id:     "d6154f40-4ba5-4033-b0a5-3379baf322e4",
+			IdData: `{"sn": "1234567890"}`,
+			IdDataStruct: map[string]interface{}{
+				"sn": "1234567890",
+			},
+		}},
+		StoreError: store.ErrAuthSetNotFound,
+	}, {
+		Name: "error, internal datastore error",
+		Devices: []model.Device{{
+			Id:     "d6154f40-4ba5-4033-b0a5-3379baf322e3",
+			IdData: `{"mac": "00:11:22:33:44:55"}`,
+			IdDataStruct: map[string]interface{}{
+				"mac": "00:11:22:33:44:55",
+			},
+		}, {
+			Id:     "d6154f40-4ba5-4033-b0a5-3379baf322e4",
+			IdData: `{"sn": "1234567890"}`,
+			IdDataStruct: map[string]interface{}{
+				"sn": "1234567890",
+			},
+		}},
+		StoreError: errors.New("store: internal error"),
+	}}
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			ds := &mstore.DataStore{}
+			devauth := NewDevAuth(ds, nil, nil, Config{})
+			defer ds.AssertExpectations(t)
+
+			if tc.StoreError != nil &&
+				tc.StoreError != store.ErrAuthSetNotFound {
+				ds.On("GetAuthSetsForDevice",
+					mtesting.ContextMatcher(),
+					tc.Devices[0].Id,
+				).Return(nil, tc.StoreError)
+			} else {
+				for i := range tc.Devices {
+					ds.On("GetAuthSetsForDevice",
+						mtesting.ContextMatcher(),
+						tc.Devices[i].Id,
+					).Return(tc.StoreAuthSets, tc.StoreError)
+				}
+			}
+
+			devsIn := make([]model.Device, len(tc.Devices))
+			copy(devsIn, tc.Devices)
+			devs, err := devauth.FillDevicesAuthSets(
+				context.TODO(), devsIn,
+			)
+			if tc.StoreError != nil &&
+				tc.StoreError != store.ErrAuthSetNotFound {
+				assert.EqualError(t, err,
+					"db get auth sets error: "+
+						tc.StoreError.Error(),
+				)
+				assert.Nil(t, devs)
+			} else {
+				assert.NoError(t, err)
+				devices := tc.Devices
+				for i := range devices {
+					devices[i].AuthSets = tc.StoreAuthSets
+				}
+				assert.Equal(t, devices, devs)
+			}
+		})
+	}
+}

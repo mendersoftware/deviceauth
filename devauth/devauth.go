@@ -606,7 +606,7 @@ func (d *DevAuth) FillDevicesAuthSets(ctx context.Context, devices []model.Devic
 			return nil, errors.Wrap(err, "db get auth sets error")
 		}
 	}
-	return devices, err
+	return devices, nil
 }
 
 func (d *DevAuth) GetDevices(ctx context.Context, skip, limit uint, filter store.DeviceFilter) ([]model.Device, error) {
