@@ -66,7 +66,13 @@ func cmdFirstKeyPos(cmd Cmder, info *CommandInfo) int {
 		return 0
 	case "publish":
 		return 1
+	case "memory":
+		// https://github.com/redis/redis/issues/7493
+		if cmd.stringArg(1) == "usage" {
+			return 2
+		}
 	}
+
 	if info == nil {
 		return 0
 	}
@@ -74,13 +80,13 @@ func cmdFirstKeyPos(cmd Cmder, info *CommandInfo) int {
 }
 
 func cmdString(cmd Cmder, val interface{}) string {
-	b := make([]byte, 0, 32)
+	b := make([]byte, 0, 64)
 
 	for i, arg := range cmd.Args() {
 		if i > 0 {
 			b = append(b, ' ')
 		}
-		b = appendArg(b, arg)
+		b = internal.AppendArg(b, arg)
 	}
 
 	if err := cmd.Err(); err != nil {
@@ -88,48 +94,10 @@ func cmdString(cmd Cmder, val interface{}) string {
 		b = append(b, err.Error()...)
 	} else if val != nil {
 		b = append(b, ": "...)
-
-		switch val := val.(type) {
-		case []byte:
-			b = append(b, val...)
-		default:
-			b = appendArg(b, val)
-		}
+		b = internal.AppendArg(b, val)
 	}
 
-	return string(b)
-}
-
-func appendArg(b []byte, v interface{}) []byte {
-	switch v := v.(type) {
-	case nil:
-		return append(b, "<nil>"...)
-	case string:
-		return append(b, v...)
-	case []byte:
-		return append(b, v...)
-	case int:
-		return strconv.AppendInt(b, int64(v), 10)
-	case int32:
-		return strconv.AppendInt(b, int64(v), 10)
-	case int64:
-		return strconv.AppendInt(b, v, 10)
-	case uint:
-		return strconv.AppendUint(b, uint64(v), 10)
-	case uint32:
-		return strconv.AppendUint(b, uint64(v), 10)
-	case uint64:
-		return strconv.AppendUint(b, v, 10)
-	case bool:
-		if v {
-			return append(b, "true"...)
-		}
-		return append(b, "false"...)
-	case time.Time:
-		return v.AppendFormat(b, time.RFC3339Nano)
-	default:
-		return append(b, fmt.Sprint(v)...)
-	}
+	return internal.String(b)
 }
 
 //------------------------------------------------------------------------------
@@ -336,7 +304,7 @@ func (cmd *Cmd) readReply(rd *proto.Reader) error {
 	return cmd.err
 }
 
-// Implements proto.MultiBulkParse
+// sliceParser implements proto.MultiBulkParse.
 func sliceParser(rd *proto.Reader, n int64) (interface{}, error) {
 	vals := make([]interface{}, n)
 	for i := 0; i < len(vals); i++ {
@@ -1104,7 +1072,7 @@ func (cmd *XMessageSliceCmd) readReply(rd *proto.Reader) error {
 	return nil
 }
 
-// Implements proto.MultiBulkParse
+// xMessageSliceParser implements proto.MultiBulkParse.
 func xMessageSliceParser(rd *proto.Reader, n int64) (interface{}, error) {
 	msgs := make([]XMessage, n)
 	for i := 0; i < len(msgs); i++ {
@@ -1139,7 +1107,7 @@ func xMessageSliceParser(rd *proto.Reader, n int64) (interface{}, error) {
 	return msgs, nil
 }
 
-// Implements proto.MultiBulkParse
+// stringInterfaceMapParser implements proto.MultiBulkParse.
 func stringInterfaceMapParser(rd *proto.Reader, n int64) (interface{}, error) {
 	m := make(map[string]interface{}, n/2)
 	for i := int64(0); i < n; i += 2 {
@@ -1889,7 +1857,7 @@ func newGeoLocationSliceParser(q *GeoRadiusQuery) proto.MultiBulkParse {
 					Name: vv,
 				})
 			case *GeoLocation:
-				//TODO: avoid copying
+				// TODO: avoid copying
 				locs = append(locs, *vv)
 			default:
 				return nil, fmt.Errorf("got %T, expected string or *GeoLocation", v)
@@ -2019,6 +1987,7 @@ type CommandInfo struct {
 	Name        string
 	Arity       int8
 	Flags       []string
+	ACLFlags    []string
 	FirstKeyPos int8
 	LastKeyPos  int8
 	StepCount   int8
@@ -2071,8 +2040,14 @@ func (cmd *CommandsInfoCmd) readReply(rd *proto.Reader) error {
 }
 
 func commandInfoParser(rd *proto.Reader, n int64) (interface{}, error) {
-	if n != 6 {
-		return nil, fmt.Errorf("redis: got %d elements in COMMAND reply, wanted 6", n)
+	const numArgRedis5 = 6
+	const numArgRedis6 = 7
+
+	switch n {
+	case numArgRedis5, numArgRedis6:
+		// continue
+	default:
+		return nil, fmt.Errorf("redis: got %d elements in COMMAND reply, wanted 7", n)
 	}
 
 	var cmd CommandInfo
@@ -2130,6 +2105,28 @@ func commandInfoParser(rd *proto.Reader, n int64) (interface{}, error) {
 			cmd.ReadOnly = true
 			break
 		}
+	}
+
+	if n == numArgRedis5 {
+		return &cmd, nil
+	}
+
+	_, err = rd.ReadReply(func(rd *proto.Reader, n int64) (interface{}, error) {
+		cmd.ACLFlags = make([]string, n)
+		for i := 0; i < len(cmd.ACLFlags); i++ {
+			switch s, err := rd.ReadString(); {
+			case err == Nil:
+				cmd.ACLFlags[i] = ""
+			case err != nil:
+				return nil, err
+			default:
+				cmd.ACLFlags[i] = s
+			}
+		}
+		return nil, nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	return &cmd, nil

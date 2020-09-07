@@ -14,6 +14,8 @@ import (
 
 	"github.com/go-redis/redis/v8/internal"
 	"github.com/go-redis/redis/v8/internal/pool"
+	"go.opentelemetry.io/otel/api/trace"
+	"go.opentelemetry.io/otel/label"
 )
 
 // Limiter is the interface of a rate limiter or a circuit breaker.
@@ -39,16 +41,18 @@ type Options struct {
 	Dialer func(ctx context.Context, network, addr string) (net.Conn, error)
 
 	// Hook that is called when new connection is established.
-	OnConnect func(*Conn) error
+	OnConnect func(ctx context.Context, cn *Conn) error
 
-	// Use the specified Username to authenticate the current connection with one of the connections defined in the ACL
-	// list when connecting to a Redis 6.0 instance, or greater, that is using the Redis ACL system.
+	// Use the specified Username to authenticate the current connection
+	// with one of the connections defined in the ACL list when connecting
+	// to a Redis 6.0 instance, or greater, that is using the Redis ACL system.
 	Username string
-
 	// Optional password. Must match the password specified in the
 	// requirepass server configuration option (if connecting to a Redis 5.0 instance, or lower),
-	// or the User Password when connecting to a Redis 6.0 instance, or greater, that is using the Redis ACL system.
+	// or the User Password when connecting to a Redis 6.0 instance, or greater,
+	// that is using the Redis ACL system.
 	Password string
+
 	// Database to be selected after connecting to the server.
 	DB int
 
@@ -100,6 +104,9 @@ type Options struct {
 	// Enables read only queries on slave nodes.
 	readOnly bool
 
+	// Enables read only queries on redis replicas in sentinel mode
+	sentinelReadOnly bool
+
 	// TLS Config to use. When set TLS will be negotiated.
 	TLSConfig *tls.Config
 
@@ -118,6 +125,9 @@ func (opt *Options) init() {
 			opt.Network = "tcp"
 		}
 	}
+	if opt.DialTimeout == 0 {
+		opt.DialTimeout = 5 * time.Second
+	}
 	if opt.Dialer == nil {
 		opt.Dialer = func(ctx context.Context, network, addr string) (net.Conn, error) {
 			netDialer := &net.Dialer{
@@ -132,9 +142,6 @@ func (opt *Options) init() {
 	}
 	if opt.PoolSize == 0 {
 		opt.PoolSize = 10 * runtime.NumCPU()
-	}
-	if opt.DialTimeout == 0 {
-		opt.DialTimeout = 5 * time.Second
 	}
 	switch opt.ReadTimeout {
 	case -1:
@@ -241,7 +248,14 @@ func newConnPool(opt *Options) *pool.ConnPool {
 			var conn net.Conn
 			err := internal.WithSpan(ctx, "dialer", func(ctx context.Context) error {
 				var err error
+				trace.SpanFromContext(ctx).SetAttributes(
+					label.String("redis.network", opt.Network),
+					label.String("redis.addr", opt.Addr),
+				)
 				conn, err = opt.Dialer(ctx, opt.Network, opt.Addr)
+				if err != nil {
+					_ = internal.RecordError(ctx, err)
+				}
 				return err
 			})
 			return conn, err

@@ -1,7 +1,5 @@
 # github.com/Azure/go-autorest v14.2.0+incompatible
 github.com/Azure/go-autorest
-# github.com/Azure/go-autorest/autorest v0.9.0
-## explicit
 # github.com/Azure/go-autorest/autorest/to v0.4.0
 ## explicit
 github.com/Azure/go-autorest/autorest/to
@@ -38,6 +36,8 @@ github.com/aws/aws-sdk-go/internal/strings
 github.com/aws/aws-sdk-go/internal/sync/singleflight
 github.com/aws/aws-sdk-go/private/protocol
 github.com/aws/aws-sdk-go/private/protocol/rest
+# github.com/cespare/xxhash/v2 v2.1.1
+github.com/cespare/xxhash/v2
 # github.com/cpuguy83/go-md2man/v2 v2.0.0-20190314233015-f79a8a8ca69d
 github.com/cpuguy83/go-md2man/v2/md2man
 # github.com/davecgh/go-spew v1.1.1
@@ -45,13 +45,14 @@ github.com/davecgh/go-spew/spew
 # github.com/dgrijalva/jwt-go v3.2.0+incompatible
 ## explicit
 github.com/dgrijalva/jwt-go
-# github.com/fsnotify/fsnotify v1.4.7
+# github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f
+github.com/dgryski/go-rendezvous
+# github.com/fsnotify/fsnotify v1.4.9
 github.com/fsnotify/fsnotify
-# github.com/go-redis/redis/v8 v8.0.0-beta.2
+# github.com/go-redis/redis/v8 v8.0.0-beta.10
 ## explicit
 github.com/go-redis/redis/v8
 github.com/go-redis/redis/v8/internal
-github.com/go-redis/redis/v8/internal/consistenthash
 github.com/go-redis/redis/v8/internal/hashtag
 github.com/go-redis/redis/v8/internal/pool
 github.com/go-redis/redis/v8/internal/proto
@@ -196,38 +197,40 @@ go.mongodb.org/mongo-driver/x/mongo/driver/session
 go.mongodb.org/mongo-driver/x/mongo/driver/topology
 go.mongodb.org/mongo-driver/x/mongo/driver/uuid
 go.mongodb.org/mongo-driver/x/mongo/driver/wiremessage
-# go.opentelemetry.io/otel v0.5.0
+# go.opentelemetry.io/otel v0.11.0
+go.opentelemetry.io/otel
 go.opentelemetry.io/otel/api/correlation
 go.opentelemetry.io/otel/api/global
 go.opentelemetry.io/otel/api/global/internal
-go.opentelemetry.io/otel/api/internal
-go.opentelemetry.io/otel/api/kv
-go.opentelemetry.io/otel/api/kv/value
 go.opentelemetry.io/otel/api/metric
 go.opentelemetry.io/otel/api/metric/registry
 go.opentelemetry.io/otel/api/propagation
 go.opentelemetry.io/otel/api/trace
 go.opentelemetry.io/otel/api/unit
-# golang.org/x/crypto v0.0.0-20190605123033-f99c8df09eb5
+go.opentelemetry.io/otel/codes
+go.opentelemetry.io/otel/internal
+go.opentelemetry.io/otel/label
+# golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550
 golang.org/x/crypto/ocsp
 golang.org/x/crypto/pbkdf2
-# golang.org/x/net v0.0.0-20200202094626-16171245cfb2
+# golang.org/x/exp v0.0.0-20200821190819-94841d0725da
+golang.org/x/exp/rand
+# golang.org/x/net v0.0.0-20200520004742-59133d7f0dd7
 golang.org/x/net/context
 # golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 golang.org/x/sync/errgroup
 golang.org/x/sync/semaphore
-# golang.org/x/sys v0.0.0-20191010194322-b09406accb47
+# golang.org/x/sys v0.0.0-20200615200032-f1bc736245b1
+golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/unix
 # golang.org/x/text v0.3.3
 golang.org/x/text/transform
 golang.org/x/text/unicode/norm
-# google.golang.org/grpc v1.29.1
-google.golang.org/grpc/codes
 # gopkg.in/ini.v1 v1.51.0
 gopkg.in/ini.v1
 # gopkg.in/tomb.v2 v2.0.0-20161208151619-d5d1b5820637
 gopkg.in/tomb.v2
-# gopkg.in/yaml.v2 v2.2.7
+# gopkg.in/yaml.v2 v2.3.0
 gopkg.in/yaml.v2
 # gopkg.in/yaml.v3 v3.0.0-20200615113413-eeeca48fe776
 ## explicit

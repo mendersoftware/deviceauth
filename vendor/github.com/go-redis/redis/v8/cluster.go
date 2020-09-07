@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"fmt"
 	"math"
-	"math/rand"
 	"net"
 	"runtime"
 	"sort"
@@ -17,6 +16,7 @@ import (
 	"github.com/go-redis/redis/v8/internal/hashtag"
 	"github.com/go-redis/redis/v8/internal/pool"
 	"github.com/go-redis/redis/v8/internal/proto"
+	"golang.org/x/exp/rand"
 )
 
 var errClusterNoNodes = fmt.Errorf("redis: cluster has no nodes")
@@ -26,6 +26,9 @@ var errClusterNoNodes = fmt.Errorf("redis: cluster has no nodes")
 type ClusterOptions struct {
 	// A seed list of host:port addresses of cluster nodes.
 	Addrs []string
+
+	// NewClient creates a cluster node client with provided name and options.
+	NewClient func(opt *Options) *Client
 
 	// The maximum number of retries before giving up. Command is retried
 	// on network errors and MOVED/ASK redirects.
@@ -48,14 +51,11 @@ type ClusterOptions struct {
 	// and Cluster.ReloadState to manually trigger state reloading.
 	ClusterSlots func() ([]ClusterSlot, error)
 
-	// Optional hook that is called when a new node is created.
-	OnNewNode func(*Client)
-
 	// Following options are copied from Options struct.
 
 	Dialer func(ctx context.Context, network, addr string) (net.Conn, error)
 
-	OnConnect func(*Conn) error
+	OnConnect func(ctx context.Context, cn *Conn) error
 
 	Username string
 	Password string
@@ -67,9 +67,6 @@ type ClusterOptions struct {
 	DialTimeout  time.Duration
 	ReadTimeout  time.Duration
 	WriteTimeout time.Duration
-
-	// NewClient creates a cluster node client with provided name and options.
-	NewClient func(opt *Options) *Client
 
 	// PoolSize applies per cluster node and not for the whole cluster.
 	PoolSize           int
@@ -179,10 +176,6 @@ func newClusterNode(clOpt *ClusterOptions, addr string) *clusterNode {
 		go node.updateLatency()
 	}
 
-	if clOpt.OnNewNode != nil {
-		clOpt.OnNewNode(node.Client)
-	}
-
 	return &node
 }
 
@@ -248,11 +241,11 @@ func (n *clusterNode) SetGeneration(gen uint32) {
 type clusterNodes struct {
 	opt *ClusterOptions
 
-	mu           sync.RWMutex
-	allAddrs     []string
-	allNodes     map[string]*clusterNode
-	clusterAddrs []string
-	closed       bool
+	mu          sync.RWMutex
+	addrs       []string
+	nodes       map[string]*clusterNode
+	activeAddrs []string
+	closed      bool
 
 	_generation uint32 // atomic
 }
@@ -261,8 +254,8 @@ func newClusterNodes(opt *ClusterOptions) *clusterNodes {
 	return &clusterNodes{
 		opt: opt,
 
-		allAddrs: opt.Addrs,
-		allNodes: make(map[string]*clusterNode),
+		addrs: opt.Addrs,
+		nodes: make(map[string]*clusterNode),
 	}
 }
 
@@ -276,14 +269,14 @@ func (c *clusterNodes) Close() error {
 	c.closed = true
 
 	var firstErr error
-	for _, node := range c.allNodes {
+	for _, node := range c.nodes {
 		if err := node.Client.Close(); err != nil && firstErr == nil {
 			firstErr = err
 		}
 	}
 
-	c.allNodes = nil
-	c.clusterAddrs = nil
+	c.nodes = nil
+	c.activeAddrs = nil
 
 	return firstErr
 }
@@ -293,10 +286,10 @@ func (c *clusterNodes) Addrs() ([]string, error) {
 	c.mu.RLock()
 	closed := c.closed
 	if !closed {
-		if len(c.clusterAddrs) > 0 {
-			addrs = c.clusterAddrs
+		if len(c.activeAddrs) > 0 {
+			addrs = c.activeAddrs
 		} else {
-			addrs = c.allAddrs
+			addrs = c.addrs
 		}
 	}
 	c.mu.RUnlock()
@@ -318,16 +311,20 @@ func (c *clusterNodes) NextGeneration() uint32 {
 func (c *clusterNodes) GC(generation uint32) {
 	//nolint:prealloc
 	var collected []*clusterNode
+
 	c.mu.Lock()
-	for addr, node := range c.allNodes {
+
+	c.activeAddrs = c.activeAddrs[:0]
+	for addr, node := range c.nodes {
 		if node.Generation() >= generation {
+			c.activeAddrs = append(c.activeAddrs, addr)
 			continue
 		}
 
-		c.clusterAddrs = remove(c.clusterAddrs, addr)
-		delete(c.allNodes, addr)
+		delete(c.nodes, addr)
 		collected = append(collected, node)
 	}
+
 	c.mu.Unlock()
 
 	for _, node := range collected {
@@ -351,18 +348,17 @@ func (c *clusterNodes) Get(addr string) (*clusterNode, error) {
 		return nil, pool.ErrClosed
 	}
 
-	node, ok := c.allNodes[addr]
+	node, ok := c.nodes[addr]
 	if ok {
-		return node, err
+		return node, nil
 	}
 
 	node = newClusterNode(c.opt, addr)
 
-	c.allAddrs = appendIfNotExists(c.allAddrs, addr)
-	c.clusterAddrs = append(c.clusterAddrs, addr)
-	c.allNodes[addr] = node
+	c.addrs = appendIfNotExists(c.addrs, addr)
+	c.nodes[addr] = node
 
-	return node, err
+	return node, nil
 }
 
 func (c *clusterNodes) get(addr string) (*clusterNode, error) {
@@ -372,7 +368,7 @@ func (c *clusterNodes) get(addr string) (*clusterNode, error) {
 	if c.closed {
 		err = pool.ErrClosed
 	} else {
-		node = c.allNodes[addr]
+		node = c.nodes[addr]
 	}
 	c.mu.RUnlock()
 	return node, err
@@ -386,8 +382,8 @@ func (c *clusterNodes) All() ([]*clusterNode, error) {
 		return nil, pool.ErrClosed
 	}
 
-	cp := make([]*clusterNode, 0, len(c.allNodes))
-	for _, node := range c.allNodes {
+	cp := make([]*clusterNode, 0, len(c.nodes))
+	for _, node := range c.nodes {
 		cp = append(cp, node)
 	}
 	return cp, nil
@@ -568,7 +564,11 @@ func (c *clusterState) slotClosestNode(slot int) (*clusterNode, error) {
 			node = n
 		}
 	}
-	return node, nil
+	if node != nil {
+		return node, nil
+	}
+	// If all nodes are failing - return random node
+	return c.nodes.Random()
 }
 
 func (c *clusterState) slotRandomNode(slot int) (*clusterNode, error) {
@@ -629,7 +629,7 @@ func (c *clusterStateHolder) LazyReload(ctx context.Context) {
 		if err != nil {
 			return
 		}
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(200 * time.Millisecond)
 	}()
 }
 
@@ -637,7 +637,7 @@ func (c *clusterStateHolder) Get(ctx context.Context) (*clusterState, error) {
 	v := c.state.Load()
 	if v != nil {
 		state := v.(*clusterState)
-		if time.Since(state.createdAt) > time.Minute {
+		if time.Since(state.createdAt) > 10*time.Second {
 			c.LazyReload(ctx)
 		}
 		return state, nil
@@ -787,10 +787,10 @@ func (c *ClusterClient) _process(ctx context.Context, cmd Cmder) error {
 		if lastErr == nil {
 			return nil
 		}
-		if lastErr != Nil {
-			c.state.LazyReload(ctx)
-		}
-		if lastErr == pool.ErrClosed || isReadOnlyError(lastErr) {
+		if isReadOnly := isReadOnlyError(lastErr); isReadOnly || lastErr == pool.ErrClosed {
+			if isReadOnly {
+				c.state.LazyReload(ctx)
+			}
 			node = nil
 			continue
 		}
@@ -814,7 +814,7 @@ func (c *ClusterClient) _process(ctx context.Context, cmd Cmder) error {
 			continue
 		}
 
-		if isRetryableError(lastErr, cmd.readTimeout() == nil) {
+		if shouldRetry(lastErr, cmd.readTimeout() == nil) {
 			// First retry the same node.
 			if attempt == 0 {
 				continue
@@ -907,9 +907,9 @@ func (c *ClusterClient) ForEachSlave(
 	}
 }
 
-// ForEachNode concurrently calls the fn on each known node in the cluster.
+// ForEachShard concurrently calls the fn on each known node in the cluster.
 // It returns the first error if any.
-func (c *ClusterClient) ForEachNode(
+func (c *ClusterClient) ForEachShard(
 	ctx context.Context,
 	fn func(ctx context.Context, client *Client) error,
 ) error {
@@ -1000,7 +1000,10 @@ func (c *ClusterClient) loadState(ctx context.Context) (*clusterState, error) {
 	}
 
 	var firstErr error
-	for _, addr := range addrs {
+
+	for _, idx := range rand.Perm(len(addrs)) {
+		addr := addrs[idx]
+
 		node, err := c.nodes.Get(addr)
 		if err != nil {
 			if firstErr == nil {
@@ -1020,6 +1023,16 @@ func (c *ClusterClient) loadState(ctx context.Context) (*clusterState, error) {
 		return newClusterState(c.nodes, slots, node.Client.opt.Addr)
 	}
 
+	/*
+	 * No node is connectable. It's possible that all nodes' IP has changed.
+	 * Clear activeAddrs to let client be able to re-connect using the initial
+	 * setting of the addresses (e.g. [redis-cluster-0:6379, redis-cluster-1:6379]),
+	 * which might have chance to resolve domain name and get updated IP address.
+	 */
+	c.nodes.mu.Lock()
+	c.nodes.activeAddrs = nil
+	c.nodes.mu.Unlock()
+
 	return nil, firstErr
 }
 
@@ -1037,7 +1050,7 @@ func (c *ClusterClient) reaper(idleCheckFrequency time.Duration) {
 		for _, node := range nodes {
 			_, err := node.Client.connPool.(*pool.ConnPool).ReapStaleConns()
 			if err != nil {
-				internal.Logger.Printf("ReapStaleConns failed: %s", err)
+				internal.Logger.Printf(c.Context(), "ReapStaleConns failed: %s", err)
 			}
 		}
 	}
@@ -1436,9 +1449,6 @@ func (c *ClusterClient) Watch(ctx context.Context, fn func(*Tx) error, keys ...s
 		if err == nil {
 			break
 		}
-		if err != Nil {
-			c.state.LazyReload(ctx)
-		}
 
 		moved, ask, addr := isMovedError(err)
 		if moved || ask {
@@ -1449,7 +1459,10 @@ func (c *ClusterClient) Watch(ctx context.Context, fn func(*Tx) error, keys ...s
 			continue
 		}
 
-		if err == pool.ErrClosed || isReadOnlyError(err) {
+		if isReadOnly := isReadOnlyError(err); isReadOnly || err == pool.ErrClosed {
+			if isReadOnly {
+				c.state.LazyReload(ctx)
+			}
 			node, err = c.slotMasterNode(ctx, slot)
 			if err != nil {
 				return err
@@ -1457,7 +1470,7 @@ func (c *ClusterClient) Watch(ctx context.Context, fn func(*Tx) error, keys ...s
 			continue
 		}
 
-		if isRetryableError(err, true) {
+		if shouldRetry(err, true) {
 			continue
 		}
 
@@ -1533,28 +1546,43 @@ func (c *ClusterClient) retryBackoff(attempt int) time.Duration {
 }
 
 func (c *ClusterClient) cmdsInfo() (map[string]*CommandInfo, error) {
+	// Try 3 random nodes.
+	const nodeLimit = 3
+
 	addrs, err := c.nodes.Addrs()
 	if err != nil {
 		return nil, err
 	}
 
 	var firstErr error
-	for _, addr := range addrs {
+
+	perm := rand.Perm(len(addrs))
+	if len(perm) > nodeLimit {
+		perm = perm[:nodeLimit]
+	}
+
+	for _, idx := range perm {
+		addr := addrs[idx]
+
 		node, err := c.nodes.Get(addr)
 		if err != nil {
-			return nil, err
-		}
-		if node == nil {
+			if firstErr == nil {
+				firstErr = err
+			}
 			continue
 		}
 
-		info, err := node.Client.Command(context.TODO()).Result()
+		info, err := node.Client.Command(c.ctx).Result()
 		if err == nil {
 			return info, nil
 		}
 		if firstErr == nil {
 			firstErr = err
 		}
+	}
+
+	if firstErr == nil {
+		panic("not reached")
 	}
 	return nil, firstErr
 }
@@ -1567,7 +1595,7 @@ func (c *ClusterClient) cmdInfo(name string) *CommandInfo {
 
 	info := cmdsInfo[name]
 	if info == nil {
-		internal.Logger.Printf("info for cmd=%s not found", name)
+		internal.Logger.Printf(c.Context(), "info for cmd=%s not found", name)
 	}
 	return info
 }
@@ -1642,21 +1670,6 @@ loop:
 			}
 		}
 		ss = append(ss, e)
-	}
-	return ss
-}
-
-func remove(ss []string, es ...string) []string {
-	if len(es) == 0 {
-		return ss[:0]
-	}
-	for _, e := range es {
-		for i, s := range ss {
-			if s == e {
-				ss = append(ss[:i], ss[i+1:]...)
-				break
-			}
-		}
 	}
 	return ss
 }

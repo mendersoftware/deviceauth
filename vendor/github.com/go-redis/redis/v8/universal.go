@@ -20,23 +20,29 @@ type UniversalOptions struct {
 
 	// Common options.
 
-	Dialer             func(ctx context.Context, network, addr string) (net.Conn, error)
-	OnConnect          func(*Conn) error
-	Username           string
-	Password           string
-	MaxRetries         int
-	MinRetryBackoff    time.Duration
-	MaxRetryBackoff    time.Duration
-	DialTimeout        time.Duration
-	ReadTimeout        time.Duration
-	WriteTimeout       time.Duration
+	Dialer    func(ctx context.Context, network, addr string) (net.Conn, error)
+	OnConnect func(ctx context.Context, cn *Conn) error
+
+	Username         string
+	Password         string
+	SentinelPassword string
+
+	MaxRetries      int
+	MinRetryBackoff time.Duration
+	MaxRetryBackoff time.Duration
+
+	DialTimeout  time.Duration
+	ReadTimeout  time.Duration
+	WriteTimeout time.Duration
+
 	PoolSize           int
 	MinIdleConns       int
 	MaxConnAge         time.Duration
 	PoolTimeout        time.Duration
 	IdleTimeout        time.Duration
 	IdleCheckFrequency time.Duration
-	TLSConfig          *tls.Config
+
+	TLSConfig *tls.Config
 
 	// Only cluster clients.
 
@@ -100,9 +106,10 @@ func (o *UniversalOptions) Failover() *FailoverOptions {
 		Dialer:    o.Dialer,
 		OnConnect: o.OnConnect,
 
-		DB:       o.DB,
-		Username: o.Username,
-		Password: o.Password,
+		DB:               o.DB,
+		Username:         o.Username,
+		Password:         o.Password,
+		SentinelPassword: o.SentinelPassword,
 
 		MaxRetries:      o.MaxRetries,
 		MinRetryBackoff: o.MinRetryBackoff,
@@ -176,9 +183,11 @@ type UniversalClient interface {
 	Close() error
 }
 
-var _ UniversalClient = (*Client)(nil)
-var _ UniversalClient = (*ClusterClient)(nil)
-var _ UniversalClient = (*Ring)(nil)
+var (
+	_ UniversalClient = (*Client)(nil)
+	_ UniversalClient = (*ClusterClient)(nil)
+	_ UniversalClient = (*Ring)(nil)
+)
 
 // NewUniversalClient returns a new multi client. The type of client returned depends
 // on the following three conditions:
