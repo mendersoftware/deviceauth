@@ -2485,6 +2485,137 @@ func TestStoreGetDeviceById(t *testing.T) {
 	}
 }
 
+func TestGetDevicesById(t *testing.T) {
+	testCases := []struct {
+		Name string
+		CTX  context.Context
+
+		DeviceIDs []string
+		Devices   []model.Device
+
+		ExpectedCount int
+		Error         error
+	}{{
+		Name: "ok",
+
+		CTX: context.Background(),
+
+		DeviceIDs: []string{"d6154f40-4ba5-4033-b0a5-3379baf322e3"},
+		Devices: []model.Device{{
+			Id:     "d6154f40-4ba5-4033-b0a5-3379baf322e3",
+			IdData: `{"mac": "00:11:22:33:44:55"}`,
+			IdDataStruct: map[string]interface{}{
+				"mac": "00:11:22:33:44:55",
+			},
+			IdDataSha256: []byte("c715e514a804d9a61106dd605e393940" +
+				"d0e10b890cd6f057c9312e3ebe5ff1d8"),
+		}, {
+			Id:     "d6154f40-4ba5-4033-b0a5-3379baf322e4",
+			IdData: `{"sn": "1234567890"}`,
+			IdDataStruct: map[string]interface{}{
+				"sn": "1234567890",
+			},
+			IdDataSha256: []byte("a73524cff4e03b802a02f3a8d517caab" +
+				"7fd8dac1ba752ff469d136a55ecb0ba7"),
+		}},
+		ExpectedCount: 1,
+	}, {
+		Name: "ok, with tenant",
+
+		CTX: identity.WithContext(
+			context.Background(),
+			&identity.Identity{
+				Tenant: oid.NewBSONID().String(),
+			},
+		),
+
+		DeviceIDs: []string{"d6154f40-4ba5-4033-b0a5-3379baf322e3"},
+		Devices: []model.Device{{
+			Id:     "d6154f40-4ba5-4033-b0a5-3379baf322e3",
+			IdData: `{"mac": "00:11:22:33:44:55"}`,
+			IdDataStruct: map[string]interface{}{
+				"mac": "00:11:22:33:44:55",
+			},
+			IdDataSha256: []byte("c715e514a804d9a61106dd605e393940" +
+				"d0e10b890cd6f057c9312e3ebe5ff1d8"),
+		}, {
+			Id:     "d6154f40-4ba5-4033-b0a5-3379baf322e4",
+			IdData: `{"sn": "1234567890"}`,
+			IdDataStruct: map[string]interface{}{
+				"sn": "1234567890",
+			},
+			IdDataSha256: []byte("a73524cff4e03b802a02f3a8d517caab" +
+				"7fd8dac1ba752ff469d136a55ecb0ba7"),
+		}},
+		ExpectedCount: 1,
+	}, {
+		Name: "error, context canceled",
+
+		CTX: func() context.Context {
+			ctx, cancel := context.WithCancel(context.TODO())
+			cancel()
+			return ctx
+		}(),
+
+		DeviceIDs: []string{"d6154f40-4ba5-4033-b0a5-3379baf322e3"},
+		Devices: []model.Device{{
+			Id:     "d6154f40-4ba5-4033-b0a5-3379baf322e3",
+			IdData: `{"mac": "00:11:22:33:44:55"}`,
+			IdDataStruct: map[string]interface{}{
+				"mac": "00:11:22:33:44:55",
+			},
+			IdDataSha256: []byte("c715e514a804d9a61106dd605e393940" +
+				"d0e10b890cd6f057c9312e3ebe5ff1d8"),
+		}, {
+			Id:     "d6154f40-4ba5-4033-b0a5-3379baf322e4",
+			IdData: `{"sn": "1234567890"}`,
+			IdDataStruct: map[string]interface{}{
+				"sn": "1234567890",
+			},
+			IdDataSha256: []byte("a73524cff4e03b802a02f3a8d517caab" +
+				"7fd8dac1ba752ff469d136a55ecb0ba7"),
+		}},
+		Error: context.Canceled,
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			db.Wipe()
+			ds := &DataStoreMongo{
+				client:      db.Client(),
+				multitenant: true,
+			}
+			collDevs := db.Client().
+				Database(ctxstore.DbFromContext(tc.CTX, DbName)).
+				Collection(DbDevicesColl)
+			ins := make([]interface{}, len(tc.Devices))
+			for i, dev := range tc.Devices {
+				ins[i] = dev
+			}
+			res, err := collDevs.InsertMany(context.Background(), ins)
+			if !assert.NoError(t, err) ||
+				!assert.Len(t, res.InsertedIDs, len(ins)) {
+				panic("[TEST ERROR] Failed to initialize test case")
+			}
+
+			devs, err := ds.GetDevicesById(tc.CTX, tc.DeviceIDs)
+			if tc.Error != nil {
+				if assert.Error(t, err) {
+					assert.Contains(t,
+						err.Error(),
+						tc.Error.Error(),
+					)
+				}
+			} else {
+				assert.Len(t, devs, tc.ExpectedCount)
+				for _, dev := range devs {
+					assert.Contains(t, tc.DeviceIDs, dev.Id)
+				}
+			}
+		})
+	}
+}
+
 func getIdDataHash(idData string) []byte {
 	hash := sha256.New()
 	hash.Write([]byte(idData))
