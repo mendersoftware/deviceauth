@@ -240,13 +240,15 @@ func (d *DevAuthApiHandlers) PostDevicesV2Handler(w rest.ResponseWriter, r *rest
 		return
 	}
 
-	err = d.devAuth.PreauthorizeDevice(ctx, reqDbModel)
+	device, err := d.devAuth.PreauthorizeDevice(ctx, reqDbModel)
 	switch err {
 	case nil:
 		w.Header().Set("Location", "devices/"+reqDbModel.DeviceId)
 		w.WriteHeader(http.StatusCreated)
 	case devauth.ErrDeviceExists:
-		rest_utils.RestErrWithLog(w, r, l, err, http.StatusConflict)
+		l.Error(err)
+		w.WriteHeader(http.StatusConflict)
+		w.WriteJson(device)
 	default:
 		rest_utils.RestErrWithLogInternal(w, r, l, err)
 	}

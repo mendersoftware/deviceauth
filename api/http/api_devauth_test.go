@@ -409,6 +409,9 @@ func TestApiV2DevAuthPreauthDevice(t *testing.T) {
 		body interface{}
 
 		devAuthErr error
+		outDev     *model.Device
+
+		callApp bool
 
 		checker mt.ResponseChecker
 	}{
@@ -419,6 +422,7 @@ func TestApiV2DevAuthPreauthDevice(t *testing.T) {
 				},
 				PubKey: pubkeyStr,
 			},
+			callApp: true,
 			checker: mt.NewJSONResponse(
 				http.StatusCreated,
 				nil,
@@ -431,6 +435,7 @@ func TestApiV2DevAuthPreauthDevice(t *testing.T) {
 				},
 				PubKey: pubkeyStr,
 			},
+			callApp: true,
 			checker: NewJSONResponseIDChecker(
 				http.StatusCreated,
 				map[string]string{"Location": "devices/somegeneratedid"},
@@ -493,10 +498,12 @@ func TestApiV2DevAuthPreauthDevice(t *testing.T) {
 				PubKey: pubkeyStr,
 			},
 			devAuthErr: devauth.ErrDeviceExists,
+			outDev:     &model.Device{Id: "foo"},
+			callApp:    true,
 			checker: mt.NewJSONResponse(
 				http.StatusConflict,
 				nil,
-				restError("device already exists")),
+				model.Device{Id: "foo"}),
 		},
 		"devauth: generic error": {
 			body: &preAuthReq{
@@ -505,6 +512,7 @@ func TestApiV2DevAuthPreauthDevice(t *testing.T) {
 				},
 				PubKey: pubkeyStr,
 			},
+			callApp:    true,
 			devAuthErr: errors.New("generic"),
 			checker: mt.NewJSONResponse(
 				http.StatusInternalServerError,
@@ -516,10 +524,12 @@ func TestApiV2DevAuthPreauthDevice(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(fmt.Sprintf("tc %s", name), func(t *testing.T) {
 			da := &mocks.App{}
-			da.On("PreauthorizeDevice",
-				mtest.ContextMatcher(),
-				mock.AnythingOfType("*model.PreAuthReq")).
-				Return(tc.devAuthErr)
+			if tc.callApp {
+				da.On("PreauthorizeDevice",
+					mtest.ContextMatcher(),
+					mock.AnythingOfType("*model.PreAuthReq")).
+					Return(tc.outDev, tc.devAuthErr)
+			}
 
 			apih := makeMockApiHandler(t, da, nil)
 
@@ -531,6 +541,7 @@ func TestApiV2DevAuthPreauthDevice(t *testing.T) {
 
 			recorded := test.RunRequest(t, apih, req)
 			mt.CheckResponse(t, tc.checker, recorded)
+			da.AssertExpectations(t)
 		})
 	}
 }
