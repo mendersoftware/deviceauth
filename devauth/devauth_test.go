@@ -905,6 +905,10 @@ func TestDevAuthPreauthorizeDevice(t *testing.T) {
 	deviceID := oid.NewUUIDv5("did").String()
 	idData := "{\"mac\":\"00:00:00:01\"}"
 	pubKey := "pubkey"
+	idDataStruct := map[string]interface{}{"mac": "00:00:00:01"}
+
+	_, idDataSha256, err := parseIdData(idData)
+	assert.NoError(t, err)
 
 	req := &model.PreAuthReq{
 		AuthSetId: authsetID,
@@ -926,40 +930,58 @@ func TestDevAuthPreauthorizeDevice(t *testing.T) {
 
 		addDeviceErr  error
 		addAuthSetErr error
+		getDevByIdErr error
+		inventoryErr  error
 
-		err error
+		callOrchestrator bool
+		callInventory    bool
+		callDb           bool
+
+		outDev *model.Device
+		err    error
 	}{
 		{
-			desc: "ok",
-			req:  req,
+			desc:             "ok",
+			req:              req,
+			callOrchestrator: true,
+			callInventory:    true,
+			callDb:           true,
 		},
 		{
-			desc: "error: add device, exists",
-			req:  req,
+			desc:   "error: add device, exists",
+			req:    req,
+			callDb: true,
 
 			addDeviceErr: store.ErrObjectExists,
 
-			err: ErrDeviceExists,
+			outDev: &model.Device{Id: deviceID},
+			err:    ErrDeviceExists,
 		},
 		{
-			desc: "error: add device, generic",
-			req:  req,
+			desc:   "error: add device, generic",
+			req:    req,
+			callDb: true,
 
 			addDeviceErr: errors.New("generic error"),
 
 			err: errors.New("failed to add device: generic error"),
 		},
 		{
-			desc: "error: add auth set, exists",
-			req:  req,
+			desc:             "error: add auth set, exists",
+			req:              req,
+			callOrchestrator: true,
+			callDb:           true,
 
 			addAuthSetErr: store.ErrObjectExists,
 
-			err: ErrDeviceExists,
+			outDev: &model.Device{Id: deviceID},
+			err:    ErrDeviceExists,
 		},
 		{
-			desc: "error: add auth set, exists",
-			req:  req,
+			desc:             "error: add auth set, exists",
+			req:              req,
+			callOrchestrator: true,
+			callDb:           true,
 
 			addAuthSetErr: errors.New("generic error"),
 
@@ -985,37 +1007,75 @@ func TestDevAuthPreauthorizeDevice(t *testing.T) {
 			})
 
 			db := mstore.DataStore{}
-			db.On("AddDevice",
-				ctxMatcher,
-				mock.MatchedBy(
-					func(d model.Device) bool {
-						return (d.IdData == tc.req.IdData) &&
-							(d.Id == tc.req.DeviceId) &&
-							(d.PubKey == tc.req.PubKey)
-					})).Return(tc.addDeviceErr)
+			if tc.callDb {
+				db.On("AddDevice",
+					ctxMatcher,
+					mock.MatchedBy(
+						func(d model.Device) bool {
+							return (d.IdData == tc.req.IdData) &&
+								(d.Id == tc.req.DeviceId) &&
+								(d.PubKey == tc.req.PubKey)
+						})).Return(tc.addDeviceErr)
 
-			db.On("AddAuthSet",
-				ctxMatcher,
-				mock.MatchedBy(
-					func(m model.AuthSet) bool {
-						return (m.Id == tc.req.AuthSetId) &&
-							(m.DeviceId == tc.req.DeviceId) &&
-							(m.IdData == tc.req.IdData) &&
-							(m.PubKey == tc.req.PubKey)
-					})).Return(tc.addAuthSetErr)
+				if tc.addDeviceErr == nil {
+					db.On("AddAuthSet",
+						ctxMatcher,
+						mock.MatchedBy(
+							func(m model.AuthSet) bool {
+								return (m.Id == tc.req.AuthSetId) &&
+									(m.DeviceId == tc.req.DeviceId) &&
+									(m.IdData == tc.req.IdData) &&
+									(m.PubKey == tc.req.PubKey)
+							})).Return(tc.addAuthSetErr)
+				}
+			}
 
 			co := morchestrator.ClientRunner{}
-			co.On("SubmitUpdateDeviceStatusJob", ctxMatcher,
-				mock.AnythingOfType("orchestrator.UpdateDeviceStatusReq")).
-				Return(nil)
+			if tc.callOrchestrator {
+				co.On("SubmitUpdateDeviceStatusJob", ctxMatcher,
+					mock.AnythingOfType("orchestrator.UpdateDeviceStatusReq")).
+					Return(nil)
+			}
+
+			if tc.err == ErrDeviceExists {
+				db.On("GetDeviceByIdentityDataHash",
+					ctxMatcher,
+					idDataSha256).Return(
+					func(ctx context.Context, idDataHash []byte) *model.Device {
+						if tc.getDevByIdErr == nil {
+							return &model.Device{
+								PubKey:       "dummy_key",
+								IdDataSha256: idDataSha256,
+								Id:           deviceID,
+							}
+						}
+						return nil
+					},
+					tc.getDevByIdErr)
+			}
 			devauth := NewDevAuth(&db, &co, nil, Config{})
-			err := devauth.PreauthorizeDevice(context.Background(), tc.req)
+			inv := &minv.Client{}
+			devauth.invClient = inv
+			if tc.callInventory {
+				inv.On("SetDeviceIdentity", ctxMatcher, mock.AnythingOfType("string"), deviceID, idDataStruct).
+					Return(tc.inventoryErr)
+			}
+			dev, err := devauth.PreauthorizeDevice(context.Background(), tc.req)
 
 			if tc.err != nil {
 				assert.EqualError(t, err, tc.err.Error())
 			} else {
 				assert.NoError(t, err)
 			}
+
+			if tc.outDev != nil {
+				assert.Equal(t, tc.outDev.Id, dev.Id)
+			} else {
+				assert.Nil(t, dev)
+			}
+			co.AssertExpectations(t)
+			inv.AssertExpectations(t)
+			db.AssertExpectations(t)
 		})
 	}
 }
