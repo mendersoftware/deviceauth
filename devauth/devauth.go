@@ -106,7 +106,7 @@ type App interface {
 	AcceptDeviceAuth(ctx context.Context, dev_id string, auth_id string) error
 	RejectDeviceAuth(ctx context.Context, dev_id string, auth_id string) error
 	ResetDeviceAuth(ctx context.Context, dev_id string, auth_id string) error
-	PreauthorizeDevice(ctx context.Context, req *model.PreAuthReq) error
+	PreauthorizeDevice(ctx context.Context, req *model.PreAuthReq) (*model.Device, error)
 
 	RevokeToken(ctx context.Context, tokenID string) error
 	VerifyToken(ctx context.Context, token string) error
@@ -917,19 +917,22 @@ func parseIdData(idData string) (map[string]interface{}, []byte, error) {
 	return idDataStruct, idDataSha256, nil
 }
 
-func (d *DevAuth) PreauthorizeDevice(ctx context.Context, req *model.PreAuthReq) error {
+func (d *DevAuth) PreauthorizeDevice(ctx context.Context, req *model.PreAuthReq) (*model.Device, error) {
 	// try add device, if a device with the given id_data exists -
 	// the unique index on id_data will prevent it (conflict)
 	// this is the only safeguard against id data conflict - we won't try to handle it
 	// additionally on inserting the auth set (can't add an id data index on auth set - would prevent key rotation)
 
 	// FIXME: tenant_token is "" on purpose, will be removed
+
+	l := log.FromContext(ctx)
+
 	dev := model.NewDevice(req.DeviceId, req.IdData, req.PubKey)
 	dev.Status = model.DevStatusPreauth
 
 	idDataStruct, idDataSha256, err := parseIdData(req.IdData)
 	if err != nil {
-		return MakeErrDevAuthBadRequest(err)
+		return nil, MakeErrDevAuthBadRequest(err)
 	}
 
 	dev.IdDataStruct = idDataStruct
@@ -940,15 +943,20 @@ func (d *DevAuth) PreauthorizeDevice(ctx context.Context, req *model.PreAuthReq)
 	case nil:
 		break
 	case store.ErrObjectExists:
-		return ErrDeviceExists
+		dev, err = d.db.GetDeviceByIdentityDataHash(ctx, idDataSha256)
+		if err != nil {
+			l.Error("failed to find device but could not preauthorize either")
+			return nil, errors.New("failed to preauthorize device")
+		}
+		return dev, ErrDeviceExists
 	default:
-		return errors.Wrap(err, "failed to add device")
+		return nil, errors.Wrap(err, "failed to add device")
 	}
 
 	// submit device status change job
 	b, err := json.Marshal([]string{dev.Id})
 	if err != nil {
-		return errors.New("internal error: cannot marshal array into json")
+		return nil, errors.New("internal error: cannot marshal array into json")
 	}
 
 	tenantId := ""
@@ -956,8 +964,6 @@ func (d *DevAuth) PreauthorizeDevice(ctx context.Context, req *model.PreAuthReq)
 	if idData != nil {
 		tenantId = idData.Tenant
 	}
-
-	d.invClient.SetDeviceIdentity(ctx, tenantId, dev.Id, dev.IdDataStruct)
 
 	if err = d.cOrch.SubmitUpdateDeviceStatusJob(
 		ctx,
@@ -967,7 +973,7 @@ func (d *DevAuth) PreauthorizeDevice(ctx context.Context, req *model.PreAuthReq)
 			TenantId:  tenantId,
 			Status:    dev.Status,
 		}); err != nil {
-		return errors.Wrap(err, "update device status job error")
+		return nil, errors.Wrap(err, "update device status job error")
 	}
 
 	// record authentication request
@@ -985,12 +991,19 @@ func (d *DevAuth) PreauthorizeDevice(ctx context.Context, req *model.PreAuthReq)
 	err = d.db.AddAuthSet(ctx, authset)
 	switch err {
 	case nil:
-		d.invClient.SetDeviceIdentity(ctx, tenantId, req.DeviceId, idDataStruct)
-		return nil
+		if err := d.invClient.SetDeviceIdentity(ctx, tenantId, dev.Id, dev.IdDataStruct); err != nil {
+			return nil, errors.Wrap(err, "failed to propagate device identity to inventory service")
+		}
+		return nil, nil
 	case store.ErrObjectExists:
-		return ErrDeviceExists
+		dev, err = d.db.GetDeviceByIdentityDataHash(ctx, idDataSha256)
+		if err != nil {
+			l.Error("failed to find device but could not preauthorize either")
+			return nil, errors.New("failed to preauthorize device")
+		}
+		return dev, ErrDeviceExists
 	default:
-		return errors.Wrap(err, "failed to add auth set")
+		return nil, errors.Wrap(err, "failed to add auth set")
 	}
 }
 
