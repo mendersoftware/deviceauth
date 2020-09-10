@@ -8,21 +8,19 @@ stages:
   - publish
 
 include:
-  - project: 'Northern.tech/Mender/mendertesting'
-    file: '.gitlab-ci-check-golang-static.yml'
-  - project: 'Northern.tech/Mender/mendertesting'
-    file: '.gitlab-ci-check-golang-unittests.yml'
-  - project: 'Northern.tech/Mender/mendertesting'
-    file: '.gitlab-ci-check-docker-acceptance.yml'
-  - project: 'Northern.tech/Mender/mendertesting'
-    file: '.gitlab-ci-check-apidocs.yml'
-  - project: 'Northern.tech/Mender/mendertesting'
-    file: '.gitlab-ci-check-docker-build.yml'
-  - project: 'Northern.tech/Mender/mendertesting'
-    file: '.gitlab-ci-github-status-updates.yml'
+  # - project: 'Northern.tech/Mender/mendertesting'
+  #   file: '.gitlab-ci-check-golang-static.yml'
+  - remote: 'https://raw.githubusercontent.com/lluiscampos/mendertesting/QA-220-migrate-to-coveralls/.gitlab-ci-check-golang-unittests.yml'
+  - remote: 'https://raw.githubusercontent.com/lluiscampos/mendertesting/QA-220-migrate-to-coveralls/.gitlab-ci-check-docker-acceptance.yml'
+  # - project: 'Northern.tech/Mender/mendertesting'
+  #   file: '.gitlab-ci-check-apidocs.yml'
+  # - project: 'Northern.tech/Mender/mendertesting'
+  #   file: '.gitlab-ci-check-docker-build.yml'
+  # - project: 'Northern.tech/Mender/mendertesting'
+  #   file: '.gitlab-ci-github-status-updates.yml'
 
-test:static:
-  image: golang:1.14
+# test:static:
+#   image: golang:1.14
 
 test:unit:
   image: golang:1.14
