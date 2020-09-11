@@ -334,11 +334,11 @@ func (_m *DataStore) GetDeviceStatus(ctx context.Context, dev_id string) (string
 }
 
 // GetDevices provides a mock function with given fields: ctx, skip, limit, filter
-func (_m *DataStore) GetDevices(ctx context.Context, skip uint, limit uint, filter store.DeviceFilter) ([]model.Device, error) {
+func (_m *DataStore) GetDevices(ctx context.Context, skip uint, limit uint, filter model.DeviceFilter) ([]model.Device, error) {
 	ret := _m.Called(ctx, skip, limit, filter)
 
 	var r0 []model.Device
-	if rf, ok := ret.Get(0).(func(context.Context, uint, uint, store.DeviceFilter) []model.Device); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, uint, uint, model.DeviceFilter) []model.Device); ok {
 		r0 = rf(ctx, skip, limit, filter)
 	} else {
 		if ret.Get(0) != nil {
@@ -347,7 +347,7 @@ func (_m *DataStore) GetDevices(ctx context.Context, skip uint, limit uint, filt
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, uint, uint, store.DeviceFilter) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, uint, uint, model.DeviceFilter) error); ok {
 		r1 = rf(ctx, skip, limit, filter)
 	} else {
 		r1 = ret.Error(1)

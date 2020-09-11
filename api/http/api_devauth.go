@@ -68,8 +68,6 @@ const (
 var (
 	ErrIncorrectStatus = errors.New("incorrect device status")
 	ErrNoAuthHeader    = errors.New("no authorization header")
-
-	DevStatuses = []string{model.DevStatusPending, model.DevStatusRejected, model.DevStatusAccepted, model.DevStatusPreauth}
 )
 
 type DevAuthApiHandlers struct {
@@ -266,16 +264,21 @@ func (d *DevAuthApiHandlers) GetDevicesV2Handler(w rest.ResponseWriter, r *rest.
 		return
 	}
 
-	status, err := rest_utils.ParseQueryParmStr(r, model.DevKeyStatus, false, DevStatuses)
-	if err != nil {
+	if err = r.ParseForm(); err != nil {
+		err = errors.Wrap(err, "api: malformed query parameters")
+		rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		return
+	}
+
+	fltr := model.DeviceFilter{}
+	if err = fltr.ParseForm(r.Form); err != nil {
 		rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
 		return
 	}
 
 	skip := (page - 1) * perPage
 	limit := perPage + 1
-	devs, err := d.devAuth.GetDevices(ctx, uint(skip), uint(limit),
-		store.DeviceFilter{Status: status})
+	devs, err := d.devAuth.GetDevices(ctx, uint(skip), uint(limit), fltr)
 	if err != nil {
 		rest_utils.RestErrWithLogInternal(w, r, l, err)
 		return

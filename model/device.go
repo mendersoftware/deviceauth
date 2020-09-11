@@ -14,9 +14,12 @@
 package model
 
 import (
+	"net/url"
 	"time"
 
+	"github.com/asaskevich/govalidator"
 	"github.com/mendersoftware/go-lib-micro/ratelimits"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -29,6 +32,15 @@ const (
 	DevKeyIdData       = "id_data"
 	DevKeyIdDataSha256 = "id_data_sha256"
 	DevKeyStatus       = "status"
+)
+
+var (
+	DevStatuses = []string{
+		DevStatusPending,
+		DevStatusRejected,
+		DevStatusAccepted,
+		DevStatusPreauth,
+	}
 )
 
 // note: fields with underscores need the 'bson' decorator
@@ -70,4 +82,36 @@ func NewDevice(id, id_data, pubkey string) *Device {
 		CreatedTs:       now,
 		UpdatedTs:       now,
 	}
+}
+
+type DeviceFilter struct {
+	Status *string  `bson:"status,omitempty"`
+	IDs    []string `bson:"-"`
+}
+
+func (fltr DeviceFilter) Validate() error {
+	if fltr.Status != nil && !govalidator.IsIn(*fltr.Status,
+		DevStatusPending,
+		DevStatusRejected,
+		DevStatusAccepted,
+		DevStatusPreauth,
+	) {
+		return errors.Errorf(
+			`parameter status must be one of: `+
+				`%s, %s, %s or %s`,
+			DevStatusPending, DevStatusRejected,
+			DevStatusAccepted, DevStatusPreauth,
+		)
+	}
+	return nil
+}
+
+func (fltr *DeviceFilter) ParseForm(form url.Values) error {
+	if status := form.Get("status"); status != "" {
+		fltr.Status = &status
+	}
+	if IDs, ok := form["id"]; ok {
+		fltr.IDs = IDs
+	}
+	return fltr.Validate()
 }

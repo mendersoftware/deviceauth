@@ -1023,7 +1023,7 @@ func TestApiV2GetDevices(t *testing.T) {
 			da := &mocks.App{}
 			da.On("GetDevices",
 				mtest.ContextMatcher(),
-				tc.skip, tc.limit, mock.AnythingOfType("store.DeviceFilter")).Return(
+				tc.skip, tc.limit, mock.AnythingOfType("model.DeviceFilter")).Return(
 				tc.devices, tc.err)
 
 			apih := makeMockApiHandler(t, da, nil)
@@ -1937,7 +1937,7 @@ func TestApiGetTenantDevicesV2(t *testing.T) {
 					}
 					return true
 				}),
-				tc.skip, tc.limit, mock.AnythingOfType("store.DeviceFilter")).Return(
+				tc.skip, tc.limit, mock.AnythingOfType("model.DeviceFilter")).Return(
 				tc.devices, tc.err)
 
 			apih := makeMockApiHandler(t, da, nil)
