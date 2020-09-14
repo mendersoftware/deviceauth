@@ -12,8 +12,10 @@ include:
     file: '.gitlab-ci-check-golang-static.yml'
   - project: 'Northern.tech/Mender/mendertesting'
     file: '.gitlab-ci-check-golang-unittests.yml'
+    ref: 959a63a9d61dccfd693342968d3ec3958a6dff30
   - project: 'Northern.tech/Mender/mendertesting'
     file: '.gitlab-ci-check-docker-acceptance.yml'
+    ref: 959a63a9d61dccfd693342968d3ec3958a6dff30
   - project: 'Northern.tech/Mender/mendertesting'
     file: '.gitlab-ci-check-apidocs.yml'
   - project: 'Northern.tech/Mender/mendertesting'
