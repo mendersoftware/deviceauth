@@ -90,8 +90,11 @@ func TestMigration_1_9_0(t *testing.T) {
 		assert.NoError(t, err)
 	}
 
+	// NOTE: after upgrading past mongodb 4.0 there are no longer
+	//       restrictions on Index Key Size
+	// ref: https://docs.mongodb.com/manual/reference/limits/#Index-Key-Limit
 	// try device or authset with 'too large' id data - should fail
-	idData := randstr(1025)
+	idData := randstr(4096)
 	devTooLarge := model.Device{
 		Id:              "3",
 		IdData:          idData,
@@ -103,8 +106,8 @@ func TestMigration_1_9_0(t *testing.T) {
 		UpdatedTs:       ts,
 	}
 
-	err := db.AddDevice(ctx, devTooLarge)
-	assert.NotNil(t, err)
+	// err := db.AddDevice(ctx, devTooLarge)
+	// assert.NotNil(t, err)
 
 	asetTooLarge := model.AuthSet{
 		Id:           "3",
@@ -115,15 +118,15 @@ func TestMigration_1_9_0(t *testing.T) {
 		PubKey:       "key3",
 		Timestamp:    &ts,
 	}
-	err = db.AddAuthSet(ctx, asetTooLarge)
-	assert.NotNil(t, err)
+	// err = db.AddAuthSet(ctx, asetTooLarge)
+	// assert.NotNil(t, err)
 
 	// test new version, long id data added successfully
 	mig190 := migration_1_9_0{
 		ds:  db,
 		ctx: ctx,
 	}
-	err = mig190.Up(migrate.MakeVersion(1, 9, 0))
+	err := mig190.Up(migrate.MakeVersion(1, 9, 0))
 	assert.NoError(t, err)
 
 	err = db.AddDevice(ctx, devTooLarge)
