@@ -48,10 +48,6 @@ type AuthSetFilter struct {
 	Status   string `bson:"status,omitempty"`
 }
 
-type DeviceFilter struct {
-	Status string `bson:"status,omitempty"`
-}
-
 //go:generate ../utils/mockgen.sh
 type DataStore interface {
 	Ping(ctx context.Context) error
@@ -64,7 +60,7 @@ type DataStore interface {
 	GetDeviceByIdentityDataHash(ctx context.Context, idataHash []byte) (*model.Device, error)
 
 	// list devices
-	GetDevices(ctx context.Context, skip, limit uint, filter DeviceFilter) ([]model.Device, error)
+	GetDevices(ctx context.Context, skip, limit uint, filter model.DeviceFilter) ([]model.Device, error)
 
 	AddDevice(ctx context.Context, d model.Device) error
 

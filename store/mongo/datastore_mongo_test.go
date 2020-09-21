@@ -155,6 +155,17 @@ func compareTime(expected time.Time, actual time.Time, t *testing.T) {
 	assert.Equal(t, expected.Unix(), actual.Unix())
 }
 
+func NewDeviceFilter(status string, ids []string) model.DeviceFilter {
+	ret := model.DeviceFilter{}
+	if status != "" {
+		ret.Status = &status
+	}
+	if ids != nil {
+		ret.IDs = ids
+	}
+	return ret
+}
+
 func TestPing(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping TestPing in short mode")
@@ -969,7 +980,7 @@ func TestStoreGetDevices(t *testing.T) {
 	testCases := map[string]struct {
 		skip            uint
 		limit           uint
-		filter          store.DeviceFilter
+		filter          model.DeviceFilter
 		expectedCount   int
 		expectedStartId int
 		expectedEndId   int
@@ -998,7 +1009,7 @@ func TestStoreGetDevices(t *testing.T) {
 		"filter acceted": {
 			skip:            0,
 			limit:           devCount,
-			filter:          store.DeviceFilter{Status: model.DevStatusAccepted},
+			filter:          NewDeviceFilter(model.DevStatusAccepted, nil),
 			expectedCount:   devCount,
 			expectedStartId: 0,
 			expectedEndId:   devCount - 1,
@@ -1006,7 +1017,7 @@ func TestStoreGetDevices(t *testing.T) {
 		"filter rejected": {
 			skip:            0,
 			limit:           devCount,
-			filter:          store.DeviceFilter{Status: model.DevStatusRejected},
+			filter:          NewDeviceFilter(model.DevStatusRejected, nil),
 			expectedCount:   devCount,
 			expectedStartId: 0,
 			expectedEndId:   devCount - 1,
@@ -1014,7 +1025,7 @@ func TestStoreGetDevices(t *testing.T) {
 		"filter preauthorized": {
 			skip:            0,
 			limit:           devCount,
-			filter:          store.DeviceFilter{Status: model.DevStatusPreauth},
+			filter:          NewDeviceFilter(model.DevStatusPreauth, nil),
 			expectedCount:   devCount,
 			expectedStartId: 0,
 			expectedEndId:   devCount - 1,
@@ -1022,10 +1033,26 @@ func TestStoreGetDevices(t *testing.T) {
 		"filter pending": {
 			skip:            0,
 			limit:           devCount,
-			filter:          store.DeviceFilter{Status: model.DevStatusPending},
+			filter:          NewDeviceFilter(model.DevStatusPending, nil),
 			expectedCount:   devCount,
 			expectedStartId: 0,
 			expectedEndId:   devCount - 1,
+		},
+		"filter by id": {
+			skip:  0,
+			limit: devCount,
+			filter: func() model.DeviceFilter {
+				deviceIDs := make([]string, devCount/4)
+				for i := range deviceIDs {
+					deviceIDs[i] = devsList[i].Id
+				}
+				return model.DeviceFilter{
+					IDs: deviceIDs,
+				}
+			}(),
+			expectedCount:   devCount / 4,
+			expectedStartId: 0,
+			expectedEndId:   devCount/4 - 1,
 		},
 	}
 
@@ -1035,11 +1062,10 @@ func TestStoreGetDevices(t *testing.T) {
 			dbdevs, err := db.GetDevices(ctx, tc.skip, tc.limit, tc.filter)
 			assert.NoError(t, err)
 
-			emptyFilter := store.DeviceFilter{}
-			if tc.filter != emptyFilter {
+			if tc.filter.Status != nil {
+				assert.Len(t, dbdevs, devsCountByStatus[*tc.filter.Status])
 				for _, d := range dbdevs {
-					assert.Equal(t, tc.filter.Status, d.Status)
-					assert.Len(t, dbdevs, devsCountByStatus[tc.filter.Status])
+					assert.Equal(t, *tc.filter.Status, d.Status)
 				}
 			} else {
 				assert.Len(t, dbdevs, tc.expectedCount)
@@ -1048,6 +1074,15 @@ func TestStoreGetDevices(t *testing.T) {
 					assert.NotEmpty(t, dbdevs[dbidx].Id)
 					// clear it now so that next assert does not fail
 					assert.EqualValues(t, devsList[i], dbdevs[dbidx])
+				}
+			}
+			if tc.filter.IDs != nil {
+				if assert.Len(t, dbdevs, len(tc.filter.IDs)) {
+					for i := range dbdevs {
+						assert.Equal(t,
+							dbdevs[i].Id,
+							tc.filter.IDs[i])
+					}
 				}
 			}
 		})
