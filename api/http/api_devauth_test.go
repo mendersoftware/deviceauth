@@ -1791,6 +1791,84 @@ func TestApiDevAuthGetTenantDeviceStatus(t *testing.T) {
 	}
 }
 
+func TestApiDevAuthGetTenantDeviceCount(t *testing.T) {
+	t.Parallel()
+
+	// enforce specific field naming in errors returned by API
+	updateRestErrorFieldName()
+
+	tcases := map[string]struct {
+		tid    string
+		status string
+
+		count    int
+		countErr error
+
+		checker mt.ResponseChecker
+	}{
+		"ok": {
+			tid: "foo",
+
+			count: 1,
+
+			checker: mt.NewJSONResponse(
+				http.StatusOK,
+				nil,
+				model.Count{Count: 1}),
+		},
+		"ok, with status": {
+			tid:    "foo",
+			status: "accepted",
+
+			count: 1,
+
+			checker: mt.NewJSONResponse(
+				http.StatusOK,
+				nil,
+				model.Count{Count: 1}),
+		},
+		"error: tenant id empty": {
+			checker: mt.NewJSONResponse(
+				http.StatusBadRequest,
+				nil,
+				restError("tenant id (tid) cannot be empty")),
+		},
+		"error: generic": {
+			tid: "foo",
+
+			countErr: errors.New("generic error"),
+
+			checker: mt.NewJSONResponse(
+				http.StatusInternalServerError,
+				nil,
+				restError("internal error")),
+		},
+	}
+
+	for i := range tcases {
+		tc := tcases[i]
+		t.Run(fmt.Sprintf("tc %s", i), func(t *testing.T) {
+			t.Parallel()
+
+			req := makeReq("GET",
+				fmt.Sprintf("http://1.2.3.4/api/internal/v1/devauth/tenants/%s/devices/count?status=%s", tc.tid, tc.status),
+				"",
+				nil)
+
+			da := &mocks.App{}
+			da.On("GetDevCountByStatus",
+				mtest.ContextMatcher(),
+				tc.status,
+			).Return(tc.count, tc.countErr)
+
+			apih := makeMockApiHandler(t, da, nil)
+
+			recorded := test.RunRequest(t, apih, req)
+			mt.CheckResponse(t, tc.checker, recorded)
+		})
+	}
+}
+
 func mockAuthSets(num int) []model.DevAdmAuthSet {
 	var sets []model.DevAdmAuthSet
 	for i := 0; i < num; i++ {

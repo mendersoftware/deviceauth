@@ -48,6 +48,7 @@ const (
 	uriTenants            = "/api/internal/v1/devauth/tenants"
 	uriTenantDeviceStatus = "/api/internal/v1/devauth/tenants/:tid/devices/:did/status"
 	uriTenantDevices      = "/api/internal/v1/devauth/tenants/:tid/devices"
+	uriTenantDevicesCount = "/api/internal/v1/devauth/tenants/:tid/devices/count"
 
 	// management API v2
 	v2uriDevices             = "/api/management/v2/devauth/devices"
@@ -102,6 +103,7 @@ func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
 		rest.Post(uriTenants, d.ProvisionTenantHandler),
 		rest.Get(uriTenantDeviceStatus, d.GetTenantDeviceStatus),
 		rest.Get(uriTenantDevices, d.GetTenantDevicesHandler),
+		rest.Get(uriTenantDevicesCount, d.GetTenantDevicesCountHandler),
 
 		// API v2
 		rest.Get(v2uriDevicesCount, d.GetDevicesCountHandler),
@@ -716,6 +718,22 @@ func (d *DevAuthApiHandlers) GetTenantDevicesHandler(w rest.ResponseWriter, r *r
 	r.Request = r.WithContext(ctx)
 
 	d.GetDevicesV2Handler(w, r)
+}
+
+func (d *DevAuthApiHandlers) GetTenantDevicesCountHandler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+	l := log.FromContext(ctx)
+
+	tid := r.PathParam("tid")
+	if tid == "" {
+		rest_utils.RestErrWithLog(w, r, l, errors.New("tenant id (tid) cannot be empty"), http.StatusBadRequest)
+		return
+	}
+	// Inject tenant id into the request context
+	ctx = identity.WithContext(ctx, &identity.Identity{Tenant: tid})
+	r.Request = r.WithContext(ctx)
+
+	d.GetDevicesCountHandler(w, r)
 }
 
 // Validate status.

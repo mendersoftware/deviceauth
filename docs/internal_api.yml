@@ -264,6 +264,7 @@ paths:
           description: Internal server error.
           schema:
             $ref: "#/definitions/Error"
+
   /tenants/{tid}/devices:
     get:
       operationId: List Devices
@@ -322,6 +323,38 @@ paths:
           description: Unexpected error
           schema:
             $ref: '#/definitions/Error'  
+
+  /tenants/{tid}/devices/count:
+    get:
+      operationId: Count Devices
+      summary: Count number of devices, optionally filtered by status.
+      tags:
+        - Internal API
+      parameters:
+        - name: tid
+          in: path
+          description: Tenant identifier.
+          required: true
+          type: string
+        - name: status
+          in: query
+          description: |
+            Device status filter, one of 'pending', 'accepted', 'rejected', 'noauth'. Default is 'all devices'.
+          required: false
+          type: string
+      responses:
+        200:
+          description: Device count.
+          schema:
+            $ref: '#/definitions/Count'
+        400:
+          description: Missing/malformed request params.
+          schema:
+            $ref: '#/definitions/Error'
+        500:
+          description: Unexpected error
+          schema:
+            $ref: '#/definitions/Error'
 
 definitions:
   NewTenant:
@@ -429,6 +462,15 @@ definitions:
         type: string
         format: datetime
         description: Created timestamp
+  Count:
+    description: Counter type
+    type: object
+    properties:
+      count:
+        description: The count of requested items.
+        type: integer
+    example:
+      count: 42
   IdentityData:
     description: |
       Device identity attributes, in the form of a JSON structure.
