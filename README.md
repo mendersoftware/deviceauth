@@ -1,5 +1,5 @@
 [![Build Status](https://gitlab.com/Northern.tech/Mender/deviceauth/badges/master/pipeline.svg)](https://gitlab.com/Northern.tech/Mender/deviceauth/pipelines)
-[![codecov](https://codecov.io/gh/mendersoftware/deviceauth/branch/master/graph/badge.svg)](https://codecov.io/gh/mendersoftware/deviceauth)
+[![Coverage Status](https://coveralls.io/repos/github/mendersoftware/deviceauth/badge.svg?branch=master)](https://coveralls.io/github/mendersoftware/deviceauth?branch=master)
 [![Go Report Card](https://goreportcard.com/badge/github.com/mendersoftware/deviceauth)](https://goreportcard.com/report/github.com/mendersoftware/deviceauth)
 [![Docker pulls](https://img.shields.io/docker/pulls/mendersoftware/deviceauth.svg?maxAge=3600)](https://hub.docker.com/r/mendersoftware/deviceauth/)
 
