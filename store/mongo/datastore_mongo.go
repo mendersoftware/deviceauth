@@ -96,7 +96,6 @@ func NewDataStoreMongo(config DataStoreMongoConfig) (*DataStoreMongo, error) {
 		tlsConfig.InsecureSkipVerify = config.SSLSkipVerify
 		clientOptions.SetTLSConfig(tlsConfig)
 	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -111,6 +110,58 @@ func NewDataStoreMongo(config DataStoreMongoConfig) (*DataStoreMongo, error) {
 	}
 
 	return NewDataStoreMongoWithClient(client), nil
+}
+
+func (db *DataStoreMongo) ForEachDatabase(
+	ctx context.Context,
+	mapFunc store.MapFunc,
+) error {
+	var (
+		dbCtx   context.Context
+		err     error
+		errChan = make(chan error, 1)
+	)
+	databases, err := db.client.ListDatabaseNames(ctx, bson.D{{
+		Key: "name", Value: bson.D{{
+			Key: "$regex", Value: "^" + DbName}},
+	}})
+	if err != nil {
+		return errors.Wrap(err, "store: failed to retrieve databases")
+	}
+	go func() {
+		for _, dbName := range databases {
+			if ctx.Err() != nil {
+				return
+			}
+			tenantID := ctxstore.TenantFromDbName(dbName, DbName)
+			if tenantID != "" {
+				dbCtx = identity.WithContext(ctx,
+					&identity.Identity{
+						Tenant: tenantID,
+					},
+				)
+			} else {
+				dbCtx = ctx
+			}
+			err := mapFunc(dbCtx)
+			if err != nil {
+				errChan <- errors.Wrapf(err,
+					`store: failed to apply mapFunc to database "%s"`,
+					dbName,
+				)
+			}
+		}
+		errChan <- nil
+	}()
+
+	select {
+	case err = <-errChan:
+	case <-ctx.Done():
+		err = errors.Wrap(ctx.Err(),
+			"store: database operations stopped prematurely",
+		)
+	}
+	return err
 }
 
 func (db *DataStoreMongo) Ping(ctx context.Context) error {
