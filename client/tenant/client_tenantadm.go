@@ -20,7 +20,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mendersoftware/go-lib-micro/apiclient"
 	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/mendersoftware/go-lib-micro/rest_utils"
 	"github.com/pkg/errors"
@@ -61,15 +60,15 @@ type Config struct {
 //go:generate ../../utils/mockgen.sh
 type ClientRunner interface {
 	CheckHealth(ctx context.Context) error
-	VerifyToken(ctx context.Context, token string, client apiclient.HttpRunner) (*Tenant, error)
-	GetTenant(ctx context.Context, tid string,
-		client apiclient.HttpRunner) (*Tenant, error)
+	VerifyToken(ctx context.Context, token string) (*Tenant, error)
+	GetTenant(ctx context.Context, tid string) (*Tenant, error)
 }
 
 // Client is an opaque implementation of tenant administrator client. Implements
 // ClientRunner interface
 type Client struct {
 	conf Config
+	http http.Client
 }
 
 // NewClient creates a client with given config.
@@ -80,13 +79,15 @@ func NewClient(c Config) *Client {
 
 	return &Client{
 		conf: c,
+		http: http.Client{
+			Timeout: c.Timeout,
+		},
 	}
 }
 
 func (c *Client) CheckHealth(ctx context.Context) error {
 	var (
 		apiErr rest_utils.ApiError
-		client http.Client
 	)
 
 	if ctx == nil {
@@ -102,7 +103,7 @@ func (c *Client) CheckHealth(ctx context.Context) error {
 		utils.JoinURL(c.conf.TenantAdmAddr, TenantHealthURI), nil,
 	)
 
-	rsp, err := client.Do(req)
+	rsp, err := c.http.Do(req)
 	if err != nil {
 		return err
 	}
@@ -119,8 +120,7 @@ func (c *Client) CheckHealth(ctx context.Context) error {
 
 // VerifyToken will execute a request to tenenatadm's endpoint for token
 // verification. Returns nil if verification was successful.
-func (tc *Client) VerifyToken(ctx context.Context, token string,
-	client apiclient.HttpRunner) (*Tenant, error) {
+func (tc *Client) VerifyToken(ctx context.Context, token string) (*Tenant, error) {
 
 	l := log.FromContext(ctx)
 
@@ -139,7 +139,7 @@ func (tc *Client) VerifyToken(ctx context.Context, token string,
 	ctx, cancel := context.WithTimeout(ctx, tc.conf.Timeout)
 	defer cancel()
 
-	rsp, err := client.Do(req.WithContext(ctx))
+	rsp, err := tc.http.Do(req.WithContext(ctx))
 	if err != nil {
 		l.Errorf("tenantadm request failed: %v", err)
 		return nil, errors.Wrap(err, "request to verify token failed")
@@ -170,8 +170,7 @@ func (tc *Client) VerifyToken(ctx context.Context, token string,
 
 // GetTenant will retrieve a single tenant
 // verification. Returns nil if verification was successful.
-func (tc *Client) GetTenant(ctx context.Context, tid string,
-	client apiclient.HttpRunner) (*Tenant, error) {
+func (tc *Client) GetTenant(ctx context.Context, tid string) (*Tenant, error) {
 
 	l := log.FromContext(ctx)
 
@@ -188,7 +187,7 @@ func (tc *Client) GetTenant(ctx context.Context, tid string,
 	ctx, cancel := context.WithTimeout(ctx, tc.conf.Timeout)
 	defer cancel()
 
-	rsp, err := client.Do(req.WithContext(ctx))
+	rsp, err := tc.http.Do(req.WithContext(ctx))
 	if err != nil {
 		l.Errorf("tenantadm request failed: %v", err)
 		return nil, errors.Wrap(err, "request to get tenant failed")

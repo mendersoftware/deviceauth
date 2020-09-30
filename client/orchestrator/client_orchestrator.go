@@ -95,6 +95,7 @@ type ClientRunner interface {
 // ClientRunner interface
 type Client struct {
 	conf Config
+	http http.Client
 }
 
 func NewClient(c Config) *Client {
@@ -104,13 +105,15 @@ func NewClient(c Config) *Client {
 
 	return &Client{
 		conf: c,
+		http: http.Client{
+			Timeout: c.Timeout,
+		},
 	}
 }
 
 func (c *Client) CheckHealth(ctx context.Context) error {
 	var (
 		apiErr rest_utils.ApiError
-		client http.Client
 	)
 
 	if ctx == nil {
@@ -126,7 +129,7 @@ func (c *Client) CheckHealth(ctx context.Context) error {
 		utils.JoinURL(c.conf.OrchestratorAddr, HealthURI), nil,
 	)
 
-	rsp, err := client.Do(req)
+	rsp, err := c.http.Do(req)
 	if err != nil {
 		return err
 	}
@@ -144,7 +147,6 @@ func (c *Client) CheckHealth(ctx context.Context) error {
 func (co *Client) SubmitDeviceDecommisioningJob(ctx context.Context, decommissioningReq DecommissioningReq) error {
 
 	l := log.FromContext(ctx)
-	client := http.Client{}
 
 	l.Debugf("Submit decommissioning job for device: %s", decommissioningReq.DeviceId)
 
@@ -169,7 +171,7 @@ func (co *Client) SubmitDeviceDecommisioningJob(ctx context.Context, decommissio
 	ctx, cancel := context.WithTimeout(ctx, co.conf.Timeout)
 	defer cancel()
 
-	rsp, err := client.Do(req.WithContext(ctx))
+	rsp, err := co.http.Do(req.WithContext(ctx))
 	if err != nil {
 		return errors.Wrapf(err, "failed to submit decommissioning job")
 	}
@@ -192,7 +194,6 @@ func (co *Client) SubmitDeviceDecommisioningJob(ctx context.Context, decommissio
 func (co *Client) SubmitProvisionDeviceJob(ctx context.Context, provisionDeviceReq ProvisionDeviceReq) error {
 
 	l := log.FromContext(ctx)
-	client := http.Client{}
 
 	l.Debugf("Submit provision device job for device: %s", provisionDeviceReq.Device.Id)
 
@@ -217,7 +218,7 @@ func (co *Client) SubmitProvisionDeviceJob(ctx context.Context, provisionDeviceR
 	ctx, cancel := context.WithTimeout(ctx, co.conf.Timeout)
 	defer cancel()
 
-	rsp, err := client.Do(req.WithContext(ctx))
+	rsp, err := co.http.Do(req.WithContext(ctx))
 	if err != nil {
 		return errors.Wrapf(err, "failed to submit provision device job")
 	}
@@ -239,7 +240,6 @@ func (co *Client) SubmitProvisionDeviceJob(ctx context.Context, provisionDeviceR
 
 func (co *Client) SubmitUpdateDeviceStatusJob(ctx context.Context, updateDeviceStatusReq UpdateDeviceStatusReq) error {
 	l := log.FromContext(ctx)
-	client := http.Client{}
 
 	l.Debugf("Submit update device status job for devices: %q", updateDeviceStatusReq.Ids)
 
@@ -264,7 +264,7 @@ func (co *Client) SubmitUpdateDeviceStatusJob(ctx context.Context, updateDeviceS
 	ctx, cancel := context.WithTimeout(ctx, co.conf.Timeout)
 	defer cancel()
 
-	rsp, err := client.Do(req.WithContext(ctx))
+	rsp, err := co.http.Do(req.WithContext(ctx))
 	if err != nil {
 		return errors.Wrapf(err, "failed to submit update device status job")
 	}

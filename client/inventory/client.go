@@ -50,7 +50,6 @@ type Client interface {
 type client struct {
 	client  *http.Client
 	urlBase string
-	verbose string
 }
 
 func NewClient(urlBase string, skipVerify bool) *client {
