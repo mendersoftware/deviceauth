@@ -700,39 +700,21 @@ func (db *DataStoreMongo) GetLimit(ctx context.Context, name string) (*model.Lim
 }
 
 func (db *DataStoreMongo) GetDevCountByStatus(ctx context.Context, status string) (int, error) {
-	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
+	var (
+		fltr     = bson.D{}
+		devsColl = db.client.
+				Database(ctxstore.DbFromContext(ctx, DbName)).
+				Collection(DbDevicesColl)
+	)
 
-	// if status == "", fallback to a simple count of all devices
-	if status == "" {
-		devsColl := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
-		count, err := devsColl.CountDocuments(ctx, bson.D{})
-		if err != nil {
-			return 0, err
-		}
-		return int(count), nil
+	if status != "" {
+		fltr = bson.D{{Key: "status", Value: status}}
 	}
-
-	// compose aggregation pipeline
-	match := bson.D{{Key: "$match", Value: bson.D{{Key: "status", Value: status}}}}
-	count := bson.D{{Key: "$count", Value: "count"}}
-
-	var resp []bson.M
-
-	cursor, err := c.Aggregate(ctx, []bson.D{match, count})
+	count, err := devsColl.CountDocuments(ctx, fltr)
 	if err != nil {
 		return 0, err
 	}
-	if err := cursor.All(ctx, &resp); err != nil {
-		if err == mongo.ErrNoDocuments {
-			return 0, nil
-		}
-		return 0, err
-	}
-	if len(resp) > 0 {
-		return int(resp[0]["count"].(int32)), nil
-	}
-
-	return 0, err
+	return int(count), nil
 }
 
 func (db *DataStoreMongo) GetDeviceStatus(ctx context.Context, devId string) (string, error) {
