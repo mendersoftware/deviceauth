@@ -599,8 +599,7 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 				if tc.inReq.TenantToken != "" {
 					ct.On("VerifyToken",
 						mtesting.ContextMatcher(),
-						tc.inReq.TenantToken,
-						mock.AnythingOfType("*apiclient.HttpApi")).
+						tc.inReq.TenantToken).
 						Return(
 							&tenant.Tenant{},
 							tc.tenantVerificationErr)
@@ -608,8 +607,7 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 				if tc.config.DefaultTenantToken != "" {
 					ct.On("VerifyToken",
 						mtesting.ContextMatcher(),
-						tc.config.DefaultTenantToken,
-						mock.AnythingOfType("*apiclient.HttpApi")).
+						tc.config.DefaultTenantToken).
 						Return(
 							&tenant.Tenant{},
 							tc.tenantVerificationErr)
@@ -2226,7 +2224,8 @@ func TestDevAuthVerifyTokenWithCache(t *testing.T) {
 				if tc.getDeviceErr == nil {
 					tclient.On("GetTenant",
 						ctx,
-						token.Claims.Tenant, mock.AnythingOfType("*apiclient.HttpApi")).Return(tc.tenant, tc.getTenantErr)
+						token.Claims.Tenant).
+						Return(tc.tenant, tc.getTenantErr)
 				}
 
 				if tc.getDeviceErr == nil && tc.getTenantErr == nil {

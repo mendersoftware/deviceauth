@@ -26,7 +26,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mendersoftware/go-lib-micro/apiclient"
 	"github.com/mendersoftware/go-lib-micro/rest_utils"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
@@ -204,7 +203,7 @@ func TestClientVerifyToken(t *testing.T) {
 				TenantAdmAddr: s.URL,
 			})
 
-			tenant, err := c.VerifyToken(context.Background(), tc.token, &apiclient.HttpApi{})
+			tenant, err := c.VerifyToken(context.Background(), tc.token)
 			if tc.err != nil {
 				assert.EqualError(t, err, tc.err.Error())
 			} else {
@@ -309,7 +308,7 @@ func TestClientGetTenant(t *testing.T) {
 				TenantAdmAddr: s.URL,
 			})
 
-			tenant, err := c.GetTenant(context.Background(), tc.tid, &apiclient.HttpApi{})
+			tenant, err := c.GetTenant(context.Background(), tc.tid)
 			if tc.err != nil {
 				assert.EqualError(t, err, tc.err.Error())
 			} else {
