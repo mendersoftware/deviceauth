@@ -237,6 +237,13 @@ class CliClient:
 
         subprocess.run(args, check=True)
 
+    def check_device_limits(self, threshold=90.0):
+        args = [self.cmd, "check-device-limits", "--threshold", "%.2f" % threshold]
+
+        return subprocess.run(args, check=True, stdout=subprocess.PIPE).stdout.decode(
+            "utf-8"
+        )
+
     def list_tenants(self, tenant=None):
         args = [self.cmd, "migrate", "--list-tenants"]
 
