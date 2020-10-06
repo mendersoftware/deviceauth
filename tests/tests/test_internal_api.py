@@ -17,25 +17,25 @@ from common import clean_db, mongo, internal_api
 
 import bravado
 
-class TestInternalApi:
 
+class TestInternalApi:
     def test_create_tenant_ok(self, internal_api, clean_db):
-        _, r = internal_api.create_tenant('foobar')
+        _, r = internal_api.create_tenant("foobar")
         assert r.status_code == 201
 
-        assert 'deviceauth-foobar' in clean_db.database_names()
-        assert 'migration_info' in clean_db['deviceauth-foobar'].collection_names()
+        assert "deviceauth-foobar" in clean_db.list_database_names()
+        assert "migration_info" in clean_db["deviceauth-foobar"].collection_names()
 
     def test_create_tenant_twice(self, internal_api, clean_db):
-        _, r = internal_api.create_tenant('foobar')
+        _, r = internal_api.create_tenant("foobar")
         assert r.status_code == 201
 
         # creating once more should not fail
-        _, r = internal_api.create_tenant('foobar')
+        _, r = internal_api.create_tenant("foobar")
         assert r.status_code == 201
 
     def test_create_tenant_empty(self, internal_api):
         try:
-            _, r = internal_api.create_tenant('')
+            _, r = internal_api.create_tenant("")
         except bravado.exception.HTTPError as e:
             assert e.response.status_code == 400

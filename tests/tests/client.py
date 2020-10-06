@@ -26,8 +26,8 @@ from requests.utils import parse_header_links
 
 
 class BaseApiClient:
-
-    api_url = "http://%s/api/management/v1/devauth/" % pytest.config.getoption("host")
+    def __init__(self, hostname):
+        self.api_url = "http://%s/api/management/v1/devauth/" % hostname
 
     def make_api_url(self, path):
         return os.path.join(
@@ -36,9 +36,8 @@ class BaseApiClient:
 
 
 class BaseDevicesApiClient(BaseApiClient):
-    api_url = "http://%s/api/devices/v1/authentication/" % pytest.config.getoption(
-        "host"
-    )
+    def __init__(self, hostname):
+        self.api_url = "http://%s/api/devices/v1/authentication/" % hostname
 
     @property
     def auth_requests_url(self):
@@ -56,21 +55,25 @@ class SwaggerApiClient(BaseApiClient):
     }
 
     log = logging.getLogger("client.SwaggerApiClient")
-    spec_option = "spec"
+
+    def __init__(self, hostname, swagger_spec):
+        self.spec = swagger_spec
+        super().__init__(hostname)
 
     def setup_swagger(self):
         self.http_client = RequestsClient()
         self.http_client.session.verify = False
 
-        spec = pytest.config.getoption(self.spec_option)
         self.client = SwaggerClient.from_spec(
-            load_file(spec), config=self.config, http_client=self.http_client
+            load_file(self.spec), config=self.config, http_client=self.http_client
         )
         self.client.swagger_spec.api_url = self.api_url
 
 
 class InternalClient(SwaggerApiClient):
-    api_url = "http://%s/api/internal/v1/devauth/" % pytest.config.getoption("host")
+    def __init__(self, hostname, swagger_spec):
+        super().__init__(hostname, swagger_spec)
+        self.api_url = "http://%s/api/internal/v1/devauth/" % hostname
 
     log = logging.getLogger("client.InternalClient")
 
@@ -102,12 +105,15 @@ class SimpleInternalClient(InternalClient):
 
     log = logging.getLogger("client.SimpleInternalClient")
 
-    def __init__(self):
+    def __init__(self, hostname, swagger_spec):
+        super().__init__(hostname, swagger_spec)
         self.setup_swagger()
 
 
 class ManagementClient(SwaggerApiClient):
-    api_url = "http://%s/api/management/v2/devauth/" % pytest.config.getoption("host")
+    def __init__(self, hostname, swagger_spec):
+        super().__init__(hostname, swagger_spec)
+        self.api_url = "http://%s/api/management/v2/devauth/" % hostname
 
     log = logging.getLogger("client.ManagementClient")
 
@@ -175,7 +181,8 @@ class SimpleManagementClient(ManagementClient):
 
     log = logging.getLogger("client.SimpleManagementClient")
 
-    def __init__(self):
+    def __init__(self, hostname, swagger_spec):
+        super().__init__(hostname, swagger_spec)
         self.setup_swagger()
 
     def list_devices(self, **kwargs):
