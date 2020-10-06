@@ -294,3 +294,7 @@ def tenant_foobar_devices(device_api, management_api, tenant_foobar, request):
 
 def get_fake_tenantadm_addr():
     return os.environ.get("FAKE_TENANTADM_ADDR", "0.0.0.0:9999")
+
+
+def get_fake_workflows_addr():
+    return os.environ.get("FAKE_ORCHESTRATOR_ADDR", "0.0.0.0:9998")

@@ -32,6 +32,7 @@ const (
 	// devices endpoint
 	TenantVerifyUri = "/api/internal/v1/tenantadm/tenants/verify"
 	TenantGetUri    = "/api/internal/v1/tenantadm/tenants/:tid"
+	TenantUsersURI  = "/api/internal/v1/tenantadm/tenants/users"
 	// default request timeout, 10s?
 	defaultReqTimeout = time.Duration(10) * time.Second
 )
@@ -62,6 +63,7 @@ type ClientRunner interface {
 	CheckHealth(ctx context.Context) error
 	VerifyToken(ctx context.Context, token string) (*Tenant, error)
 	GetTenant(ctx context.Context, tid string) (*Tenant, error)
+	GetTenantUsers(ctx context.Context, tenantID string) ([]User, error)
 }
 
 // Client is an opaque implementation of tenant administrator client. Implements
@@ -207,4 +209,55 @@ func (tc *Client) GetTenant(ctx context.Context, tid string) (*Tenant, error) {
 		return nil, errors.Errorf("getting tenant resulted in unexpected code: %v",
 			rsp.StatusCode)
 	}
+}
+
+type User struct {
+	ID       string `json:"id"`
+	Email    string `json:"name"`
+	TenantID string `json:"tenant_id"`
+}
+
+func (tc *Client) GetTenantUsers(ctx context.Context, tenantID string) ([]User, error) {
+	var ret []User
+	if tenantID == "" {
+		return nil, errors.New("tenantadm: [internal] bad argument " +
+			"tenantID: cannot be empty")
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "GET", utils.JoinURL(tc.conf.TenantAdmAddr, TenantUsersURI), nil)
+	if err != nil {
+		return nil, errors.Wrap(err, "tenantadm: failed to prepare request")
+	}
+	q := req.URL.Query()
+	q.Add("tenant_id", tenantID)
+	req.URL.RawQuery = q.Encode()
+
+	rsp, err := tc.http.Do(req)
+	if err != nil {
+		return nil, errors.Wrap(err, "tenantadm: error sending user request")
+	}
+	defer rsp.Body.Close()
+	if rsp.StatusCode >= 400 {
+		var APIErr = new(rest_utils.ApiError)
+		jsDecoder := json.NewDecoder(rsp.Body)
+		err = jsDecoder.Decode(APIErr)
+		if err != nil {
+			return nil, errors.Errorf(
+				"tenantadm: unexpected HTTP status: %s",
+				rsp.Status,
+			)
+		}
+		return nil, errors.Wrapf(APIErr,
+			"tenantadm: HTTP error (%s) on user request",
+			rsp.Status,
+		)
+	}
+	jsDecoder := json.NewDecoder(rsp.Body)
+	err = jsDecoder.Decode(&ret)
+	if err != nil {
+		return nil, errors.Wrap(err,
+			"tenantadm: error decoding response payload",
+		)
+	}
+	return ret, nil
 }

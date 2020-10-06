@@ -96,7 +96,6 @@ func NewDataStoreMongo(config DataStoreMongoConfig) (*DataStoreMongo, error) {
 		tlsConfig.InsecureSkipVerify = config.SSLSkipVerify
 		clientOptions.SetTLSConfig(tlsConfig)
 	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -111,6 +110,58 @@ func NewDataStoreMongo(config DataStoreMongoConfig) (*DataStoreMongo, error) {
 	}
 
 	return NewDataStoreMongoWithClient(client), nil
+}
+
+func (db *DataStoreMongo) ForEachDatabase(
+	ctx context.Context,
+	mapFunc store.MapFunc,
+) error {
+	var (
+		dbCtx   context.Context
+		err     error
+		errChan = make(chan error, 1)
+	)
+	databases, err := db.client.ListDatabaseNames(ctx, bson.D{{
+		Key: "name", Value: bson.D{{
+			Key: "$regex", Value: "^" + DbName}},
+	}})
+	if err != nil {
+		return errors.Wrap(err, "store: failed to retrieve databases")
+	}
+	go func() {
+		for _, dbName := range databases {
+			if ctx.Err() != nil {
+				return
+			}
+			tenantID := ctxstore.TenantFromDbName(dbName, DbName)
+			if tenantID != "" {
+				dbCtx = identity.WithContext(ctx,
+					&identity.Identity{
+						Tenant: tenantID,
+					},
+				)
+			} else {
+				dbCtx = ctx
+			}
+			err := mapFunc(dbCtx)
+			if err != nil {
+				errChan <- errors.Wrapf(err,
+					`store: failed to apply mapFunc to database "%s"`,
+					dbName,
+				)
+			}
+		}
+		errChan <- nil
+	}()
+
+	select {
+	case err = <-errChan:
+	case <-ctx.Done():
+		err = errors.Wrap(ctx.Err(),
+			"store: database operations stopped prematurely",
+		)
+	}
+	return err
 }
 
 func (db *DataStoreMongo) Ping(ctx context.Context) error {
@@ -649,39 +700,21 @@ func (db *DataStoreMongo) GetLimit(ctx context.Context, name string) (*model.Lim
 }
 
 func (db *DataStoreMongo) GetDevCountByStatus(ctx context.Context, status string) (int, error) {
-	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
+	var (
+		fltr     = bson.D{}
+		devsColl = db.client.
+				Database(ctxstore.DbFromContext(ctx, DbName)).
+				Collection(DbDevicesColl)
+	)
 
-	// if status == "", fallback to a simple count of all devices
-	if status == "" {
-		devsColl := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
-		count, err := devsColl.CountDocuments(ctx, bson.D{})
-		if err != nil {
-			return 0, err
-		}
-		return int(count), nil
+	if status != "" {
+		fltr = bson.D{{Key: "status", Value: status}}
 	}
-
-	// compose aggregation pipeline
-	match := bson.D{{Key: "$match", Value: bson.D{{Key: "status", Value: status}}}}
-	count := bson.D{{Key: "$count", Value: "count"}}
-
-	var resp []bson.M
-
-	cursor, err := c.Aggregate(ctx, []bson.D{match, count})
+	count, err := devsColl.CountDocuments(ctx, fltr)
 	if err != nil {
 		return 0, err
 	}
-	if err := cursor.All(ctx, &resp); err != nil {
-		if err == mongo.ErrNoDocuments {
-			return 0, nil
-		}
-		return 0, err
-	}
-	if len(resp) > 0 {
-		return int(resp[0]["count"].(int32)), nil
-	}
-
-	return 0, err
+	return int(count), nil
 }
 
 func (db *DataStoreMongo) GetDeviceStatus(ctx context.Context, devId string) (string, error) {

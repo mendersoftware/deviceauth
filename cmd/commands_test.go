@@ -29,6 +29,12 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	minv "github.com/mendersoftware/deviceauth/client/inventory/mocks"
+	"github.com/mendersoftware/deviceauth/client/orchestrator"
+	mwflows "github.com/mendersoftware/deviceauth/client/orchestrator/mocks"
+	"github.com/mendersoftware/deviceauth/client/tenant"
+	mtenant "github.com/mendersoftware/deviceauth/client/tenant/mocks"
+	"github.com/mendersoftware/deviceauth/store"
+
 	//dconfig "github.com/mendersoftware/deviceauth/config"
 	"github.com/mendersoftware/deviceauth/jwt"
 	"github.com/mendersoftware/deviceauth/model"
@@ -598,5 +604,250 @@ func TestPropagateStatusesInventory(t *testing.T) {
 				assert.NoError(t, err)
 			}
 		})
+	}
+}
+
+func TestCheckDeviceLimits(t *testing.T) {
+	type Tenant struct {
+		ID          string
+		DeviceLimit uint64
+		DeviceCount int
+		Users       []tenant.User
+
+		DeviceLimitError error
+		DeviceCountError error
+
+		TenantadmError error
+		WorkflowsError error
+
+		ReceiveEmail bool
+	}
+	testCases := []struct {
+		Name string
+
+		Threshold float64
+
+		Tenants []Tenant
+	}{{
+		Name: "ok, multiple tenants - some suppressed errors",
+
+		Threshold: 90.0,
+
+		Tenants: []Tenant{{
+			ID:          "12345678901234567890120",
+			DeviceLimit: 10,
+			DeviceCount: 0,
+		}, {
+			ID:          "12345678901234567890121",
+			DeviceLimit: 20,
+			DeviceCount: 2,
+		}, {
+			ID:          "",
+			DeviceLimit: 10,
+			DeviceCount: 4,
+		}, {
+			ID:          "12345678901234567890127",
+			DeviceLimit: 10,
+			DeviceCount: 8,
+		}, {
+			ID:           "12345678901234567890128",
+			DeviceLimit:  10,
+			DeviceCount:  9,
+			ReceiveEmail: true,
+			Users: []tenant.User{{
+				ID:    "ecaaace8-12d6-4e72-97c3-cc6a8c960c03",
+				Email: "user@acme.io",
+			}},
+			WorkflowsError: errors.New("internal error!"),
+		}, {
+			ID:             "12345678901234567890128",
+			DeviceLimit:    10,
+			DeviceCount:    9,
+			ReceiveEmail:   true,
+			TenantadmError: errors.New("internal error!"),
+		}, {
+			ID:           "12345678901234567890129",
+			DeviceLimit:  10,
+			DeviceCount:  10,
+			ReceiveEmail: true,
+			Users: []tenant.User{{
+				ID:    "ecaaace8-12d6-4e72-97c3-cc6a8c960c04",
+				Email: "foo@bar.bz",
+			}, {
+				ID:    "ecaaace8-12d6-4e72-97c3-cc6a8c960c04",
+				Email: "baz@bar.bz",
+			}},
+		}},
+	}, {
+		Name: "ok, zero threshold",
+
+		Threshold: -1.0,
+
+		Tenants: []Tenant{{
+			ID:           "12345678901234567890129",
+			DeviceLimit:  10,
+			DeviceCount:  0,
+			ReceiveEmail: true,
+			Users: []tenant.User{{
+				ID:    "ecaaace8-12d6-4e72-97c3-cc6a8c960c04",
+				Email: "foo@bar.bz",
+			}, {
+				ID:    "ecaaace8-12d6-4e72-97c3-cc6a8c960c04",
+				Email: "baz@bar.bz",
+			}},
+		}},
+	}, {
+		Name: "ok, threshold on limit",
+
+		Threshold: 200.0,
+
+		Tenants: []Tenant{{
+			ID:          "12345678901234567890128",
+			DeviceLimit: 10,
+			DeviceCount: 9,
+		}, {
+			ID:           "12345678901234567890129",
+			DeviceLimit:  10,
+			DeviceCount:  10,
+			ReceiveEmail: true,
+			Users: []tenant.User{{
+				ID:    "ecaaace8-12d6-4e72-97c3-cc6a8c960c04",
+				Email: "foo@bar.bz",
+			}, {
+				ID:    "ecaaace8-12d6-4e72-97c3-cc6a8c960c04",
+				Email: "baz@bar.bz",
+			}},
+		}},
+	}, {
+		Name: "error, datastore on GetLimit",
+
+		Threshold: 90.0,
+		Tenants: []Tenant{{
+			ID:               "12345678901234567890128",
+			DeviceLimitError: errors.New("internal error!"),
+		}},
+	}, {
+		Name: "error, datastore on GetLimit",
+
+		Threshold: 90.0,
+		Tenants: []Tenant{{
+			ID:               "12345678901234567890128",
+			DeviceLimit:      10,
+			DeviceCountError: errors.New("internal error!"),
+		}},
+	}}
+	ctxMatcher := mock.MatchedBy(func(c context.Context) bool { return true })
+	workflowMatcher := func(email string) interface{} {
+		return mock.MatchedBy(func(
+			wflow orchestrator.DeviceLimitWarning,
+		) bool {
+			return wflow.RecipientEmail == email
+		})
+	}
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			var (
+				expectedErr error
+				actualErr   error
+			)
+			wflows := &mwflows.ClientRunner{}
+			defer wflows.AssertExpectations(t)
+			tadm := &mtenant.ClientRunner{}
+			defer tadm.AssertExpectations(t)
+			ds := &mstore.DataStore{}
+			defer ds.AssertExpectations(t)
+
+			for i, tenant := range tc.Tenants {
+				if tenant.ID == "" {
+					continue
+				}
+				ds.On("GetLimit",
+					ctxMatcher,
+					model.LimitMaxDeviceCount,
+				).Return(
+					&model.Limit{
+						Name:  model.LimitMaxDeviceCount,
+						Value: tenant.DeviceLimit,
+					},
+					tenant.DeviceLimitError,
+				).Once()
+				if tenant.DeviceLimitError != nil {
+					expectedErr = tenant.DeviceLimitError
+					break
+				}
+				ds.On("GetDevCountByStatus",
+					ctxMatcher,
+					model.DevStatusAccepted,
+				).Return(
+					tc.Tenants[i].DeviceCount,
+					tenant.DeviceCountError,
+				).Once()
+				if tenant.DeviceCountError != nil {
+					expectedErr = tenant.DeviceCountError
+					break
+				}
+				if tenant.ReceiveEmail {
+					tadm.On("GetTenantUsers",
+						ctxMatcher, tenant.ID,
+					).Return(
+						tenant.Users,
+						tenant.TenantadmError,
+					).Once()
+					if tenant.TenantadmError != nil {
+						continue
+					}
+					for _, user := range tenant.Users {
+						wflows.On(
+							"SubmitDeviceLimitWarning",
+							ctxMatcher,
+							workflowMatcher(
+								user.Email,
+							),
+						).Return(
+							tenant.WorkflowsError,
+						).Once()
+						if tenant.WorkflowsError != nil {
+							break
+						}
+					}
+				}
+			}
+			ds.On("ForEachDatabase",
+				ctxMatcher,
+				mock.MatchedBy(func(f store.MapFunc) bool {
+					return true
+				}),
+			).Run(func(args mock.Arguments) {
+				// A simplified version of what
+				// mongo.ForEachDatabase does
+				for _, tenant := range tc.Tenants {
+					ctx := identity.WithContext(
+						args.Get(0).(context.Context),
+						&identity.Identity{
+							Tenant: tenant.ID,
+						},
+					)
+					mapFun := args.Get(1).(store.MapFunc)
+					actualErr = mapFun(ctx)
+					if actualErr != nil {
+						break
+					}
+				}
+			}).Return(actualErr).Once()
+
+			err := CheckDeviceLimits(
+				tc.Threshold, ds, tadm, wflows,
+			)
+			// Check if error is as expected
+			if err != nil {
+				assert.EqualError(t,
+					err,
+					expectedErr.Error(),
+				)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+
 	}
 }
