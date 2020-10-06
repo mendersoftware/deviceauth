@@ -65,6 +65,29 @@ func (_m *ClientRunner) GetTenant(ctx context.Context, tid string) (*tenant.Tena
 	return r0, r1
 }
 
+// GetTenantUsers provides a mock function with given fields: ctx, tenantID
+func (_m *ClientRunner) GetTenantUsers(ctx context.Context, tenantID string) ([]tenant.User, error) {
+	ret := _m.Called(ctx, tenantID)
+
+	var r0 []tenant.User
+	if rf, ok := ret.Get(0).(func(context.Context, string) []tenant.User); ok {
+		r0 = rf(ctx, tenantID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]tenant.User)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, tenantID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // VerifyToken provides a mock function with given fields: ctx, token
 func (_m *ClientRunner) VerifyToken(ctx context.Context, token string) (*tenant.Tenant, error) {
 	ret := _m.Called(ctx, token)

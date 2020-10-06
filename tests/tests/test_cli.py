@@ -12,9 +12,29 @@
 #    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
-from common import clean_db, mongo, cli
+import asyncio
+import json
+import tornado.web
+from contextlib import contextmanager
+
 import pytest
 
+import mockserver
+from common import (
+    DevAuthorizer,
+    Device,
+    clean_db,
+    cli,
+    device_api,
+    device_auth_req,
+    get_fake_tenantadm_addr,
+    get_fake_workflows_addr,
+    internal_api,
+    make_devices,
+    make_fake_tenant_token,
+    management_api,
+    mongo,
+)
 
 DB_NAME = "deviceauth"
 DB_MIGRATION_COLLECTION = "migration_info"
@@ -152,3 +172,178 @@ class TestCliMigrateEnterprise:
         for t in others:
             dbname = make_tenant_db(t)
             TestMigration.verify(cli, mongo, dbname, MIGRATED_TENANT_DBS[t])
+
+
+class TestCheckDeviceLimitsEnterprise:
+    @contextmanager
+    def init_service_mocks(
+        self,
+        wflows_rsp_q: asyncio.Queue = None,
+        tadm_rsp_q: asyncio.Queue = None,
+    ) -> mockserver.MockServer:
+
+        # Very simple tornado request handler for tenantadm and workflows that
+        # generates responses from items pushed onto an asyncio.Queue object,
+        # the object can either be a callable or a 3-tuple with (code, header,
+        # body). Callables are passed 'self' (RequestHandler) as argument.
+        class RequestHandler(tornado.web.RequestHandler):
+            def initialize(self, rsp_q):
+                self.rsp_q = rsp_q
+
+            def prepare(self):
+                rsp = self.rsp_q.get_nowait()
+                if callable(rsp):
+                    rsp(self)
+                else:
+                    (status, hdr, body) = rsp
+                    self.set_status(status)
+
+                    for key, val in hdr.items():
+                        self.add_header(key, val)
+
+                    if body:
+                        self.write(body)
+
+                self.finish()
+
+        with mockserver.run_fake(get_fake_tenantadm_addr()) as tadm:
+            tadm.app.add_handlers(
+                r".*",
+                [
+                    (
+                        r".*",
+                        RequestHandler,
+                        {"rsp_q": tadm_rsp_q},
+                    )
+                ],
+            )
+            with mockserver.run_fake(get_fake_workflows_addr()) as wflows:
+                wflows.app.add_handlers(
+                    r".*",
+                    [
+                        (
+                            r".*",
+                            RequestHandler,
+                            {"rsp_q": wflows_rsp_q},
+                        )
+                    ],
+                )
+                yield tadm, wflows
+
+    @pytest.mark.parametrize(
+        "test_case",
+        [
+            {
+                # Test case where tenant is above threshold
+                "tenant": {
+                    "id": "123456789012345678901234",
+                    "device_limit": 10,
+                    "users": [
+                        {
+                            "name": "user1@acme.io",
+                            "id": "f8b343d2-f0f6-4cf0-8d6b-50d4dbdd10ca",
+                        },
+                        {
+                            "name": "user2@acme.io",
+                            "id": "f8b343d2-f0f6-4cf0-8d6b-50d4dbdd10cb",
+                        },
+                    ],
+                },
+                "device_count": 10,
+                "threshold": 90.0,
+            },
+            {
+                # Test case where tenant is below threshold
+                "tenant": {
+                    "id": "123456789012345678901234",
+                    "device_limit": 10,
+                    "users": [
+                        {
+                            "name": "user1@acme.io",
+                            "id": "f8b343d2-f0f6-4cf0-8d6b-50d4dbdd10ca",
+                        },
+                        {
+                            "name": "user2@acme.io",
+                            "id": "f8b343d2-f0f6-4cf0-8d6b-50d4dbdd10cb",
+                        },
+                    ],
+                },
+                "device_count": 8,
+                "threshold": 90.0,
+            },
+        ],
+    )
+    def test_check_device_limits(
+        self, clean_db, cli, device_api, management_api, internal_api, test_case
+    ):
+
+        rsp_q_tadm = asyncio.Queue(
+            maxsize=len(test_case["tenant"]["users"]) + test_case["device_count"]
+        )
+        rsp_q_wflows = asyncio.Queue(
+            maxsize=len(test_case["tenant"]["users"]) + test_case["device_count"]
+        )
+        with self.init_service_mocks(wflows_rsp_q=rsp_q_wflows, tadm_rsp_q=rsp_q_tadm):
+            tenant_token = make_fake_tenant_token(test_case["tenant"]["id"])
+
+            internal_api.put_max_devices_limit(
+                test_case["tenant"]["id"], test_case["tenant"]["device_limit"]
+            )
+
+            for _ in range(test_case["device_count"]):
+                # POST /api/internal/v1/tenantadm/verify
+                rsp_q_tadm.put_nowait(
+                    (200, {}, '{"id": "%s", "sub": "user"}' % test_case["tenant"])
+                )
+                # POST /api/v1/workflows/provision_device
+                rsp_q_wflows.put_nowait((201, {}, ""))
+                dev = Device()
+                da = DevAuthorizer(tenant_token=tenant_token)
+                rsp = device_auth_req(device_api.auth_requests_url, da, dev)
+                assert rsp.status_code == 401
+
+            devs = management_api.list_devices(
+                status="pending", Authorization="Bearer " + tenant_token
+            )
+            for dev in devs:
+                # POST /api/v1/workflows/update_device_status
+                rsp_q_wflows.put_nowait((201, {}, ""))
+                # POST /api/v1/workflows/provision_device
+                rsp_q_wflows.put_nowait((201, {}, ""))
+                management_api.put_device_status(
+                    dev["id"],
+                    dev["auth_sets"][0]["id"],
+                    "accepted",
+                    Authorization="Bearer " + tenant_token,
+                )
+
+            if test_case["device_count"] >= (
+                (test_case["tenant"]["device_limit"] * test_case["threshold"] / 100.0)
+            ):
+                # GET /api/management/v1/tenantadm/users
+                usersJSON = json.dumps(test_case["tenant"]["users"])
+                rsp_q_tadm.put_nowait((200, {}, usersJSON))
+
+                usernames = [user["name"] for user in test_case["tenant"]["users"]]
+                # Verify that workflow is started for each user
+                for i in range(len(test_case["tenant"]["users"])):
+
+                    def verify_workflow(handler):
+                        assert handler.request.path.endswith("device_limit_email")
+                        body_json = json.loads(handler.request.body.decode("utf-8"))
+                        assert body_json["to"] in usernames
+                        usernames.remove(body_json["to"])
+                        handler.set_status(201)
+
+                    # POST /api/v1/workflows/device_limit_email
+                    rsp_q_wflows.put_nowait(verify_workflow)
+
+            cli.check_device_limits()
+
+            # All pushed mock responses should be consumed at this point.
+            assert (
+                rsp_q_tadm.empty()
+            ), "TenantAdm mock responses not consumed as expected"
+            assert (
+                rsp_q_wflows.empty()
+            ), "Workflows mock responses not consumed as expected"
