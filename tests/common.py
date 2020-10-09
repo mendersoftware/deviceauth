@@ -25,39 +25,56 @@ from pymongo import MongoClient
 
 import pytest
 
-from Crypto.PublicKey import RSA
-from Crypto.Signature import PKCS1_v1_5
-from Crypto.Hash import SHA256
+from cryptography.hazmat.primitives import serialization, hashes
+from cryptography.hazmat.primitives.asymmetric import rsa, padding
+from cryptography.hazmat.backends import default_backend
 
-from client import SimpleInternalClient, SimpleManagementClient, \
-    BaseDevicesApiClient
+from client import SimpleInternalClient, SimpleManagementClient, BaseDevicesApiClient
 
 import mockserver
 import orchestrator
 import os
 
+
 def get_keypair():
-    private = RSA.generate(1024)
-    public = private.publickey()
-    return private.exportKey().decode(), public.exportKey().decode()
+    private = rsa.generate_private_key(65537, 1024, default_backend())
+    private_pem = private.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption(),
+    ).decode("ascii")
+    public_pem = (
+        private.public_key()
+        .public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+        .decode("ascii")
+    )
+    return private_pem, public_pem
 
 
 def sign_data(data, privateKey):
-    rsakey = RSA.importKey(privateKey)
-    signer = PKCS1_v1_5.new(rsakey)
-    digest = SHA256.new()
-    if type(data) is str:
-        data = data.encode()
-    digest.update(data)
-    sign = signer.sign(digest)
+    rsakey = serialization.load_pem_private_key(
+        data=privateKey if isinstance(privateKey, bytes) else privateKey.encode(),
+        password=None,
+        backend=default_backend(),
+    )
+    sign = rsakey.sign(
+        data if isinstance(data, bytes) else data.encode(),
+        padding.PKCS1v15(),
+        hashes.SHA256(),
+    )
     return b64encode(sign)
 
 
 class Device(object):
     def __init__(self, id_data=None):
         if id_data is None:
-            mac = ":".join(["{:02x}".format(random.randint(0x00, 0xFF), 'x') for i in range(6)])
-            self.identity = json.dumps({"mac": mac}).replace(" ","")
+            mac = ":".join(
+                ["{:02x}".format(random.randint(0x00, 0xFF), "x") for i in range(6)]
+            )
+            self.identity = json.dumps({"mac": mac}).replace(" ", "")
         else:
             self.identity = id_data
 
@@ -74,11 +91,13 @@ class DevAuthorizer(object):
 
     def make_req_payload(self, dev):
         """Make auth request for given device. Returns a tuple (payload, signature)"""
-        payload = json.dumps({
-            "id_data": dev.identity,
-            "tenant_token": self.tenant_token,
-            "pubkey": dev.public_key,
-        })
+        payload = json.dumps(
+            {
+                "id_data": dev.identity,
+                "tenant_token": self.tenant_token,
+                "pubkey": dev.public_key,
+            }
+        )
         signature = sign_data(payload, dev.private_key)
         return payload, signature
 
@@ -110,14 +129,14 @@ def make_devid(identity):
     d.update(bid)
     return binascii.b2a_hex(d.digest()).decode()
 
+
 def b64pad(b64data):
-    """Pad base64 string with '=' to achieve a length that is a multiple of 4
-    """
-    return b64data + '=' * (4 - (len(b64data) % 4))
+    """Pad base64 string with '=' to achieve a length that is a multiple of 4"""
+    return b64data + "=" * (4 - (len(b64data) % 4))
 
 
 def explode_jwt(token):
-    parts = token.split('.')
+    parts = token.split(".")
     assert len(parts) == 3
 
     # JWT fields are passed in a header and use URL safe encoding, which
@@ -132,23 +151,25 @@ def explode_jwt(token):
 
     return hdr, claims, sign
 
+
 @pytest.fixture(scope="session")
 def cli():
     return CliClient()
 
+
 @pytest.fixture(scope="session")
 def mongo():
-    return MongoClient('mender-mongo:27017')
+    return MongoClient("mender-mongo:27017")
 
 
 def mongo_cleanup(mongo):
-    dbs = mongo.database_names()
-    dbs = [d for d in dbs if d not in ['local', 'admin', 'config']]
+    dbs = mongo.list_database_names()
+    dbs = [d for d in dbs if d not in ["local", "admin", "config"]]
     for d in dbs:
         mongo.drop_database(d)
 
 
-@pytest.yield_fixture(scope='function')
+@pytest.yield_fixture(scope="function")
 def clean_db(mongo):
     """Fixture setting up a clean (i.e. empty database). Yields
     pymongo.MongoClient connected to the DB."""
@@ -156,30 +177,41 @@ def clean_db(mongo):
     yield mongo
     mongo_cleanup(mongo)
 
-@pytest.yield_fixture(scope='function')
+
+@pytest.yield_fixture(scope="function")
 def clean_migrated_db(clean_db, cli):
     """Clean database with migrations applied. Yields pymongo.MongoClient connected to the DB."""
     cli.migrate()
     yield clean_db
 
-@pytest.yield_fixture(scope='function')
+
+@pytest.yield_fixture(scope="function")
 def tenant_foobar_clean_migrated_db(clean_db, cli):
     """Clean 'foobar' database with migrations applied. Yields pymongo.MongoClient connected to the DB."""
-    cli.migrate(tenant='foobar')
+    cli.migrate(tenant="foobar")
     yield clean_db
 
-@pytest.yield_fixture(scope='session')
-def management_api():
-    yield SimpleManagementClient()
 
-@pytest.yield_fixture(scope='session')
-def internal_api():
-    yield SimpleInternalClient()
+@pytest.yield_fixture(scope="session")
+def management_api(request):
+    yield SimpleManagementClient(
+        request.config.getoption("--host"),
+        request.config.getoption("--management-spec"),
+    )
 
 
-@pytest.yield_fixture(scope='session')
-def device_api():
-    yield BaseDevicesApiClient()
+@pytest.yield_fixture(scope="session")
+def internal_api(request):
+    yield SimpleInternalClient(
+        request.config.getoption("--host"),
+        request.config.getoption("--spec"),
+    )
+
+
+@pytest.yield_fixture(scope="session")
+def device_api(request):
+    yield BaseDevicesApiClient(request.config.getoption("--host"))
+
 
 def make_fake_tenant_token(tenant):
     """make_fake_tenant_token will generate a JWT-like tenant token which looks
@@ -187,28 +219,27 @@ def make_fake_tenant_token(tenant):
     issuer (Mender), subject (fake-tenant), mender.tenant (foobar)
     """
     claims = {
-        'iss': 'Mender',
-        'sub': 'fake-tenant',
-        'mender.tenant': tenant,
+        "iss": "Mender",
+        "sub": "fake-tenant",
+        "mender.tenant": tenant,
     }
 
     # serialize claims to JSON, encode as base64 and strip padding to be
     # compatible with JWT
-    enc = urlsafe_b64encode(json.dumps(claims).encode()). \
-          decode().strip('==')
+    enc = urlsafe_b64encode(json.dumps(claims).encode()).decode().strip("==")
 
-    return 'fake.' + enc + '.fake-sig'
+    return "fake." + enc + ".fake-sig"
+
 
 @pytest.fixture
 def tenant_foobar(request, tenant_foobar_clean_migrated_db):
     """Fixture that sets up a tenant with ID 'foobar', on top of a clean migrated
     (with tenant support) DB.
     """
-    return make_fake_tenant_token('foobar')
+    return make_fake_tenant_token("foobar")
+
 
 def make_devices(device_api, devcount=1, tenant_token=""):
-    print('device count to generate', devcount)
-
     url = device_api.auth_requests_url
 
     out_devices = []
@@ -225,37 +256,45 @@ def make_devices(device_api, devcount=1, tenant_token=""):
     return out_devices
 
 
-@pytest.yield_fixture(scope='function')
+@pytest.yield_fixture(scope="function")
 def devices(device_api, clean_migrated_db, request):
     """Make unauthorized devices. The fixture can be parametrized a number of
     devices to make. Yields a list of tuples:
     (instance of Device, instance of DevAuthorizer)"""
-    if not hasattr(request, 'param'):
+    if not hasattr(request, "param"):
         devcount = 1
     else:
         devcount = int(request.param)
 
     yield make_devices(device_api, devcount)
 
-@pytest.yield_fixture(scope='function')
+
+@pytest.yield_fixture(scope="function")
 def tenant_foobar_devices(device_api, management_api, tenant_foobar, request):
     """Make unauthorized devices owned by tenant with ID 'foobar'. The fixture can
     be parametrized a number of devices to make. Yields a list of tuples:
     (instance of Device, instance of DevAuthorizer)
     """
     handlers = [
-        ('POST', '/api/internal/v1/tenantadm/tenants/verify',
-            lambda _: (200, {}, '{"id": "foobar", "plan": "os"}')),
+        (
+            "POST",
+            "/api/internal/v1/tenantadm/tenants/verify",
+            lambda _: (200, {}, '{"id": "foobar", "plan": "os"}'),
+        ),
     ]
-    with mockserver.run_fake(get_fake_tenantadm_addr(),
-                             handlers=handlers) as fake:
+    with mockserver.run_fake(get_fake_tenantadm_addr(), handlers=handlers) as fake:
 
-        if not hasattr(request, 'param'):
+        if not hasattr(request, "param"):
             devcount = 1
         else:
             devcount = int(request.param)
 
         yield make_devices(device_api, devcount, tenant_token=tenant_foobar)
 
+
 def get_fake_tenantadm_addr():
-    return os.environ.get('FAKE_TENANTADM_ADDR', '0.0.0.0:9999')
+    return os.environ.get("FAKE_TENANTADM_ADDR", "0.0.0.0:9999")
+
+
+def get_fake_workflows_addr():
+    return os.environ.get("FAKE_ORCHESTRATOR_ADDR", "0.0.0.0:9998")

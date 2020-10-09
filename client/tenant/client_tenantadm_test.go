@@ -26,7 +26,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mendersoftware/go-lib-micro/apiclient"
 	"github.com/mendersoftware/go-lib-micro/rest_utils"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
@@ -34,6 +33,48 @@ import (
 	ct "github.com/mendersoftware/deviceauth/client/testing"
 	"github.com/mendersoftware/go-lib-micro/ratelimits"
 )
+
+const testServerAddrRegex = `https?://(([0-9]{1,3}\.?){4}|localhost)(:[0-9]{1,5})?`
+
+// newTestServer creates a new mock server that responds with the responses
+// pushed onto the rspChan and pushes any requests received onto reqChan if
+// the requests are consumed in the other end.
+func newTestServer(
+	rspChan <-chan *http.Response,
+	reqChan chan<- *http.Request,
+) *httptest.Server {
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		var rsp *http.Response
+		select {
+		case rsp = <-rspChan:
+		default:
+			panic("[PROG ERR] I don't know what to respond!")
+		}
+		if reqChan != nil {
+			bodyClone := bytes.NewBuffer(nil)
+			_, _ = io.Copy(bodyClone, r.Body)
+			req := r.Clone(context.TODO())
+			req.Body = ioutil.NopCloser(bodyClone)
+			select {
+			case reqChan <- req:
+				// Only push request if test function is
+				// popping from the channel.
+			default:
+			}
+		}
+		hdrs := w.Header()
+		for k, v := range rsp.Header {
+			for _, vv := range v {
+				hdrs.Add(k, vv)
+			}
+		}
+		w.WriteHeader(rsp.StatusCode)
+		if rsp.Body != nil {
+			_, _ = io.Copy(w, rsp.Body)
+		}
+	}
+	return httptest.NewServer(http.HandlerFunc(handler))
+}
 
 func TestClientGet(t *testing.T) {
 	t.Parallel()
@@ -204,7 +245,7 @@ func TestClientVerifyToken(t *testing.T) {
 				TenantAdmAddr: s.URL,
 			})
 
-			tenant, err := c.VerifyToken(context.Background(), tc.token, &apiclient.HttpApi{})
+			tenant, err := c.VerifyToken(context.Background(), tc.token)
 			if tc.err != nil {
 				assert.EqualError(t, err, tc.err.Error())
 			} else {
@@ -309,7 +350,7 @@ func TestClientGetTenant(t *testing.T) {
 				TenantAdmAddr: s.URL,
 			})
 
-			tenant, err := c.GetTenant(context.Background(), tc.tid, &apiclient.HttpApi{})
+			tenant, err := c.GetTenant(context.Background(), tc.tid)
 			if tc.err != nil {
 				assert.EqualError(t, err, tc.err.Error())
 			} else {
@@ -326,4 +367,166 @@ func TestClientGetTenant(t *testing.T) {
 
 func restError(msg string) interface{} {
 	return map[string]interface{}{"error": msg, "request_id": "test"}
+}
+
+func TestGetTenantUsers(t *testing.T) {
+	testCases := []struct {
+		Name string
+
+		CTX      context.Context
+		TenantID string
+
+		URLNoise     string
+		HTTPResponse *http.Response
+
+		Users []User
+		Error error
+	}{{
+		Name: "ok",
+
+		CTX:      context.Background(),
+		TenantID: "foobar",
+
+		HTTPResponse: func() *http.Response {
+			rsp := &http.Response{
+				StatusCode: http.StatusOK,
+			}
+			b, _ := json.Marshal([]User{{
+				ID:       "123456789012345678901234",
+				Email:    "foo@bar.com",
+				TenantID: "foobar",
+			}})
+			body := ioutil.NopCloser(bytes.NewReader(b))
+			rsp.Body = body
+			return rsp
+		}(),
+
+		Users: []User{{
+			ID:       "123456789012345678901234",
+			Email:    "foo@bar.com",
+			TenantID: "foobar",
+		}},
+	}, {
+		Name: "error, tenant id cannot be empty",
+
+		Error: errors.New(`tenantadm: \[internal\] bad argument ` +
+			`tenantID: cannot be empty`,
+		),
+	}, {
+		Name: "error, bad server url",
+
+		TenantID: "foobar",
+		URLNoise: "%%%",
+		CTX:      context.Background(),
+
+		Error: errors.New(`tenantadm: failed to prepare request: ` +
+			`parse "http://(([0-9]{1,3}\.?){4}|localhost):[0-9]+%%%` +
+			TenantUsersURI + `": invalid port ":[0-9]+%%%" after host`),
+	}, {
+		Name: "error, nil context",
+
+		TenantID: "foobar",
+
+		Error: errors.New(`tenantadm: failed to prepare request: ` +
+			`net/http: nil Context`,
+		),
+	}, {
+		Name: "error, context already canceled",
+
+		CTX: func() context.Context {
+			ctx, cancel := context.WithCancel(context.TODO())
+			cancel()
+			return ctx
+		}(),
+		TenantID: "foobar",
+		Error: errors.Wrap(context.Canceled,
+			`tenantadm: error sending user request: `+
+				`Get "`+testServerAddrRegex+TenantUsersURI+
+				`\?tenant_id=foobar"`),
+	}, {
+		Name: "error, api error from server",
+
+		CTX:      context.Background(),
+		TenantID: "123456789012345678901234",
+
+		HTTPResponse: func() *http.Response {
+			rsp := &http.Response{
+				StatusCode: http.StatusBadRequest,
+			}
+			b, _ := json.Marshal(rest_utils.ApiError{
+				Err:   "internal error",
+				ReqId: "test",
+			})
+			body := ioutil.NopCloser(bytes.NewReader(b))
+			rsp.Body = body
+			return rsp
+		}(),
+		Error: errors.New(`tenantadm: HTTP error \(400 Bad Request\) ` +
+			`on user request: internal error`),
+	}, {
+		Name: "error, unknown error from server",
+
+		CTX:      context.Background(),
+		TenantID: "123456789012345678901234",
+
+		HTTPResponse: &http.Response{
+			StatusCode: http.StatusInternalServerError,
+		},
+		Error: errors.New(`tenantadm: unexpected HTTP status: ` +
+			`500 Internal Server Error`),
+	}, {
+		Name: "error, glitchy response from tenantadm",
+
+		CTX:      context.Background(),
+		TenantID: "123456789012345678901234",
+
+		HTTPResponse: func() *http.Response {
+			rsp := &http.Response{
+				StatusCode: http.StatusOK,
+			}
+			body := ioutil.NopCloser(bytes.NewReader([]byte(
+				`plain text body`,
+			)))
+			rsp.Body = body
+			return rsp
+		}(),
+		Error: errors.New(
+			`tenantadm: error decoding response payload: ` +
+				`invalid character 'p' looking for beginning ` +
+				`of value`,
+		),
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			rspChan := make(chan *http.Response, 1)
+			reqChan := make(chan *http.Request, 1)
+			srv := newTestServer(rspChan, reqChan)
+			client := NewClient(Config{
+				TenantAdmAddr: srv.URL + tc.URLNoise,
+			})
+
+			if tc.HTTPResponse != nil {
+				rspChan <- tc.HTTPResponse
+			}
+
+			users, err := client.GetTenantUsers(tc.CTX, tc.TenantID)
+			if tc.Error != nil {
+				if assert.Error(t, err) {
+					assert.Regexp(t,
+						tc.Error.Error(),
+						err.Error(),
+					)
+				}
+			} else {
+				req := <-reqChan
+				assert.Equal(t,
+					tc.TenantID,
+					req.URL.Query().Get("tenant_id"),
+				)
+				assert.NoError(t, err)
+				assert.Equal(t, tc.Users, users)
+			}
+		})
+	}
 }

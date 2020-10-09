@@ -265,7 +265,7 @@ func tenantWithContext(ctx context.Context, tenantToken string) (context.Context
 }
 
 func (d *DevAuth) doVerifyTenant(ctx context.Context, token string) (*tenant.Tenant, error) {
-	t, err := d.cTenant.VerifyToken(ctx, token, d.clientGetter())
+	t, err := d.cTenant.VerifyToken(ctx, token)
 
 	if err != nil {
 		if tenant.IsErrTokenVerificationFailed(err) {
@@ -1204,7 +1204,7 @@ func (d *DevAuth) getApiLimits(ctx context.Context, tid, did string) (*ratelimit
 		return nil, err
 	}
 
-	t, err := d.cTenant.GetTenant(ctx, tid, d.clientGetter())
+	t, err := d.cTenant.GetTenant(ctx, tid)
 	if err != nil {
 		return nil, errors.Wrap(err, "request to get tenant failed")
 	}

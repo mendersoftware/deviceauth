@@ -11,6 +11,7 @@
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
+
 package orchestrator
 
 import (
@@ -25,7 +26,6 @@ import (
 	"github.com/mendersoftware/go-lib-micro/rest_utils"
 	"github.com/pkg/errors"
 
-	"github.com/mendersoftware/deviceauth/model"
 	"github.com/mendersoftware/deviceauth/utils"
 )
 
@@ -35,44 +35,10 @@ const (
 	ProvisionDeviceOrchestratorUri       = "/api/v1/workflow/provision_device"
 	UpdateDeviceStatusOrchestratorUri    = "/api/v1/workflow/update_device_status"
 	HealthURI                            = "/api/v1/health"
+	DeviceLimitWarningURI                = "/api/v1/workflow/device_limit_email"
 	// default request timeout, 10s?
 	defaultReqTimeout = time.Duration(10) * time.Second
 )
-
-// DecomissioningReq contains request data of request to start decommissioning workflow
-type DecommissioningReq struct {
-	// Device ID
-	DeviceId string `json:"device_id"`
-	// Request ID
-	RequestId string `json:"request_id"`
-	// User authorization, eg. the value of Authorization header of incoming
-	// HTTP request
-	Authorization string `json:"authorization"`
-}
-
-// ProvisionDeviceReq contains request data of request to start provisioning workflow
-type ProvisionDeviceReq struct {
-	// Request ID
-	RequestId string `json:"request_id"`
-	// User authorization, eg. the value of Authorization header of incoming
-	// HTTP request
-	Authorization string `json:"authorization"`
-	// Device
-	Device model.Device `json:"device"`
-}
-
-// UpdateDeviceStatusReq contains request data of request to start update
-// device status  workflow
-type UpdateDeviceStatusReq struct {
-	// Request ID
-	RequestId string `json:"request_id"`
-	// Device IDs
-	Ids string `json:"device_ids"`
-	// Tenant ID
-	TenantId string `json:"tenant_id"`
-	// new status
-	Status string `json:"device_status"`
-}
 
 // Config conveys client configuration
 type Config struct {
@@ -89,12 +55,14 @@ type ClientRunner interface {
 	SubmitDeviceDecommisioningJob(ctx context.Context, req DecommissioningReq) error
 	SubmitProvisionDeviceJob(ctx context.Context, req ProvisionDeviceReq) error
 	SubmitUpdateDeviceStatusJob(ctx context.Context, req UpdateDeviceStatusReq) error
+	SubmitDeviceLimitWarning(ctx context.Context, devWarn DeviceLimitWarning) error
 }
 
 // Client is an opaque implementation of orchestrator client. Implements
 // ClientRunner interface
 type Client struct {
 	conf Config
+	http http.Client
 }
 
 func NewClient(c Config) *Client {
@@ -104,13 +72,15 @@ func NewClient(c Config) *Client {
 
 	return &Client{
 		conf: c,
+		http: http.Client{
+			Timeout: c.Timeout,
+		},
 	}
 }
 
 func (c *Client) CheckHealth(ctx context.Context) error {
 	var (
 		apiErr rest_utils.ApiError
-		client http.Client
 	)
 
 	if ctx == nil {
@@ -126,7 +96,7 @@ func (c *Client) CheckHealth(ctx context.Context) error {
 		utils.JoinURL(c.conf.OrchestratorAddr, HealthURI), nil,
 	)
 
-	rsp, err := client.Do(req)
+	rsp, err := c.http.Do(req)
 	if err != nil {
 		return err
 	}
@@ -144,7 +114,6 @@ func (c *Client) CheckHealth(ctx context.Context) error {
 func (co *Client) SubmitDeviceDecommisioningJob(ctx context.Context, decommissioningReq DecommissioningReq) error {
 
 	l := log.FromContext(ctx)
-	client := http.Client{}
 
 	l.Debugf("Submit decommissioning job for device: %s", decommissioningReq.DeviceId)
 
@@ -169,7 +138,7 @@ func (co *Client) SubmitDeviceDecommisioningJob(ctx context.Context, decommissio
 	ctx, cancel := context.WithTimeout(ctx, co.conf.Timeout)
 	defer cancel()
 
-	rsp, err := client.Do(req.WithContext(ctx))
+	rsp, err := co.http.Do(req.WithContext(ctx))
 	if err != nil {
 		return errors.Wrapf(err, "failed to submit decommissioning job")
 	}
@@ -192,7 +161,6 @@ func (co *Client) SubmitDeviceDecommisioningJob(ctx context.Context, decommissio
 func (co *Client) SubmitProvisionDeviceJob(ctx context.Context, provisionDeviceReq ProvisionDeviceReq) error {
 
 	l := log.FromContext(ctx)
-	client := http.Client{}
 
 	l.Debugf("Submit provision device job for device: %s", provisionDeviceReq.Device.Id)
 
@@ -217,7 +185,7 @@ func (co *Client) SubmitProvisionDeviceJob(ctx context.Context, provisionDeviceR
 	ctx, cancel := context.WithTimeout(ctx, co.conf.Timeout)
 	defer cancel()
 
-	rsp, err := client.Do(req.WithContext(ctx))
+	rsp, err := co.http.Do(req.WithContext(ctx))
 	if err != nil {
 		return errors.Wrapf(err, "failed to submit provision device job")
 	}
@@ -239,7 +207,6 @@ func (co *Client) SubmitProvisionDeviceJob(ctx context.Context, provisionDeviceR
 
 func (co *Client) SubmitUpdateDeviceStatusJob(ctx context.Context, updateDeviceStatusReq UpdateDeviceStatusReq) error {
 	l := log.FromContext(ctx)
-	client := http.Client{}
 
 	l.Debugf("Submit update device status job for devices: %q", updateDeviceStatusReq.Ids)
 
@@ -264,7 +231,7 @@ func (co *Client) SubmitUpdateDeviceStatusJob(ctx context.Context, updateDeviceS
 	ctx, cancel := context.WithTimeout(ctx, co.conf.Timeout)
 	defer cancel()
 
-	rsp, err := client.Do(req.WithContext(ctx))
+	rsp, err := co.http.Do(req.WithContext(ctx))
 	if err != nil {
 		return errors.Wrapf(err, "failed to submit update device status job")
 	}
@@ -280,6 +247,51 @@ func (co *Client) SubmitUpdateDeviceStatusJob(ctx context.Context, updateDeviceS
 
 		return errors.Errorf(
 			"submit update device status request failed with status %v", rsp.Status)
+	}
+	return nil
+}
+
+func (co *Client) SubmitDeviceLimitWarning(
+	ctx context.Context,
+	devWarn DeviceLimitWarning,
+) error {
+	if err := devWarn.Validate(); err != nil {
+		return errors.Wrap(err,
+			"workflows: [internal] invalid request argument",
+		)
+	}
+
+	bodyJSON, _ := json.Marshal(devWarn)
+
+	req, err := http.NewRequestWithContext(ctx, "POST",
+		utils.JoinURL(co.conf.OrchestratorAddr, DeviceLimitWarningURI),
+		bytes.NewReader(bodyJSON),
+	)
+	if err != nil {
+		return errors.Wrap(err,
+			"workflows: error preparing device limit warning request",
+		)
+	}
+	rsp, err := co.http.Do(req)
+	if err != nil {
+		return errors.Wrap(err,
+			"workflows: error sending device limit warning request",
+		)
+	}
+	defer rsp.Body.Close()
+	if rsp.StatusCode >= 400 {
+		var (
+			apiErr    = new(rest_utils.ApiError)
+			jsDecoder = json.NewDecoder(rsp.Body)
+		)
+		err := jsDecoder.Decode(apiErr)
+		if err != nil {
+			return errors.Errorf(
+				"workflows: unexpected HTTP response: %s",
+				rsp.Status,
+			)
+		}
+		return apiErr
 	}
 	return nil
 }

@@ -27,6 +27,7 @@ import (
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	"github.com/mendersoftware/go-lib-micro/mongo/oid"
 	ctxstore "github.com/mendersoftware/go-lib-micro/store"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -164,6 +165,119 @@ func NewDeviceFilter(status string, ids []string) model.DeviceFilter {
 		ret.IDs = ids
 	}
 	return ret
+}
+
+func TestForEachDatabase(t *testing.T) {
+	testCases := []struct {
+		Name string
+
+		TenantIDs []string
+
+		CTX     context.Context
+		MapFunc store.MapFunc
+
+		Error error
+	}{{
+		Name: "ok, noop",
+
+		CTX: context.Background(),
+
+		TenantIDs: []string{"tenant1", "tenant2", ""},
+		MapFunc: func(ctx context.Context) error {
+			return nil
+		},
+	}, {
+		Name: "error, map func errored",
+
+		CTX:       context.Background(),
+		TenantIDs: []string{"tenant"},
+		MapFunc: func(ctx context.Context) error {
+			return errors.New("internal error")
+		},
+
+		Error: errors.New(
+			`store: failed to apply mapFunc to database ` +
+				`"deviceauth-tenant": internal error`,
+		),
+	}, {
+		Name: "error, context already canceled",
+
+		CTX: func() context.Context {
+			ctx, cancel := context.WithCancel(context.TODO())
+			cancel()
+			return ctx
+		}(),
+		TenantIDs: []string{"tenant"},
+		MapFunc: func(ctx context.Context) error {
+			return nil
+		},
+
+		Error: errors.Wrap(context.Canceled,
+			`store: failed to retrieve databases: `+
+				`connection(.+?) failed to write`,
+		),
+	}, {
+		Name: "error, context timeout",
+
+		CTX: func() context.Context {
+			ctx, cancel := context.WithTimeout(context.TODO(), time.Second*3)
+			go func() {
+				// the things we do for go vet...
+				<-time.After(time.Minute)
+				cancel()
+			}()
+			return ctx
+		}(),
+		TenantIDs: []string{"tenant1", "tenant2"},
+		MapFunc: func(ctx context.Context) error {
+			time.Sleep(time.Second * 3)
+			return nil
+		},
+		Error: errors.Wrap(context.DeadlineExceeded,
+			"store: database operations stopped prematurely",
+		),
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			var (
+				numCalled int
+				client    = db.Client()
+				setupCtx  = context.Background()
+			)
+			db.Wipe()
+			// Initialize databases in our test setup
+			for _, tenantID := range tc.TenantIDs {
+				dbName := ctxstore.DbNameForTenant(tenantID, DbName)
+				err := client.Database(dbName).
+					CreateCollection(setupCtx, "test")
+				if !assert.NoError(t, err) {
+					panic(err)
+				}
+			}
+			ds := NewDataStoreMongoWithClient(client)
+
+			// Wrap mapFunc to assert number of times called and
+			// database legitimacy.
+			mapFunc := func(ctx context.Context) error {
+				numCalled++
+				dbName := ctxstore.DbFromContext(ctx, DbName)
+				tenantID := ctxstore.TenantFromDbName(dbName, DbName)
+				assert.Contains(t, tc.TenantIDs, tenantID)
+				return tc.MapFunc(ctx)
+			}
+			// Run test:
+			err := ds.ForEachDatabase(tc.CTX, mapFunc)
+			if tc.Error != nil {
+				if assert.Error(t, err) {
+					assert.Regexp(t, tc.Error.Error(), err.Error())
+				}
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, numCalled, len(tc.TenantIDs))
+			}
+		})
+	}
 }
 
 func TestPing(t *testing.T) {

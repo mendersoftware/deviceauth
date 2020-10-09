@@ -20,7 +20,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mendersoftware/go-lib-micro/apiclient"
 	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/mendersoftware/go-lib-micro/rest_utils"
 	"github.com/pkg/errors"
@@ -33,6 +32,7 @@ const (
 	// devices endpoint
 	TenantVerifyUri = "/api/internal/v1/tenantadm/tenants/verify"
 	TenantGetUri    = "/api/internal/v1/tenantadm/tenants/:tid"
+	TenantUsersURI  = "/api/internal/v1/tenantadm/tenants/users"
 	// default request timeout, 10s?
 	defaultReqTimeout = time.Duration(10) * time.Second
 )
@@ -61,15 +61,16 @@ type Config struct {
 //go:generate ../../utils/mockgen.sh
 type ClientRunner interface {
 	CheckHealth(ctx context.Context) error
-	VerifyToken(ctx context.Context, token string, client apiclient.HttpRunner) (*Tenant, error)
-	GetTenant(ctx context.Context, tid string,
-		client apiclient.HttpRunner) (*Tenant, error)
+	VerifyToken(ctx context.Context, token string) (*Tenant, error)
+	GetTenant(ctx context.Context, tid string) (*Tenant, error)
+	GetTenantUsers(ctx context.Context, tenantID string) ([]User, error)
 }
 
 // Client is an opaque implementation of tenant administrator client. Implements
 // ClientRunner interface
 type Client struct {
 	conf Config
+	http http.Client
 }
 
 // NewClient creates a client with given config.
@@ -80,13 +81,15 @@ func NewClient(c Config) *Client {
 
 	return &Client{
 		conf: c,
+		http: http.Client{
+			Timeout: c.Timeout,
+		},
 	}
 }
 
 func (c *Client) CheckHealth(ctx context.Context) error {
 	var (
 		apiErr rest_utils.ApiError
-		client http.Client
 	)
 
 	if ctx == nil {
@@ -102,7 +105,7 @@ func (c *Client) CheckHealth(ctx context.Context) error {
 		utils.JoinURL(c.conf.TenantAdmAddr, TenantHealthURI), nil,
 	)
 
-	rsp, err := client.Do(req)
+	rsp, err := c.http.Do(req)
 	if err != nil {
 		return err
 	}
@@ -119,8 +122,7 @@ func (c *Client) CheckHealth(ctx context.Context) error {
 
 // VerifyToken will execute a request to tenenatadm's endpoint for token
 // verification. Returns nil if verification was successful.
-func (tc *Client) VerifyToken(ctx context.Context, token string,
-	client apiclient.HttpRunner) (*Tenant, error) {
+func (tc *Client) VerifyToken(ctx context.Context, token string) (*Tenant, error) {
 
 	l := log.FromContext(ctx)
 
@@ -139,7 +141,7 @@ func (tc *Client) VerifyToken(ctx context.Context, token string,
 	ctx, cancel := context.WithTimeout(ctx, tc.conf.Timeout)
 	defer cancel()
 
-	rsp, err := client.Do(req.WithContext(ctx))
+	rsp, err := tc.http.Do(req.WithContext(ctx))
 	if err != nil {
 		l.Errorf("tenantadm request failed: %v", err)
 		return nil, errors.Wrap(err, "request to verify token failed")
@@ -170,8 +172,7 @@ func (tc *Client) VerifyToken(ctx context.Context, token string,
 
 // GetTenant will retrieve a single tenant
 // verification. Returns nil if verification was successful.
-func (tc *Client) GetTenant(ctx context.Context, tid string,
-	client apiclient.HttpRunner) (*Tenant, error) {
+func (tc *Client) GetTenant(ctx context.Context, tid string) (*Tenant, error) {
 
 	l := log.FromContext(ctx)
 
@@ -188,7 +189,7 @@ func (tc *Client) GetTenant(ctx context.Context, tid string,
 	ctx, cancel := context.WithTimeout(ctx, tc.conf.Timeout)
 	defer cancel()
 
-	rsp, err := client.Do(req.WithContext(ctx))
+	rsp, err := tc.http.Do(req.WithContext(ctx))
 	if err != nil {
 		l.Errorf("tenantadm request failed: %v", err)
 		return nil, errors.Wrap(err, "request to get tenant failed")
@@ -208,4 +209,55 @@ func (tc *Client) GetTenant(ctx context.Context, tid string,
 		return nil, errors.Errorf("getting tenant resulted in unexpected code: %v",
 			rsp.StatusCode)
 	}
+}
+
+type User struct {
+	ID       string `json:"id"`
+	Email    string `json:"name"`
+	TenantID string `json:"tenant_id"`
+}
+
+func (tc *Client) GetTenantUsers(ctx context.Context, tenantID string) ([]User, error) {
+	var ret []User
+	if tenantID == "" {
+		return nil, errors.New("tenantadm: [internal] bad argument " +
+			"tenantID: cannot be empty")
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "GET", utils.JoinURL(tc.conf.TenantAdmAddr, TenantUsersURI), nil)
+	if err != nil {
+		return nil, errors.Wrap(err, "tenantadm: failed to prepare request")
+	}
+	q := req.URL.Query()
+	q.Add("tenant_id", tenantID)
+	req.URL.RawQuery = q.Encode()
+
+	rsp, err := tc.http.Do(req)
+	if err != nil {
+		return nil, errors.Wrap(err, "tenantadm: error sending user request")
+	}
+	defer rsp.Body.Close()
+	if rsp.StatusCode >= 400 {
+		var APIErr = new(rest_utils.ApiError)
+		jsDecoder := json.NewDecoder(rsp.Body)
+		err = jsDecoder.Decode(APIErr)
+		if err != nil {
+			return nil, errors.Errorf(
+				"tenantadm: unexpected HTTP status: %s",
+				rsp.Status,
+			)
+		}
+		return nil, errors.Wrapf(APIErr,
+			"tenantadm: HTTP error (%s) on user request",
+			rsp.Status,
+		)
+	}
+	jsDecoder := json.NewDecoder(rsp.Body)
+	err = jsDecoder.Decode(&ret)
+	if err != nil {
+		return nil, errors.Wrap(err,
+			"tenantadm: error decoding response payload",
+		)
+	}
+	return ret, nil
 }

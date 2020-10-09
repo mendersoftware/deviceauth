@@ -12,10 +12,9 @@
 #    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
-from Crypto.PublicKey import RSA
 
-def compare_keys(a,b):
-    ai = RSA.importKey(a)
-    bi = RSA.importKey(b)
 
-    return ai.exportKey().decode() == bi.exportKey().decode()
+def compare_keys(a, b):
+    a_b64 = "".join(list(filter(None, a.splitlines()))[1:-1])
+    b_b64 = "".join(list(filter(None, b.splitlines()))[1:-1])
+    return a_b64 == b_b64

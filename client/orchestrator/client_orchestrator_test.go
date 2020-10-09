@@ -31,6 +31,46 @@ import (
 	"github.com/mendersoftware/go-lib-micro/rest_utils"
 )
 
+// newTestServer creates a new mock server that responds with the responses
+// pushed onto the rspChan and pushes any requests received onto reqChan if
+// the requests are consumed in the other end.
+func newTestServer(
+	rspChan <-chan *http.Response,
+	reqChan chan<- *http.Request,
+) *httptest.Server {
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		var rsp *http.Response
+		select {
+		case rsp = <-rspChan:
+		default:
+			panic("[PROG ERR] I don't know what to respond!")
+		}
+		if reqChan != nil {
+			bodyClone := bytes.NewBuffer(nil)
+			_, _ = io.Copy(bodyClone, r.Body)
+			req := r.Clone(context.TODO())
+			req.Body = ioutil.NopCloser(bodyClone)
+			select {
+			case reqChan <- req:
+				// Only push request if test function is
+				// popping from the channel.
+			default:
+			}
+		}
+		hdrs := w.Header()
+		for k, v := range rsp.Header {
+			for _, vv := range v {
+				hdrs.Add(k, vv)
+			}
+		}
+		w.WriteHeader(rsp.StatusCode)
+		if rsp.Body != nil {
+			_, _ = io.Copy(w, rsp.Body)
+		}
+	}
+	return httptest.NewServer(http.HandlerFunc(handler))
+}
+
 func TestGetClient(t *testing.T) {
 	t.Parallel()
 
@@ -173,4 +213,177 @@ func TestClientReqNoHost(t *testing.T) {
 	err := c.SubmitDeviceDecommisioningJob(ctx, DecommissioningReq{})
 
 	assert.Error(t, err, "expected an error")
+}
+
+func TestSubmitDeviceLimitWarning(t *testing.T) {
+	testCases := []struct {
+		Name string
+
+		CTX context.Context
+		DeviceLimitWarning
+
+		URLNoise     string
+		HTTPResponse *http.Response
+
+		Error error
+	}{{
+		Name: "ok",
+
+		CTX: context.Background(),
+		DeviceLimitWarning: DeviceLimitWarning{
+			SenderEmail:    "support@mender.io",
+			RecipientEmail: "user@acme.io",
+
+			Subject: "Your approaching your device limit.",
+			Body:    "Please fix...",
+			BodyHTML: `<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"></head>
+<body><script>alert("Øpgrade plan pls");alert("ok thænks, bye!")</script></body>
+</html>
+`,
+			RemainingDevices: func() *uint {
+				ret := uint(2)
+				return &ret
+			}(),
+		},
+
+		HTTPResponse: &http.Response{
+			StatusCode: http.StatusCreated,
+		},
+	}, {
+		Name: "error, bad request argument",
+
+		DeviceLimitWarning: DeviceLimitWarning{},
+
+		Error: errors.New(
+			`workflows: \[internal\] invalid request argument: ` +
+				`invalid device limit request: ` +
+				`missing parameter "from"`),
+	}, {
+		Name: "error, bad URL",
+
+		DeviceLimitWarning: DeviceLimitWarning{
+			SenderEmail:    "support@mender.io",
+			RecipientEmail: "user@acme.io",
+
+			Subject:  "Your approaching your device limit.",
+			Body:     "Please fix...",
+			BodyHTML: `<!DOCTYPE html><html> hello! </html>`,
+			RemainingDevices: func() *uint {
+				ret := uint(2)
+				return &ret
+			}(),
+		},
+		CTX:      context.Background(),
+		URLNoise: "%%%",
+		Error: errors.New(
+			`workflows: error preparing device limit warning ` +
+				`request: parse "http://[0-9.:]+%%%` +
+				DeviceLimitWarningURI),
+	}, {
+		Name: "error, context canceled",
+
+		DeviceLimitWarning: DeviceLimitWarning{
+			SenderEmail:    "support@mender.io",
+			RecipientEmail: "user@acme.io",
+
+			Subject:  "Your approaching your device limit.",
+			Body:     "Please fix...",
+			BodyHTML: `<!DOCTYPE html><html> hello! </html>`,
+			RemainingDevices: func() *uint {
+				ret := uint(2)
+				return &ret
+			}(),
+		},
+		CTX: func() context.Context {
+			ctx, cancel := context.WithCancel(context.TODO())
+			cancel()
+			return ctx
+		}(),
+		Error: errors.Wrapf(context.Canceled,
+			`workflows: error sending device limit warning `+
+				`request: Post "http://[0-9.:].+%s"`,
+			DeviceLimitWarningURI),
+	}, {
+		Name: "error, API error returned from workflow",
+
+		CTX: context.Background(),
+		DeviceLimitWarning: DeviceLimitWarning{
+			SenderEmail:    "support@mender.io",
+			RecipientEmail: "user@acme.io",
+
+			Subject:  "Your approaching your device limit.",
+			Body:     "Please fix...",
+			BodyHTML: `<!DOCTYPE html><html>Check device limit</html>`,
+			RemainingDevices: func() *uint {
+				ret := uint(2)
+				return &ret
+			}(),
+		},
+
+		HTTPResponse: func() *http.Response {
+			rsp := &http.Response{
+				StatusCode: http.StatusInternalServerError,
+				Header: http.Header{
+					"Content-Type": []string{"application/json"},
+				},
+			}
+			b, _ := json.Marshal(rest_utils.ApiError{
+				Err:   "internal error",
+				ReqId: "foobar",
+			})
+			rsp.Body = ioutil.NopCloser(bytes.NewReader(b))
+			return rsp
+		}(),
+		Error: errors.New("internal error"),
+	}, {
+		Name: "error, bad status from workflows - content not understood",
+
+		CTX: context.Background(),
+		DeviceLimitWarning: DeviceLimitWarning{
+			SenderEmail:    "support@mender.io",
+			RecipientEmail: "user@acme.io",
+
+			Subject:  "Your approaching your device limit.",
+			Body:     "Please fix...",
+			BodyHTML: `<!DOCTYPE html><html>Check device limit</html>`,
+			RemainingDevices: func() *uint {
+				ret := uint(2)
+				return &ret
+			}(),
+		},
+
+		HTTPResponse: &http.Response{
+			StatusCode: http.StatusInternalServerError,
+		},
+		Error: errors.New("workflows: unexpected HTTP response: " +
+			"500 Internal Server Error"),
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			rspChan := make(chan *http.Response, 1)
+			srv := newTestServer(rspChan, nil)
+
+			client := NewClient(Config{
+				OrchestratorAddr: srv.URL + tc.URLNoise,
+				Timeout:          time.Minute,
+			})
+			if tc.HTTPResponse != nil {
+				rspChan <- tc.HTTPResponse
+			}
+
+			err := client.SubmitDeviceLimitWarning(
+				tc.CTX, tc.DeviceLimitWarning,
+			)
+			if tc.Error != nil {
+				if assert.Error(t, err) {
+					assert.Regexp(t, tc.Error.Error(), err.Error())
+				}
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
 }

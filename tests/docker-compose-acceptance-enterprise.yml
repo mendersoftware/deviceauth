@@ -1,7 +1,7 @@
 version: '2.1'
 services:
     acceptance:
-        image: testing
+        image: mendersoftware/mender-test-containers:acceptance-testing
         networks:
             - mender
         volumes:
@@ -15,6 +15,9 @@ services:
             FAKE_TENANTADM_ADDR: "0.0.0.0:9999"
             FAKE_ADMISSION_ADDR: "0.0.0.0:9997"
             FAKE_ORCHESTRATOR_ADDR: "0.0.0.0:9998"
+            DEVICEAUTH_TENANTADM_ADDR: "http://acceptance:9999/"
+            DEVICEAUTH_ORCHESTRATOR_ADDR: "http://acceptance:9998/"
+
     mender-device-auth:
             # built/tagged locally and only used for testing
             image: mendersoftware/deviceauth:prtest
