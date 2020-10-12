@@ -15,7 +15,7 @@ Mender server. The Mender server is designed as a microservices architecture
 and comprises several repositories.
 
 Device Authentication is responsible for issuing, maintaining and verifying
-[JWT](jwt.io) authentication tokens used by devices in Mender API calls. A token
+[JWT](https://jwt.io/) authentication tokens used by devices in Mender API calls. A token
 is issued as a result of a successful bootstrap request, whereby the device presents its
 vendor-specific identity attributes, and can be admitted in the the system by the administrator.
 Each subsequent device-specific API call is then internally routed to this service for token verification.
