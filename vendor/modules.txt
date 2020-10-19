@@ -109,7 +109,7 @@ github.com/mendersoftware/go-lib-micro/rest_utils
 github.com/mendersoftware/go-lib-micro/store
 github.com/mendersoftware/go-lib-micro/strings
 github.com/mendersoftware/go-lib-micro/testing
-# github.com/mendersoftware/mendertesting v0.0.1
+# github.com/mendersoftware/mendertesting v0.0.2-0.20201017134033-a52f7a79af4f
 ## explicit
 github.com/mendersoftware/mendertesting
 # github.com/mitchellh/mapstructure v1.1.2
