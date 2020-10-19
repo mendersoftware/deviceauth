@@ -12,58 +12,39 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// metric package provides an API for reporting diagnostic
-// measurements using four basic kinds of instruments.
+// Package metric provides support for reporting measurements using instruments.
 //
-// The three basic kinds are:
+// Instruments are categorized as below:
 //
-// - counters
-// - measures
-// - observers
+// Synchronous instruments are called by the user with a Context.
+// Asynchronous instruments are called by the SDK during collection.
 //
-// All instruments report either float64 or int64 values.
+// Additive instruments are semantically intended for capturing a sum.
+// Non-additive instruments are intended for capturing a distribution.
 //
-// The primary object that handles metrics is Meter. Meter can be
-// obtained from Provider. The implementations of the Meter and
-// Provider are provided by SDK. Normally, the Meter is used directly
-// only for the instrument creation and batch recording.
+// Additive instruments may be monotonic, in which case they are
+// non-descreasing and naturally define a rate.
 //
-// Counters are instruments that are reporting a quantity or a sum. An
-// example could be bank account balance or bytes downloaded. Counters
-// can be created with either NewFloat64Counter or
-// NewInt64Counter. Counters expect non-negative values by default to
-// be reported. This can be changed with the WithMonotonic option
-// (passing false as a parameter) passed to the Meter.New*Counter
-// function - this allows reporting negative values. To report the new
-// value, use an Add function.
+// The synchronous instrument names are:
 //
-// Measures are instruments that are reporting values that are
-// recorded separately to figure out some statistical properties from
-// those values (like average). An example could be temperature over
-// time or lines of code in the project over time. Measures can be
-// created with either NewFloat64Measure or NewInt64Measure. Measures
-// by default take only non-negative values. This can be changed with
-// the WithAbsolute option (passing false as a parameter) passed to
-// the New*Measure function - this allows reporting negative values
-// too. To report a new value, use the Record function.
+//   Counter:           additive, monotonic
+//   UpDownCounter:     additive
+//   ValueRecorder:     non-additive
 //
-// Observers are instruments that are reporting a current state of a
-// set of values. An example could be voltage or
-// temperature. Observers can be created with either
-// RegisterFloat64Observer or RegisterInt64Observer. Observers by
-// default have no limitations about reported values - they can be
-// less or greater than the last reported value. This can be changed
-// with the WithMonotonic option passed to the Register*Observer
-// function - this permits the reported values only to go
-// up. Reporting of the new values happens asynchronously, with the
-// use of a callback passed to the Register*Observer function. The
-// callback can report multiple values. There is no unregister function.
+// and the asynchronous instruments are:
 //
-// Counters and measures support creating bound instruments for a
-// potentially more efficient reporting. The bound instruments have
-// the same function names as the instruments (so a Counter bound
-// instrument has Add, and a Measure bound instrument has Record).
-// Bound Instruments can be created with the Bind function of the
-// respective instrument. When done with the bound instrument, call
-// Unbind on it.
+//   SumObserver:       additive, monotonic
+//   UpDownSumObserver: additive
+//   ValueObserver:     non-additive
+//
+// All instruments are provided with support for either float64 or
+// int64 input values.
+//
+// The Meter interface supports allocating new instruments as well as
+// interfaces for recording batches of synchronous measurements or
+// asynchronous observations.  To obtain a Meter, use a MeterProvider.
+//
+// The MeterProvider interface supports obtaining a named Meter interface. To
+// obtain a MeterProvider implementation, initialize and configure any
+// compatible SDK.
 package metric // import "go.opentelemetry.io/otel/api/metric"
