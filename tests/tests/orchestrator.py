@@ -22,66 +22,115 @@ import mockserver
 
 
 def provision_device_handler(device_id=None, status=200):
-    log = logging.getLogger('orchestartor.provision_device')
+    log = logging.getLogger("orchestartor.provision_device")
 
     def _provision_device(request):
-        device = json.loads(request.body.decode())['device']
-        log.info('provision device %s', device)
+        device = json.loads(request.body.decode())["device"]
+        log.info("provision device %s", device)
         if device_id is not None:
-            assert device.get('id', None) == device_id
+            assert device.get("id", None) == device_id
         else:
-            assert device.get('id', None)
+            assert device.get("id", None)
 
-        return (status, {}, '')
+        return (status, {}, "")
 
     return _provision_device
 
+
 def decommission_device_handler(device_id=None, status=200):
-    log = logging.getLogger('orchestartor.decommision_device')
+    log = logging.getLogger("orchestartor.decommision_device")
 
     def _decommission_device(request):
         dreq = json.loads(request.body.decode())
-        print('decommision request', dreq)
+        print("decommision request", dreq)
         # verify that devauth tries to decommision correct device
-        assert dreq.get('device_id', None) == device_id
+        assert dreq.get("device_id", None) == device_id
         # test is enforcing particular request ID
-        assert dreq.get('request_id', None) == 'delete_device'
+        assert dreq.get("request_id", None) == "delete_device"
         # test is enforcing particular request ID
-        assert dreq.get('authorization', None) == 'Bearer foobar'
-        return (status, {}, '')
+        assert dreq.get("authorization", None) == "Bearer foobar"
+        return (status, {}, "")
 
     return _decommission_device
 
+
 def update_device_status_handler(device_id=None, status=200):
-    log = logging.getLogger('orchestartor.update_device_status')
+    log = logging.getLogger("orchestartor.update_device_status")
 
     def _update_device_status(request):
         dreq = json.loads(request.body.decode())
-        print('update_device_status request', dreq)
-        return (status, {}, '')
+        print("update_device_status request", dreq)
+        return (status, {}, "")
 
     return _update_device_status
 
+
+def update_device_inventory_handler(device_id=None, status=200):
+    log = logging.getLogger("orchestartor.update_device_inventory")
+
+    def _update_device_inventory(request):
+        dreq = json.loads(request.body.decode())
+        print("update_device_inventory request", dreq)
+        return (status, {}, "")
+
+    return _update_device_inventory
+
+
 def get_fake_orchestrator_addr():
-    return os.environ.get('FAKE_ORCHESTRATOR_ADDR', '0.0.0.0:9998')
+    return os.environ.get("FAKE_ORCHESTRATOR_ADDR", "0.0.0.0:9998")
+
 
 ANY_DEVICE = None
+
 
 @contextmanager
 def run_fake_for_device_id(devid, status=None):
     if status is None:
         handlers = [
-                ('POST', '/api/v1/workflow/provision_device', provision_device_handler(devid)),
-                ('POST', '/api/v1/workflow/decommission_device', decommission_device_handler(devid)),
-                ('POST', '/api/v1/workflow/update_device_status', update_device_status_handler(devid)),
-                ]
+            (
+                "POST",
+                "/api/v1/workflow/provision_device",
+                provision_device_handler(devid),
+            ),
+            (
+                "POST",
+                "/api/v1/workflow/decommission_device",
+                decommission_device_handler(devid),
+            ),
+            (
+                "POST",
+                "/api/v1/workflow/update_device_status",
+                update_device_status_handler(devid),
+            ),
+            (
+                "POST",
+                "/api/v1/workflow/update_device_inventory",
+                update_device_inventory_handler(devid),
+            ),
+        ]
     else:
         handlers = [
-                ('POST', '/api/v1/workflow/provision_device', provision_device_handler(devid, status)),
-                ('POST', '/api/v1/workflow/decommission_device', decommission_device_handler(devid, status)),
-                ('POST', '/api/v1/workflow/update_device_status', update_device_status_handler(devid, status)),
-                ]
+            (
+                "POST",
+                "/api/v1/workflow/provision_device",
+                provision_device_handler(devid, status),
+            ),
+            (
+                "POST",
+                "/api/v1/workflow/decommission_device",
+                decommission_device_handler(devid, status),
+            ),
+            (
+                "POST",
+                "/api/v1/workflow/update_device_status",
+                update_device_status_handler(devid, status),
+            ),
+            (
+                "POST",
+                "/api/v1/workflow/update_device_inventory",
+                update_device_inventory_handler(devid, status),
+            ),
+        ]
 
-    with mockserver.run_fake(get_fake_orchestrator_addr(),
-                             handlers=handlers) as server:
+    with mockserver.run_fake(get_fake_orchestrator_addr(), handlers=handlers) as server:
         yield server
