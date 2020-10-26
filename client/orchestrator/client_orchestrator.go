@@ -34,6 +34,7 @@ const (
 	DeviceDecommissioningOrchestratorUri = "/api/v1/workflow/decommission_device"
 	ProvisionDeviceOrchestratorUri       = "/api/v1/workflow/provision_device"
 	UpdateDeviceStatusOrchestratorUri    = "/api/v1/workflow/update_device_status"
+	UpdateDeviceInventoryOrchestratorUri = "/api/v1/workflow/update_device_inventory"
 	HealthURI                            = "/api/v1/health"
 	DeviceLimitWarningURI                = "/api/v1/workflow/device_limit_email"
 	// default request timeout, 10s?
@@ -56,6 +57,7 @@ type ClientRunner interface {
 	SubmitProvisionDeviceJob(ctx context.Context, req ProvisionDeviceReq) error
 	SubmitUpdateDeviceStatusJob(ctx context.Context, req UpdateDeviceStatusReq) error
 	SubmitDeviceLimitWarning(ctx context.Context, devWarn DeviceLimitWarning) error
+	SubmitUpdateDeviceInventoryJob(ctx context.Context, req UpdateDeviceInventoryReq) error
 }
 
 // Client is an opaque implementation of orchestrator client. Implements
@@ -292,6 +294,52 @@ func (co *Client) SubmitDeviceLimitWarning(
 			)
 		}
 		return apiErr
+	}
+	return nil
+}
+
+func (co *Client) SubmitUpdateDeviceInventoryJob(ctx context.Context, updateDeviceInventoryReq UpdateDeviceInventoryReq) error {
+	l := log.FromContext(ctx)
+
+	l.Debugf("Submit update device inventory job for device: %q", updateDeviceInventoryReq.DeviceId)
+
+	UpdateDeviceInventoryReqJson, err := json.Marshal(updateDeviceInventoryReq)
+	if err != nil {
+		return errors.Wrapf(err, "failed to submit update device inventory job")
+	}
+
+	contentReader := bytes.NewReader(UpdateDeviceInventoryReqJson)
+
+	req, err := http.NewRequest(
+		http.MethodPost,
+		utils.JoinURL(co.conf.OrchestratorAddr, UpdateDeviceInventoryOrchestratorUri),
+		contentReader)
+	if err != nil {
+		return errors.Wrapf(err, "failed to create request")
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	// set the workflows client request timeout
+	ctx, cancel := context.WithTimeout(ctx, co.conf.Timeout)
+	defer cancel()
+
+	rsp, err := co.http.Do(req.WithContext(ctx))
+	if err != nil {
+		return errors.Wrapf(err, "failed to submit update device inventory job")
+	}
+	defer rsp.Body.Close()
+
+	if rsp.StatusCode != http.StatusOK && rsp.StatusCode != http.StatusCreated {
+		body, err := ioutil.ReadAll(rsp.Body)
+		if err != nil {
+			body = []byte("<failed to read>")
+		}
+		l.Errorf("update device inventory request %s %s failed with status %v, response text: %s",
+			req.Method, req.URL, rsp.Status, body)
+
+		return errors.Errorf(
+			"submit update device inventory request failed with status %v", rsp.Status)
 	}
 	return nil
 }

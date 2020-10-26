@@ -88,3 +88,18 @@ func (dl *DeviceLimitWarning) Validate() error {
 	}
 	return nil
 }
+
+// UpdateDeviceInventoryReq contains request data of request to start update
+// device inventory workflow
+type UpdateDeviceInventoryReq struct {
+	// Request ID
+	RequestId string `json:"request_id"`
+	// Tenant ID
+	TenantId string `json:"tenant_id"`
+	// Device ID
+	DeviceId string `json:"device_id"`
+	// Attributes scope
+	Scope string `json:"scope"`
+	// Device inventory attributes
+	Attributes string `json:"attributes"`
+}
