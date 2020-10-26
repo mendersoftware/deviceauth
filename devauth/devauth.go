@@ -186,6 +186,42 @@ func (d *DevAuth) HealthCheck(ctx context.Context) error {
 	return nil
 }
 
+func (d *DevAuth) setDeviceIdentity(ctx context.Context, dev *model.Device, tenantId string) error {
+	attributes := make([]model.DeviceAttribute, len(dev.IdDataStruct))
+	i := 0
+	for name, value := range dev.IdDataStruct {
+		if name == "status" {
+			//we have to forbid the client to override attribute status in identity scope
+			//since it stands for status of a device (as in: accepted, rejected, preauthorized)
+			continue
+		}
+		attribute := model.DeviceAttribute{
+			Name:        name,
+			Description: nil,
+			Value:       value,
+			Scope:       "identity",
+		}
+		attributes[i] = attribute
+		i++
+	}
+	attrJson, err := json.Marshal(attributes)
+	if err != nil {
+		return errors.New("internal error: cannot marshal attributes into json")
+	}
+	if err := d.cOrch.SubmitUpdateDeviceInventoryJob(
+		ctx,
+		orchestrator.UpdateDeviceInventoryReq{
+			RequestId:  requestid.FromContext(ctx),
+			TenantId:   tenantId,
+			DeviceId:   dev.Id,
+			Scope:      "identity",
+			Attributes: string(attrJson),
+		}); err != nil {
+		return errors.Wrap(err, "failed to start device inventory update job")
+	}
+	return nil
+}
+
 func (d *DevAuth) getDeviceFromAuthRequest(ctx context.Context, r *model.AuthReq, currentStatus *string) (*model.Device, error) {
 	dev := model.NewDevice("", r.IdData, r.PubKey)
 
@@ -221,7 +257,9 @@ func (d *DevAuth) getDeviceFromAuthRequest(ctx context.Context, r *model.AuthReq
 		tenantId = idData.Tenant
 	}
 	if addDeviceErr != store.ErrObjectExists {
-		d.invClient.SetDeviceIdentity(ctx, tenantId, dev.Id, dev.IdDataStruct)
+		if err := d.setDeviceIdentity(ctx, dev, tenantId); err != nil {
+			return nil, err
+		}
 	}
 
 	if addDeviceErr == store.ErrObjectExists {
@@ -991,8 +1029,8 @@ func (d *DevAuth) PreauthorizeDevice(ctx context.Context, req *model.PreAuthReq)
 	err = d.db.AddAuthSet(ctx, authset)
 	switch err {
 	case nil:
-		if err := d.invClient.SetDeviceIdentity(ctx, tenantId, dev.Id, dev.IdDataStruct); err != nil {
-			return nil, errors.Wrap(err, "failed to propagate device identity to inventory service")
+		if err := d.setDeviceIdentity(ctx, dev, tenantId); err != nil {
+			return nil, err
 		}
 		return nil, nil
 	case store.ErrObjectExists:

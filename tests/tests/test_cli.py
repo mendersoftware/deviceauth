@@ -177,9 +177,7 @@ class TestCliMigrateEnterprise:
 class TestCheckDeviceLimitsEnterprise:
     @contextmanager
     def init_service_mocks(
-        self,
-        wflows_rsp_q: asyncio.Queue = None,
-        tadm_rsp_q: asyncio.Queue = None,
+        self, wflows_rsp_q: asyncio.Queue = None, tadm_rsp_q: asyncio.Queue = None,
     ) -> mockserver.MockServer:
 
         # Very simple tornado request handler for tenantadm and workflows that
@@ -208,25 +206,11 @@ class TestCheckDeviceLimitsEnterprise:
 
         with mockserver.run_fake(get_fake_tenantadm_addr()) as tadm:
             tadm.app.add_handlers(
-                r".*",
-                [
-                    (
-                        r".*",
-                        RequestHandler,
-                        {"rsp_q": tadm_rsp_q},
-                    )
-                ],
+                r".*", [(r".*", RequestHandler, {"rsp_q": tadm_rsp_q},)],
             )
             with mockserver.run_fake(get_fake_workflows_addr()) as wflows:
                 wflows.app.add_handlers(
-                    r".*",
-                    [
-                        (
-                            r".*",
-                            RequestHandler,
-                            {"rsp_q": wflows_rsp_q},
-                        )
-                    ],
+                    r".*", [(r".*", RequestHandler, {"rsp_q": wflows_rsp_q},)],
                 )
                 yield tadm, wflows
 
@@ -295,6 +279,8 @@ class TestCheckDeviceLimitsEnterprise:
                 rsp_q_tadm.put_nowait(
                     (200, {}, '{"id": "%s", "sub": "user"}' % test_case["tenant"])
                 )
+                # POST /api/v1/workflows/update_device_inventory
+                rsp_q_wflows.put_nowait((201, {}, ""))
                 # POST /api/v1/workflows/provision_device
                 rsp_q_wflows.put_nowait((201, {}, ""))
                 dev = Device()
