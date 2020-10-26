@@ -115,3 +115,10 @@ func (fltr *DeviceFilter) ParseForm(form url.Values) error {
 	}
 	return fltr.Validate()
 }
+
+type DeviceAttribute struct {
+	Name        string      `json:"name" bson:",omitempty"`
+	Description *string     `json:"description,omitempty" bson:",omitempty"`
+	Value       interface{} `json:"value" bson:",omitempty"`
+	Scope       string      `json:"scope" bson:",omitempty"`
+}
