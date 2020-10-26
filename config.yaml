@@ -113,7 +113,7 @@
 # redis_timeout_sec: "5"
 
 # Redis tenant/device limits expiration(sec)
-# Defaults to: 1600 (30mins)
+# Defaults to: 1800 (30mins)
 # Overwrite with environment variable: DEVICEAUTH_REDIS_LIMITS_EXPIRE_SEC
 
 # redis_limits_expire_sec: "1800"
