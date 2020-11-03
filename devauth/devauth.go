@@ -1459,11 +1459,12 @@ func (d *DevAuth) ProvisionTenant(ctx context.Context, tenant_id string) error {
 }
 
 func (d *DevAuth) GetTenantDeviceStatus(ctx context.Context, tenantId, deviceId string) (*model.Status, error) {
-	tenantCtx := identity.WithContext(ctx, &identity.Identity{
-		Tenant: tenantId,
-	})
-
-	dev, err := d.db.GetDeviceById(tenantCtx, deviceId)
+	if tenantId != "" {
+		ctx = identity.WithContext(ctx, &identity.Identity{
+			Tenant: tenantId,
+		})
+	}
+	dev, err := d.db.GetDeviceById(ctx, deviceId)
 	switch err {
 	case nil:
 		return &model.Status{Status: dev.Status}, nil
