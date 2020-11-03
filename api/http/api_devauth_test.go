@@ -733,9 +733,9 @@ func TestApiDevAuthVerifyToken(t *testing.T) {
 				"http://1.2.3.4/api/internal/v1/devauth/tokens/verify", nil),
 			code: 429,
 			headers: map[string]string{
-				"authorization":     "dummytoken",
-				"X-Original-Method": "POST",
-				"X-Original-URI":    "/deployments/next",
+				"authorization":      "dummytoken",
+				"X-Forwarded-Method": "POST",
+				"X-Forwarded-Uri":    "/deployments/next",
 			},
 			err: cache.ErrTooManyRequests,
 		},
