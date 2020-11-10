@@ -15,7 +15,6 @@
 package orchestrator
 
 import (
-	"github.com/mendersoftware/deviceauth/model"
 	"github.com/pkg/errors"
 )
 
@@ -37,8 +36,10 @@ type ProvisionDeviceReq struct {
 	// User authorization, eg. the value of Authorization header of incoming
 	// HTTP request
 	Authorization string `json:"authorization"`
-	// Device
-	Device model.Device `json:"device"`
+	// DeviceID
+	DeviceID string `json:"device_id"`
+	// TenantID
+	TenantID string `json:"tenant_id"`
 }
 
 // UpdateDeviceStatusReq contains request data of request to start update
