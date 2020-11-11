@@ -2819,6 +2819,8 @@ func TestDevAuthDeleteAuthSet(t *testing.T) {
 		dbGetDeviceStatusErr        error
 		dbUpdateDeviceErr           error
 
+		orchestratorErr error
+
 		authSet *model.AuthSet
 
 		outErr string
@@ -2863,9 +2865,19 @@ func TestDevAuthDeleteAuthSet(t *testing.T) {
 			devId:             oid.NewUUIDv5("devId8").String(),
 			authId:            oid.NewUUIDv5("authId8").String(),
 			authSet:           &model.AuthSet{Status: model.DevStatusPreauth},
+			dbGetDeviceStatus: "decommissioned",
 			dbDeleteDeviceErr: errors.New("DeleteDevice Error"),
 			outErr:            "DeleteDevice Error",
 		},
+		{
+			devId:             oid.NewUUIDv5("devId8").String(),
+			authId:            oid.NewUUIDv5("authId8").String(),
+			authSet:           &model.AuthSet{Status: model.DevStatusPreauth},
+			dbGetDeviceStatus: "decommissioned",
+			orchestratorErr:   errors.New("orchestrator error"),
+			outErr:            "update device status job error: orchestrator error",
+		},
+
 		{
 			devId:             oid.NewUUIDv5("devId9").String(),
 			authId:            oid.NewUUIDv5("authId9").String(),
@@ -2964,11 +2976,15 @@ func TestDevAuthDeleteAuthSet(t *testing.T) {
 						id, err := json.Marshal([]string{tc.devId})
 						assert.NoError(t, err)
 						if tc.dbGetDeviceStatusErr == store.ErrAuthSetNotFound {
-							return req.Ids == string(id) && req.Status == "noauth"
+							assert.Equal(t, string(id), req.Ids)
+							assert.Equal(t, "noauth", req.Status)
+							return true
 						} else {
-							return req.Ids == string(id) && req.Status == tc.dbGetDeviceStatus
+							assert.Equal(t, string(id), req.Ids)
+							assert.Equal(t, tc.dbGetDeviceStatus, req.Status)
+							return true
 						}
-					})).Return(nil)
+					})).Return(tc.orchestratorErr)
 
 			devauth := NewDevAuth(&db, &co, nil, Config{})
 

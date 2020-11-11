@@ -18,7 +18,6 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"github.com/mendersoftware/deviceauth/client/inventory"
 	"net/http"
 	"strings"
 	"time"
@@ -37,6 +36,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 
 	"github.com/mendersoftware/deviceauth/cache"
+	"github.com/mendersoftware/deviceauth/client/inventory"
 	"github.com/mendersoftware/deviceauth/client/orchestrator"
 	"github.com/mendersoftware/deviceauth/client/tenant"
 	"github.com/mendersoftware/deviceauth/jwt"
@@ -726,17 +726,18 @@ func (d *DevAuth) DeleteAuthSet(ctx context.Context, devID string, authId string
 				"db delete device tokens error")
 		}
 	} else if authSet.Status == model.DevStatusPreauth {
-		// only delete the device if the set is 'preauthorized'
-		// otherwise device data may live in other services too,
-		// and is a case for decommissioning
-		err = d.db.DeleteDevice(ctx, devID)
-		if err != nil {
-			return err
-		}
-		tenantId := ""
+		// if the auth set status is 'preauthorized', the device is deleted from
+		// deviceauth. We cannot start the decommission_device workflow because
+		// we don't provision devices until they are accepted. Still, we need to
+		// remove the device from the inventory service because we index pre-authorized
+		// devices for consumption via filtering APIs. To trigger the deletion
+		// from the inventory service, we start the status update workflow with the
+		// special value "decommissioned", which will cause the deletion of the
+		// device from the inventory service's database
+		tenantID := ""
 		idData := identity.FromContext(ctx)
 		if idData != nil {
-			tenantId = idData.Tenant
+			tenantID = idData.Tenant
 		}
 		b, err := json.Marshal([]string{devID})
 		if err != nil {
@@ -747,12 +748,14 @@ func (d *DevAuth) DeleteAuthSet(ctx context.Context, devID string, authId string
 			orchestrator.UpdateDeviceStatusReq{
 				RequestId: requestid.FromContext(ctx),
 				Ids:       string(b), // []string{dev.Id},
-				TenantId:  tenantId,
+				TenantId:  tenantID,
 				Status:    "decommissioned",
 			}); err != nil {
 			return errors.Wrap(err, "update device status job error")
 		}
-		return err
+
+		// delete device
+		return d.db.DeleteDevice(ctx, devID)
 	}
 
 	return d.updateDeviceStatus(ctx, devID, "", authSet.Status)
