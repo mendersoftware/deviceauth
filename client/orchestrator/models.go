@@ -41,13 +41,18 @@ type ProvisionDeviceReq struct {
 	Device model.Device `json:"device"`
 }
 
+type DeviceUpdate struct {
+	Id       string `json:"id"`
+	Revision uint   `json:"revision"`
+}
+
 // UpdateDeviceStatusReq contains request data of request to start update
 // device status  workflow
 type UpdateDeviceStatusReq struct {
 	// Request ID
 	RequestId string `json:"request_id"`
 	// Device IDs
-	Ids string `json:"device_ids"`
+	Devices string `json:"devices"`
 	// Tenant ID
 	TenantId string `json:"tenant_id"`
 	// new status

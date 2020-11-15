@@ -589,6 +589,8 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 			db.On("UpdateDevice", ctxMatcher,
 				mock.AnythingOfType("model.Device"),
 				mock.AnythingOfType("model.DeviceUpdate")).Return(nil)
+			db.On("GetDeviceById", ctxMatcher,
+				mock.AnythingOfType("string")).Return(&model.Device{}, nil)
 
 			jwth := mjwt.Handler{}
 			jwth.On("ToJWT",
@@ -1470,6 +1472,8 @@ func TestDevAuthRejectDevice(t *testing.T) {
 			db.On("UpdateDevice", ctx,
 				mock.AnythingOfType("model.Device"),
 				mock.AnythingOfType("model.DeviceUpdate")).Return(nil)
+			db.On("GetDeviceById", ctx,
+				mock.AnythingOfType("string")).Return(&model.Device{}, nil)
 
 			co := morchestrator.ClientRunner{}
 			co.On("SubmitUpdateDeviceStatusJob", ctx,
@@ -1696,6 +1700,8 @@ func TestDevAuthResetDevice(t *testing.T) {
 			db.On("UpdateDevice", context.Background(),
 				mock.AnythingOfType("model.Device"),
 				mock.AnythingOfType("model.DeviceUpdate")).Return(nil)
+			db.On("GetDeviceById", context.Background(),
+				mock.AnythingOfType("string")).Return(&model.Device{}, nil)
 
 			co := morchestrator.ClientRunner{}
 			co.On("SubmitUpdateDeviceStatusJob", context.Background(),
@@ -2993,19 +2999,21 @@ func TestDevAuthDeleteAuthSet(t *testing.T) {
 			db.On("UpdateDevice", ctx,
 				mock.AnythingOfType("model.Device"),
 				mock.AnythingOfType("model.DeviceUpdate")).Return(tc.dbUpdateDeviceErr)
+			db.On("GetDeviceById", ctx,
+				mock.AnythingOfType("string")).Return(&model.Device{Id: tc.devId}, nil)
 
 			co := morchestrator.ClientRunner{}
 			co.On("SubmitUpdateDeviceStatusJob", ctx,
 				mock.MatchedBy(
 					func(req orchestrator.UpdateDeviceStatusReq) bool {
-						id, err := json.Marshal([]string{tc.devId})
+						devices, err := json.Marshal([]orchestrator.DeviceUpdate{{Id: tc.devId}})
 						assert.NoError(t, err)
 						if tc.dbGetDeviceStatusErr == store.ErrAuthSetNotFound {
-							assert.Equal(t, string(id), req.Ids)
+							assert.Equal(t, string(devices), req.Devices)
 							assert.Equal(t, "noauth", req.Status)
 							return true
 						} else {
-							assert.Equal(t, string(id), req.Ids)
+							assert.Equal(t, string(devices), req.Devices)
 							assert.Equal(t, tc.dbGetDeviceStatus, req.Status)
 							return true
 						}

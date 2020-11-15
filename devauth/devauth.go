@@ -557,22 +557,27 @@ func (d *DevAuth) updateDeviceStatus(ctx context.Context, devId, status string, 
 		return errors.Wrap(err, "failed to update device status")
 	}
 
-	b, err := json.Marshal([]string{devId})
-	if err != nil {
-		return errors.New("internal error: cannot marshal array into json")
-	}
 	// submit device status change job
 	if statusChanged {
+		dev, err := d.db.GetDeviceById(ctx, devId)
+		if err != nil {
+			return errors.Wrap(err, "db get device by id error")
+		}
+
 		tenantId := ""
 		idData := identity.FromContext(ctx)
 		if idData != nil {
 			tenantId = idData.Tenant
 		}
+		b, err := json.Marshal([]orchestrator.DeviceUpdate{{Id: dev.Id, Revision: dev.Revision}})
+		if err != nil {
+			return errors.New("internal error: cannot marshal array into json")
+		}
 		if err := d.cOrch.SubmitUpdateDeviceStatusJob(
 			ctx,
 			orchestrator.UpdateDeviceStatusReq{
 				RequestId: requestid.FromContext(ctx),
-				Ids:       string(b), // []string{devId},
+				Devices:   string(b),
 				TenantId:  tenantId,
 				Status:    status,
 			}); err != nil {
@@ -777,7 +782,7 @@ func (d *DevAuth) DeleteAuthSet(ctx context.Context, devID string, authId string
 		if idData != nil {
 			tenantID = idData.Tenant
 		}
-		b, err := json.Marshal([]string{devID})
+		b, err := json.Marshal([]orchestrator.DeviceUpdate{{Id: devID}})
 		if err != nil {
 			return errors.New("internal error: cannot marshal array into json")
 		}
@@ -785,7 +790,7 @@ func (d *DevAuth) DeleteAuthSet(ctx context.Context, devID string, authId string
 			ctx,
 			orchestrator.UpdateDeviceStatusReq{
 				RequestId: requestid.FromContext(ctx),
-				Ids:       string(b), // []string{dev.Id},
+				Devices:   string(b),
 				TenantId:  tenantID,
 				Status:    "decommissioned",
 			}); err != nil {
@@ -995,7 +1000,7 @@ func (d *DevAuth) PreauthorizeDevice(ctx context.Context, req *model.PreAuthReq)
 	}
 
 	// submit device status change job
-	b, err := json.Marshal([]string{dev.Id})
+	b, err := json.Marshal([]orchestrator.DeviceUpdate{{Id: dev.Id, Revision: dev.Revision}})
 	if err != nil {
 		return nil, errors.New("internal error: cannot marshal array into json")
 	}
@@ -1010,7 +1015,7 @@ func (d *DevAuth) PreauthorizeDevice(ctx context.Context, req *model.PreAuthReq)
 		ctx,
 		orchestrator.UpdateDeviceStatusReq{
 			RequestId: requestid.FromContext(ctx),
-			Ids:       string(b), // []string{dev.Id},
+			Devices:   string(b),
 			TenantId:  tenantId,
 			Status:    dev.Status,
 		}); err != nil {

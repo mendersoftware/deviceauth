@@ -210,7 +210,7 @@ func (co *Client) SubmitProvisionDeviceJob(ctx context.Context, provisionDeviceR
 func (co *Client) SubmitUpdateDeviceStatusJob(ctx context.Context, updateDeviceStatusReq UpdateDeviceStatusReq) error {
 	l := log.FromContext(ctx)
 
-	l.Debugf("Submit update device status job for devices: %q", updateDeviceStatusReq.Ids)
+	l.Debugf("Submit update device status job for devices: %v", updateDeviceStatusReq.Devices)
 
 	UpdateDeviceStatusReqJson, err := json.Marshal(updateDeviceStatusReq)
 	if err != nil {
