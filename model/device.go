@@ -58,6 +58,9 @@ type Device struct {
 	AuthSets        []AuthSet              `json:"auth_sets" bson:"-"`
 	//ApiLimits override tenant-wide quota/burst config
 	ApiLimits ratelimits.ApiLimits `json:"-" bson:"api_limits"`
+
+	//object revision which we use when synchronizint status with inventory service
+	Revision uint `json:"-" bson:"revision"`
 }
 
 type DeviceUpdate struct {
@@ -81,6 +84,7 @@ func NewDevice(id, id_data, pubkey string) *Device {
 		Decommissioning: false,
 		CreatedTs:       now,
 		UpdatedTs:       now,
+		Revision:        1,
 	}
 }
 
