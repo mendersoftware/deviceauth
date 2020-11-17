@@ -186,6 +186,42 @@ func (d *DevAuth) HealthCheck(ctx context.Context) error {
 	return nil
 }
 
+func (d *DevAuth) setDeviceIdentity(ctx context.Context, dev *model.Device, tenantId string) error {
+	attributes := make([]model.DeviceAttribute, len(dev.IdDataStruct))
+	i := 0
+	for name, value := range dev.IdDataStruct {
+		if name == "status" {
+			//we have to forbid the client to override attribute status in identity scope
+			//since it stands for status of a device (as in: accepted, rejected, preauthorized)
+			continue
+		}
+		attribute := model.DeviceAttribute{
+			Name:        name,
+			Description: nil,
+			Value:       value,
+			Scope:       "identity",
+		}
+		attributes[i] = attribute
+		i++
+	}
+	attrJson, err := json.Marshal(attributes)
+	if err != nil {
+		return errors.New("internal error: cannot marshal attributes into json")
+	}
+	if err := d.cOrch.SubmitUpdateDeviceInventoryJob(
+		ctx,
+		orchestrator.UpdateDeviceInventoryReq{
+			RequestId:  requestid.FromContext(ctx),
+			TenantId:   tenantId,
+			DeviceId:   dev.Id,
+			Scope:      "identity",
+			Attributes: string(attrJson),
+		}); err != nil {
+		return errors.Wrap(err, "failed to start device inventory update job")
+	}
+	return nil
+}
+
 func (d *DevAuth) getDeviceFromAuthRequest(ctx context.Context, r *model.AuthReq, currentStatus *string) (*model.Device, error) {
 	dev := model.NewDevice("", r.IdData, r.PubKey)
 
@@ -221,7 +257,9 @@ func (d *DevAuth) getDeviceFromAuthRequest(ctx context.Context, r *model.AuthReq
 		tenantId = idData.Tenant
 	}
 	if addDeviceErr != store.ErrObjectExists {
-		d.invClient.SetDeviceIdentity(ctx, tenantId, dev.Id, dev.IdDataStruct)
+		if err := d.setDeviceIdentity(ctx, dev, tenantId); err != nil {
+			return nil, err
+		}
 	}
 
 	if addDeviceErr == store.ErrObjectExists {
@@ -519,22 +557,27 @@ func (d *DevAuth) updateDeviceStatus(ctx context.Context, devId, status string, 
 		return errors.Wrap(err, "failed to update device status")
 	}
 
-	b, err := json.Marshal([]string{devId})
-	if err != nil {
-		return errors.New("internal error: cannot marshal array into json")
-	}
 	// submit device status change job
 	if statusChanged {
+		dev, err := d.db.GetDeviceById(ctx, devId)
+		if err != nil {
+			return errors.Wrap(err, "db get device by id error")
+		}
+
 		tenantId := ""
 		idData := identity.FromContext(ctx)
 		if idData != nil {
 			tenantId = idData.Tenant
 		}
+		b, err := json.Marshal([]orchestrator.DeviceUpdate{{Id: dev.Id, Revision: dev.Revision}})
+		if err != nil {
+			return errors.New("internal error: cannot marshal array into json")
+		}
 		if err := d.cOrch.SubmitUpdateDeviceStatusJob(
 			ctx,
 			orchestrator.UpdateDeviceStatusReq{
 				RequestId: requestid.FromContext(ctx),
-				Ids:       string(b), // []string{devId},
+				Devices:   string(b),
 				TenantId:  tenantId,
 				Status:    status,
 			}); err != nil {
@@ -739,7 +782,7 @@ func (d *DevAuth) DeleteAuthSet(ctx context.Context, devID string, authId string
 		if idData != nil {
 			tenantID = idData.Tenant
 		}
-		b, err := json.Marshal([]string{devID})
+		b, err := json.Marshal([]orchestrator.DeviceUpdate{{Id: devID}})
 		if err != nil {
 			return errors.New("internal error: cannot marshal array into json")
 		}
@@ -747,7 +790,7 @@ func (d *DevAuth) DeleteAuthSet(ctx context.Context, devID string, authId string
 			ctx,
 			orchestrator.UpdateDeviceStatusReq{
 				RequestId: requestid.FromContext(ctx),
-				Ids:       string(b), // []string{dev.Id},
+				Devices:   string(b),
 				TenantId:  tenantID,
 				Status:    "decommissioned",
 			}); err != nil {
@@ -957,7 +1000,7 @@ func (d *DevAuth) PreauthorizeDevice(ctx context.Context, req *model.PreAuthReq)
 	}
 
 	// submit device status change job
-	b, err := json.Marshal([]string{dev.Id})
+	b, err := json.Marshal([]orchestrator.DeviceUpdate{{Id: dev.Id, Revision: dev.Revision}})
 	if err != nil {
 		return nil, errors.New("internal error: cannot marshal array into json")
 	}
@@ -972,7 +1015,7 @@ func (d *DevAuth) PreauthorizeDevice(ctx context.Context, req *model.PreAuthReq)
 		ctx,
 		orchestrator.UpdateDeviceStatusReq{
 			RequestId: requestid.FromContext(ctx),
-			Ids:       string(b), // []string{dev.Id},
+			Devices:   string(b),
 			TenantId:  tenantId,
 			Status:    dev.Status,
 		}); err != nil {
@@ -994,8 +1037,8 @@ func (d *DevAuth) PreauthorizeDevice(ctx context.Context, req *model.PreAuthReq)
 	err = d.db.AddAuthSet(ctx, authset)
 	switch err {
 	case nil:
-		if err := d.invClient.SetDeviceIdentity(ctx, tenantId, dev.Id, dev.IdDataStruct); err != nil {
-			return nil, errors.Wrap(err, "failed to propagate device identity to inventory service")
+		if err := d.setDeviceIdentity(ctx, dev, tenantId); err != nil {
+			return nil, err
 		}
 		return nil, nil
 	case store.ErrObjectExists:
@@ -1424,11 +1467,12 @@ func (d *DevAuth) ProvisionTenant(ctx context.Context, tenant_id string) error {
 }
 
 func (d *DevAuth) GetTenantDeviceStatus(ctx context.Context, tenantId, deviceId string) (*model.Status, error) {
-	tenantCtx := identity.WithContext(ctx, &identity.Identity{
-		Tenant: tenantId,
-	})
-
-	dev, err := d.db.GetDeviceById(tenantCtx, deviceId)
+	if tenantId != "" {
+		ctx = identity.WithContext(ctx, &identity.Identity{
+			Tenant: tenantId,
+		})
+	}
+	dev, err := d.db.GetDeviceById(ctx, deviceId)
 	switch err {
 	case nil:
 		return &model.Status{Status: dev.Status}, nil

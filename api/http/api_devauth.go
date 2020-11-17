@@ -683,11 +683,6 @@ func (d *DevAuthApiHandlers) GetTenantDeviceStatus(w rest.ResponseWriter, r *res
 	tid := r.PathParam("tid")
 	did := r.PathParam("did")
 
-	if tid == "" {
-		rest_utils.RestErrWithLog(w, r, l, errors.New("tenant id (tid) cannot be empty"), http.StatusBadRequest)
-		return
-	}
-
 	if did == "" {
 		rest_utils.RestErrWithLog(w, r, l, errors.New("device id (did) cannot be empty"), http.StatusBadRequest)
 		return

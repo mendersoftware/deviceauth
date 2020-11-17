@@ -1726,13 +1726,15 @@ func TestApiDevAuthGetTenantDeviceStatus(t *testing.T) {
 				nil,
 				model.Status{Status: "accepted"}),
 		},
-		"error: tenant id empty": {
+		"ok: tenant id empty": {
 			did: "bar",
 
+			daStatus: &model.Status{Status: "accepted"},
+
 			checker: mt.NewJSONResponse(
-				http.StatusBadRequest,
+				http.StatusOK,
 				nil,
-				restError("tenant id (tid) cannot be empty")),
+				model.Status{Status: "accepted"}),
 		},
 		"error: device id empty": {
 			tid: "foo",

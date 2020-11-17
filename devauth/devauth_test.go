@@ -155,7 +155,7 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 	devId := oid.NewUUIDv4().String()
 	authId := oid.NewUUIDv4().String()
 
-	_, idDataHash, err := parseIdData(idData)
+	idDataStruct, idDataHash, err := parseIdData(idData)
 	assert.NoError(t, err)
 
 	req := model.AuthReq{
@@ -195,6 +195,9 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 
 		config Config
 
+		updateDeviceInventory bool
+		updateDeviceStatus    bool
+
 		res string
 		err error
 	}{
@@ -220,6 +223,8 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 			getDevByIdKey: pubKey,
 			getDevByKeyId: devId,
 
+			updateDeviceStatus: true,
+
 			res: "dummytoken",
 		},
 		{
@@ -236,6 +241,8 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 			getDevByIdKey: pubKey,
 			getDevByKeyId: devId,
 
+			updateDeviceStatus: true,
+
 			err: ErrDevAuthUnauthorized,
 		},
 		{
@@ -251,6 +258,8 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 			getDevByIdKey: pubKey,
 			getDevByKeyId: devId,
 
+			updateDeviceStatus: true,
+
 			err: ErrDevAuthUnauthorized,
 		},
 		{
@@ -263,6 +272,9 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 
 			getDevByIdKey: pubKey,
 			getDevByKeyId: devId,
+
+			updateDeviceInventory: true,
+			updateDeviceStatus:    true,
 
 			err: ErrDevAuthUnauthorized,
 		},
@@ -289,6 +301,8 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 			addAuthSetErr: store.ErrObjectExists,
 
 			getAuthSetErr: store.ErrAuthSetNotFound,
+
+			updateDeviceStatus: true,
 
 			err: errors.New("failed to locate device auth set"),
 		},
@@ -416,8 +430,10 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 			addDeviceErr:  store.ErrObjectExists,
 			addAuthSetErr: store.ErrObjectExists,
 
-			tenantVerify: true,
-			err:          ErrDevAuthUnauthorized,
+			tenantVerify:       true,
+			updateDeviceStatus: true,
+
+			err: ErrDevAuthUnauthorized,
 		},
 		{
 			//new device - tenant token optional, and not provided
@@ -440,8 +456,10 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 			addDeviceErr:  store.ErrObjectExists,
 			addAuthSetErr: store.ErrObjectExists,
 
-			tenantVerify: true,
-			err:          ErrDevAuthUnauthorized,
+			tenantVerify:       true,
+			updateDeviceStatus: true,
+
+			err: ErrDevAuthUnauthorized,
 		},
 		{
 			//identity data malformed
@@ -478,7 +496,8 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 			getDevByIdKey: pubKey,
 			getDevByKeyId: devId,
 
-			tenantVerify: true,
+			tenantVerify:       true,
+			updateDeviceStatus: true,
 
 			devStatus: model.DevStatusAccepted,
 
@@ -527,6 +546,7 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 						return &model.Device{
 							PubKey:       tc.getDevByIdKey,
 							IdDataSha256: idDataHash,
+							IdDataStruct: idDataStruct,
 							Id:           devId,
 						}
 					}
@@ -569,6 +589,8 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 			db.On("UpdateDevice", ctxMatcher,
 				mock.AnythingOfType("model.Device"),
 				mock.AnythingOfType("model.DeviceUpdate")).Return(nil)
+			db.On("GetDeviceById", ctxMatcher,
+				mock.AnythingOfType("string")).Return(&model.Device{}, nil)
 
 			jwth := mjwt.Handler{}
 			jwth.On("ToJWT",
@@ -588,9 +610,16 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 			}
 			ctx = identity.WithContext(ctx, id)
 			co := morchestrator.ClientRunner{}
-			co.On("SubmitUpdateDeviceStatusJob", mock.Anything,
-				mock.AnythingOfType("orchestrator.UpdateDeviceStatusReq")).
-				Return(nil)
+			if tc.updateDeviceStatus {
+				co.On("SubmitUpdateDeviceStatusJob", mock.Anything,
+					mock.AnythingOfType("orchestrator.UpdateDeviceStatusReq")).
+					Return(nil)
+			}
+			if tc.updateDeviceInventory {
+				co.On("SubmitUpdateDeviceInventoryJob", ctxMatcher,
+					mock.AnythingOfType("orchestrator.UpdateDeviceInventoryReq")).
+					Return(nil)
+			}
 
 			devauth := NewDevAuth(&db, &co, &jwth, tc.config)
 
@@ -624,6 +653,7 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
+			co.AssertExpectations(t)
 		})
 	}
 }
@@ -903,7 +933,6 @@ func TestDevAuthPreauthorizeDevice(t *testing.T) {
 	deviceID := oid.NewUUIDv5("did").String()
 	idData := "{\"mac\":\"00:00:00:01\"}"
 	pubKey := "pubkey"
-	idDataStruct := map[string]interface{}{"mac": "00:00:00:01"}
 
 	_, idDataSha256, err := parseIdData(idData)
 	assert.NoError(t, err)
@@ -931,19 +960,19 @@ func TestDevAuthPreauthorizeDevice(t *testing.T) {
 		getDevByIdErr error
 		inventoryErr  error
 
-		callOrchestrator bool
-		callInventory    bool
-		callDb           bool
+		updateDeviceStatus    bool
+		updateDeviceInventory bool
+		callDb                bool
 
 		outDev *model.Device
 		err    error
 	}{
 		{
-			desc:             "ok",
-			req:              req,
-			callOrchestrator: true,
-			callInventory:    true,
-			callDb:           true,
+			desc:                  "ok",
+			req:                   req,
+			updateDeviceStatus:    true,
+			updateDeviceInventory: true,
+			callDb:                true,
 		},
 		{
 			desc:   "error: add device, exists",
@@ -965,10 +994,10 @@ func TestDevAuthPreauthorizeDevice(t *testing.T) {
 			err: errors.New("failed to add device: generic error"),
 		},
 		{
-			desc:             "error: add auth set, exists",
-			req:              req,
-			callOrchestrator: true,
-			callDb:           true,
+			desc:               "error: add auth set, exists",
+			req:                req,
+			updateDeviceStatus: true,
+			callDb:             true,
 
 			addAuthSetErr: store.ErrObjectExists,
 
@@ -976,10 +1005,10 @@ func TestDevAuthPreauthorizeDevice(t *testing.T) {
 			err:    ErrDeviceExists,
 		},
 		{
-			desc:             "error: add auth set, exists",
-			req:              req,
-			callOrchestrator: true,
-			callDb:           true,
+			desc:               "error: add auth set, exists",
+			req:                req,
+			updateDeviceStatus: true,
+			callDb:             true,
 
 			addAuthSetErr: errors.New("generic error"),
 
@@ -1029,9 +1058,14 @@ func TestDevAuthPreauthorizeDevice(t *testing.T) {
 			}
 
 			co := morchestrator.ClientRunner{}
-			if tc.callOrchestrator {
+			if tc.updateDeviceStatus {
 				co.On("SubmitUpdateDeviceStatusJob", ctxMatcher,
 					mock.AnythingOfType("orchestrator.UpdateDeviceStatusReq")).
+					Return(nil)
+			}
+			if tc.updateDeviceInventory {
+				co.On("SubmitUpdateDeviceInventoryJob", ctxMatcher,
+					mock.AnythingOfType("orchestrator.UpdateDeviceInventoryReq")).
 					Return(nil)
 			}
 
@@ -1052,12 +1086,6 @@ func TestDevAuthPreauthorizeDevice(t *testing.T) {
 					tc.getDevByIdErr)
 			}
 			devauth := NewDevAuth(&db, &co, nil, Config{})
-			inv := &minv.Client{}
-			devauth.invClient = inv
-			if tc.callInventory {
-				inv.On("SetDeviceIdentity", ctxMatcher, mock.AnythingOfType("string"), deviceID, idDataStruct).
-					Return(tc.inventoryErr)
-			}
 			dev, err := devauth.PreauthorizeDevice(context.Background(), tc.req)
 
 			if tc.err != nil {
@@ -1072,7 +1100,6 @@ func TestDevAuthPreauthorizeDevice(t *testing.T) {
 				assert.Nil(t, dev)
 			}
 			co.AssertExpectations(t)
-			inv.AssertExpectations(t)
 			db.AssertExpectations(t)
 		})
 	}
@@ -1445,6 +1472,8 @@ func TestDevAuthRejectDevice(t *testing.T) {
 			db.On("UpdateDevice", ctx,
 				mock.AnythingOfType("model.Device"),
 				mock.AnythingOfType("model.DeviceUpdate")).Return(nil)
+			db.On("GetDeviceById", ctx,
+				mock.AnythingOfType("string")).Return(&model.Device{}, nil)
 
 			co := morchestrator.ClientRunner{}
 			co.On("SubmitUpdateDeviceStatusJob", ctx,
@@ -1671,6 +1700,8 @@ func TestDevAuthResetDevice(t *testing.T) {
 			db.On("UpdateDevice", context.Background(),
 				mock.AnythingOfType("model.Device"),
 				mock.AnythingOfType("model.DeviceUpdate")).Return(nil)
+			db.On("GetDeviceById", context.Background(),
+				mock.AnythingOfType("string")).Return(&model.Device{}, nil)
 
 			co := morchestrator.ClientRunner{}
 			co.On("SubmitUpdateDeviceStatusJob", context.Background(),
@@ -2968,19 +2999,21 @@ func TestDevAuthDeleteAuthSet(t *testing.T) {
 			db.On("UpdateDevice", ctx,
 				mock.AnythingOfType("model.Device"),
 				mock.AnythingOfType("model.DeviceUpdate")).Return(tc.dbUpdateDeviceErr)
+			db.On("GetDeviceById", ctx,
+				mock.AnythingOfType("string")).Return(&model.Device{Id: tc.devId}, nil)
 
 			co := morchestrator.ClientRunner{}
 			co.On("SubmitUpdateDeviceStatusJob", ctx,
 				mock.MatchedBy(
 					func(req orchestrator.UpdateDeviceStatusReq) bool {
-						id, err := json.Marshal([]string{tc.devId})
+						devices, err := json.Marshal([]orchestrator.DeviceUpdate{{Id: tc.devId}})
 						assert.NoError(t, err)
 						if tc.dbGetDeviceStatusErr == store.ErrAuthSetNotFound {
-							assert.Equal(t, string(id), req.Ids)
+							assert.Equal(t, string(devices), req.Devices)
 							assert.Equal(t, "noauth", req.Status)
 							return true
 						} else {
-							assert.Equal(t, string(id), req.Ids)
+							assert.Equal(t, string(devices), req.Devices)
 							assert.Equal(t, tc.dbGetDeviceStatus, req.Status)
 							return true
 						}
