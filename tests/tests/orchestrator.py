@@ -25,11 +25,12 @@ def provision_device_handler(device_id=None, status=200):
     log = logging.getLogger("orchestartor.provision_device")
 
     def _provision_device(request):
-        payload = json.loads(request.body.decode())
+        device = json.loads(request.body.decode())["device"]
+        log.info("provision device %s", device)
         if device_id is not None:
-            assert payload.get("device_id", None) == device_id
+            assert device.get("id", None) == device_id
         else:
-            assert "device_id" in payload
+            assert device.get("id", None)
 
         return (status, {}, "")
 
@@ -64,6 +65,17 @@ def update_device_status_handler(device_id=None, status=200):
     return _update_device_status
 
 
+def update_device_inventory_handler(device_id=None, status=200):
+    log = logging.getLogger("orchestartor.update_device_inventory")
+
+    def _update_device_inventory(request):
+        dreq = json.loads(request.body.decode())
+        print("update_device_inventory request", dreq)
+        return (status, {}, "")
+
+    return _update_device_inventory
+
+
 def get_fake_orchestrator_addr():
     return os.environ.get("FAKE_ORCHESTRATOR_ADDR", "0.0.0.0:9998")
 
@@ -90,6 +102,11 @@ def run_fake_for_device_id(devid, status=None):
                 "/api/v1/workflow/update_device_status",
                 update_device_status_handler(devid),
             ),
+            (
+                "POST",
+                "/api/v1/workflow/update_device_inventory",
+                update_device_inventory_handler(devid),
+            ),
         ]
     else:
         handlers = [
@@ -107,6 +124,11 @@ def run_fake_for_device_id(devid, status=None):
                 "POST",
                 "/api/v1/workflow/update_device_status",
                 update_device_status_handler(devid, status),
+            ),
+            (
+                "POST",
+                "/api/v1/workflow/update_device_inventory",
+                update_device_inventory_handler(devid, status),
             ),
         ]
 
