@@ -41,13 +41,18 @@ type ProvisionDeviceReq struct {
 	Device model.Device `json:"device"`
 }
 
+type DeviceUpdate struct {
+	Id       string `json:"id"`
+	Revision uint   `json:"revision"`
+}
+
 // UpdateDeviceStatusReq contains request data of request to start update
 // device status  workflow
 type UpdateDeviceStatusReq struct {
 	// Request ID
 	RequestId string `json:"request_id"`
 	// Device IDs
-	Ids string `json:"device_ids"`
+	Devices string `json:"devices"`
 	// Tenant ID
 	TenantId string `json:"tenant_id"`
 	// new status
@@ -87,4 +92,19 @@ func (dl *DeviceLimitWarning) Validate() error {
 		return errors.Errorf(ErrMsgFmt, "remaining_devices")
 	}
 	return nil
+}
+
+// UpdateDeviceInventoryReq contains request data of request to start update
+// device inventory workflow
+type UpdateDeviceInventoryReq struct {
+	// Request ID
+	RequestId string `json:"request_id"`
+	// Tenant ID
+	TenantId string `json:"tenant_id"`
+	// Device ID
+	DeviceId string `json:"device_id"`
+	// Attributes scope
+	Scope string `json:"scope"`
+	// Device inventory attributes
+	Attributes string `json:"attributes"`
 }
