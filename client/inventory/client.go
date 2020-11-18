@@ -28,6 +28,7 @@ import (
 	"github.com/mendersoftware/go-lib-micro/rest_utils"
 	"github.com/pkg/errors"
 
+	"github.com/mendersoftware/deviceauth/model"
 	"github.com/mendersoftware/deviceauth/utils"
 )
 
@@ -196,13 +197,6 @@ func (c *client) SetDeviceStatus(ctx context.Context, tenantId string, deviceIds
 	return nil
 }
 
-type DeviceAttribute struct {
-	Name        string      `json:"name" bson:",omitempty"`
-	Description *string     `json:"description,omitempty" bson:",omitempty"`
-	Value       interface{} `json:"value" bson:",omitempty"`
-	Scope       string      `json:"scope" bson:",omitempty"`
-}
-
 func (c *client) SetDeviceIdentity(ctx context.Context, tenantId, deviceId string, idData map[string]interface{}) error {
 	l := log.FromContext(ctx)
 
@@ -210,7 +204,7 @@ func (c *client) SetDeviceIdentity(ctx context.Context, tenantId, deviceId strin
 		return errors.New("device id is needed")
 	}
 
-	attributes := make([]DeviceAttribute, len(idData))
+	attributes := make([]model.DeviceAttribute, len(idData))
 	i := 0
 	for name, value := range idData {
 		if name == "status" {
@@ -218,7 +212,7 @@ func (c *client) SetDeviceIdentity(ctx context.Context, tenantId, deviceId strin
 			//since it stands for status of a device (as in: accepted, rejected, preauthorized)
 			continue
 		}
-		attribute := DeviceAttribute{
+		attribute := model.DeviceAttribute{
 			Name:        name,
 			Description: nil,
 			Value:       value,

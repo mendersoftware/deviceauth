@@ -43,6 +43,8 @@ const (
 	DbAuthSetColl = "auth_sets"
 	DbTokensColl  = "tokens"
 	DbLimitsColl  = "limits"
+
+	DbKeyDeviceRevision = "revision"
 )
 
 var (
@@ -283,7 +285,12 @@ func (db *DataStoreMongo) UpdateDevice(ctx context.Context,
 	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
 
 	updev.UpdatedTs = uto.TimePtr(time.Now().UTC())
-	update := bson.M{"$set": updev}
+	update := bson.M{
+		"$inc": bson.M{
+			DbKeyDeviceRevision: 1,
+		},
+		"$set": updev,
+	}
 
 	res, err := c.UpdateOne(ctx, bson.M{"_id": d.Id}, update)
 	if err != nil {
