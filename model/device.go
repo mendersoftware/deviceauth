@@ -126,3 +126,8 @@ type DeviceAttribute struct {
 	Value       interface{} `json:"value" bson:",omitempty"`
 	Scope       string      `json:"scope" bson:",omitempty"`
 }
+
+type DeviceInventoryUpdate struct {
+	Id       string `json:"id"`
+	Revision uint   `json:"revision"`
+}
