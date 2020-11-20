@@ -352,13 +352,16 @@ func updateDevicesStatus(ctx context.Context, db store.DataStore, c cinv.Client,
 		if len(devices) < 1 {
 			break
 		}
-		devicesIds := make([]string, len(devices))
+
+		deviceUpdates := make([]model.DeviceInventoryUpdate, len(devices))
+
 		for i, d := range devices {
-			devicesIds[i] = d.Id
+			deviceUpdates[i].Id = d.Id
+			deviceUpdates[i].Revision = d.Revision
 		}
 
 		if !dryRun {
-			err = c.SetDeviceStatus(ctx, tenant, devicesIds, status)
+			err = c.SetDeviceStatus(ctx, tenant, deviceUpdates, status)
 			if err != nil {
 				return err
 			}

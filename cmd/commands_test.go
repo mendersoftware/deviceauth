@@ -578,16 +578,16 @@ func TestPropagateStatusesInventory(t *testing.T) {
 
 			if tc.cmdDryRun == false {
 				for n, devs := range dbs {
-					deviceIds := make([]string, len(devs))
+					devices := make([]model.DeviceInventoryUpdate, len(devs))
 					for i, d := range devs {
-						deviceIds[i] = d.Id
+						devices[i].Id = d.Id
 					}
 					tenant := ctxstore.TenantFromDbName(n, mongo.DbName)
 					for _, status := range []string{"accepted", "pending", "rejected", "preauthorized"} {
 						c.On("SetDeviceStatus",
 							mock.Anything,
 							tenant,
-							deviceIds,
+							devices,
 							status).Return(tc.setStatus)
 					}
 				}
