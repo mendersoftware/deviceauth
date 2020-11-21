@@ -40,6 +40,7 @@ var (
 		DevStatusRejected,
 		DevStatusAccepted,
 		DevStatusPreauth,
+		DevStatusNoAuth,
 	}
 )
 
@@ -99,12 +100,14 @@ func (fltr DeviceFilter) Validate() error {
 		DevStatusRejected,
 		DevStatusAccepted,
 		DevStatusPreauth,
+		DevStatusNoAuth,
 	) {
 		return errors.Errorf(
 			`parameter status must be one of: `+
-				`%s, %s, %s or %s`,
+				`%s, %s, %s, %s or %s`,
 			DevStatusPending, DevStatusRejected,
 			DevStatusAccepted, DevStatusPreauth,
+			DevStatusNoAuth,
 		)
 	}
 	return nil

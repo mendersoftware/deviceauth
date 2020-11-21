@@ -424,7 +424,7 @@ func tryPropagateStatusesInventoryForDb(db store.DataStore, c cinv.Client, dbnam
 
 	var err error
 	var errReturned error
-	for _, status := range []string{"accepted", "pending", "rejected", "preauthorized"} {
+	for _, status := range model.DevStatuses {
 		err = updateDevicesStatus(ctx, db, c, tenant, status, dryRun)
 		if err != nil {
 			l.Infof("Done with DB %s status=%s, but there were errors: %s.", dbname, status, err.Error())
