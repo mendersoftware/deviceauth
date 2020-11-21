@@ -498,10 +498,7 @@ func TestPropagateStatusesInventory(t *testing.T) {
 	for k := range cases {
 		tc := cases[k]
 		t.Run(fmt.Sprintf("tc %s", k), func(t *testing.T) {
-			var deviceStatuses = []string{
-				"accepted", "pending",
-				"rejected", "preauthorized",
-			}
+			var deviceStatuses = model.DevStatuses
 			db := &mstore.DataStore{}
 			v, _ := migrate.NewVersion(tc.forcedVersion)
 			db.On("StoreMigrationVersion",
@@ -578,16 +575,16 @@ func TestPropagateStatusesInventory(t *testing.T) {
 
 			if tc.cmdDryRun == false {
 				for n, devs := range dbs {
-					deviceIds := make([]string, len(devs))
+					devices := make([]model.DeviceInventoryUpdate, len(devs))
 					for i, d := range devs {
-						deviceIds[i] = d.Id
+						devices[i].Id = d.Id
 					}
 					tenant := ctxstore.TenantFromDbName(n, mongo.DbName)
-					for _, status := range []string{"accepted", "pending", "rejected", "preauthorized"} {
+					for _, status := range model.DevStatuses {
 						c.On("SetDeviceStatus",
 							mock.Anything,
 							tenant,
-							deviceIds,
+							devices,
 							status).Return(tc.setStatus)
 					}
 				}
