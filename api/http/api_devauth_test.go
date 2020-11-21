@@ -760,6 +760,15 @@ func TestApiDevAuthVerifyToken(t *testing.T) {
 		{
 			req: test.MakeSimpleRequest("POST",
 				"http://1.2.3.4/api/internal/v1/devauth/tokens/verify", nil),
+			code: http.StatusUnauthorized,
+			headers: map[string]string{
+				"authorization": "dummytoken",
+			},
+			err: store.ErrAuthSetNotFound,
+		},
+		{
+			req: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/internal/v1/devauth/tokens/verify", nil),
 			code: 500,
 			body: RestError("internal error"),
 			headers: map[string]string{
