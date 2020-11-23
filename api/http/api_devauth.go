@@ -440,7 +440,7 @@ func (d *DevAuthApiHandlers) VerifyTokenHandler(w rest.ResponseWriter, r *rest.R
 		switch err {
 		case jwt.ErrTokenExpired:
 			code = http.StatusForbidden
-		case store.ErrTokenNotFound, jwt.ErrTokenInvalid:
+		case store.ErrTokenNotFound, store.ErrAuthSetNotFound, jwt.ErrTokenInvalid:
 			code = http.StatusUnauthorized
 		case cache.ErrTooManyRequests:
 			code = http.StatusTooManyRequests

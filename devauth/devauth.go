@@ -1160,7 +1160,7 @@ func (d *DevAuth) VerifyToken(ctx context.Context, raw string) error {
 	auth, err := d.db.GetAuthSetById(ctx, jti.String())
 	if err != nil {
 		if err == store.ErrAuthSetNotFound {
-			l.Errorf("Token %s not found", jti)
+			l.Errorf("Auth set %s not found", jti)
 			return err
 		}
 		return err
