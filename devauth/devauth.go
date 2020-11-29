@@ -569,7 +569,7 @@ func (d *DevAuth) updateDeviceStatus(ctx context.Context, devId, status string, 
 		if idData != nil {
 			tenantId = idData.Tenant
 		}
-		b, err := json.Marshal([]orchestrator.DeviceUpdate{{Id: dev.Id, Revision: dev.Revision}})
+		b, err := json.Marshal([]model.DeviceInventoryUpdate{{Id: dev.Id, Revision: dev.Revision}})
 		if err != nil {
 			return errors.New("internal error: cannot marshal array into json")
 		}
@@ -782,7 +782,7 @@ func (d *DevAuth) DeleteAuthSet(ctx context.Context, devID string, authId string
 		if idData != nil {
 			tenantID = idData.Tenant
 		}
-		b, err := json.Marshal([]orchestrator.DeviceUpdate{{Id: devID}})
+		b, err := json.Marshal([]model.DeviceInventoryUpdate{{Id: devID}})
 		if err != nil {
 			return errors.New("internal error: cannot marshal array into json")
 		}
@@ -1000,7 +1000,7 @@ func (d *DevAuth) PreauthorizeDevice(ctx context.Context, req *model.PreAuthReq)
 	}
 
 	// submit device status change job
-	b, err := json.Marshal([]orchestrator.DeviceUpdate{{Id: dev.Id, Revision: dev.Revision}})
+	b, err := json.Marshal([]model.DeviceInventoryUpdate{{Id: dev.Id, Revision: dev.Revision}})
 	if err != nil {
 		return nil, errors.New("internal error: cannot marshal array into json")
 	}
@@ -1160,7 +1160,7 @@ func (d *DevAuth) VerifyToken(ctx context.Context, raw string) error {
 	auth, err := d.db.GetAuthSetById(ctx, jti.String())
 	if err != nil {
 		if err == store.ErrAuthSetNotFound {
-			l.Errorf("Token %s not found", jti)
+			l.Errorf("Auth set %s not found", jti)
 			return err
 		}
 		return err

@@ -44,7 +44,7 @@ const (
 type Client interface {
 	CheckHealth(ctx context.Context) error
 	PatchDeviceV2(ctx context.Context, did, tid, src string, ts int64, attrs []Attribute) error
-	SetDeviceStatus(ctx context.Context, tenantId string, deviceIds []string, status string) error
+	SetDeviceStatus(ctx context.Context, tenantId string, deviceUpdates []model.DeviceInventoryUpdate, status string) error
 	SetDeviceIdentity(ctx context.Context, tenantId, deviceId string, idData map[string]interface{}) error
 }
 
@@ -149,15 +149,15 @@ func (c *client) PatchDeviceV2(ctx context.Context, did, tid, src string, ts int
 	return nil
 }
 
-func (c *client) SetDeviceStatus(ctx context.Context, tenantId string, deviceIds []string, status string) error {
+func (c *client) SetDeviceStatus(ctx context.Context, tenantId string, deviceUpdates []model.DeviceInventoryUpdate, status string) error {
 	l := log.FromContext(ctx)
 
-	if len(deviceIds) < 1 {
+	if len(deviceUpdates) < 1 {
 		return errors.New("no devices to update")
 	}
-	body, err := json.Marshal(deviceIds)
+	body, err := json.Marshal(deviceUpdates)
 	if err != nil {
-		return errors.Wrapf(err, "failed to serialize device ids")
+		return errors.Wrapf(err, "failed to serialize devices")
 	}
 
 	rd := bytes.NewReader(body)

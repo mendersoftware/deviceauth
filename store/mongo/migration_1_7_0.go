@@ -50,26 +50,27 @@ func (m *migration_1_7_0) updateDevicesStatus(ctx context.Context, status string
 		return err
 	}
 	id := identity.FromContext(m.ctx)
-	var devicesIds []string
-	devicesIds = make([]string, devicesBatchSize)
+	var deviceUpdates []model.DeviceInventoryUpdate
+	deviceUpdates = make([]model.DeviceInventoryUpdate, devicesBatchSize)
 	var i uint
 	i = 0
 	for cur.Next(ctx) {
 		var d model.Device
 		err = cur.Decode(&d)
 		if i >= devicesBatchSize {
-			err = c.SetDeviceStatus(ctx, id.Tenant, devicesIds, status)
+			err = c.SetDeviceStatus(ctx, id.Tenant, deviceUpdates, status)
 			if err != nil {
 				return err
 			}
-			devicesIds = make([]string, devicesBatchSize)
+			deviceUpdates = make([]model.DeviceInventoryUpdate, devicesBatchSize)
 			i = 0
 		}
-		devicesIds[i] = d.Id
+		deviceUpdates[i].Id = d.Id
+		deviceUpdates[i].Revision = d.Revision
 		i++
 	}
 	if i >= 1 {
-		err = c.SetDeviceStatus(ctx, id.Tenant, devicesIds[:i], status)
+		err = c.SetDeviceStatus(ctx, id.Tenant, deviceUpdates[:i], status)
 		if err != nil {
 			return err
 		}

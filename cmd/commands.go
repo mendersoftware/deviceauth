@@ -352,13 +352,16 @@ func updateDevicesStatus(ctx context.Context, db store.DataStore, c cinv.Client,
 		if len(devices) < 1 {
 			break
 		}
-		devicesIds := make([]string, len(devices))
+
+		deviceUpdates := make([]model.DeviceInventoryUpdate, len(devices))
+
 		for i, d := range devices {
-			devicesIds[i] = d.Id
+			deviceUpdates[i].Id = d.Id
+			deviceUpdates[i].Revision = d.Revision
 		}
 
 		if !dryRun {
-			err = c.SetDeviceStatus(ctx, tenant, devicesIds, status)
+			err = c.SetDeviceStatus(ctx, tenant, deviceUpdates, status)
 			if err != nil {
 				return err
 			}
@@ -421,7 +424,7 @@ func tryPropagateStatusesInventoryForDb(db store.DataStore, c cinv.Client, dbnam
 
 	var err error
 	var errReturned error
-	for _, status := range []string{"accepted", "pending", "rejected", "preauthorized"} {
+	for _, status := range model.DevStatuses {
 		err = updateDevicesStatus(ctx, db, c, tenant, status, dryRun)
 		if err != nil {
 			l.Infof("Done with DB %s status=%s, but there were errors: %s.", dbname, status, err.Error())
