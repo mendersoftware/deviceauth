@@ -14,15 +14,18 @@
 package http
 
 import (
+	"bytes"
 	"context"
 	"crypto"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"strconv"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/ant0ine/go-json-rest/rest/test"
@@ -931,6 +934,251 @@ func TestApiV2GetDevice(t *testing.T) {
 
 			apih := makeMockApiHandler(t, da, nil)
 			runTestRequest(t, apih, tc.req, tc.code, tc.body)
+		})
+	}
+}
+
+func TestSearchDevices(t *testing.T) {
+	t.Parallel()
+	testCases := []struct {
+		Name string
+
+		Request      *http.Request
+		DeviceFilter model.DeviceFilter
+		AppDevices   []model.Device
+		AppError     error
+
+		// Response
+		StatusCode int
+		Headers    http.Header
+		Body       []byte
+	}{{
+		Name: "ok, single device",
+
+		Request: func() *http.Request {
+			body := []byte(`{"id":"123456789012345678901234"}`)
+			req, _ := http.NewRequest("POST",
+				"http://localhost/api/management/v2/devauth/devices/search",
+				bytes.NewReader(body),
+			)
+			req.Header.Add("X-MEN-RequestID", "test")
+			return req
+		}(),
+		DeviceFilter: model.DeviceFilter{
+			IDs: []string{"123456789012345678901234"},
+		},
+		AppDevices: []model.Device{{
+			Id: "123456789012345678901234",
+			PubKey: "----------SUCH PUBLIC----------\n" +
+				"----------MUCH ENCRYPTION----------",
+			Status:    "accepted",
+			CreatedTs: time.Unix(1606942069, 0),
+		}},
+
+		StatusCode: http.StatusOK,
+		Headers:    http.Header{"X-Men-Requestid": []string{"test"}},
+		Body: func() []byte {
+			dev := []model.Device{{
+				Id: "123456789012345678901234",
+				PubKey: "----------SUCH PUBLIC----------\n" +
+					"----------MUCH ENCRYPTION----------",
+				Status:    "accepted",
+				CreatedTs: time.Unix(1606942069, 0),
+			}}
+			devV2, _ := devicesV2FromDbModel(dev)
+			b, _ := json.Marshal(devV2)
+			return b
+		}(),
+	}, {
+		Name: "ok, single device url-encoded post-form",
+
+		Request: func() *http.Request {
+			body := []byte(`id=123456789012345678901234&status=accepted`)
+			req, _ := http.NewRequest("POST",
+				"http://localhost/api/management/v2/devauth/devices/search",
+				bytes.NewReader(body),
+			)
+			req.Header.Add("X-MEN-RequestID", "test")
+			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+			return req
+		}(),
+		DeviceFilter: model.DeviceFilter{
+			IDs:    []string{"123456789012345678901234"},
+			Status: []string{"accepted"},
+		},
+		AppDevices: []model.Device{{
+			Id: "123456789012345678901234",
+			PubKey: "----------SUCH PUBLIC----------\n" +
+				"----------MUCH ENCRYPTION----------",
+			Status:    "accepted",
+			CreatedTs: time.Unix(1606942069, 0),
+		}},
+
+		StatusCode: http.StatusOK,
+		Headers:    http.Header{"X-Men-Requestid": []string{"test"}},
+		Body: func() []byte {
+			dev := []model.Device{{
+				Id: "123456789012345678901234",
+				PubKey: "----------SUCH PUBLIC----------\n" +
+					"----------MUCH ENCRYPTION----------",
+				Status:    "accepted",
+				CreatedTs: time.Unix(1606942069, 0),
+			}}
+			devV2, _ := devicesV2FromDbModel(dev)
+			b, _ := json.Marshal(devV2)
+			return b
+		}(),
+	}, {
+		Name: "error, bad paging params",
+
+		Request: func() *http.Request {
+			body := []byte(`id=123456789012345678901234&status=accepted`)
+			req, _ := http.NewRequest("POST",
+				"http://localhost/api/management/v2/devauth/devices/search?per_page=many",
+				bytes.NewReader(body),
+			)
+			req.Header.Add("X-MEN-RequestID", "test")
+			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+			return req
+		}(),
+
+		StatusCode: http.StatusBadRequest,
+		Headers:    http.Header{"X-Men-Requestid": []string{"test"}},
+		Body: func() []byte {
+			err := rest_utils.ApiError{
+				Err:   "Can't parse param per_page",
+				ReqId: "test",
+			}
+			b, _ := json.Marshal(err)
+			return b
+		}(),
+	}, {
+		Name: "error, bad Content-Type",
+
+		Request: func() *http.Request {
+			body := []byte(`id=123456789012345678901234&status=accepted`)
+			req, _ := http.NewRequest("POST",
+				"http://localhost/api/management/v2/devauth/devices/search",
+				bytes.NewReader(body),
+			)
+			req.Header.Add("X-MEN-RequestID", "test")
+			req.Header.Add("Content-Type", "application/yæml")
+			return req
+		}(),
+
+		StatusCode: http.StatusUnsupportedMediaType,
+		Headers:    http.Header{"X-Men-Requestid": []string{"test"}},
+		Body: func() []byte {
+			err := rest_utils.ApiError{
+				Err:   "Content-Type 'application/yæml' not supported",
+				ReqId: "test",
+			}
+			b, _ := json.Marshal(err)
+			return b
+		}(),
+	}, {
+		Name: "error, bad JSON",
+
+		Request: func() *http.Request {
+			body := []byte(`{{"id":123456789012345678901234,"status":"accepted"}`)
+			req, _ := http.NewRequest("POST",
+				"http://localhost/api/management/v2/devauth/devices/search",
+				bytes.NewReader(body),
+			)
+			req.Header.Add("X-MEN-RequestID", "test")
+			req.Header.Add("Content-Type", "application/json")
+			return req
+		}(),
+
+		StatusCode: http.StatusBadRequest,
+		Headers:    http.Header{"X-Men-Requestid": []string{"test"}},
+		Body: func() []byte {
+			err := rest_utils.ApiError{
+				Err: "api: malformed request body: " +
+					"invalid character '{' looking for " +
+					"beginning of object key string",
+				ReqId: "test",
+			}
+			b, _ := json.Marshal(err)
+			return b
+		}(),
+	}, {
+		Name: "error, bad url form",
+
+		Request: func() *http.Request {
+			body := []byte(`id=%%%%%%`)
+			req, _ := http.NewRequest("POST",
+				"http://localhost/api/management/v2/devauth/devices/search",
+				bytes.NewReader(body),
+			)
+			req.Header.Add("X-MEN-RequestID", "test")
+			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+			return req
+		}(),
+
+		StatusCode: http.StatusBadRequest,
+		Headers:    http.Header{"X-Men-Requestid": []string{"test"}},
+		Body: func() []byte {
+			err := rest_utils.ApiError{
+				Err:   "api: malformed query parameters: invalid URL escape \"%%%\"",
+				ReqId: "test",
+			}
+			b, _ := json.Marshal(err)
+			return b
+		}(),
+	}, {
+		Name: "error, bad form parameters",
+
+		Request: func() *http.Request {
+			body := []byte(`status=vettiche`)
+			req, _ := http.NewRequest("POST",
+				"http://localhost/api/management/v2/devauth/devices/search",
+				bytes.NewReader(body),
+			)
+			req.Header.Add("X-MEN-RequestID", "test")
+			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+			return req
+		}(),
+
+		StatusCode: http.StatusBadRequest,
+		Headers:    http.Header{"X-Men-Requestid": []string{"test"}},
+		Body: func() []byte {
+			err := rest_utils.ApiError{
+				Err: "filter status must be one of: " +
+					"accepted, pending, rejected, " +
+					"preauthorized or noauth",
+				ReqId: "test",
+			}
+			b, _ := json.Marshal(err)
+			return b
+		}(),
+	}}
+
+	for i := range testCases {
+		tc := testCases[i]
+		t.Run(tc.Name, func(t *testing.T) {
+			app := &mocks.App{}
+			if tc.AppDevices != nil || tc.AppError != nil {
+				app.On("GetDevices",
+					mtest.ContextMatcher(),
+					mock.AnythingOfType("uint"),
+					mock.AnythingOfType("uint"),
+					tc.DeviceFilter,
+				).Return(tc.AppDevices, tc.AppError)
+			}
+			apih := makeMockApiHandler(t, app, nil)
+			w := httptest.NewRecorder()
+			apih.ServeHTTP(w, tc.Request)
+			assert.Equal(t, tc.StatusCode, w.Code)
+			rspHeader := w.Header()
+			for key, values := range tc.Headers {
+				if assert.Contains(t, rspHeader, key) {
+					for _, value := range values {
+						assert.Contains(t, rspHeader[key], value)
+					}
+				}
+			}
+			assert.Equal(t, w.Body.String(), string(tc.Body))
 		})
 	}
 }
