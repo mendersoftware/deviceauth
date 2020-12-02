@@ -170,11 +170,43 @@ func (db *DataStoreMongo) Ping(ctx context.Context) error {
 	return db.client.Ping(ctx, nil)
 }
 
+type DeviceFilter model.DeviceFilter
+
+func (fltr DeviceFilter) MarshalBSON() (b []byte, err error) {
+	doc := bson.D{}
+	switch len(fltr.IDs) {
+	case 0:
+		break
+	case 1:
+		doc = append(doc, bson.E{Key: "_id", Value: fltr.IDs[0]})
+	default:
+		doc = append(doc, bson.E{
+			Key: "_id", Value: bson.D{{
+				Key: "$in", Value: fltr.IDs,
+			}},
+		})
+	}
+	switch len(fltr.Status) {
+	case 0:
+		break
+	case 1:
+		doc = append(doc, bson.E{Key: "status", Value: fltr.Status[0]})
+	default:
+		doc = append(doc, bson.E{
+			Key: "status", Value: bson.D{{
+				Key: "$in", Value: fltr.Status,
+			}},
+		})
+	}
+
+	return bson.Marshal(doc)
+}
+
 func (db *DataStoreMongo) GetDevices(ctx context.Context, skip, limit uint, filter model.DeviceFilter) ([]model.Device, error) {
 	const MaxInt64 = int64(^uint64(1 << 63))
 	var (
 		res  = []model.Device{}
-		fltr = bson.D{}
+		fltr = DeviceFilter(filter)
 	)
 	collDevs := db.client.
 		Database(ctxstore.DbFromContext(ctx, DbName)).
@@ -185,16 +217,6 @@ func (db *DataStoreMongo) GetDevices(ctx context.Context, skip, limit uint, filt
 
 	if limit > 0 {
 		findOpts.SetLimit(int64(limit))
-	}
-
-	if filter.IDs != nil {
-		fltr = append(fltr, bson.E{
-			Key:   "_id",
-			Value: bson.D{{Key: "$in", Value: filter.IDs}},
-		})
-	}
-	if filter.Status != nil {
-		fltr = append(fltr, bson.E{Key: "status", Value: filter.Status})
 	}
 
 	cursor, err := collDevs.Find(ctx, fltr, findOpts)

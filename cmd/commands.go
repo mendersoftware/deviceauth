@@ -275,7 +275,11 @@ func updateDevicesStatus(ctx context.Context, db store.DataStore, c cinv.Client,
 
 	skip = 0
 	for {
-		devices, err := db.GetDevices(ctx, skip, devicesBatchSize, model.DeviceFilter{Status: &status})
+		devices, err := db.GetDevices(ctx,
+			skip,
+			devicesBatchSize,
+			model.DeviceFilter{Status: []string{status}},
+		)
 		if err != nil {
 			return errors.Wrap(err, "failed to get devices")
 		}
