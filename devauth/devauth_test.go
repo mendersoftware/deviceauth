@@ -820,18 +820,14 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 		t.Run(fmt.Sprintf("tc: %s", tc.desc), func(t *testing.T) {
 			t.Parallel()
 
-			ctx := context.Background()
-			id := &identity.Identity{
-				Tenant: "5f89045239781243abcfdefdf",
-			}
-			ctx = identity.WithContext(ctx, id)
+			ctxMatcher := mtesting.ContextMatcher()
 
 			// setup mocks
 			db := mstore.DataStore{}
 
 			// get the auth set to check if preauthorized
 			db.On("GetAuthSetByIdDataHashKey",
-				ctx,
+				ctxMatcher,
 				idDataSha256,
 				inReq.PubKey,
 			).Return(
@@ -841,7 +837,7 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 
 			// for a preauthorized set - check if we're not over the limit
 			db.On("GetLimit",
-				ctx,
+				ctxMatcher,
 				model.LimitMaxDeviceCount,
 			).Return(
 				tc.dbGetLimitRes,
@@ -850,7 +846,7 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 
 			// takes part in limit checking
 			db.On("GetDevCountByStatus",
-				ctx,
+				ctxMatcher,
 				model.DevStatusAccepted,
 			).Return(
 				tc.dbGetDevCountByStatusRes,
@@ -860,7 +856,7 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 			// at the end of processing, updates the preauthorized set to 'accepted'
 			// just happy path, errors tested elsewhere
 			db.On("UpdateAuthSetById",
-				ctx,
+				ctxMatcher,
 				mock.AnythingOfType("string"),
 				mock.MatchedBy(
 					func(u model.AuthSetUpdate) bool {
@@ -870,7 +866,7 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 
 			// at the end of processing, updates the device status to 'accepted'
 			db.On("UpdateDevice",
-				ctx,
+				ctxMatcher,
 				mock.MatchedBy(
 					func(m model.Device) bool {
 						return m.Id == dummyDevId
@@ -885,14 +881,14 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 			// at the end of processing, saves the issued token
 			// only happy path, errors tested elsewhere
 			db.On("AddToken",
-				ctx,
+				ctxMatcher,
 				mock.AnythingOfType("*jwt.Token"),
 			).Return(nil)
 
 			db.On("GetDeviceById",
-				ctx, dummyDevId).Return(tc.dev, tc.dbGetDeviceByIdErr)
+				ctxMatcher, dummyDevId).Return(tc.dev, tc.dbGetDeviceByIdErr)
 
-			db.On("GetDeviceStatus", ctx,
+			db.On("GetDeviceStatus", ctxMatcher,
 				mock.AnythingOfType("string")).Return(
 				"pending", nil)
 			// token serialization - happy path only, errors tested elsewhere
@@ -902,10 +898,10 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 			).Return(dummyToken, nil)
 
 			co := morchestrator.ClientRunner{}
-			co.On("SubmitProvisionDeviceJob", ctx,
+			co.On("SubmitProvisionDeviceJob", ctxMatcher,
 				mock.AnythingOfType("orchestrator.ProvisionDeviceReq")).
 				Return(tc.coSubmitProvisionDeviceJobErr)
-			co.On("SubmitUpdateDeviceStatusJob", ctx,
+			co.On("SubmitUpdateDeviceStatusJob", ctxMatcher,
 				mock.AnythingOfType("orchestrator.UpdateDeviceStatusReq")).
 				Return(nil)
 
@@ -913,7 +909,7 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 			devauth := NewDevAuth(&db, &co, &jwth, Config{})
 
 			// test
-			res, err := devauth.SubmitAuthRequest(ctx, &inReq)
+			res, err := devauth.SubmitAuthRequest(context.Background(), &inReq)
 
 			// verify
 			assert.Equal(t, tc.res, res)
