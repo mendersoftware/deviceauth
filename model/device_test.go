@@ -58,7 +58,7 @@ func TestDeviceFilterParseForm(t *testing.T) {
 			"status": []string{"occupied"},
 		},
 		Error: errors.New("parameter status must be one of: " +
-			"pending, rejected, accepted or preauthorized"),
+			"pending, rejected, accepted, preauthorized or noauth"),
 	}}
 
 	for _, tc := range testCases {

@@ -42,11 +42,6 @@ type ProvisionDeviceReq struct {
 	TenantID string `json:"tenant_id"`
 }
 
-type DeviceUpdate struct {
-	Id       string `json:"id"`
-	Revision uint   `json:"revision"`
-}
-
 // UpdateDeviceStatusReq contains request data of request to start update
 // device status  workflow
 type UpdateDeviceStatusReq struct {

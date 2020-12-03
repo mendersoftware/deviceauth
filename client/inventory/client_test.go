@@ -30,6 +30,8 @@ import (
 	"github.com/mendersoftware/go-lib-micro/rest_utils"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/mendersoftware/deviceauth/model"
 )
 
 func TestCheckHealth(t *testing.T) {
@@ -279,9 +281,9 @@ func TestClientPatchDeviceV2(t *testing.T) {
 
 func TestClientSetDeviceStatus(t *testing.T) {
 	cases := map[string]struct {
-		tid    string
-		did    []string
-		status string
+		tid     string
+		devices []model.DeviceInventoryUpdate
+		status  string
 
 		code             int
 		errCheckPrefix   bool
@@ -289,20 +291,32 @@ func TestClientSetDeviceStatus(t *testing.T) {
 		err              error
 	}{
 		"ok": {
-			did:    []string{"dev1", "dev2", "dev3"},
+			devices: []model.DeviceInventoryUpdate{
+				{Id: "dev1"},
+				{Id: "dev2"},
+				{Id: "dev3"},
+			},
 			tid:    "tenant",
 			status: "accepted",
 
 			code: http.StatusOK,
 		},
 		"ok, no tenant": {
-			did:    []string{"dev1", "dev2", "dev3"},
+			devices: []model.DeviceInventoryUpdate{
+				{Id: "dev1"},
+				{Id: "dev2"},
+				{Id: "dev3"},
+			},
 			status: "accepted",
 
 			code: http.StatusOK,
 		},
 		"error: inventory": {
-			did:    []string{"dev1", "dev2", "dev3"},
+			devices: []model.DeviceInventoryUpdate{
+				{Id: "dev1"},
+				{Id: "dev2"},
+				{Id: "dev3"},
+			},
 			status: "accepted",
 
 			code: http.StatusBadRequest,
@@ -313,7 +327,11 @@ func TestClientSetDeviceStatus(t *testing.T) {
 			err: errors.New("no devices to update"),
 		},
 		"error: not a valid url": {
-			did:    []string{"dev1", "dev2", "dev3"},
+			devices: []model.DeviceInventoryUpdate{
+				{Id: "dev1"},
+				{Id: "dev2"},
+				{Id: "dev3"},
+			},
 			status: "accepted",
 			tid:    "/well, leads to % no / good url/",
 
@@ -321,7 +339,11 @@ func TestClientSetDeviceStatus(t *testing.T) {
 			err:            errors.New("failed to create request: parse"),
 		},
 		"error: connection refused": {
-			did:    []string{"dev1", "dev2", "dev3"},
+			devices: []model.DeviceInventoryUpdate{
+				{Id: "dev1"},
+				{Id: "dev2"},
+				{Id: "dev3"},
+			},
 			status: "accepted",
 			tid:    "tenant",
 
@@ -340,7 +362,7 @@ func TestClientSetDeviceStatus(t *testing.T) {
 				c := NewClient("http://this.does.not.exists/url/also/", true)
 				err := c.SetDeviceStatus(context.TODO(),
 					tc.tid,
-					tc.did,
+					tc.devices,
 					tc.status)
 				assert.True(t, strings.HasPrefix(err.Error(), "failed to submit POST"))
 				return
@@ -368,7 +390,7 @@ func TestClientSetDeviceStatus(t *testing.T) {
 			c := NewClient(s.URL, true)
 			err := c.SetDeviceStatus(context.TODO(),
 				tc.tid,
-				tc.did,
+				tc.devices,
 				tc.status)
 			if tc.err == nil {
 				if tc.code == 0 {
