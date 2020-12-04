@@ -46,6 +46,11 @@ paths:
             - rejected
             - preauthorized
             - noauth
+        - name: id
+          in: query
+          description: |
+            Device ID filter. Can be repeated to query a set of devices.
+          type: string
         - name: page
           in: query
           description: Results page number

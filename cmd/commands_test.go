@@ -32,7 +32,6 @@ import (
 	//dconfig "github.com/mendersoftware/deviceauth/config"
 	"github.com/mendersoftware/deviceauth/jwt"
 	"github.com/mendersoftware/deviceauth/model"
-	"github.com/mendersoftware/deviceauth/store"
 	mstore "github.com/mendersoftware/deviceauth/store/mocks"
 	"github.com/mendersoftware/deviceauth/store/mongo"
 )
@@ -327,7 +326,7 @@ func TestPropagateInventory(t *testing.T) {
 					context.Background(),
 					uint(0),
 					uint(100),
-					store.DeviceFilter{}).Return(
+					model.DeviceFilter{}).Return(
 					dbs["deviceauth"],
 					tc.errDbDevices)
 			} else {
@@ -342,7 +341,7 @@ func TestPropagateInventory(t *testing.T) {
 						m,
 						uint(0),
 						uint(100),
-						store.DeviceFilter{}).Return(
+						model.DeviceFilter{}).Return(
 						v,
 						tc.errDbDevices)
 				}
@@ -493,7 +492,10 @@ func TestPropagateStatusesInventory(t *testing.T) {
 	for k := range cases {
 		tc := cases[k]
 		t.Run(fmt.Sprintf("tc %s", k), func(t *testing.T) {
-
+			var deviceStatuses = []string{
+				"accepted", "pending",
+				"rejected", "preauthorized",
+			}
 			db := &mstore.DataStore{}
 			v, _ := migrate.NewVersion(tc.forcedVersion)
 			db.On("StoreMigrationVersion",
@@ -530,14 +532,16 @@ func TestPropagateStatusesInventory(t *testing.T) {
 			// all devs in all dbs if no tenant selected
 			// just one tenant dev set if tenant selected
 			if st {
-				for _, status := range []string{"accepted", "pending", "rejected", "preauthorized"} {
+				for i := range deviceStatuses {
 					db.On("GetDevices",
 						context.Background(),
 						uint(0),
 						uint(512),
-						store.DeviceFilter{Status: status}).Return(
+						model.DeviceFilter{Status: &deviceStatuses[i]},
+					).Return(
 						dbs["deviceauth"],
-						tc.errDbDevices)
+						tc.errDbDevices,
+					)
 				}
 			} else {
 				for k, v := range dbs {
@@ -547,12 +551,13 @@ func TestPropagateStatusesInventory(t *testing.T) {
 						return id.Tenant == tname
 					})
 
-					for _, status := range []string{"accepted", "pending", "rejected", "preauthorized"} {
+					for i := range deviceStatuses {
 						db.On("GetDevices",
 							m,
 							uint(0),
 							uint(512),
-							store.DeviceFilter{Status: status}).Return(
+							model.DeviceFilter{Status: &deviceStatuses[i]},
+						).Return(
 							v,
 							tc.errDbDevices)
 					}

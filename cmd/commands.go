@@ -302,7 +302,7 @@ func tryPropagateInventoryForDb(db store.DataStore, c cinv.Client, dbname string
 	limit := 100
 	errs := false
 	for {
-		devs, err := db.GetDevices(ctx, uint(skip), uint(limit), store.DeviceFilter{})
+		devs, err := db.GetDevices(ctx, uint(skip), uint(limit), model.DeviceFilter{})
 		if err != nil {
 			return errors.Wrap(err, "failed to get devices")
 		}
@@ -342,7 +342,7 @@ func updateDevicesStatus(ctx context.Context, db store.DataStore, c cinv.Client,
 
 	skip = 0
 	for {
-		devices, err := db.GetDevices(ctx, skip, devicesBatchSize, store.DeviceFilter{Status: status})
+		devices, err := db.GetDevices(ctx, skip, devicesBatchSize, model.DeviceFilter{Status: &status})
 		if err != nil {
 			return errors.Wrap(err, "failed to get devices")
 		}
@@ -376,7 +376,7 @@ func updateDevicesIdData(ctx context.Context, db store.DataStore, c cinv.Client,
 
 	skip = 0
 	for {
-		devices, err := db.GetDevices(ctx, skip, devicesBatchSize, store.DeviceFilter{})
+		devices, err := db.GetDevices(ctx, skip, devicesBatchSize, model.DeviceFilter{})
 		if err != nil {
 			return errors.Wrap(err, "failed to get devices")
 		}

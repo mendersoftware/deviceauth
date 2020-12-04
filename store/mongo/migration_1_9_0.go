@@ -15,7 +15,6 @@ package mongo
 
 import (
 	"context"
-	"strings"
 
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	ctxstore "github.com/mendersoftware/go-lib-micro/store"
@@ -78,7 +77,13 @@ func (m *migration_1_9_0) Version() migrate.Version {
 	return migrate.MakeVersion(1, 9, 0)
 }
 
+// ref: https://github.com/mongodb/mongo/blob/master/src/mongo/base/error_codes.yml
 func isIndexNotFound(e error) bool {
-	return strings.HasPrefix(e.Error(), "(IndexNotFound) index not found with name") ||
-		e.Error() == "(NamespaceNotFound) ns not found"
+	if mgoErr, ok := e.(mongo.CommandError); ok {
+		if mgoErr.Code == 27 || // IndexNotFound - index does not exist
+			mgoErr.Code == 26 { // NamespaceNotFound - collection does not exist
+			return true
+		}
+	}
+	return false
 }

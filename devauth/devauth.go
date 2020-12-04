@@ -99,7 +99,7 @@ type App interface {
 	HealthCheck(ctx context.Context) error
 	SubmitAuthRequest(ctx context.Context, r *model.AuthReq) (string, error)
 
-	GetDevices(ctx context.Context, skip, limit uint, filter store.DeviceFilter) ([]model.Device, error)
+	GetDevices(ctx context.Context, skip, limit uint, filter model.DeviceFilter) ([]model.Device, error)
 	GetDevice(ctx context.Context, dev_id string) (*model.Device, error)
 	DecommissionDevice(ctx context.Context, dev_id string) error
 	DeleteAuthSet(ctx context.Context, dev_id string, auth_id string) error
@@ -597,7 +597,7 @@ func (d *DevAuth) processAuthRequest(ctx context.Context, r *model.AuthReq) (*mo
 	return areq, nil
 }
 
-func (d *DevAuth) GetDevices(ctx context.Context, skip, limit uint, filter store.DeviceFilter) ([]model.Device, error) {
+func (d *DevAuth) GetDevices(ctx context.Context, skip, limit uint, filter model.DeviceFilter) ([]model.Device, error) {
 	devs, err := d.db.GetDevices(ctx, skip, limit, filter)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list devices")

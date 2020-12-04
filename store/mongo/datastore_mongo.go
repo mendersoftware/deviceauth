@@ -117,30 +117,34 @@ func (db *DataStoreMongo) Ping(ctx context.Context) error {
 	return db.client.Ping(ctx, nil)
 }
 
-func (db *DataStoreMongo) GetDevices(ctx context.Context, skip, limit uint, filter store.DeviceFilter) ([]model.Device, error) {
-
-	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
-
-	res := []model.Device{}
-
-	pipeline := []bson.D{
-		{
-			{Key: "$match", Value: filter},
-		},
-		{
-			{Key: "$sort", Value: bson.M{"_id": 1}},
-		},
-		{
-			{Key: "$skip", Value: skip},
-		},
-	}
+func (db *DataStoreMongo) GetDevices(ctx context.Context, skip, limit uint, filter model.DeviceFilter) ([]model.Device, error) {
+	const MaxInt64 = int64(^uint64(1 << 63))
+	var (
+		res  = []model.Device{}
+		fltr = bson.D{}
+	)
+	collDevs := db.client.
+		Database(ctxstore.DbFromContext(ctx, DbName)).
+		Collection(DbDevicesColl)
+	findOpts := mopts.Find().
+		SetSort(bson.D{{Key: "_id", Value: 1}}).
+		SetSkip(int64(skip) & MaxInt64)
 
 	if limit > 0 {
-		pipeline = append(pipeline,
-			bson.D{{Key: "$limit", Value: limit}})
+		findOpts.SetLimit(int64(limit))
 	}
 
-	cursor, err := c.Aggregate(ctx, pipeline)
+	if filter.IDs != nil {
+		fltr = append(fltr, bson.E{
+			Key:   "_id",
+			Value: bson.D{{Key: "$in", Value: filter.IDs}},
+		})
+	}
+	if filter.Status != nil {
+		fltr = append(fltr, bson.E{Key: "status", Value: filter.Status})
+	}
+
+	cursor, err := collDevs.Find(ctx, fltr, findOpts)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to fetch device list")
 	}
