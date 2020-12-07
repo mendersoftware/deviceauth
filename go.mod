@@ -12,7 +12,6 @@ require (
 	github.com/go-redis/redis/v8 v8.4.2
 	github.com/gomodule/redigo v1.8.2 // indirect
 	github.com/mendersoftware/go-lib-micro v0.0.0-20201013131806-cf1f6a851bcb
-	github.com/mendersoftware/mendertesting v0.0.2-0.20201017134033-a52f7a79af4f
 	github.com/pkg/errors v0.9.1
 	github.com/satori/go.uuid v1.2.0
 	github.com/stretchr/testify v1.6.1
