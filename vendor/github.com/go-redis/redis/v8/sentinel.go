@@ -177,11 +177,14 @@ func NewFailoverClient(failoverOpt *FailoverOptions) *Client {
 	opt.init()
 
 	connPool := newConnPool(opt)
+
+	failover.mu.Lock()
 	failover.onFailover = func(ctx context.Context, addr string) {
 		_ = connPool.Filter(func(cn *pool.Conn) bool {
 			return cn.RemoteAddr().String() != addr
 		})
 	}
+	failover.mu.Unlock()
 
 	c := Client{
 		baseClient: newBaseClient(opt, connPool),
@@ -646,6 +649,7 @@ func (c *sentinelFailover) discoverSentinels(ctx context.Context) {
 
 func (c *sentinelFailover) listen(pubsub *PubSub) {
 	ctx := context.TODO()
+
 	if c.onUpdate != nil {
 		c.onUpdate(ctx)
 	}
@@ -723,9 +727,12 @@ func NewFailoverClusterClient(failoverOpt *FailoverOptions) *ClusterClient {
 	}
 
 	c := NewClusterClient(opt)
+
+	failover.mu.Lock()
 	failover.onUpdate = func(ctx context.Context) {
 		c.ReloadState(ctx)
 	}
+	failover.mu.Unlock()
 
 	return c
 }
