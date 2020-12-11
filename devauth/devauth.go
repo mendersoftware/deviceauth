@@ -536,10 +536,9 @@ func (d *DevAuth) processPreAuthRequest(ctx context.Context, r *model.AuthReq) (
 }
 
 func (d *DevAuth) updateDeviceStatus(ctx context.Context, devId, status string, currentStatus string) error {
-	statusChanged := true
 	newStatus, err := d.db.GetDeviceStatus(ctx, devId)
 	if currentStatus == newStatus {
-		statusChanged = false
+		return nil
 	}
 	if status == "" {
 		switch err {
@@ -564,31 +563,29 @@ func (d *DevAuth) updateDeviceStatus(ctx context.Context, devId, status string, 
 	}
 
 	// submit device status change job
-	if statusChanged {
-		dev, err := d.db.GetDeviceById(ctx, devId)
-		if err != nil {
-			return errors.Wrap(err, "db get device by id error")
-		}
+	dev, err := d.db.GetDeviceById(ctx, devId)
+	if err != nil {
+		return errors.Wrap(err, "db get device by id error")
+	}
 
-		tenantId := ""
-		idData := identity.FromContext(ctx)
-		if idData != nil {
-			tenantId = idData.Tenant
-		}
-		b, err := json.Marshal([]model.DeviceInventoryUpdate{{Id: dev.Id, Revision: dev.Revision}})
-		if err != nil {
-			return errors.New("internal error: cannot marshal array into json")
-		}
-		if err := d.cOrch.SubmitUpdateDeviceStatusJob(
-			ctx,
-			orchestrator.UpdateDeviceStatusReq{
-				RequestId: requestid.FromContext(ctx),
-				Devices:   string(b),
-				TenantId:  tenantId,
-				Status:    status,
-			}); err != nil {
-			return errors.Wrap(err, "update device status job error")
-		}
+	tenantId := ""
+	idData := identity.FromContext(ctx)
+	if idData != nil {
+		tenantId = idData.Tenant
+	}
+	b, err := json.Marshal([]model.DeviceInventoryUpdate{{Id: dev.Id, Revision: dev.Revision}})
+	if err != nil {
+		return errors.New("internal error: cannot marshal array into json")
+	}
+	if err := d.cOrch.SubmitUpdateDeviceStatusJob(
+		ctx,
+		orchestrator.UpdateDeviceStatusReq{
+			RequestId: requestid.FromContext(ctx),
+			Devices:   string(b),
+			TenantId:  tenantId,
+			Status:    status,
+		}); err != nil {
+		return errors.Wrap(err, "update device status job error")
 	}
 	return nil
 }
