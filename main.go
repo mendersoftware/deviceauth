@@ -90,22 +90,6 @@ func doMain(args []string) {
 			Action: cmdMigrate,
 		},
 		{
-			Name:  "propagate-inventory",
-			Usage: "Push device attributes to inventory",
-			Flags: []cli.Flag{
-				cli.StringFlag{
-					Name:  "tenant_id",
-					Usage: "Tenant ID (optional) - propagate for just a single tenant.",
-				},
-				cli.BoolFlag{
-					Name:  "dry-run",
-					Usage: "Do not perform any inventory modifications, just scan and print devices.",
-				},
-			},
-
-			Action: cmdPropagateInventory,
-		},
-		{
 			Name:  "propagate-inventory-statuses",
 			Usage: "Push device statuses to inventory",
 			Flags: []cli.Flag{
@@ -258,19 +242,6 @@ func cmdMaintenance(args *cli.Context) error {
 	err := cmd.Maintenance(args.Bool("decommissioning-cleanup"), args.String("tenant"), args.Bool("dry-run"))
 	if err != nil {
 		return cli.NewExitError(err, 6)
-	}
-	return nil
-}
-
-func cmdPropagateInventory(args *cli.Context) error {
-	db, err := mongo.NewDataStoreMongo(makeDataStoreConfig())
-
-	inv := config.Config.GetString(dconfig.SettingInventoryAddr)
-	c := cinv.NewClient(inv, false)
-
-	err = cmd.PropagateInventory(db, c, args.String("tenant_id"), args.Bool("dry-run"))
-	if err != nil {
-		return cli.NewExitError(err, 7)
 	}
 	return nil
 }

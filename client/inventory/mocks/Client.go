@@ -19,7 +19,6 @@ package mocks
 import (
 	context "context"
 
-	inventory "github.com/mendersoftware/deviceauth/client/inventory"
 	mock "github.com/stretchr/testify/mock"
 
 	model "github.com/mendersoftware/deviceauth/model"
@@ -37,20 +36,6 @@ func (_m *Client) CheckHealth(ctx context.Context) error {
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context) error); ok {
 		r0 = rf(ctx)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// PatchDeviceV2 provides a mock function with given fields: ctx, did, tid, src, ts, attrs
-func (_m *Client) PatchDeviceV2(ctx context.Context, did string, tid string, src string, ts int64, attrs []inventory.Attribute) error {
-	ret := _m.Called(ctx, did, tid, src, ts, attrs)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, int64, []inventory.Attribute) error); ok {
-		r0 = rf(ctx, did, tid, src, ts, attrs)
 	} else {
 		r0 = ret.Error(0)
 	}
