@@ -505,6 +505,10 @@ func (d *DevAuth) processPreAuthRequest(ctx context.Context, r *model.AuthReq) (
 
 	if !deviceAlreadyAccepted {
 		reqId := requestid.FromContext(ctx)
+		var tenantID string
+		if idty := identity.FromContext(ctx); idty != nil {
+			tenantID = idty.Tenant
+		}
 
 		// submit device accepted job
 		if err := d.cOrch.SubmitProvisionDeviceJob(
@@ -512,9 +516,8 @@ func (d *DevAuth) processPreAuthRequest(ctx context.Context, r *model.AuthReq) (
 			orchestrator.ProvisionDeviceReq{
 				RequestId:     reqId,
 				Authorization: ctxhttpheader.FromContext(ctx, "Authorization"),
-				Device: model.Device{
-					Id: aset.DeviceId,
-				},
+				DeviceID:      aset.DeviceId,
+				TenantID:      tenantID,
 			}); err != nil {
 			return nil, errors.Wrap(err, "submit device provisioning job error")
 		}
@@ -858,15 +861,19 @@ func (d *DevAuth) AcceptDeviceAuth(ctx context.Context, device_id string, auth_i
 
 	reqId := requestid.FromContext(ctx)
 
+	var tenantID string
+	if idty := identity.FromContext(ctx); idty != nil {
+		tenantID = idty.Tenant
+	}
+
 	// submit device accepted job
 	if err := d.cOrch.SubmitProvisionDeviceJob(
 		ctx,
 		orchestrator.ProvisionDeviceReq{
 			RequestId:     reqId,
 			Authorization: ctxhttpheader.FromContext(ctx, "Authorization"),
-			Device: model.Device{
-				Id: aset.DeviceId,
-			},
+			DeviceID:      aset.DeviceId,
+			TenantID:      tenantID,
 		}); err != nil {
 		return errors.Wrap(err, "submit device provisioning job error")
 	}
