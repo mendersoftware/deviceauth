@@ -332,7 +332,7 @@ func TestPropagateStatusesInventory(t *testing.T) {
 						context.Background(),
 						uint(0),
 						uint(512),
-						model.DeviceFilter{Status: &deviceStatuses[i]},
+						model.DeviceFilter{Status: []string{deviceStatuses[i]}},
 					).Return(
 						dbs["deviceauth"],
 						tc.errDbDevices,
@@ -351,7 +351,7 @@ func TestPropagateStatusesInventory(t *testing.T) {
 							m,
 							uint(0),
 							uint(512),
-							model.DeviceFilter{Status: &deviceStatuses[i]},
+							model.DeviceFilter{Status: []string{deviceStatuses[i]}},
 						).Return(
 							v,
 							tc.errDbDevices)

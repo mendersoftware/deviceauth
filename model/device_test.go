@@ -15,6 +15,7 @@
 package model
 
 import (
+	"encoding/json"
 	"errors"
 	"net/url"
 	"testing"
@@ -42,10 +43,7 @@ func TestDeviceFilterParseForm(t *testing.T) {
 			},
 		},
 		Result: DeviceFilter{
-			Status: func() *string {
-				s := "pending"
-				return &s
-			}(),
+			Status: []string{"pending"},
 			IDs: []string{
 				"66c3a801-c5da-4f23-9ab7-7489127ad473",
 				"66c3a801-c5da-4f23-9ab7-7489127ad474",
@@ -57,8 +55,8 @@ func TestDeviceFilterParseForm(t *testing.T) {
 		Form: url.Values{
 			"status": []string{"occupied"},
 		},
-		Error: errors.New("parameter status must be one of: " +
-			"pending, rejected, accepted, preauthorized or noauth"),
+		Error: errors.New("filter status must be one of: " +
+			"accepted, pending, rejected, preauthorized or noauth"),
 	}}
 
 	for _, tc := range testCases {
@@ -70,6 +68,112 @@ func TestDeviceFilterParseForm(t *testing.T) {
 				assert.EqualError(t, err, tc.Error.Error())
 			} else {
 				assert.Equal(t, tc.Result, fltr)
+			}
+		})
+	}
+}
+
+func TestDeviceFilterUnmarshalJSON(t *testing.T) {
+	testCases := []struct {
+		Name string
+
+		JSON []byte
+
+		Expected DeviceFilter
+		Error    error
+	}{{
+		Name: "ok, empty",
+		JSON: []byte{'{', '}'},
+
+		Expected: DeviceFilter{},
+	}, {
+		Name: "ok, slices",
+		JSON: func() []byte {
+			b, _ := json.Marshal(map[string]interface{}{
+				"status": []string{"accepted", "pending"},
+				"id":     []string{"1", "2", "3"},
+			})
+			return b
+		}(),
+		Expected: DeviceFilter{
+			Status: []string{"accepted", "pending"},
+			IDs:    []string{"1", "2", "3"},
+		},
+	}, {
+		Name: "ok, strings",
+		JSON: func() []byte {
+			b, _ := json.Marshal(map[string]string{
+				"status": "accepted",
+				"id":     "123456",
+			})
+			return b
+		}(),
+		Expected: DeviceFilter{
+			Status: []string{"accepted"},
+			IDs:    []string{"123456"},
+		},
+	}, {
+		Name: "error, unmarshal error",
+		JSON: []byte("Lorem ipsum"),
+
+		Error: errors.New("invalid character 'L' looking for beginning of value"),
+	}, {
+		Name: "error, invalid status type",
+		JSON: func() []byte {
+			b, _ := json.Marshal(map[string]interface{}{
+				"status": 404,
+			})
+			return b
+		}(),
+		Error: errors.New(`invalid JSON type for 'status': ` +
+			`must be string or \[\]string`),
+	}, {
+		Name: "error, invalid status array type",
+		JSON: func() []byte {
+			b, _ := json.Marshal(map[string]interface{}{
+				"status": []int{404, 200},
+			})
+			return b
+		}(),
+		Error: errors.New(`invalid JSON type for 'status': ` +
+			`must be string or \[\]string`),
+	}, {
+		Name: "error, invalid id type",
+		JSON: func() []byte {
+			b, _ := json.Marshal(map[string]interface{}{
+				"id": 404,
+			})
+			return b
+		}(),
+		Error: errors.New(`invalid JSON type for 'id': ` +
+			`must be string or \[\]string`),
+	}, {
+		Name: "error, invalid id array type",
+		JSON: func() []byte {
+			b, _ := json.Marshal(map[string]interface{}{
+				"id": []int{404, 200},
+			})
+			return b
+		}(),
+		Error: errors.New(`invalid JSON type for 'id': ` +
+			`must be string or \[\]string`),
+	}}
+
+	for i := range testCases {
+		tc := testCases[i]
+		t.Run(tc.Name, func(t *testing.T) {
+			var fltr DeviceFilter
+			err := fltr.UnmarshalJSON(tc.JSON)
+			if tc.Error != nil {
+				if assert.Error(t, err) {
+					assert.Regexp(t,
+						tc.Error.Error(),
+						err.Error(),
+					)
+				}
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tc.Expected, fltr)
 			}
 		})
 	}

@@ -14,6 +14,7 @@
 package model
 
 import (
+	"encoding/json"
 	"net/url"
 	"time"
 
@@ -90,32 +91,87 @@ func NewDevice(id, id_data, pubkey string) *Device {
 }
 
 type DeviceFilter struct {
-	Status *string  `bson:"status,omitempty"`
-	IDs    []string `bson:"-"`
+	Status []string `json:"status,omitempty"`
+	IDs    []string `json:"id,omitempty"`
 }
 
 func (fltr DeviceFilter) Validate() error {
-	if fltr.Status != nil && !govalidator.IsIn(*fltr.Status,
-		DevStatusPending,
-		DevStatusRejected,
-		DevStatusAccepted,
-		DevStatusPreauth,
-		DevStatusNoAuth,
-	) {
-		return errors.Errorf(
-			`parameter status must be one of: `+
-				`%s, %s, %s, %s or %s`,
-			DevStatusPending, DevStatusRejected,
-			DevStatusAccepted, DevStatusPreauth,
-			DevStatusNoAuth,
+	for _, stat := range fltr.Status {
+		if !govalidator.IsIn(stat, DevStatuses...) {
+			return errors.Errorf(
+				`filter status must be one of: `+
+					`%s, %s, %s, %s or %s`,
+				DevStatusAccepted, DevStatusPending,
+				DevStatusRejected, DevStatusPreauth,
+				DevStatusNoAuth,
+			)
+		}
+	}
+	return nil
+}
+
+func (fltr *DeviceFilter) UnmarshalJSON(b []byte) error {
+	schema := struct {
+		Status interface{} `json:"status"`
+		IDs    interface{} `json:"id"`
+	}{}
+
+	err := json.Unmarshal(b, &schema)
+	if err != nil {
+		return err
+	}
+	switch t := schema.Status.(type) {
+	case string:
+		fltr.Status = []string{t}
+	case []interface{}:
+		fltr.Status = make([]string, 0, len(t))
+		for _, elem := range t {
+			if str, ok := elem.(string); ok {
+				fltr.Status = append(fltr.Status, str)
+			} else {
+				return errors.New(
+					"invalid JSON type for 'status': " +
+						"must be string or []string",
+				)
+			}
+		}
+	case nil:
+		break
+	default:
+		return errors.New(
+			"invalid JSON type for 'status': " +
+				"must be string or []string",
+		)
+	}
+	switch t := schema.IDs.(type) {
+	case string:
+		fltr.IDs = []string{t}
+	case []interface{}:
+		fltr.IDs = make([]string, 0, len(t))
+		for _, elem := range t {
+			if str, ok := elem.(string); ok {
+				fltr.IDs = append(fltr.IDs, str)
+			} else {
+				return errors.New(
+					"invalid JSON type for 'id': " +
+						"must be string or []string",
+				)
+			}
+		}
+	case nil:
+		break
+	default:
+		return errors.New(
+			"invalid JSON type for 'id': " +
+				"must be string or []string",
 		)
 	}
 	return nil
 }
 
 func (fltr *DeviceFilter) ParseForm(form url.Values) error {
-	if status := form.Get("status"); status != "" {
-		fltr.Status = &status
+	if stat, ok := form["status"]; ok {
+		fltr.Status = stat
 	}
 	if IDs, ok := form["id"]; ok {
 		fltr.IDs = IDs

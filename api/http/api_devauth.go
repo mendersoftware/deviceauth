@@ -53,6 +53,7 @@ const (
 	// management API v2
 	v2uriDevices             = "/api/management/v2/devauth/devices"
 	v2uriDevicesCount        = "/api/management/v2/devauth/devices/count"
+	v2uriDevicesSearch       = "/api/management/v2/devauth/devices/search"
 	v2uriDevice              = "/api/management/v2/devauth/devices/:id"
 	v2uriDeviceAuthSet       = "/api/management/v2/devauth/devices/:id/auth/:aid"
 	v2uriDeviceAuthSetStatus = "/api/management/v2/devauth/devices/:id/auth/:aid/status"
@@ -108,6 +109,7 @@ func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
 		// API v2
 		rest.Get(v2uriDevicesCount, d.GetDevicesCountHandler),
 		rest.Get(v2uriDevices, d.GetDevicesV2Handler),
+		rest.Post(v2uriDevicesSearch, d.SearchDevicesV2Handler),
 		rest.Post(v2uriDevices, d.PostDevicesV2Handler),
 		rest.Get(v2uriDevice, d.GetDeviceV2Handler),
 		rest.Delete(v2uriDevice, d.DeleteDeviceHandler),
@@ -254,10 +256,8 @@ func (d *DevAuthApiHandlers) PostDevicesV2Handler(w rest.ResponseWriter, r *rest
 	}
 }
 
-func (d *DevAuthApiHandlers) GetDevicesV2Handler(w rest.ResponseWriter, r *rest.Request) {
-
+func (d *DevAuthApiHandlers) SearchDevicesV2Handler(w rest.ResponseWriter, r *rest.Request) {
 	ctx := r.Context()
-
 	l := log.FromContext(ctx)
 
 	page, perPage, err := rest_utils.ParsePagination(r)
@@ -265,16 +265,33 @@ func (d *DevAuthApiHandlers) GetDevicesV2Handler(w rest.ResponseWriter, r *rest.
 		rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
 		return
 	}
-
-	if err = r.ParseForm(); err != nil {
-		err = errors.Wrap(err, "api: malformed query parameters")
-		rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
-		return
-	}
-
 	fltr := model.DeviceFilter{}
-	if err = fltr.ParseForm(r.Form); err != nil {
-		rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+
+	switch strings.ToLower(r.Header.Get("Content-Type")) {
+	case "application/json", "":
+		err := r.DecodeJsonPayload(&fltr)
+		if err != nil {
+			err = errors.Wrap(err, "api: malformed request body")
+			rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+			return
+		}
+
+	case "application/x-www-form-urlencoded":
+		if err = r.ParseForm(); err != nil {
+			err = errors.Wrap(err, "api: malformed query parameters")
+			rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+			return
+		}
+		if err = fltr.ParseForm(r.Form); err != nil {
+			rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+			return
+		}
+
+	default:
+		rest_utils.RestErrWithLog(w, r, l, errors.Errorf(
+			"Content-Type '%s' not supported",
+			r.Header.Get("Content-Type"),
+		), http.StatusUnsupportedMediaType)
 		return
 	}
 
@@ -305,7 +322,12 @@ func (d *DevAuthApiHandlers) GetDevicesV2Handler(w rest.ResponseWriter, r *rest.
 		return
 	}
 
-	w.WriteJson(outDevs)
+	_ = w.WriteJson(outDevs)
+}
+
+func (d *DevAuthApiHandlers) GetDevicesV2Handler(w rest.ResponseWriter, r *rest.Request) {
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	d.SearchDevicesV2Handler(w, r)
 }
 
 func (d *DevAuthApiHandlers) GetDevicesCountHandler(w rest.ResponseWriter, r *rest.Request) {

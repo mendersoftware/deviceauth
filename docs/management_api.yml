@@ -122,6 +122,79 @@ paths:
           schema:
             $ref: '#/definitions/Error'
 
+  /devices/search:
+    post:
+      operationId: Search Devices
+      security:
+        - ManagementJWT: []
+      summary: >-
+        Query for devices. Returns a list of matching devices with AuthSets
+        sorted by age.
+      tags:
+        - Management API
+      parameters:
+        - name: page
+          in: query
+          description: Results page number
+          required: false
+          type: integer
+          default: 1
+        - name: per_page
+          in: query
+          description: Maximum number of results per page.
+          required: false
+          type: integer
+          default: 20
+          maximum: 500
+        - name: filter
+          in: body
+          description: |
+            Device status filter.
+            All properties can be either a single string or an array of strings.
+          required: true
+          schema:
+            type: object
+            properties:
+              status:
+                type: string
+                description: >-
+                  Device status filter. Can be an array for querying devices
+                  from multiple device statuses.
+                enum:
+                  - pending
+                  - accepted
+                  - rejected
+                  - preauthorized
+                  - noauth
+              id:
+                type: array
+                items:
+                  type: string
+                  description: >-
+                    Device ID
+                description: >-
+                  Device ID filter. Can be a string for querying for a single device.
+      responses:
+        200:
+          description: Successful response
+          schema:
+            description: Array of devices
+            type: array
+            items:
+                $ref: '#/definitions/Device'
+          headers:
+            Link:
+              type: string
+              description: Pagination link header, we support 'first', 'next', and 'prev'.
+        400:
+          description: Missing/malformed request params.
+          schema:
+            $ref: '#/definitions/Error'
+        500:
+          description: Unexpected error
+          schema:
+            $ref: '#/definitions/Error'
+
   /devices/{id}:
     get:
       operationId: Get Device
