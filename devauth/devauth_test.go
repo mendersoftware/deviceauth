@@ -2390,6 +2390,7 @@ func TestDevAuthDecommissionDevice(t *testing.T) {
 				orchestrator.DecommissioningReq{
 					DeviceId:      tc.devId,
 					Authorization: tc.coAuthorization,
+					TenantID:      tc.tenant,
 				}).
 				Return(tc.coSubmitDeviceDecommisioningJobErr)
 

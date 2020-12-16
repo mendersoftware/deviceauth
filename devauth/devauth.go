@@ -704,6 +704,12 @@ func (d *DevAuth) DecommissionDevice(ctx context.Context, devID string) error {
 
 	reqId := requestid.FromContext(ctx)
 
+	tenantID := ""
+	idData := identity.FromContext(ctx)
+	if idData != nil {
+		tenantID = idData.Tenant
+	}
+
 	// submit device decommissioning job
 	if err := d.cOrch.SubmitDeviceDecommisioningJob(
 		ctx,
@@ -711,6 +717,7 @@ func (d *DevAuth) DecommissionDevice(ctx context.Context, devID string) error {
 			DeviceId:      devID,
 			RequestId:     reqId,
 			Authorization: ctxhttpheader.FromContext(ctx, "Authorization"),
+			TenantID:      tenantID,
 		}); err != nil {
 		return errors.Wrap(err, "submit device decommissioning job error")
 	}

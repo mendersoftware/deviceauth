@@ -27,6 +27,8 @@ type DecommissioningReq struct {
 	// User authorization, eg. the value of Authorization header of incoming
 	// HTTP request
 	Authorization string `json:"authorization"`
+	// TenantID
+	TenantID string `json:"tenant_id"`
 }
 
 // ProvisionDeviceReq contains request data of request to start provisioning workflow
