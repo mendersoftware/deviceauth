@@ -343,6 +343,12 @@ func (d *DevAuth) SubmitAuthRequest(ctx context.Context, r *model.AuthReq) (stri
 		if err != nil {
 			return "", err
 		}
+	} else {
+		// ignore identity data when tenant verification is off
+		// it's possible that the device will provide old auth token or old tenant token
+		// in the authorization header;
+		// in that case we need to wipe identity data from the context
+		ctx = identity.WithContext(ctx, nil)
 	}
 
 	// first, try to handle preauthorization
