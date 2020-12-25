@@ -164,7 +164,7 @@ func (co *Client) SubmitProvisionDeviceJob(ctx context.Context, provisionDeviceR
 
 	l := log.FromContext(ctx)
 
-	l.Debugf("Submit provision device job for device: %s", provisionDeviceReq.Device.Id)
+	l.Debugf("Submit provision device job for device: %s", provisionDeviceReq.DeviceID)
 
 	ProvisionDeviceReqJson, err := json.Marshal(provisionDeviceReq)
 	if err != nil {

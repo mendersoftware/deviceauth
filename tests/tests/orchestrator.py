@@ -25,12 +25,11 @@ def provision_device_handler(device_id=None, status=200):
     log = logging.getLogger("orchestartor.provision_device")
 
     def _provision_device(request):
-        device = json.loads(request.body.decode())["device"]
-        log.info("provision device %s", device)
+        payload = json.loads(request.body.decode())
         if device_id is not None:
-            assert device.get("id", None) == device_id
+            assert payload.get("device_id", None) == device_id
         else:
-            assert device.get("id", None)
+            assert "device_id" in payload
 
         return (status, {}, "")
 

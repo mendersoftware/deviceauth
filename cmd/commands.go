@@ -193,26 +193,6 @@ func decommissioningCleanupExecute(db *mongo.DataStoreMongo, dbName string) erro
 	return nil
 }
 
-func PropagateInventory(db store.DataStore, c cinv.Client, tenant string, dryrun bool) error {
-	l := log.NewEmpty()
-
-	dbs, err := selectDbs(db, tenant)
-	if err != nil {
-		return errors.Wrap(err, "aborting")
-	}
-
-	for _, d := range dbs {
-		err := tryPropagateInventoryForDb(db, c, d, dryrun)
-		if err != nil {
-			l.Errorf("giving up on DB %s due to fatal error: %s", d, err.Error())
-			continue
-		}
-	}
-
-	l.Info("all DBs processed, exiting.")
-	return nil
-}
-
 func PropagateStatusesInventory(db store.DataStore, c cinv.Client, tenant string, migrationVersion string, dryRun bool) error {
 	l := log.NewEmpty()
 
@@ -286,55 +266,6 @@ func selectDbs(db store.DataStore, tenant string) ([]string, error) {
 	return dbs, nil
 }
 
-func tryPropagateInventoryForDb(db store.DataStore, c cinv.Client, dbname string, dryrun bool) error {
-	l := log.NewEmpty()
-
-	l.Infof("propagating inventory from DB: %s", dbname)
-
-	tenant := mstore.TenantFromDbName(dbname, mongo.DbName)
-
-	ctx := context.Background()
-	if tenant != "" {
-		ctx = identity.WithContext(ctx, &identity.Identity{
-			Tenant: tenant,
-		})
-	}
-
-	skip := 0
-	limit := 100
-	errs := false
-	for {
-		devs, err := db.GetDevices(ctx, uint(skip), uint(limit), model.DeviceFilter{})
-		if err != nil {
-			return errors.Wrap(err, "failed to get devices")
-		}
-
-		for _, d := range devs {
-			l.Infof("propagating device %s", d.Id)
-			err := propagateSingleDevice(d, c, tenant, dryrun)
-			if err != nil {
-				errs = true
-				l.Errorf("FAILED: %s", err.Error())
-				continue
-			}
-		}
-
-		if len(devs) < limit {
-			break
-		} else {
-			skip += limit
-		}
-	}
-
-	if errs {
-		l.Infof("Done with DB %s, but there were errors", dbname)
-	} else {
-		l.Infof("Done with DB %s", dbname)
-	}
-
-	return nil
-}
-
 const (
 	devicesBatchSize = 512
 )
@@ -344,7 +275,11 @@ func updateDevicesStatus(ctx context.Context, db store.DataStore, c cinv.Client,
 
 	skip = 0
 	for {
-		devices, err := db.GetDevices(ctx, skip, devicesBatchSize, model.DeviceFilter{Status: &status})
+		devices, err := db.GetDevices(ctx,
+			skip,
+			devicesBatchSize,
+			model.DeviceFilter{Status: []string{status}},
+		)
 		if err != nil {
 			return errors.Wrap(err, "failed to get devices")
 		}
@@ -472,22 +407,6 @@ func tryPropagateIdDataInventoryForDb(db store.DataStore, c cinv.Client, dbname 
 	}
 
 	return err
-}
-
-func propagateSingleDevice(d model.Device, c cinv.Client, tenant string, dryrun bool) error {
-	attrs, err := idDataToInventoryAttrs(d.IdDataStruct)
-	if err != nil {
-		return err
-	}
-
-	if !dryrun {
-		err = c.PatchDeviceV2(context.Background(), d.Id, tenant, "deviceauth", NowUnixMilis(), attrs)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 func idDataToInventoryAttrs(id map[string]interface{}) ([]cinv.Attribute, error) {

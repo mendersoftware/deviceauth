@@ -381,6 +381,12 @@ func (d *DevAuth) SubmitAuthRequest(ctx context.Context, r *model.AuthReq) (stri
 		if err != nil {
 			return "", err
 		}
+	} else {
+		// ignore identity data when tenant verification is off
+		// it's possible that the device will provide old auth token or old tenant token
+		// in the authorization header;
+		// in that case we need to wipe identity data from the context
+		ctx = identity.WithContext(ctx, nil)
 	}
 
 	// first, try to handle preauthorization
@@ -499,6 +505,10 @@ func (d *DevAuth) processPreAuthRequest(ctx context.Context, r *model.AuthReq) (
 
 	if !deviceAlreadyAccepted {
 		reqId := requestid.FromContext(ctx)
+		var tenantID string
+		if idty := identity.FromContext(ctx); idty != nil {
+			tenantID = idty.Tenant
+		}
 
 		// submit device accepted job
 		if err := d.cOrch.SubmitProvisionDeviceJob(
@@ -506,9 +516,8 @@ func (d *DevAuth) processPreAuthRequest(ctx context.Context, r *model.AuthReq) (
 			orchestrator.ProvisionDeviceReq{
 				RequestId:     reqId,
 				Authorization: ctxhttpheader.FromContext(ctx, "Authorization"),
-				Device: model.Device{
-					Id: aset.DeviceId,
-				},
+				DeviceID:      aset.DeviceId,
+				TenantID:      tenantID,
 			}); err != nil {
 			return nil, errors.Wrap(err, "submit device provisioning job error")
 		}
@@ -530,10 +539,9 @@ func (d *DevAuth) processPreAuthRequest(ctx context.Context, r *model.AuthReq) (
 }
 
 func (d *DevAuth) updateDeviceStatus(ctx context.Context, devId, status string, currentStatus string) error {
-	statusChanged := true
 	newStatus, err := d.db.GetDeviceStatus(ctx, devId)
 	if currentStatus == newStatus {
-		statusChanged = false
+		return nil
 	}
 	if status == "" {
 		switch err {
@@ -558,31 +566,29 @@ func (d *DevAuth) updateDeviceStatus(ctx context.Context, devId, status string, 
 	}
 
 	// submit device status change job
-	if statusChanged {
-		dev, err := d.db.GetDeviceById(ctx, devId)
-		if err != nil {
-			return errors.Wrap(err, "db get device by id error")
-		}
+	dev, err := d.db.GetDeviceById(ctx, devId)
+	if err != nil {
+		return errors.Wrap(err, "db get device by id error")
+	}
 
-		tenantId := ""
-		idData := identity.FromContext(ctx)
-		if idData != nil {
-			tenantId = idData.Tenant
-		}
-		b, err := json.Marshal([]model.DeviceInventoryUpdate{{Id: dev.Id, Revision: dev.Revision}})
-		if err != nil {
-			return errors.New("internal error: cannot marshal array into json")
-		}
-		if err := d.cOrch.SubmitUpdateDeviceStatusJob(
-			ctx,
-			orchestrator.UpdateDeviceStatusReq{
-				RequestId: requestid.FromContext(ctx),
-				Devices:   string(b),
-				TenantId:  tenantId,
-				Status:    status,
-			}); err != nil {
-			return errors.Wrap(err, "update device status job error")
-		}
+	tenantId := ""
+	idData := identity.FromContext(ctx)
+	if idData != nil {
+		tenantId = idData.Tenant
+	}
+	b, err := json.Marshal([]model.DeviceInventoryUpdate{{Id: dev.Id, Revision: dev.Revision}})
+	if err != nil {
+		return errors.New("internal error: cannot marshal array into json")
+	}
+	if err := d.cOrch.SubmitUpdateDeviceStatusJob(
+		ctx,
+		orchestrator.UpdateDeviceStatusReq{
+			RequestId: requestid.FromContext(ctx),
+			Devices:   string(b),
+			TenantId:  tenantId,
+			Status:    status,
+		}); err != nil {
+		return errors.Wrap(err, "update device status job error")
 	}
 	return nil
 }
@@ -698,6 +704,12 @@ func (d *DevAuth) DecommissionDevice(ctx context.Context, devID string) error {
 
 	reqId := requestid.FromContext(ctx)
 
+	tenantID := ""
+	idData := identity.FromContext(ctx)
+	if idData != nil {
+		tenantID = idData.Tenant
+	}
+
 	// submit device decommissioning job
 	if err := d.cOrch.SubmitDeviceDecommisioningJob(
 		ctx,
@@ -705,6 +717,7 @@ func (d *DevAuth) DecommissionDevice(ctx context.Context, devID string) error {
 			DeviceId:      devID,
 			RequestId:     reqId,
 			Authorization: ctxhttpheader.FromContext(ctx, "Authorization"),
+			TenantID:      tenantID,
 		}); err != nil {
 		return errors.Wrap(err, "submit device decommissioning job error")
 	}
@@ -855,15 +868,19 @@ func (d *DevAuth) AcceptDeviceAuth(ctx context.Context, device_id string, auth_i
 
 	reqId := requestid.FromContext(ctx)
 
+	var tenantID string
+	if idty := identity.FromContext(ctx); idty != nil {
+		tenantID = idty.Tenant
+	}
+
 	// submit device accepted job
 	if err := d.cOrch.SubmitProvisionDeviceJob(
 		ctx,
 		orchestrator.ProvisionDeviceReq{
 			RequestId:     reqId,
 			Authorization: ctxhttpheader.FromContext(ctx, "Authorization"),
-			Device: model.Device{
-				Id: aset.DeviceId,
-			},
+			DeviceID:      aset.DeviceId,
+			TenantID:      tenantID,
 		}); err != nil {
 		return errors.Wrap(err, "submit device provisioning job error")
 	}

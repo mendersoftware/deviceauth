@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -43,7 +42,6 @@ const (
 //go:generate ../../utils/mockgen.sh
 type Client interface {
 	CheckHealth(ctx context.Context) error
-	PatchDeviceV2(ctx context.Context, did, tid, src string, ts int64, attrs []Attribute) error
 	SetDeviceStatus(ctx context.Context, tenantId string, deviceUpdates []model.DeviceInventoryUpdate, status string) error
 	SetDeviceIdentity(ctx context.Context, tenantId, deviceId string, idData map[string]interface{}) error
 }
@@ -95,58 +93,6 @@ func (c *client) CheckHealth(ctx context.Context) error {
 		return errors.Errorf("health check HTTP error: %s", rsp.Status)
 	}
 	return &apiErr
-}
-
-func (c *client) PatchDeviceV2(ctx context.Context, did, tid, src string, ts int64, attrs []Attribute) error {
-	l := log.FromContext(ctx)
-
-	body, err := json.Marshal(attrs)
-	if err != nil {
-		return errors.Wrapf(err, "failed to serialize attributes %v", attrs)
-	}
-
-	rd := bytes.NewReader(body)
-
-	url := utils.JoinURL(c.urlBase, urlPatchAttrs)
-	url = strings.Replace(url, ":id", did, 1)
-
-	req, err := http.NewRequest(http.MethodPatch, url, rd)
-	if err != nil {
-		return errors.Wrapf(err, "failed to create request")
-	}
-
-	req.Header.Set("X-MEN-Source", src)
-	req.Header.Set("X-MEN-Msg-Timestamp", strconv.FormatUint(uint64(ts), 10))
-	req.Header.Set("Content-Type", "application/json")
-
-	if tid != "" {
-		q := req.URL.Query()
-		q.Add("tenant_id", tid)
-		req.URL.RawQuery = q.Encode()
-	}
-
-	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
-	defer cancel()
-
-	rsp, err := c.client.Do(req.WithContext(ctx))
-	if err != nil {
-		return errors.Wrapf(err, "failed to submit %s %s", req.Method, req.URL)
-	}
-	defer rsp.Body.Close()
-
-	if rsp.StatusCode != http.StatusOK {
-		body, err := ioutil.ReadAll(rsp.Body)
-		if err != nil {
-			body = []byte("<failed to read>")
-		}
-		l.Errorf("request %s %s failed with status %v, response: %s",
-			req.Method, req.URL, rsp.Status, body)
-
-		return errors.Errorf(
-			"%s %s request failed with status %v", req.Method, req.URL, rsp.Status)
-	}
-
-	return nil
 }
 
 func (c *client) SetDeviceStatus(ctx context.Context, tenantId string, deviceUpdates []model.DeviceInventoryUpdate, status string) error {

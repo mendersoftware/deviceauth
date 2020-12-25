@@ -9,14 +9,13 @@ require (
 	github.com/ant0ine/go-json-rest v3.3.3-0.20170913041208-ebb33769ae01+incompatible
 	github.com/asaskevich/govalidator v0.0.0-20180315120708-ccb8e960c48f
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
-	github.com/go-redis/redis/v8 v8.3.1
+	github.com/go-redis/redis/v8 v8.4.4
 	github.com/gomodule/redigo v1.8.2 // indirect
 	github.com/mendersoftware/go-lib-micro v0.0.0-20201013131806-cf1f6a851bcb
-	github.com/mendersoftware/mendertesting v0.0.2-0.20201017134033-a52f7a79af4f
 	github.com/pkg/errors v0.9.1
 	github.com/satori/go.uuid v1.2.0
 	github.com/stretchr/testify v1.6.1
 	github.com/urfave/cli v1.22.5
 	github.com/yuin/gopher-lua v0.0.0-20200816102855-ee81675732da // indirect
-	go.mongodb.org/mongo-driver v1.4.2
+	go.mongodb.org/mongo-driver v1.4.4
 )

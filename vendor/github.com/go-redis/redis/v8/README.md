@@ -15,7 +15,7 @@
 
 ## Ecosystem
 
-- [redisext](https://github.com/go-redis/redisext) - tracing using OpenTelemetry and OpenCensus.
+- [Redis Mock](https://github.com/go-redis/redismock).
 - [Distributed Locks](https://github.com/bsm/redislock).
 - [Redis Cache](https://github.com/go-redis/cache).
 - [Rate limiting](https://github.com/go-redis/redis_rate).
@@ -48,7 +48,7 @@ module:
 go mod init github.com/my/repo
 ```
 
-And then install go-redis (note _v8_ in the import; omitting it is a popular mistake):
+And then install go-redis/v8 (note _v8_ in the import; omitting it is a popular mistake):
 
 ```shell
 go get github.com/go-redis/redis/v8
