@@ -2,7 +2,7 @@
 # Apache-2.0
 09e8a9bcec8067104652c168685ab0931e7868f9c8284b66f5ae6edae5f1130b  vendor/github.com/gomodule/redigo/LICENSE
 c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4  vendor/go.opentelemetry.io/otel/LICENSE
-32714818ad6f98ee0185a52e23a475d89122e3efd2b2c26c733781c28e798c99  LICENSE
+b4acfcfa2a0ba1a8c82ec3965fbcee886cff8394ca4214e0ddac0a36beb1e05a  LICENSE
 d5a55eaa82e2c109b8bcadfa66139497511b80d665668264f155b5a45086b086  vendor/github.com/mendersoftware/go-lib-micro/LICENSE
 5e3400b93bbb099e83e52bab885e7441750673c21f97988ca3f1240639b63283  vendor/github.com/spf13/afero/LICENSE.txt
 09e8a9bcec8067104652c168685ab0931e7868f9c8284b66f5ae6edae5f1130b  vendor/github.com/xdg/scram/LICENSE
