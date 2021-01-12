@@ -1,5 +1,7 @@
 variables:
   DOCKER_REPOSITORY: mendersoftware/deviceauth
+  #just to see if will be picked up in downstream pipeline
+  DEBUG_TEST_VAR: var_in_devicauth_gitlab
 
 stages:
   - test_prep
@@ -16,8 +18,11 @@ include:
     file: '.gitlab-ci-check-commits.yml'
   - project: 'Northern.tech/Mender/mendertesting'
     file: '.gitlab-ci-check-license.yml'
-  - project: 'Northern.tech/Mender/mendertesting'
-    file: '.gitlab-ci-check-docker-acceptance.yml'
+
+    #- project: 'Northern.tech/Mender/mendertesting'
+    #file: '.gitlab-ci-check-docker-acceptance.yml'
+  - remote: 'https://raw.githubusercontent.com/mchalski/mendertesting/mender-test-container/.gitlab-ci-check-docker-acceptance.yml'
+
   - project: 'Northern.tech/Mender/mendertesting'
     file: '.gitlab-ci-check-apidocs.yml'
   - project: 'Northern.tech/Mender/mendertesting'
