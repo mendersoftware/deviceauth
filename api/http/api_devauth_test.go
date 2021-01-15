@@ -1,4 +1,4 @@
-// Copyright 2020 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -736,9 +736,9 @@ func TestApiDevAuthVerifyToken(t *testing.T) {
 				"http://1.2.3.4/api/internal/v1/devauth/tokens/verify", nil),
 			code: 429,
 			headers: map[string]string{
-				"authorization":     "dummytoken",
-				"X-Original-Method": "POST",
-				"X-Original-URI":    "/deployments/next",
+				"authorization":      "dummytoken",
+				"X-Forwarded-Method": "POST",
+				"X-Forwarded-Uri":    "/deployments/next",
 			},
 			err: cache.ErrTooManyRequests,
 		},
