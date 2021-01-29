@@ -14,7 +14,7 @@ require (
 	github.com/mendersoftware/go-lib-micro v0.0.0-20201013131806-cf1f6a851bcb
 	github.com/pkg/errors v0.9.1
 	github.com/satori/go.uuid v1.2.0
-	github.com/stretchr/testify v1.6.1
+	github.com/stretchr/testify v1.7.0
 	github.com/urfave/cli v1.22.5
 	github.com/yuin/gopher-lua v0.0.0-20200816102855-ee81675732da // indirect
 	go.mongodb.org/mongo-driver v1.4.5
