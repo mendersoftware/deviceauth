@@ -1,4 +1,4 @@
-// Copyright 2020 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -452,8 +452,8 @@ func (d *DevAuthApiHandlers) VerifyTokenHandler(w rest.ResponseWriter, r *rest.R
 
 	ctx = ctxhttpheader.WithContext(ctx,
 		r.Header,
-		"X-Original-Method",
-		"X-Original-URI")
+		"X-Forwarded-Method",
+		"X-Forwarded-Uri")
 
 	// verify token
 	err = d.devAuth.VerifyToken(ctx, tokenStr)
