@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/mendersoftware/go-lib-micro/addons"
 	"github.com/mendersoftware/go-lib-micro/apiclient"
 	ctxhttpheader "github.com/mendersoftware/go-lib-micro/context/httpheader"
 	"github.com/mendersoftware/go-lib-micro/identity"
@@ -427,13 +428,12 @@ func (d *DevAuth) SubmitAuthRequest(ctx context.Context, r *model.AuthReq) (stri
 		}}
 
 		if d.verifyTenant {
-			ident := identity.FromContext(ctx)
-			if ident != nil && ident.Tenant != "" {
-				token.Claims.Tenant = ident.Tenant
-				token.Claims.Plan = tenant.Plan
-			}
+			token.Claims.Tenant = tenant.ID
+			token.Claims.Plan = tenant.Plan
+			token.Claims.Addons = tenant.Addons
 		} else {
 			token.Claims.Plan = plan.PlanEnterprise
+			token.Addons = addons.AllAddonsEnabled
 		}
 
 		// sign and encode as JWT
