@@ -225,9 +225,9 @@ class TestTokenEnterprise:
         "test_case",
         [
             {
-                "addons": ["troubleshoot"],
-                "forwarded_uri": "/api/devices/v1/deviceconnect/connect",
-                "method": "GET",
+                "addons": ["troubleshoot", "configure"],
+                "forwarded_uri": "/api/devices/v1/deviceconfig/configuration",
+                "method": "PUT",
                 "status_code": 200,
             },
             {
