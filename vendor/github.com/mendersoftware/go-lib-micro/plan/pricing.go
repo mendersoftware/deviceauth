@@ -14,11 +14,11 @@
 package plan
 
 func IsHigherOrEqual(plan string, thenPlan string) bool {
-	if _,ok := PlanWeights[plan]; !ok {
+	if _, ok := PlanWeights[plan]; !ok {
 		return false
 	}
-	if _,ok := PlanWeights[thenPlan]; !ok {
+	if _, ok := PlanWeights[thenPlan]; !ok {
 		return false
 	}
-	return PlanWeights[plan]>=PlanWeights[thenPlan]
+	return PlanWeights[plan] >= PlanWeights[thenPlan]
 }
