@@ -36,6 +36,7 @@ import (
 	"github.com/pkg/errors"
 	"go.mongodb.org/mongo-driver/bson"
 
+	"github.com/mendersoftware/deviceauth/access"
 	"github.com/mendersoftware/deviceauth/cache"
 	"github.com/mendersoftware/deviceauth/client/inventory"
 	"github.com/mendersoftware/deviceauth/client/orchestrator"
@@ -137,6 +138,7 @@ type DevAuth struct {
 	config       Config
 	cache        cache.Cache
 	clock        utils.Clock
+	checker      access.Checker
 }
 
 type Config struct {
@@ -148,10 +150,17 @@ type Config struct {
 	// empty
 	DefaultTenantToken string
 	InventoryAddr      string
+
+	HaveAddons bool
 }
 
 func NewDevAuth(d store.DataStore, co orchestrator.ClientRunner,
 	jwt jwt.Handler, config Config) *DevAuth {
+	// initialize checker using an empty merge (returns nil on validate)
+	checker := access.Merge()
+	if config.HaveAddons {
+		checker = access.NewAddonChecker()
+	}
 
 	return &DevAuth{
 		db:           d,
@@ -162,6 +171,7 @@ func NewDevAuth(d store.DataStore, co orchestrator.ClientRunner,
 		verifyTenant: false,
 		config:       config,
 		clock:        utils.NewClock(),
+		checker:      checker,
 	}
 }
 
@@ -1139,6 +1149,9 @@ func (d *DevAuth) VerifyToken(ctx context.Context, raw string) error {
 	}
 
 	if err := verifyTenantClaim(ctx, d.verifyTenant, token.Claims.Tenant); err != nil {
+		return err
+	}
+	if err = d.checker.ValidateWithContext(ctx); err != nil {
 		return err
 	}
 

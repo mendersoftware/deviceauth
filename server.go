@@ -49,6 +49,7 @@ func SetupAPI(stacktype string) (*rest.Api, error) {
 }
 
 func RunServer(c config.Reader) error {
+	var tenantadmAddr = c.GetString(dconfig.SettingTenantAdmAddr)
 
 	l := log.New(log.Ctx{})
 
@@ -86,15 +87,15 @@ func RunServer(c config.Reader) error {
 			ExpirationTime:     int64(c.GetInt(dconfig.SettingJWTExpirationTimeout)),
 			DefaultTenantToken: c.GetString(dconfig.SettingDefaultTenantToken),
 			InventoryAddr:      config.Config.GetString(dconfig.SettingInventoryAddr),
+
+			HaveAddons: config.Config.GetBool(dconfig.SettingHaveAddons) &&
+				tenantadmAddr != "",
 		})
 
-	if tadmAddr := c.GetString(dconfig.SettingTenantAdmAddr); tadmAddr != "" {
-		l.Infof("settting up tenant verification")
-
+	if tenantadmAddr != "" {
 		tc := tenant.NewClient(tenant.Config{
-			TenantAdmAddr: tadmAddr,
+			TenantAdmAddr: tenantadmAddr,
 		})
-
 		devauth = devauth.WithTenantVerification(tc)
 	}
 

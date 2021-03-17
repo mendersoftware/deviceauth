@@ -1,4 +1,4 @@
-// Copyright 2017 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -16,12 +16,14 @@ package httpheader
 import (
 	"context"
 	"net/http"
+	"net/textproto"
 )
 
 type headerKeyType string
 
 func makeKeyName(hdr string) headerKeyType {
-	return headerKeyType(hdr)
+	key := textproto.CanonicalMIMEHeaderKey(hdr)
+	return headerKeyType(key)
 }
 
 // WithContext stores HTTP headers from `hdrs` which listed in `which` in a

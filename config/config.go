@@ -77,6 +77,11 @@ const (
 
 	SettingRedisLimitsExpSec        = "redis_limits_expire_sec"
 	SettingRedisLimitsExpSecDefault = "1800"
+
+	// SettingHaveAddons is a feature toggle for using addon restrictions.
+	// Has no effect if not running in multi-tenancy context.
+	SettingHaveAddons        = "have_addons"
+	SettingHaveAddonsDefault = false
 )
 
 var (
@@ -102,5 +107,6 @@ var (
 		{Key: SettingRedisTimeoutSec, Value: SettingRedisTimeoutSecDefault},
 		{Key: SettingRedisDb, Value: SettingRedisDbDefault},
 		{Key: SettingRedisLimitsExpSec, Value: SettingRedisLimitsExpSecDefault},
+		{Key: SettingHaveAddons, Value: SettingHaveAddonsDefault},
 	}
 )
