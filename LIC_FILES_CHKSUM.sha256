@@ -80,6 +80,7 @@ da277af11b85227490377fbcac6afccc68be560c4fff36ac05ca62de55345fd7  vendor/github.
 260ffdb7a4ba43069407382e611dab0797bcdabad46deb3d25b36af7f8204f66  vendor/github.com/yuin/gopher-lua/LICENSE
 a94710b55e03b5285f77d048c5ba61bb9d6ee04a06c0eb90e68821e11b0c707a  vendor/gopkg.in/yaml.v2/LICENSE.libyaml
 d18f6323b71b0b768bb5e9616e36da390fbd39369a81807cca352de4e4e6aa0b  vendor/gopkg.in/yaml.v3/LICENSE
+6d13d89b6c33df37f92553cc95cec278d8770ddc78c9de84620cc16dfb48cef6  vendor/github.com/youmark/pkcs8/LICENSE
 #
 # MPL-2.0
 bef1747eda88b9ed46e94830b0d978c3499dad5dfe38d364971760881901dadd  vendor/github.com/hashicorp/hcl/LICENSE
