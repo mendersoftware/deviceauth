@@ -115,7 +115,7 @@ github.com/magefile/mage/sh
 github.com/magiconair/properties
 # github.com/mattn/go-isatty v0.0.12
 github.com/mattn/go-isatty
-# github.com/mendersoftware/go-lib-micro v0.0.0-20210311084510-06d0c5918746
+# github.com/mendersoftware/go-lib-micro v0.0.0-20210317131202-d8b47cfebb37
 ## explicit
 github.com/mendersoftware/go-lib-micro/accesslog
 github.com/mendersoftware/go-lib-micro/addons

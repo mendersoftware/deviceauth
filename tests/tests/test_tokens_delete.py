@@ -17,6 +17,8 @@ import requests
 import json
 import base64
 
+from contextlib import contextmanager
+
 from common import (
     Device,
     DevAuthorizer,
@@ -39,35 +41,50 @@ import orchestrator
 import mockserver
 
 
-def request_token(device, dev_auth, url):
-    tenant_id = ""
-    if isinstance(dev_auth.tenant_token, str):
-        jwt_b64 = dev_auth.tenant_token.split(".")
+@contextmanager
+def mock_tenantadm_auth(tenant_addons):
+    def tenantadm_handler(req):
+        auth = req.headers["Authorization"]
+        # jwt = <header (base64)>.<claims (base64)>.<signature (base64)>
+        jwt_b64 = auth.split(".")
         if len(jwt_b64) > 1:
+            print(jwt_b64)
             # Convert base64 from url- to std-encoding and append padding
-            claims_b64 = jwt_b64[1].replace("+", "-").replace("?", "_") + (
-                "=" * ((4 - (len(dev_auth.tenant_token) % 4)) % 4)
-            )
+            claims_b64 = jwt_b64[1].replace("+", "-").replace("?", "_")
+            # Add padding
+            claims_b64 += "=" * (-len(claims_b64) % 4)
+            # Decode claims
             claims = base64.b64decode(claims_b64)
             d = json.loads(claims)
-            tenant_id = d.get("mender.tenant", tenant_id)
-    handlers = [
-        (
-            "POST",
-            "/api/internal/v1/tenantadm/tenants/verify",
-            lambda _: (
+            tenant_id = d["mender.tenant"]
+            return (
                 200,
                 {},
                 {
                     "id": tenant_id,
                     "name": "Acme",
+                    "addons": [
+                        {"name": addon, "enabled": True} for addon in tenant_addons
+                    ],
                 },
-            ),
-        ),
-    ]
-    with mockserver.run_fake(get_fake_tenantadm_addr(), handlers=handlers) as fake:
+            )
+        else:
+            return (500, {}, {})
+
+    with mockserver.run_fake(
+        get_fake_tenantadm_addr(),
+        handlers=[
+            ("POST", "/api/internal/v1/tenantadm/tenants/verify", tenantadm_handler)
+        ],
+    ) as srv:
+        yield srv
+
+
+def request_token(device, dev_auth, url, tenant_addons=[]):
+    with mock_tenantadm_auth(tenant_addons):
         rsp = device_auth_req(url, dev_auth, device)
         assert rsp.status_code == 200
+
     dev_auth.parse_rsp_payload(device, rsp.text)
     return device.token
 

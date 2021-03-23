@@ -117,3 +117,9 @@
 # Overwrite with environment variable: DEVICEAUTH_REDIS_LIMITS_EXPIRE_SEC
 
 # redis_limits_expire_sec: "1800"
+
+
+#    Enable addon feature restrictions.
+#    Defaults to: false
+#    Overwrite with environment variable: DEVICEAUTH_HAVE_ADDONS
+# have_addons: false
