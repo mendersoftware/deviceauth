@@ -1,4 +1,4 @@
-// Copyright 2020 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -11,6 +11,7 @@
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
+
 package main
 
 import (
@@ -49,6 +50,7 @@ func SetupAPI(stacktype string) (*rest.Api, error) {
 }
 
 func RunServer(c config.Reader) error {
+	var tenantadmAddr = c.GetString(dconfig.SettingTenantAdmAddr)
 
 	l := log.New(log.Ctx{})
 
@@ -86,15 +88,15 @@ func RunServer(c config.Reader) error {
 			ExpirationTime:     int64(c.GetInt(dconfig.SettingJWTExpirationTimeout)),
 			DefaultTenantToken: c.GetString(dconfig.SettingDefaultTenantToken),
 			InventoryAddr:      config.Config.GetString(dconfig.SettingInventoryAddr),
+
+			HaveAddons: config.Config.GetBool(dconfig.SettingHaveAddons) &&
+				tenantadmAddr != "",
 		})
 
-	if tadmAddr := c.GetString(dconfig.SettingTenantAdmAddr); tadmAddr != "" {
-		l.Infof("settting up tenant verification")
-
+	if tenantadmAddr != "" {
 		tc := tenant.NewClient(tenant.Config{
-			TenantAdmAddr: tadmAddr,
+			TenantAdmAddr: tenantadmAddr,
 		})
-
 		devauth = devauth.WithTenantVerification(tc)
 	}
 

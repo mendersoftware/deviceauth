@@ -1,4 +1,4 @@
-// Copyright 2020 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -11,6 +11,7 @@
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
+
 package config
 
 import (
@@ -77,6 +78,11 @@ const (
 
 	SettingRedisLimitsExpSec        = "redis_limits_expire_sec"
 	SettingRedisLimitsExpSecDefault = "1800"
+
+	// SettingHaveAddons is a feature toggle for using addon restrictions.
+	// Has no effect if not running in multi-tenancy context.
+	SettingHaveAddons        = "have_addons"
+	SettingHaveAddonsDefault = false
 )
 
 var (
@@ -102,5 +108,6 @@ var (
 		{Key: SettingRedisTimeoutSec, Value: SettingRedisTimeoutSecDefault},
 		{Key: SettingRedisDb, Value: SettingRedisDbDefault},
 		{Key: SettingRedisLimitsExpSec, Value: SettingRedisLimitsExpSecDefault},
+		{Key: SettingHaveAddons, Value: SettingHaveAddonsDefault},
 	}
 )

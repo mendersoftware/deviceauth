@@ -1,4 +1,4 @@
-// Copyright 2020 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -11,12 +11,14 @@
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
+
 package jwt
 
 import (
 	"encoding/json"
 	"time"
 
+	"github.com/mendersoftware/go-lib-micro/addons"
 	"github.com/mendersoftware/go-lib-micro/mongo/oid"
 )
 
@@ -39,6 +41,8 @@ type Claims struct {
 	Device bool `json:"mender.device,omitempty" bson:"mender.device,omitempty"`
 	// Plan holds the tenant's feature plan claim.
 	Plan string `json:"mender.plan,omitempty"`
+	// Addons contains the settings for addons enabled for the tenant.
+	Addons []addons.Addon `json:"mender.addons,omitempty"`
 }
 
 type Time struct {
