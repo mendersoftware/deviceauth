@@ -1,4 +1,4 @@
-// Copyright 2020 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -840,7 +840,9 @@ func verifyIndexes(t *testing.T, coll *mongo.Collection, expected []mongo.IndexM
 				t.Logf("found same index, comparing")
 				found = true
 				assert.Equal(t, *expectedIdx.Options.Background, idx["background"])
-				assert.Equal(t, *expectedIdx.Options.Unique, idx["unique"])
+				if idx["unique"] != nil {
+					assert.Equal(t, *expectedIdx.Options.Unique, idx["unique"])
+				}
 				break
 			}
 		}
@@ -944,16 +946,28 @@ func TestStoreMigrate(t *testing.T) {
 
 						// verify that all indexes are created
 						verifyIndexes(t, db.client.Database(d).Collection(DbDevicesColl),
-							[]mongo.IndexModel{{
-								Keys: bson.D{
-									{Key: model.DevKeyIdDataSha256, Value: 1},
+							[]mongo.IndexModel{
+								{
+									Keys: bson.D{
+										{Key: model.DevKeyIdDataSha256, Value: 1},
+									},
+									Options: &options.IndexOptions{
+										Background: &_false,
+										Name:       &indexDevices_IdentityDataSha256,
+										Unique:     &_true,
+									},
 								},
-								Options: &options.IndexOptions{
-									Background: &_false,
-									Name:       &indexDevices_IdentityDataSha256,
-									Unique:     &_true,
+								{
+									Keys: bson.D{
+										{Key: model.DevKeyStatus, Value: 1},
+										{Key: model.DevKeyId, Value: 1},
+									},
+									Options: &options.IndexOptions{
+										Background: &_false,
+										Name:       &indexDevices_Status,
+									},
 								},
-							}},
+							},
 						)
 						verifyIndexes(t, db.client.Database(d).Collection(DbAuthSetColl),
 							[]mongo.IndexModel{

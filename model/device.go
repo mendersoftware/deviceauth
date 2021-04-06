@@ -1,4 +1,4 @@
-// Copyright 2020 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -30,6 +30,7 @@ const (
 	DevStatusPreauth  = "preauthorized"
 	DevStatusNoAuth   = "noauth"
 
+	DevKeyId           = "_id"
 	DevKeyIdData       = "id_data"
 	DevKeyIdDataSha256 = "id_data_sha256"
 	DevKeyStatus       = "status"
