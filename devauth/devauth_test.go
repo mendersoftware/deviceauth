@@ -3004,14 +3004,15 @@ func TestDevAuthDeleteAuthSet(t *testing.T) {
 			co.On("SubmitUpdateDeviceStatusJob", ctx,
 				mock.MatchedBy(
 					func(req orchestrator.UpdateDeviceStatusReq) bool {
-						devices, err := json.Marshal([]model.DeviceInventoryUpdate{{Id: tc.devId}})
+						var updates []model.DeviceInventoryUpdate
+						err := json.Unmarshal([]byte(req.Devices), &updates)
 						assert.NoError(t, err)
 						if tc.dbGetDeviceStatusErr == store.ErrAuthSetNotFound {
-							assert.Equal(t, string(devices), req.Devices)
+							assert.Equal(t, tc.devId, updates[0].Id)
 							assert.Equal(t, "noauth", req.Status)
 							return true
 						} else {
-							assert.Equal(t, string(devices), req.Devices)
+							assert.Equal(t, tc.devId, updates[0].Id)
 							assert.Equal(t, tc.dbGetDeviceStatus, req.Status)
 							return true
 						}
