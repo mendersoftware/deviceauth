@@ -4,7 +4,7 @@ COPY . /go/src/github.com/mendersoftware/deviceauth
 RUN cd /go/src/github.com/mendersoftware/deviceauth && \
     env CGO_ENABLED=0 go test -c -o deviceauth-test -coverpkg $(go list ./... | grep -v vendor | grep -v mock | grep -v test | tr  '\n' ,)
 
-FROM alpine:3.13.3
+FROM alpine:3.13.4
 
 EXPOSE 8080
 
