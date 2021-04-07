@@ -1,4 +1,4 @@
-FROM golang:1.15.8-alpine3.12 as builder
+FROM golang:1.16.3-alpine3.12 as builder
 RUN mkdir -p /go/src/github.com/mendersoftware/deviceauth
 WORKDIR /go/src/github.com/mendersoftware/deviceauth
 ADD ./ .
