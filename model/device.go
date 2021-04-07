@@ -83,7 +83,7 @@ func NewDevice(id, id_data, pubkey string) *Device {
 		Id:              id,
 		IdData:          id_data,
 		PubKey:          pubkey,
-		Status:          DevStatusPending,
+		Status:          DevStatusNoAuth,
 		Decommissioning: false,
 		CreatedTs:       now,
 		UpdatedTs:       now,
