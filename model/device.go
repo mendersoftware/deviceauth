@@ -1,4 +1,4 @@
-// Copyright 2020 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -82,7 +82,7 @@ func NewDevice(id, id_data, pubkey string) *Device {
 		Id:              id,
 		IdData:          id_data,
 		PubKey:          pubkey,
-		Status:          DevStatusPending,
+		Status:          DevStatusNoAuth,
 		Decommissioning: false,
 		CreatedTs:       now,
 		UpdatedTs:       now,
