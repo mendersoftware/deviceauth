@@ -437,6 +437,7 @@ func (d *DevAuth) SubmitAuthRequest(ctx context.Context, r *model.AuthReq) (stri
 			token.Claims.Tenant = tenant.ID
 			token.Claims.Plan = tenant.Plan
 			token.Claims.Addons = tenant.Addons
+			token.Claims.Trial = tenant.Trial
 		} else {
 			token.Claims.Plan = plan.PlanEnterprise
 			token.Addons = addons.AllAddonsEnabled

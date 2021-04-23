@@ -61,6 +61,11 @@ func (c addonChecker) ValidateWithContext(ctx context.Context) error {
 		return errors.New("missing tenant context")
 	}
 
+	// sidestep addon validation if the device is in trial mode
+	if id.Trial {
+		return nil
+	}
+
 	for _, rule := range addonRules {
 		if rule.Methods != nil {
 			var applies bool = false

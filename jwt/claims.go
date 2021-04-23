@@ -41,6 +41,8 @@ type Claims struct {
 	Device bool `json:"mender.device,omitempty" bson:"mender.device,omitempty"`
 	// Plan holds the tenant's feature plan claim.
 	Plan string `json:"mender.plan,omitempty"`
+	// Trial claim holds a boolean which is true if the tenant is in trial mode
+	Trial bool `json:"mender.trial" bson:"trial"`
 	// Addons contains the settings for addons enabled for the tenant.
 	Addons []addons.Addon `json:"mender.addons,omitempty"`
 }
