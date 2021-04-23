@@ -30,6 +30,7 @@ type Identity struct {
 	IsDevice bool           `json:"mender.device,omitempty"`
 	Plan     string         `json:"mender.plan,omitempty"`
 	Addons   []addons.Addon `json:"mender.addons,omitempty"`
+	Trial    bool           `json:"mender.trial"`
 }
 
 // ExtractJWTFromHeader inspect the Authorization header for a Bearer token and
