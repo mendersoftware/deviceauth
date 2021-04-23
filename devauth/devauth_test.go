@@ -176,6 +176,8 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 
 		inReq model.AuthReq
 
+		trial bool
+
 		devStatus string
 
 		// key of returned device
@@ -504,6 +506,37 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 
 			res: "dummytoken",
 		},
+		{
+			// a known device of with a correct tenant token, hand
+			// out a token with tenant claim in it
+			desc: "known, accepted, tenant, give out token with tenant claim, trial",
+
+			inReq: model.AuthReq{
+				IdData: idData,
+				// token with the following claims:
+				//   {
+				//      "sub": "bogusdevice",
+				//      "mender.tenant": "foobar"
+				//   }
+				TenantToken: "fake.eyJzdWIiOiJib2d1c2RldmljZSIsIm1lbmRlci50ZW5hbnQiOiJmb29iYXIifQ.fake",
+				PubKey:      pubKey,
+			},
+
+			trial: true,
+
+			addDeviceErr:  store.ErrObjectExists,
+			addAuthSetErr: store.ErrObjectExists,
+
+			getDevByIdKey: pubKey,
+			getDevByKeyId: devId,
+
+			tenantVerify:       true,
+			updateDeviceStatus: true,
+
+			devStatus: model.DevStatusAccepted,
+
+			res: "dummytoken",
+		},
 	}
 
 	for tcidx := range testCases {
@@ -601,7 +634,9 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 					return assert.NotNil(t, jt) &&
 						assert.Equal(t, devUUID, jt.Claims.Subject) &&
 						(tc.tenantVerify == false ||
-							assert.Equal(t, "foobar", jt.Claims.Tenant))
+							assert.Equal(t, "foobar", jt.Claims.Tenant)) &&
+						(tc.tenantVerify == false ||
+							assert.Equal(t, tc.trial, jt.Claims.Trial))
 				})).
 				Return("dummytoken", nil)
 
@@ -631,7 +666,7 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 						mtesting.ContextMatcher(),
 						tc.inReq.TenantToken).
 						Return(
-							&tenant.Tenant{ID: "foobar"},
+							&tenant.Tenant{ID: "foobar", Trial: tc.trial},
 							tc.tenantVerificationErr)
 				}
 				if tc.config.DefaultTenantToken != "" {
