@@ -61,6 +61,23 @@ func TestValidateAddons(t *testing.T) {
 			})
 		}(),
 	}, {
+		Name: "ok, addon disabled but trial mode",
+
+		CTX: func() context.Context {
+			ctx := context.Background()
+			ctx = hdr.WithContext(ctx, http.Header{
+				hdrForwardedMethod: []string{"GET"},
+				hdrForwardedURI: []string{
+					"/api/devices/v1/deviceconfig/configuration",
+				},
+			}, hdrForwardedMethod, hdrForwardedURI)
+			return identity.WithContext(ctx, &identity.Identity{
+				Plan:   plan.PlanEnterprise,
+				Addons: addons.AllAddonsDisabled,
+				Trial:  true,
+			})
+		}(),
+	}, {
 		Name: "error, addon disabled",
 
 		CTX: func() context.Context {
