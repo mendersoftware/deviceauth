@@ -26,6 +26,7 @@ type Tenant struct {
 	Status    string          `json:"status"`
 	Plan      string          `json:"plan"`
 	ApiLimits TenantApiLimits `json:"api_limits"`
+	Trial     bool            `json:"trial"`
 
 	Addons []addons.Addon `json:"addons"`
 }
