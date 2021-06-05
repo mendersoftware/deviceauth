@@ -82,12 +82,6 @@ func MakeErrDevAuthBadRequest(e error) error {
 	return errors.Wrap(e, MsgErrDevAuthBadRequest)
 }
 
-// Expiration Timeout should be moved to database
-// Do we need Expiration Timeout per device?
-const (
-	defaultExpirationTimeout = 3600
-)
-
 // helper for obtaining API clients
 type ApiClientGetter func() apiclient.HttpRunner
 
@@ -979,7 +973,7 @@ func parseIdData(idData string) (map[string]interface{}, []byte, error) {
 	}
 
 	hash := sha256.New()
-	hash.Write([]byte(idData))
+	_, _ = hash.Write([]byte(idData))
 	idDataSha256 = hash.Sum(nil)
 
 	return idDataStruct, idDataSha256, nil
@@ -1138,7 +1132,7 @@ func (d *DevAuth) VerifyToken(ctx context.Context, raw string) error {
 		return jwt.ErrTokenInvalid
 	}
 
-	if token.Claims.Device != true {
+	if !token.Claims.Device {
 		l.Errorf("not a device token")
 		return jwt.ErrTokenInvalid
 	}
