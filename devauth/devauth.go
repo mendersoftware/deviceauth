@@ -1070,23 +1070,23 @@ func (d *DevAuth) PreauthorizeDevice(ctx context.Context, req *model.PreAuthReq)
 }
 
 func (d *DevAuth) RevokeToken(ctx context.Context, tokenID string) error {
-
 	l := log.FromContext(ctx)
 	tokenOID := oid.FromString(tokenID)
 
-	if d.cache != nil {
-		token, err := d.db.GetToken(ctx, tokenOID)
-		if err != nil {
-			return err
-		}
-		err = d.cacheDeleteToken(ctx, token.Claims.Subject.String())
-		if err != nil {
-			return errors.Wrapf(err, "failed to delete token for %s from cache", token.Claims.Subject.String())
-		}
+	var token *jwt.Token
+	token, err := d.db.GetToken(ctx, tokenOID)
+	if err != nil {
+		return err
 	}
 
 	l.Warnf("Revoke token with jti: %s", tokenID)
-	return d.db.DeleteToken(ctx, tokenOID)
+	err = d.db.DeleteToken(ctx, tokenOID)
+
+	if err == nil && d.cache != nil {
+		err = d.cacheDeleteToken(ctx, token.Claims.Subject.String())
+		err = errors.Wrapf(err, "failed to delete token for %s from cache", token.Claims.Subject.String())
+	}
+	return err
 }
 
 func verifyTenantClaim(ctx context.Context, verifyTenant bool, tenant string) error {
