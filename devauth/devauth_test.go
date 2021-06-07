@@ -1059,9 +1059,7 @@ func TestDevAuthPreauthorizeDevice(t *testing.T) {
 		t.Run(fmt.Sprintf("tc: %s", tc.desc), func(t *testing.T) {
 			t.Parallel()
 
-			ctxMatcher := mtesting.ContextMatcher()
-
-			ctxMatcher = mock.MatchedBy(func(c context.Context) bool {
+			ctxMatcher := mock.MatchedBy(func(c context.Context) bool {
 				return true
 			})
 
