@@ -82,12 +82,6 @@ func MakeErrDevAuthBadRequest(e error) error {
 	return errors.Wrap(e, MsgErrDevAuthBadRequest)
 }
 
-// Expiration Timeout should be moved to database
-// Do we need Expiration Timeout per device?
-const (
-	defaultExpirationTimeout = 3600
-)
-
 // helper for obtaining API clients
 type ApiClientGetter func() apiclient.HttpRunner
 
@@ -979,7 +973,7 @@ func parseIdData(idData string) (map[string]interface{}, []byte, error) {
 	}
 
 	hash := sha256.New()
-	hash.Write([]byte(idData))
+	_, _ = hash.Write([]byte(idData))
 	idDataSha256 = hash.Sum(nil)
 
 	return idDataStruct, idDataSha256, nil
@@ -1076,23 +1070,23 @@ func (d *DevAuth) PreauthorizeDevice(ctx context.Context, req *model.PreAuthReq)
 }
 
 func (d *DevAuth) RevokeToken(ctx context.Context, tokenID string) error {
-
 	l := log.FromContext(ctx)
 	tokenOID := oid.FromString(tokenID)
 
-	if d.cache != nil {
-		token, err := d.db.GetToken(ctx, tokenOID)
-		if err != nil {
-			return err
-		}
-		err = d.cacheDeleteToken(ctx, token.Claims.Subject.String())
-		if err != nil {
-			return errors.Wrapf(err, "failed to delete token for %s from cache", token.Claims.Subject.String())
-		}
+	var token *jwt.Token
+	token, err := d.db.GetToken(ctx, tokenOID)
+	if err != nil {
+		return err
 	}
 
 	l.Warnf("Revoke token with jti: %s", tokenID)
-	return d.db.DeleteToken(ctx, tokenOID)
+	err = d.db.DeleteToken(ctx, tokenOID)
+
+	if err == nil && d.cache != nil {
+		err = d.cacheDeleteToken(ctx, token.Claims.Subject.String())
+		err = errors.Wrapf(err, "failed to delete token for %s from cache", token.Claims.Subject.String())
+	}
+	return err
 }
 
 func verifyTenantClaim(ctx context.Context, verifyTenant bool, tenant string) error {
@@ -1138,7 +1132,7 @@ func (d *DevAuth) VerifyToken(ctx context.Context, raw string) error {
 		return jwt.ErrTokenInvalid
 	}
 
-	if token.Claims.Device != true {
+	if !token.Claims.Device {
 		l.Errorf("not a device token")
 		return jwt.ErrTokenInvalid
 	}
