@@ -1,4 +1,4 @@
-// Copyright 2020 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -34,7 +34,7 @@ import (
 const (
 	urlHealth             = "/api/internal/v1/inventory/health"
 	urlPatchAttrs         = "/api/internal/v2/inventory/devices/:id"
-	urlUpdateDeviceStatus = "/api/internal/v1/inventory/tenants/:tid/devices/"
+	urlUpdateDeviceStatus = "/api/internal/v1/inventory/tenants/:tid/devices/status/"
 	urlSetDeviceAttribute = "/api/internal/v1/inventory/tenants/:tid/device/:did/attribute/scope/:scope"
 	defaultTimeout        = 10 * time.Second
 )
