@@ -15,6 +15,7 @@
 package main
 
 import (
+	"crypto/rsa"
 	"net/http"
 	"time"
 
@@ -59,6 +60,15 @@ func RunServer(c config.Reader) error {
 		return errors.Wrap(err, "failed to read rsa private key")
 	}
 
+	fallbackPrivKeyPath := c.GetString(dconfig.SettingServerFallbackPrivKeyPath)
+	var fallbackPrivKey *rsa.PrivateKey
+	if fallbackPrivKeyPath != "" {
+		fallbackPrivKey, err = keys.LoadRSAPrivate(fallbackPrivKeyPath)
+		if err != nil {
+			return errors.Wrap(err, "failed to read fallback rsa private key")
+		}
+	}
+
 	db, err := mongo.NewDataStoreMongo(
 		mongo.DataStoreMongoConfig{
 			ConnectionString: c.GetString(dconfig.SettingDb),
@@ -73,7 +83,7 @@ func RunServer(c config.Reader) error {
 		return errors.Wrap(err, "database connection failed")
 	}
 
-	jwtHandler := jwt.NewJWTHandlerRS256(privKey)
+	jwtHandler := jwt.NewJWTHandlerRS256(privKey, fallbackPrivKey)
 
 	orchClientConf := orchestrator.Config{
 		OrchestratorAddr: c.GetString(dconfig.SettingOrchestratorAddr),

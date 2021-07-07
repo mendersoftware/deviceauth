@@ -68,8 +68,15 @@
 
 # Private key path - used for JWT signing
 # Defaults to: /etc/deviceauth/rsa/private.pem
+# Overwrite with environment variable: DEVICEAUTH_SERVER_PRIV_KEY_PATH
 
 # server_priv_key_path: /etc/deviceauth/rsa/private.pem
+
+# Fallback private key path - used for JWT verification
+# Defaults to: none
+# Overwrite with environment variable: DEVICEAUTH_SERVER_FALLBACK_PRIV_KEY_PATH
+
+# server_fallback_priv_key_path: /etc/deviceauth/rsa/private-fallback.pem
 
 # JWT issuer ('iss' claim)
 # Defaults to: Mender

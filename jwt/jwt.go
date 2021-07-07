@@ -1,4 +1,4 @@
-// Copyright 2020 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -38,12 +38,14 @@ type Handler interface {
 
 // JWTHandlerRS256 is an RS256-specific JWTHandler
 type JWTHandlerRS256 struct {
-	privKey *rsa.PrivateKey
+	privKey         *rsa.PrivateKey
+	fallbackPrivKey *rsa.PrivateKey
 }
 
-func NewJWTHandlerRS256(privKey *rsa.PrivateKey) *JWTHandlerRS256 {
+func NewJWTHandlerRS256(privKey *rsa.PrivateKey, fallbackPrivKey *rsa.PrivateKey) *JWTHandlerRS256 {
 	return &JWTHandlerRS256{
-		privKey: privKey,
+		privKey:         privKey,
+		fallbackPrivKey: fallbackPrivKey,
 	}
 }
 
@@ -57,14 +59,26 @@ func (j *JWTHandlerRS256) ToJWT(token *Token) (string, error) {
 }
 
 func (j *JWTHandlerRS256) FromJWT(tokstr string) (*Token, error) {
-	jwttoken, err := jwtgo.ParseWithClaims(tokstr, &Claims{},
-		func(token *jwtgo.Token) (interface{}, error) {
-			if _, ok := token.Method.(*jwtgo.SigningMethodRSA); !ok {
-				return nil, errors.New("unexpected signing method: " + token.Method.Alg())
+	var err error
+	var jwttoken *jwtgo.Token
+	for _, privKey := range []*rsa.PrivateKey{
+		j.privKey,
+		j.fallbackPrivKey,
+	} {
+		if privKey != nil {
+			jwttoken, err = jwtgo.ParseWithClaims(tokstr, &Claims{},
+				func(token *jwtgo.Token) (interface{}, error) {
+					if _, ok := token.Method.(*jwtgo.SigningMethodRSA); !ok {
+						return nil, errors.New("unexpected signing method: " + token.Method.Alg())
+					}
+					return &privKey.PublicKey, nil
+				},
+			)
+			if jwttoken != nil && err == nil {
+				break
 			}
-			return &j.privKey.PublicKey, nil
-		},
-	)
+		}
+	}
 
 	// our Claims return Mender-specific validation errors
 	// go-jwt will wrap them in a generic ValidationError - unwrap and return directly

@@ -55,6 +55,9 @@ const (
 	SettingServerPrivKeyPath        = "server_priv_key_path"
 	SettingServerPrivKeyPathDefault = "/etc/deviceauth/rsa/private.pem"
 
+	SettingServerFallbackPrivKeyPath        = "server_fallback_priv_key_path"
+	SettingServerFallbackPrivKeyPathDefault = ""
+
 	SettingJWTIssuer        = "jwt_issuer"
 	SettingJWTIssuerDefault = "Mender"
 
@@ -97,6 +100,7 @@ var (
 		{Key: SettingTenantAdmAddr, Value: SettingTenantAdmAddrDefault},
 		{Key: SettingDefaultTenantToken, Value: SettingDefaultTenantTokenDefault},
 		{Key: SettingServerPrivKeyPath, Value: SettingServerPrivKeyPathDefault},
+		{Key: SettingServerFallbackPrivKeyPath, Value: SettingServerFallbackPrivKeyPathDefault},
 		{Key: SettingJWTIssuer, Value: SettingJWTIssuerDefault},
 		{Key: SettingJWTExpirationTimeout, Value: SettingJWTExpirationTimeoutDefault},
 		{Key: SettingDbSSL, Value: SettingDbSSLDefault},
