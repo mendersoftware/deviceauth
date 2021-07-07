@@ -28,8 +28,6 @@ paths:
   /auth_requests:
     post:
       operationId: Authenticate Device
-      security:
-        - DeviceJWT: []
       tags:
         - Device API
       summary: Submit an authentication request
