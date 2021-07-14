@@ -1,4 +1,4 @@
-// Copyright 2020 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ import (
 
 func TestNewJWTHandlerRS256(t *testing.T) {
 	privKey := loadPrivKey("./testdata/private.pem", t)
-	jwtHandler := NewJWTHandlerRS256(privKey)
+	jwtHandler := NewJWTHandlerRS256(privKey, nil)
 
 	assert.NotNil(t, jwtHandler)
 }
@@ -66,7 +66,7 @@ func TestJWTHandlerRS256GenerateToken(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Logf("test case: %s", name)
-		jwtHandler := NewJWTHandlerRS256(tc.privKey)
+		jwtHandler := NewJWTHandlerRS256(tc.privKey, nil)
 
 		raw, err := jwtHandler.ToJWT(&Token{
 			Claims: tc.claims,
@@ -90,9 +90,11 @@ func TestJWTHandlerRS256GenerateToken(t *testing.T) {
 func TestJWTHandlerRS256FromJWT(t *testing.T) {
 
 	key := loadPrivKey("./testdata/private.pem", t)
+	keyAlternative := loadPrivKey("./testdata/private_alternative.pem", t)
 
 	testCases := map[string]struct {
-		privKey *rsa.PrivateKey
+		privKey         *rsa.PrivateKey
+		fallbackPrivKey *rsa.PrivateKey
 
 		inToken string
 
@@ -170,6 +172,84 @@ func TestJWTHandlerRS256FromJWT(t *testing.T) {
 				},
 			},
 		},
+		"ok (fallback not used)": {
+			privKey:         key,
+			fallbackPrivKey: keyAlternative,
+
+			inToken: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdW" +
+				"QiOiJNZW5kZXIiLCJleHAiOjQxNDc0ODM2NDcsImp0aS" +
+				"I6ImI5NDc1MzM2LWRkZTYtNTQ5Ny04MDQ0LTUxYWE5ZG" +
+				"RjMDJmOCIsImlhdCI6MTIzNDU2NywiaXNzIjoiTWVuZG" +
+				"VyIiwibmJmIjoxMjM0NTY3OCwic3ViIjoiYmNhOTVhZG" +
+				"ItYjVmMS01NjRmLTk2YTctNjM1NWM1MmQxZmE3Iiwic2" +
+				"NwIjoibWVuZGVyLioifQ.bEvw5q8Ohf_3DOw77EDeOTq" +
+				"99_JKUDz1YhCpJ5NaKPtMGmTksZIDoc6vk_lFyrPWzXm" +
+				"lmbiCB8bEYI2-QGe2XwTnCkWm8YPxTFJw3UriZLt-5Pw" +
+				"cEBDPG8FqTMtFaRjcbH-E7W7m_KT_Tm6fm93Vvqv_z6a" +
+				"JiCOL7e16sLC0DQCJ2nZ4OleztNDkP4rCOgtBuSbhOaR" +
+				"E_zhSsLf2Dj4Dlt5DVqDd8kqUBmA9-Sn9m5BeCUs023_" +
+				"W4FWOH4NJpqyxjO0jXGoncvZu0AYPqHSbJ9J6Oucvc4y" +
+				"lpbrCHN4diQ39s2egWzRbrSORsr-IL3hb1PZTINzLlQE" +
+				"6Wol2S-I8ag",
+
+			outToken: Token{
+				Claims: Claims{
+					ID:       oid.NewUUIDv5("someid"),
+					Subject:  oid.NewUUIDv5("foo"),
+					Audience: "Mender",
+					ExpiresAt: Time{
+						Time: time.Unix(4147483647, 0),
+					},
+					IssuedAt: Time{
+						Time: time.Unix(1234567, 0),
+					},
+					Issuer: "Mender",
+					NotBefore: Time{
+						Time: time.Unix(12345678, 0),
+					},
+					Scope: "mender.*",
+				},
+			},
+		},
+		"ok (fallback used)": {
+			privKey:         keyAlternative,
+			fallbackPrivKey: key,
+
+			inToken: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdW" +
+				"QiOiJNZW5kZXIiLCJleHAiOjQxNDc0ODM2NDcsImp0aS" +
+				"I6ImI5NDc1MzM2LWRkZTYtNTQ5Ny04MDQ0LTUxYWE5ZG" +
+				"RjMDJmOCIsImlhdCI6MTIzNDU2NywiaXNzIjoiTWVuZG" +
+				"VyIiwibmJmIjoxMjM0NTY3OCwic3ViIjoiYmNhOTVhZG" +
+				"ItYjVmMS01NjRmLTk2YTctNjM1NWM1MmQxZmE3Iiwic2" +
+				"NwIjoibWVuZGVyLioifQ.bEvw5q8Ohf_3DOw77EDeOTq" +
+				"99_JKUDz1YhCpJ5NaKPtMGmTksZIDoc6vk_lFyrPWzXm" +
+				"lmbiCB8bEYI2-QGe2XwTnCkWm8YPxTFJw3UriZLt-5Pw" +
+				"cEBDPG8FqTMtFaRjcbH-E7W7m_KT_Tm6fm93Vvqv_z6a" +
+				"JiCOL7e16sLC0DQCJ2nZ4OleztNDkP4rCOgtBuSbhOaR" +
+				"E_zhSsLf2Dj4Dlt5DVqDd8kqUBmA9-Sn9m5BeCUs023_" +
+				"W4FWOH4NJpqyxjO0jXGoncvZu0AYPqHSbJ9J6Oucvc4y" +
+				"lpbrCHN4diQ39s2egWzRbrSORsr-IL3hb1PZTINzLlQE" +
+				"6Wol2S-I8ag",
+
+			outToken: Token{
+				Claims: Claims{
+					ID:       oid.NewUUIDv5("someid"),
+					Subject:  oid.NewUUIDv5("foo"),
+					Audience: "Mender",
+					ExpiresAt: Time{
+						Time: time.Unix(4147483647, 0),
+					},
+					IssuedAt: Time{
+						Time: time.Unix(1234567, 0),
+					},
+					Issuer: "Mender",
+					NotBefore: Time{
+						Time: time.Unix(12345678, 0),
+					},
+					Scope: "mender.*",
+				},
+			},
+		},
 		"error - token invalid": {
 			privKey: key,
 
@@ -182,7 +262,7 @@ func TestJWTHandlerRS256FromJWT(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Logf("test case: %s", name)
-		jwtHandler := NewJWTHandlerRS256(tc.privKey)
+		jwtHandler := NewJWTHandlerRS256(tc.privKey, tc.fallbackPrivKey)
 
 		token, err := jwtHandler.FromJWT(tc.inToken)
 		if tc.outErr == nil {
