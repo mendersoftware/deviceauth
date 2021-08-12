@@ -16,7 +16,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"net/http"
 
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/mendersoftware/go-lib-micro/accesslog"
@@ -61,50 +60,6 @@ var (
 	}
 
 	commonStack = []rest.Middleware{
-		// CORS
-		&rest.CorsMiddleware{
-			RejectNonCorsRequests: false,
-
-			// Should be tested with some list
-			OriginValidator: func(origin string, request *rest.Request) bool {
-				// Accept all requests
-				return true
-			},
-
-			// Preflight request cache length
-			AccessControlMaxAge: 60,
-
-			// Allow authentication requests
-			AccessControlAllowCredentials: true,
-
-			// Allowed headers
-			AllowedMethods: []string{
-				http.MethodGet,
-				http.MethodPost,
-				http.MethodPut,
-				http.MethodDelete,
-				http.MethodOptions,
-			},
-
-			// Allowed headers
-			AllowedHeaders: []string{
-				"Accept",
-				"Allow",
-				"Content-Type",
-				"Origin",
-				"Authorization",
-				"Accept-Encoding",
-				"Access-Control-Request-Headers",
-				"Header-Access-Control-Request",
-			},
-
-			// Headers that can be exposed to JS
-			AccessControlExposeHeaders: []string{
-				"Location",
-				"Link",
-			},
-		},
-
 		// verifies the request Content-Type header
 		// The expected Content-Type is 'application/json'
 		// if the content is non-null
