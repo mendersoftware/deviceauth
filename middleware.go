@@ -21,7 +21,6 @@ import (
 	"github.com/mendersoftware/go-lib-micro/accesslog"
 	mctx "github.com/mendersoftware/go-lib-micro/context"
 	ctxhttpheader "github.com/mendersoftware/go-lib-micro/context/httpheader"
-	"github.com/mendersoftware/go-lib-micro/customheader"
 	"github.com/mendersoftware/go-lib-micro/identity"
 	dlog "github.com/mendersoftware/go-lib-micro/log"
 	"github.com/mendersoftware/go-lib-micro/requestid"
@@ -84,11 +83,6 @@ var (
 func SetupMiddleware(api *rest.Api, mwtype string) error {
 
 	l := dlog.New(dlog.Ctx{})
-
-	api.Use(&customheader.CustomHeaderMiddleware{
-		HeaderName:  "X-AUTHENTICATION-VERSION",
-		HeaderValue: CreateVersionString(),
-	})
 
 	l.Infof("setting up %s middleware", mwtype)
 
