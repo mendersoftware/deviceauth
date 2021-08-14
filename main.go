@@ -1,4 +1,4 @@
-// Copyright 2020 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -41,7 +41,6 @@ func doMain(args []string) {
 
 	app := cli.NewApp()
 	app.Usage = "Device Authentication Service"
-	app.Version = CreateVersionString()
 
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
@@ -219,8 +218,7 @@ func cmdServer(args *cli.Context) error {
 			3)
 	}
 
-	l.Printf("Device Authentication Service, version %s starting up",
-		CreateVersionString())
+	l.Print("Device Authentication Service starting up")
 
 	err = RunServer(config.Config)
 	if err != nil {
