@@ -1166,6 +1166,7 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 			aset: &model.AuthSet{
 				Id:       dummyAuthID,
 				DeviceId: dummyDevID,
+				Status:   model.DevStatusPending,
 			},
 			dev: &model.Device{
 				Id:     dummyDevID,
@@ -1177,6 +1178,20 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 			aset: &model.AuthSet{
 				Id:       dummyAuthID,
 				DeviceId: dummyDevID,
+				Status:   model.DevStatusPreauth,
+			},
+			dev: &model.Device{
+				Id:     dummyDevID,
+				Status: model.DevStatusPreauth,
+			},
+			dbLimit: &model.Limit{Value: 0},
+			outErr:  "dev auth: bad request",
+		},
+		{
+			aset: &model.AuthSet{
+				Id:       dummyAuthID,
+				DeviceId: dummyDevID,
+				Status:   model.DevStatusPending,
 			},
 			dev: &model.Device{
 				Id:     dummyDevID,
@@ -1217,6 +1232,7 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 			aset: &model.AuthSet{
 				Id:       dummyAuthID,
 				DeviceId: dummyDevID,
+				Status:   model.DevStatusPending,
 			},
 			dev: &model.Device{
 				Id:     dummyDevID,
@@ -1230,6 +1246,7 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 			aset: &model.AuthSet{
 				Id:       dummyAuthID,
 				DeviceId: dummyDevID,
+				Status:   model.DevStatusPending,
 			},
 			dev: &model.Device{
 				Id:     dummyDevID,
@@ -1243,6 +1260,7 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 			aset: &model.AuthSet{
 				Id:       dummyAuthID,
 				DeviceId: dummyDevID,
+				Status:   model.DevStatusPending,
 			},
 			dev: &model.Device{
 				Id:     dummyDevID,
@@ -1256,6 +1274,7 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 			aset: &model.AuthSet{
 				Id:       dummyAuthID,
 				DeviceId: dummyDevID,
+				Status:   model.DevStatusPending,
 			},
 			dev: &model.Device{
 				Id:     dummyDevID,
@@ -1275,6 +1294,7 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 			aset: &model.AuthSet{
 				Id:       dummyAuthID,
 				DeviceId: dummyDevID,
+				Status:   model.DevStatusPending,
 			},
 			dev: &model.Device{
 				Id:     dummyDevID,
@@ -1288,6 +1308,7 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 			aset: &model.AuthSet{
 				Id:       dummyAuthID,
 				DeviceId: dummyDevID,
+				Status:   model.DevStatusPending,
 			},
 			dev: &model.Device{
 				Id:     dummyDevID,
@@ -1301,6 +1322,7 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 			aset: &model.AuthSet{
 				Id:       dummyAuthID,
 				DeviceId: dummyDevID,
+				Status:   model.DevStatusPending,
 			},
 			dev: &model.Device{
 				Id:     dummyDevID,
@@ -1313,6 +1335,7 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 			aset: &model.AuthSet{
 				Id:       dummyAuthID,
 				DeviceId: dummyDevID,
+				Status:   model.DevStatusPending,
 			},
 			dev: &model.Device{
 				Id:     dummyDevID,
@@ -1325,6 +1348,7 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 			aset: &model.AuthSet{
 				Id:       dummyAuthID,
 				DeviceId: dummyDevID,
+				Status:   model.DevStatusPending,
 			},
 			dbLimit:            &model.Limit{Value: 5},
 			dbCount:            4,
@@ -1421,12 +1445,14 @@ func TestDevAuthRejectDevice(t *testing.T) {
 			aset: &model.AuthSet{
 				Id:       dummyAuthID,
 				DeviceId: dummyDevID,
+				Status:   model.DevStatusAccepted,
 			},
 		},
 		{
 			aset: &model.AuthSet{
 				Id:       dummyAuthID,
 				DeviceId: dummyDevID,
+				Status:   model.DevStatusAccepted,
 			},
 			withCache:      true,
 			tenant:         "acme",
@@ -1437,6 +1463,7 @@ func TestDevAuthRejectDevice(t *testing.T) {
 			aset: &model.AuthSet{
 				Id:       dummyAuthID,
 				DeviceId: dummyDevID,
+				Status:   model.DevStatusAccepted,
 			},
 			withCache: true,
 			outErr:    "failed to delete token for 9c5df658-26ff-55e1-87a1-6780ca473154 from cache: can't unpack tenant identity data from context",
@@ -1445,6 +1472,7 @@ func TestDevAuthRejectDevice(t *testing.T) {
 			aset: &model.AuthSet{
 				Id:       dummyAuthID,
 				DeviceId: dummyDevID,
+				Status:   model.DevStatusAccepted,
 			},
 			withCache: true,
 			tenant:    "acme",
@@ -1458,6 +1486,7 @@ func TestDevAuthRejectDevice(t *testing.T) {
 			aset: &model.AuthSet{
 				Id:       dummyAuthID,
 				DeviceId: dummyDevID,
+				Status:   model.DevStatusAccepted,
 			},
 			dbDelDevTokenErr: store.ErrTokenNotFound,
 		},
@@ -1465,10 +1494,18 @@ func TestDevAuthRejectDevice(t *testing.T) {
 			aset: &model.AuthSet{
 				Id:       dummyAuthID,
 				DeviceId: dummyDevID,
-				Status:   "accepted",
+				Status:   model.DevStatusAccepted,
 			},
 			dbDelDevTokenErr: errors.New("some error"),
 			outErr:           "db delete device token error: some error",
+		},
+		{
+			aset: &model.AuthSet{
+				Id:       dummyAuthID,
+				DeviceId: dummyDevID,
+				Status:   model.DevStatusPreauth,
+			},
+			outErr: "dev auth: bad request",
 		},
 	}
 
