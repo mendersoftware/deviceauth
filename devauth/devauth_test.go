@@ -2459,9 +2459,8 @@ func TestDevAuthDecommissionDevice(t *testing.T) {
 			co := morchestrator.ClientRunner{}
 			co.On("SubmitDeviceDecommisioningJob", ctx,
 				orchestrator.DecommissioningReq{
-					DeviceId:      tc.devId,
-					Authorization: tc.coAuthorization,
-					TenantID:      tc.tenant,
+					DeviceId: tc.devId,
+					TenantID: tc.tenant,
 				}).
 				Return(tc.coSubmitDeviceDecommisioningJobErr)
 

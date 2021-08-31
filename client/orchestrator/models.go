@@ -1,4 +1,4 @@
-// Copyright 2020 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -24,9 +24,6 @@ type DecommissioningReq struct {
 	DeviceId string `json:"device_id"`
 	// Request ID
 	RequestId string `json:"request_id"`
-	// User authorization, eg. the value of Authorization header of incoming
-	// HTTP request
-	Authorization string `json:"authorization"`
 	// TenantID
 	TenantID string `json:"tenant_id"`
 }
@@ -35,9 +32,6 @@ type DecommissioningReq struct {
 type ProvisionDeviceReq struct {
 	// Request ID
 	RequestId string `json:"request_id"`
-	// User authorization, eg. the value of Authorization header of incoming
-	// HTTP request
-	Authorization string `json:"authorization"`
 	// DeviceID
 	DeviceID string `json:"device_id"`
 	// TenantID
