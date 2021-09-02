@@ -515,10 +515,9 @@ func (d *DevAuth) processPreAuthRequest(ctx context.Context, r *model.AuthReq) (
 		if err := d.cOrch.SubmitProvisionDeviceJob(
 			ctx,
 			orchestrator.ProvisionDeviceReq{
-				RequestId:     reqId,
-				Authorization: ctxhttpheader.FromContext(ctx, "Authorization"),
-				DeviceID:      aset.DeviceId,
-				TenantID:      tenantID,
+				RequestId: reqId,
+				DeviceID:  aset.DeviceId,
+				TenantID:  tenantID,
 			}); err != nil {
 			return nil, errors.Wrap(err, "submit device provisioning job error")
 		}
@@ -713,10 +712,9 @@ func (d *DevAuth) DecommissionDevice(ctx context.Context, devID string) error {
 	if err := d.cOrch.SubmitDeviceDecommisioningJob(
 		ctx,
 		orchestrator.DecommissioningReq{
-			DeviceId:      devID,
-			RequestId:     reqId,
-			Authorization: ctxhttpheader.FromContext(ctx, "Authorization"),
-			TenantID:      tenantID,
+			DeviceId:  devID,
+			RequestId: reqId,
+			TenantID:  tenantID,
 		}); err != nil {
 		return errors.Wrap(err, "submit device decommissioning job error")
 	}
@@ -878,10 +876,9 @@ func (d *DevAuth) AcceptDeviceAuth(ctx context.Context, device_id string, auth_i
 	if err := d.cOrch.SubmitProvisionDeviceJob(
 		ctx,
 		orchestrator.ProvisionDeviceReq{
-			RequestId:     reqId,
-			Authorization: ctxhttpheader.FromContext(ctx, "Authorization"),
-			DeviceID:      aset.DeviceId,
-			TenantID:      tenantID,
+			RequestId: reqId,
+			DeviceID:  aset.DeviceId,
+			TenantID:  tenantID,
 		}); err != nil {
 		return errors.Wrap(err, "submit device provisioning job error")
 	}

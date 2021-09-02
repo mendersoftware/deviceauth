@@ -46,8 +46,6 @@ def decommission_device_handler(device_id=None, status=200):
         assert dreq.get("device_id", None) == device_id
         # test is enforcing particular request ID
         assert dreq.get("request_id", None) == "delete_device"
-        # test is enforcing particular request ID
-        assert dreq.get("authorization", None) == "Bearer foobar"
         return (status, {}, "")
 
     return _decommission_device
