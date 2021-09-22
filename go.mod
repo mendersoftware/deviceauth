@@ -10,12 +10,12 @@ require (
 	github.com/asaskevich/govalidator v0.0.0-20180315120708-ccb8e960c48f
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/go-redis/redis/v8 v8.11.0
-	github.com/gomodule/redigo v1.8.4 // indirect
-	github.com/mendersoftware/go-lib-micro v0.0.0-20210415085542-cde9a9910cf6
+	github.com/gomodule/redigo v1.8.5 // indirect
+	github.com/mendersoftware/go-lib-micro v0.0.0-20210914080905-f12605450a77
 	github.com/pkg/errors v0.9.1
 	github.com/satori/go.uuid v1.2.0
 	github.com/stretchr/testify v1.7.0
 	github.com/urfave/cli v1.22.5
-	github.com/yuin/gopher-lua v0.0.0-20200816102855-ee81675732da // indirect
-	go.mongodb.org/mongo-driver v1.5.4
+	github.com/yuin/gopher-lua v0.0.0-20210529063254-f4c35e4016d9 // indirect
+	go.mongodb.org/mongo-driver v1.7.2
 )
