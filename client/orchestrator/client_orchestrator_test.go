@@ -1,4 +1,4 @@
-// Copyright 2020 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -231,7 +231,6 @@ func TestSubmitDeviceLimitWarning(t *testing.T) {
 
 		CTX: context.Background(),
 		DeviceLimitWarning: DeviceLimitWarning{
-			SenderEmail:    "support@mender.io",
 			RecipientEmail: "user@acme.io",
 
 			Subject: "Your approaching your device limit.",
@@ -259,12 +258,11 @@ func TestSubmitDeviceLimitWarning(t *testing.T) {
 		Error: errors.New(
 			`workflows: \[internal\] invalid request argument: ` +
 				`invalid device limit request: ` +
-				`missing parameter "from"`),
+				`missing parameter "to"`),
 	}, {
 		Name: "error, bad URL",
 
 		DeviceLimitWarning: DeviceLimitWarning{
-			SenderEmail:    "support@mender.io",
 			RecipientEmail: "user@acme.io",
 
 			Subject:  "Your approaching your device limit.",
@@ -285,7 +283,6 @@ func TestSubmitDeviceLimitWarning(t *testing.T) {
 		Name: "error, context canceled",
 
 		DeviceLimitWarning: DeviceLimitWarning{
-			SenderEmail:    "support@mender.io",
 			RecipientEmail: "user@acme.io",
 
 			Subject:  "Your approaching your device limit.",
@@ -310,7 +307,6 @@ func TestSubmitDeviceLimitWarning(t *testing.T) {
 
 		CTX: context.Background(),
 		DeviceLimitWarning: DeviceLimitWarning{
-			SenderEmail:    "support@mender.io",
 			RecipientEmail: "user@acme.io",
 
 			Subject:  "Your approaching your device limit.",
@@ -342,7 +338,6 @@ func TestSubmitDeviceLimitWarning(t *testing.T) {
 
 		CTX: context.Background(),
 		DeviceLimitWarning: DeviceLimitWarning{
-			SenderEmail:    "support@mender.io",
 			RecipientEmail: "user@acme.io",
 
 			Subject:  "Your approaching your device limit.",
