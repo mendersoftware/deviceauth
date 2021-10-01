@@ -54,7 +54,6 @@ type UpdateDeviceStatusReq struct {
 type DeviceLimitWarning struct {
 	RequestID string `json:"request_id"`
 
-	SenderEmail    string `json:"from"`
 	RecipientEmail string `json:"to"`
 
 	Subject          string `json:"subject"`
@@ -65,9 +64,6 @@ type DeviceLimitWarning struct {
 
 func (dl *DeviceLimitWarning) Validate() error {
 	const ErrMsgFmt = `invalid device limit request: missing parameter "%s"`
-	if len(dl.SenderEmail) <= 0 {
-		return errors.Errorf(ErrMsgFmt, "from")
-	}
 	if len(dl.RecipientEmail) <= 0 {
 		return errors.Errorf(ErrMsgFmt, "to")
 	}

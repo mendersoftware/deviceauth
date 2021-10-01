@@ -1,4 +1,4 @@
-// Copyright 2020 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -435,7 +435,6 @@ func idDataToInventoryAttrs(id map[string]interface{}) ([]cinv.Attribute, error)
 }
 
 const (
-	WorkflowsDeviceLimitSender  = "support@mender.io"
 	WorkflowsDeviceLimitText    = "@/etc/workflows-enterprise/data/device_limit_email.txt"
 	WorkflowsDeviceLimitHTML    = "@/etc/workflows-enterprise/data/device_limit_email.html"
 	WorkflowsDeviceLimitSubject = "Device limit almost reached"
@@ -458,7 +457,6 @@ func warnTenantUsers(
 			RequestID:      "deviceAuthAdmin",
 			RecipientEmail: users[i].Email,
 
-			SenderEmail:      WorkflowsDeviceLimitSender,
 			Subject:          WorkflowsDeviceLimitSubject,
 			Body:             WorkflowsDeviceLimitText,
 			BodyHTML:         WorkflowsDeviceLimitHTML,
