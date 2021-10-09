@@ -37,7 +37,7 @@ paths:
 
         Unless the device is pre-authorized, the very first authentication request from a device will
         always result in a 'HTTP 401 Unauthorized' response. At the same time, the identity data is recorded for
-        later inspection by the user, who can then explicitly accepts or rejects the device via the web GUI.
+        later inspection by the user, who can then explicitly accept or reject the device via the web GUI.
         A subsequent authentication request will reflect this decision.
 
         Note that when the JWT expires, the device must renew the JWT by sending a new authentication request.
