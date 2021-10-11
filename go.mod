@@ -9,7 +9,7 @@ require (
 	github.com/ant0ine/go-json-rest v3.3.3-0.20170913041208-ebb33769ae01+incompatible
 	github.com/asaskevich/govalidator v0.0.0-20180315120708-ccb8e960c48f
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
-	github.com/go-redis/redis/v8 v8.11.0
+	github.com/go-redis/redis/v8 v8.11.4
 	github.com/gomodule/redigo v1.8.5 // indirect
 	github.com/mendersoftware/go-lib-micro v0.0.0-20210914080905-f12605450a77
 	github.com/pkg/errors v0.9.1
