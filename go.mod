@@ -1,6 +1,6 @@
 module github.com/mendersoftware/deviceauth
 
-go 1.14
+go 1.16
 
 require (
 	github.com/Azure/go-autorest/autorest/to v0.4.0
