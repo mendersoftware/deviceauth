@@ -14,11 +14,14 @@
 package model
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"net/url"
 	"time"
 
 	"github.com/asaskevich/govalidator"
+	validation "github.com/go-ozzo/ozzo-validation/v4"
+	"github.com/google/uuid"
 	"github.com/mendersoftware/go-lib-micro/ratelimits"
 	"github.com/pkg/errors"
 )
@@ -59,11 +62,66 @@ type Device struct {
 	CreatedTs       time.Time              `json:"created_ts" bson:"created_ts,omitempty"`
 	UpdatedTs       time.Time              `json:"updated_ts" bson:"updated_ts,omitempty"`
 	AuthSets        []AuthSet              `json:"auth_sets" bson:"-"`
+	External        *ExternalDevice        `json:"external,omitempty" bson:"external,omitempty"`
 	//ApiLimits override tenant-wide quota/burst config
 	ApiLimits ratelimits.ApiLimits `json:"-" bson:"api_limits"`
 
 	//object revision which we use when synchronizint status with inventory service
 	Revision uint `json:"-" bson:"revision"`
+}
+
+type ExternalDevice struct {
+	ID       string `json:"id" bson:"id"`
+	Provider string `json:"provider" bson:"provider"`
+	Name     string `json:"name,omitempty" bson:"name,omitempty"`
+}
+
+func (ext ExternalDevice) Validate() error {
+	return validation.ValidateStruct(&ext,
+		validation.Field(&ext.ID, validation.Required),
+		validation.Field(&ext.Provider, validation.Required),
+		validation.Field(&ext.Name, validation.Required),
+	)
+}
+
+func (ext ExternalDevice) IDData() map[string]interface{} {
+	m := map[string]interface{}{
+		"external_id":       ext.ID,
+		"external_provider": ext.Provider,
+	}
+	if ext.Name != "" {
+		m["external_name"] = ext.Name
+	}
+
+	return m
+}
+
+type ExternalDeviceRequest struct {
+	ExternalDevice
+	IDData map[string]interface{} `json:"id_data"`
+}
+
+func (ext ExternalDeviceRequest) Validate() error {
+	return validation.ValidateStruct(&ext,
+		validation.Field(&ext.ExternalDevice),
+	)
+}
+
+func (ext ExternalDeviceRequest) NewDevice() *Device {
+	id := uuid.New()
+	var idData map[string]interface{} = ext.IDData
+	if len(idData) == 0 {
+		idData = ext.ExternalDevice.IDData()
+	}
+	b, _ := json.Marshal(idData)
+	dev := NewDevice(id.String(), string(b), "")
+	chksum := sha256.New()
+	chksum.Write(b)
+	dev.IdDataSha256 = chksum.Sum(nil)
+	dev.IdDataStruct = idData
+	dev.Status = DevStatusAccepted
+	dev.External = &ext.ExternalDevice
+	return dev
 }
 
 type DeviceUpdate struct {
@@ -74,6 +132,7 @@ type DeviceUpdate struct {
 	Status          string                 `json:"-" bson:",omitempty"`
 	Decommissioning *bool                  `json:"-" bson:",omitempty"`
 	UpdatedTs       *time.Time             `json:"updated_ts" bson:"updated_ts,omitempty"`
+	ExternalName    string                 `json:"external_name,omitempty" bson:"external.name,omitempty"`
 }
 
 func NewDevice(id, id_data, pubkey string) *Device {

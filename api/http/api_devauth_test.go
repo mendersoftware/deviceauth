@@ -461,7 +461,7 @@ func TestApiV2DevAuthPreauthDevice(t *testing.T) {
 			checker: mt.NewJSONResponse(
 				http.StatusBadRequest,
 				nil,
-				restError("failed to decode preauth request: id_data: non zero value required;")),
+				restError("failed to decode preauth request: identity_data: cannot be blank.")),
 		},
 		"invalid: no pubkey": {
 			body: &preAuthReq{
@@ -472,7 +472,7 @@ func TestApiV2DevAuthPreauthDevice(t *testing.T) {
 			checker: mt.NewJSONResponse(
 				http.StatusBadRequest,
 				nil,
-				restError("failed to decode preauth request: pubkey: non zero value required")),
+				restError("failed to decode preauth request: pubkey: cannot be blank.")),
 		},
 		"invalid: no body": {
 			checker: mt.NewJSONResponse(

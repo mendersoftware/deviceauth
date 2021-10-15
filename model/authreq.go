@@ -1,4 +1,4 @@
-// Copyright 2020 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -47,13 +47,9 @@ func (r *AuthReq) Validate() error {
 		return err
 	}
 
-	keyStruct, ok := key.(crypto.PublicKey)
-	if !ok {
-		return errors.New("cannot decode public key")
-	}
-	r.PubKeyStruct = keyStruct
+	r.PubKeyStruct = key
 
-	serialized, err := utils.SerializePubKey(keyStruct)
+	serialized, err := utils.SerializePubKey(key)
 	if err != nil {
 		return err
 	}
