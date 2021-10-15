@@ -1,8 +1,6 @@
 #
 # Apache-2.0
 b4acfcfa2a0ba1a8c82ec3965fbcee886cff8394ca4214e0ddac0a36beb1e05a  LICENSE
-f7a4d9fa675c9347d97d6cb7b3142f733a828e8884eef461f30601f797f8248a  vendor/github.com/Azure/go-autorest/autorest/to/LICENSE
-f7a4d9fa675c9347d97d6cb7b3142f733a828e8884eef461f30601f797f8248a  vendor/github.com/Azure/go-autorest/LICENSE
 0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594  vendor/github.com/gomodule/redigo/LICENSE
 3eb823230e5d112e1bd032ccc82ae765cf676d0d6d46a1a1daa2d658b3005b67  vendor/github.com/mendersoftware/go-lib-micro/LICENSE
 c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4  vendor/github.com/modern-go/concurrent/LICENSE

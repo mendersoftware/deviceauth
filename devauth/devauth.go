@@ -22,7 +22,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/mendersoftware/go-lib-micro/addons"
 	"github.com/mendersoftware/go-lib-micro/apiclient"
 	ctxhttpheader "github.com/mendersoftware/go-lib-micro/context/httpheader"
@@ -692,7 +691,7 @@ func (d *DevAuth) DecommissionDevice(ctx context.Context, devID string) error {
 
 	// set decommissioning flag on the device
 	updev := model.DeviceUpdate{
-		Decommissioning: to.BoolPtr(true),
+		Decommissioning: uto.BoolPtr(true),
 	}
 	if err := d.db.UpdateDevice(
 		ctx, model.Device{Id: devID}, updev,
