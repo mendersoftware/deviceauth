@@ -22,7 +22,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	"github.com/mendersoftware/go-lib-micro/mongo/oid"
@@ -462,14 +461,14 @@ func TestStoreUpdateDevice(t *testing.T) {
 		{
 			id:     dev1.Id,
 			old:    dev1,
-			update: model.DeviceUpdate{Decommissioning: to.BoolPtr(true)},
+			update: model.DeviceUpdate{Decommissioning: uto.BoolPtr(true)},
 			outErr: "",
 			tenant: tenant,
 		},
 		{
 			// other tenant's DB
 			id:     dev1.Id,
-			update: model.DeviceUpdate{Decommissioning: to.BoolPtr(true)},
+			update: model.DeviceUpdate{Decommissioning: uto.BoolPtr(true)},
 			outErr: store.ErrDevNotFound.Error(),
 			tenant: "",
 		},
