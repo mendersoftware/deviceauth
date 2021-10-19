@@ -4,7 +4,7 @@ WORKDIR /go/src/github.com/mendersoftware/deviceauth
 ADD ./ .
 RUN CGO_ENABLED=0 GOARCH=amd64 go build -o deviceauth .
 
-FROM alpine:3.14.0
+FROM alpine:3.14.2
 EXPOSE 8080
 # mount your private key at /etc/deviceauth/rsa/private.pem
 RUN mkdir -p /etc/deviceauth/rsa

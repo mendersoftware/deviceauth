@@ -1,4 +1,3 @@
-# The standard Go .gitignore file follows. (Sourced from: github.com/github/gitignore/master/Go.gitignore)
 # Compiled Object files, Static and Dynamic libs (Shared Objects)
 *.o
 *.a
@@ -7,9 +6,6 @@
 # Folders
 _obj
 _test
-.DS_Store
-.idea/
-.vscode/
 
 # Architecture specific extensions/prefixes
 *.[568vq]
@@ -26,7 +22,4 @@ _testmain.go
 *.exe
 *.test
 *.prof
-
-# go-autorest specific
-vendor/
-autorest/azure/example/example
+/s2/cmd/_s2sx/sfx-exe

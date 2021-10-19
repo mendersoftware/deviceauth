@@ -22,7 +22,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/go-autorest/autorest/to"
 	ctxhttpheader "github.com/mendersoftware/go-lib-micro/context/httpheader"
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/mongo/oid"
@@ -46,6 +45,7 @@ import (
 	"github.com/mendersoftware/deviceauth/store/mongo"
 	"github.com/mendersoftware/deviceauth/utils"
 	mtesting "github.com/mendersoftware/deviceauth/utils/testing"
+	uto "github.com/mendersoftware/deviceauth/utils/to"
 	"github.com/pkg/errors"
 )
 
@@ -2469,7 +2469,7 @@ func TestDevAuthDecommissionDevice(t *testing.T) {
 			db.On("UpdateDevice", ctx,
 				model.Device{Id: tc.devId},
 				model.DeviceUpdate{
-					Decommissioning: to.BoolPtr(true),
+					Decommissioning: uto.BoolPtr(true),
 				}).Return(
 				tc.dbUpdateDeviceErr)
 			db.On("DeleteAuthSetsForDevice", ctx,

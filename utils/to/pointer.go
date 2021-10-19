@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -26,4 +26,9 @@ func Time(f *time.Time) time.Time {
 
 func TimePtr(t time.Time) *time.Time {
 	return &t
+}
+
+// BoolPtr returns a pointer to the passed bool.
+func BoolPtr(b bool) *bool {
+	return &b
 }
