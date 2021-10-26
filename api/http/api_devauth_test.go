@@ -20,9 +20,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -30,6 +32,7 @@ import (
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/ant0ine/go-json-rest/rest/test"
 	"github.com/mendersoftware/go-lib-micro/identity"
+	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/mendersoftware/go-lib-micro/requestid"
 	"github.com/mendersoftware/go-lib-micro/requestlog"
 	"github.com/mendersoftware/go-lib-micro/rest_utils"
@@ -461,7 +464,7 @@ func TestApiV2DevAuthPreauthDevice(t *testing.T) {
 			checker: mt.NewJSONResponse(
 				http.StatusBadRequest,
 				nil,
-				restError("failed to decode preauth request: id_data: non zero value required;")),
+				restError("failed to decode preauth request: identity_data: cannot be blank.")),
 		},
 		"invalid: no pubkey": {
 			body: &preAuthReq{
@@ -472,7 +475,7 @@ func TestApiV2DevAuthPreauthDevice(t *testing.T) {
 			checker: mt.NewJSONResponse(
 				http.StatusBadRequest,
 				nil,
-				restError("failed to decode preauth request: pubkey: non zero value required")),
+				restError("failed to decode preauth request: pubkey: cannot be blank.")),
 		},
 		"invalid: no body": {
 			checker: mt.NewJSONResponse(
@@ -545,6 +548,225 @@ func TestApiV2DevAuthPreauthDevice(t *testing.T) {
 			recorded := test.RunRequest(t, apih, req)
 			mt.CheckResponse(t, tc.checker, recorded)
 			da.AssertExpectations(t)
+		})
+	}
+}
+
+func TestProvisionDeviceExternal(t *testing.T) {
+	t.Parallel()
+	var contextMatcher = func(tenantID string) interface{} {
+		return mock.MatchedBy(func(ctx context.Context) bool {
+			id := identity.FromContext(ctx)
+			if tenantID == "" && id == nil {
+				return true
+			} else {
+				if id != nil {
+					if id.Tenant == tenantID {
+						return true
+					}
+				}
+			}
+			return false
+		})
+	}
+	type testCase struct {
+		Name string
+
+		Request  interface{}
+		TenantID string
+		App      func(t *testing.T, self *testCase) *mocks.App
+
+		StatusCode int
+		RspHeaders http.Header
+		Error      error
+	}
+	const uuidHexRegex = `[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}`
+	testCases := []testCase{{
+		Name: "ok",
+
+		Request: model.ExternalDeviceRequest{
+			ExternalDevice: model.ExternalDevice{
+				ID:       "ef20a8b1-ef00-4e59-9a8a-fe5ef0be6b92",
+				Provider: "acme inc.",
+				Name:     "niceAndShinySBC",
+			},
+			IDData: map[string]interface{}{
+				"niceAndShiny": true,
+			},
+		},
+		App: func(t *testing.T, self *testCase) *mocks.App {
+			app := new(mocks.App)
+			req := self.Request.(model.ExternalDeviceRequest)
+			app.On("ProvisionDevice",
+				contextMatcher(self.TenantID),
+				mock.AnythingOfType("*model.Device")).
+				Run(func(args mock.Arguments) {
+					dev := args.Get(1).(*model.Device)
+					assert.Equal(t, req.ID, dev.External.ID)
+					assert.Equal(t, req.IDData, dev.IdDataStruct)
+					assert.Equal(t, req.Provider, dev.External.Provider)
+				}).Return(nil)
+			return app
+		},
+
+		StatusCode: http.StatusCreated,
+		RspHeaders: http.Header{
+			"Location": {v2uriDevices + "/" + uuidHexRegex},
+		},
+	}, {
+		Name: "ok, id_data from external ID",
+
+		Request: model.ExternalDeviceRequest{
+			ExternalDevice: model.ExternalDevice{
+				ID:       "ef20a8b1-ef00-4e59-9a8a-fe5ef0be6b92",
+				Provider: "acme inc.",
+				Name:     "niceAndShinySBC",
+			},
+		},
+		TenantID: "123456789012345678901234",
+		App: func(t *testing.T, self *testCase) *mocks.App {
+			app := new(mocks.App)
+			req := self.Request.(model.ExternalDeviceRequest)
+			app.On("ProvisionDevice",
+				contextMatcher(self.TenantID),
+				mock.AnythingOfType("*model.Device")).
+				Run(func(args mock.Arguments) {
+					dev := args.Get(1).(*model.Device)
+					assert.Equal(t, req.ID, dev.External.ID)
+					assert.Equal(t, req.ExternalDevice.IDData(), dev.IdDataStruct)
+					assert.Equal(t, req.Provider, dev.External.Provider)
+				}).Return(nil)
+			return app
+		},
+
+		StatusCode: http.StatusCreated,
+		RspHeaders: http.Header{
+			"Location": {v2uriDevices + "/" + uuidHexRegex},
+		},
+	}, {
+		Name: "error, malformed request",
+
+		Request: []byte("this is gonna be a problem..."),
+		App: func(t *testing.T, self *testCase) *mocks.App {
+			return new(mocks.App)
+		},
+
+		StatusCode: http.StatusBadRequest,
+		Error:      errors.New("malformed request body"),
+	}, {
+		Name: "error, invalid request parameters",
+
+		Request: model.ExternalDeviceRequest{
+			ExternalDevice: model.ExternalDevice{
+				ID: "ef20a8b1-ef00-4e59-9a8a-fe5ef0be6b92",
+			},
+		},
+		App: func(t *testing.T, self *testCase) *mocks.App {
+			return new(mocks.App)
+		},
+
+		StatusCode: http.StatusBadRequest,
+		Error:      errors.New("invalid request parameter: name: cannot be blank; provider: cannot be blank."),
+	}, {
+		Name: "error, device exists",
+
+		Request: model.ExternalDeviceRequest{
+			ExternalDevice: model.ExternalDevice{
+				ID:       "ef20a8b1-ef00-4e59-9a8a-fe5ef0be6b92",
+				Provider: "acme inc.",
+				Name:     "niceAndShinySBC",
+			},
+		},
+		TenantID: "123456789012345678901234",
+		App: func(t *testing.T, self *testCase) *mocks.App {
+			app := new(mocks.App)
+			req := self.Request.(model.ExternalDeviceRequest)
+			app.On("ProvisionDevice",
+				contextMatcher(self.TenantID),
+				mock.AnythingOfType("*model.Device")).
+				Run(func(args mock.Arguments) {
+					dev := args.Get(1).(*model.Device)
+					assert.Equal(t, req.ID, dev.External.ID)
+					assert.Equal(t, req.ExternalDevice.IDData(), dev.IdDataStruct)
+					assert.Equal(t, req.Provider, dev.External.Provider)
+				}).Return(devauth.ErrDeviceExists)
+			return app
+		},
+
+		StatusCode: http.StatusConflict,
+		Error:      devauth.ErrDeviceExists,
+	}, {
+		Name: "error, internal server error",
+
+		Request: model.ExternalDeviceRequest{
+			ExternalDevice: model.ExternalDevice{
+				ID:       "ef20a8b1-ef00-4e59-9a8a-fe5ef0be6b92",
+				Provider: "acme inc.",
+				Name:     "niceAndShinySBC",
+			},
+		},
+		TenantID: "123456789012345678901234",
+		App: func(t *testing.T, self *testCase) *mocks.App {
+			app := new(mocks.App)
+			req := self.Request.(model.ExternalDeviceRequest)
+			app.On("ProvisionDevice",
+				contextMatcher(self.TenantID),
+				mock.AnythingOfType("*model.Device")).
+				Run(func(args mock.Arguments) {
+					dev := args.Get(1).(*model.Device)
+					assert.Equal(t, req.ID, dev.External.ID)
+					assert.Equal(t, req.ExternalDevice.IDData(), dev.IdDataStruct)
+					assert.Equal(t, req.Provider, dev.External.Provider)
+				}).Return(errors.New("internal error"))
+			return app
+		},
+
+		StatusCode: http.StatusInternalServerError,
+		Error:      errors.New("internal error"),
+	}}
+	for i := range testCases {
+		tc := testCases[i]
+		t.Run(tc.Name, func(t *testing.T) {
+			t.Parallel()
+			app := tc.App(t, &tc)
+			defer app.AssertExpectations(t)
+			URI := strings.ReplaceAll(uriTenantDevicesExternal, ":tid", tc.TenantID)
+			var b []byte
+			switch typ := tc.Request.(type) {
+			case []byte:
+				b = typ
+			default:
+				b, _ = json.Marshal(typ)
+			}
+			l := log.NewEmpty()
+			l.Logger.Out = io.Discard
+			ctx := log.WithContext(context.Background(), l)
+			req, _ := http.NewRequestWithContext(
+				ctx,
+				http.MethodPost,
+				URI,
+				bytes.NewReader(b),
+			)
+			req.Header.Set("X-Men-Requestid", "test")
+			handler := makeMockApiHandler(t, app, nil)
+			w := httptest.NewRecorder()
+			handler.ServeHTTP(w, req)
+			assert.Equal(t, tc.StatusCode, w.Code)
+			rspHdrs := w.Header()
+			for hdr := range tc.RspHeaders {
+				expectedRegex := tc.RspHeaders.Get(hdr)
+				actual := rspHdrs.Get(hdr)
+				assert.Regexpf(t, expectedRegex, actual,
+					"expected header '%s' does not match response", hdr,
+				)
+			}
+			if tc.Error != nil {
+				var rsp rest_utils.ApiError
+				err := json.Unmarshal(w.Body.Bytes(), &rsp)
+				if assert.NoError(t, err, "expected a rest (JSON) error response") {
+					assert.Regexp(t, tc.Error.Error(), rsp.Error())
+				}
+			}
 		})
 	}
 }

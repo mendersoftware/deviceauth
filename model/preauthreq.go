@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ import (
 	"encoding/json"
 	"io"
 
-	"github.com/asaskevich/govalidator"
+	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/pkg/errors"
 
 	"github.com/mendersoftware/deviceauth/utils"
@@ -48,7 +48,13 @@ func ParsePreAuthReq(source io.Reader) (*PreAuthReq, error) {
 }
 
 func (r *PreAuthReq) Validate() error {
-	if _, err := govalidator.ValidateStruct(*r); err != nil {
+	err := validation.ValidateStruct(r,
+		validation.Field(&r.DeviceId, validation.Required),
+		validation.Field(&r.AuthSetId, validation.Required),
+		validation.Field(&r.IdData, validation.Required),
+		validation.Field(&r.PubKey, validation.Required),
+	)
+	if err != nil {
 		return err
 	}
 

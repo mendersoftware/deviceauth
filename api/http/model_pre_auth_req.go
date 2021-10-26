@@ -1,4 +1,4 @@
-// Copyright 2020 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -17,9 +17,8 @@ import (
 	"encoding/json"
 	"io"
 
-	"github.com/asaskevich/govalidator"
-	"github.com/pkg/errors"
-	"github.com/satori/go.uuid"
+	validation "github.com/go-ozzo/ozzo-validation/v4"
+	"github.com/google/uuid"
 
 	"github.com/mendersoftware/deviceauth/model"
 	"github.com/mendersoftware/deviceauth/utils"
@@ -47,14 +46,15 @@ func parsePreAuthReq(source io.Reader) (*preAuthReq, error) {
 }
 
 func (r *preAuthReq) validate() error {
-	if _, err := govalidator.ValidateStruct(*r); err != nil {
+	err := validation.ValidateStruct(r,
+		validation.Field(&r.IdData, validation.Required),
+		validation.Field(&r.PubKey, validation.Required),
+	)
+	if err != nil {
 		return err
 	}
 
-	if len(r.IdData) == 0 {
-		return errors.New("id_data: non zero value required;")
-	}
-	_, err := json.Marshal(r.IdData)
+	_, err = json.Marshal(r.IdData)
 	if err != nil {
 		return err
 	}
@@ -81,8 +81,8 @@ func (r *preAuthReq) getDbModel() (*model.PreAuthReq, error) {
 		return nil, err
 	}
 
-	dId := uuid.NewV4()
-	asId := uuid.NewV4()
+	dId := uuid.New()
+	asId := uuid.New()
 
 	return &model.PreAuthReq{
 		DeviceId:  dId.String(),

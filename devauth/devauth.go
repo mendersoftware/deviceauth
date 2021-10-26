@@ -116,6 +116,7 @@ type App interface {
 	GetDevCountByStatus(ctx context.Context, status string) (int, error)
 
 	ProvisionTenant(ctx context.Context, tenant_id string) error
+	ProvisionDevice(ctx context.Context, dev *model.Device) (err error)
 
 	GetTenantDeviceStatus(ctx context.Context, tenantId, deviceId string) (*model.Status, error)
 }
@@ -1086,6 +1087,79 @@ func (d *DevAuth) PreauthorizeDevice(ctx context.Context, req *model.PreAuthReq)
 	default:
 		return nil, errors.Wrap(err, "failed to add auth set")
 	}
+}
+
+func (d *DevAuth) ProvisionDevice(ctx context.Context, dev *model.Device) (err error) {
+	var tenantID string
+	idData := identity.FromContext(ctx)
+	if idData != nil {
+		tenantID = idData.Tenant
+	}
+	l := log.FromContext(ctx)
+	err = d.db.AddDevice(ctx, *dev)
+	switch err {
+	case nil:
+		break
+	case store.ErrObjectExists:
+		return ErrDeviceExists
+	default:
+		return errors.Wrap(err, "failed to add device")
+	}
+	defer func() {
+		// Compensate device if we fail at this point
+		if err != nil {
+			errDel := d.db.DeleteDevice(ctx, dev.Id)
+			if errDel != nil {
+				l.Errorf("failed to resolve device data "+
+					"inconsistency for device '%s': %s",
+					dev.Id, errDel)
+			}
+		}
+	}()
+
+	// FIXME: merge 'update_status', 'submit_identity' and 'provision_device'
+	//        workflow into a single job.
+	if err = d.cOrch.SubmitProvisionDeviceJob(ctx, orchestrator.ProvisionDeviceReq{
+		DeviceID:  dev.Id,
+		RequestId: requestid.FromContext(ctx),
+		TenantID:  tenantID,
+	}); err != nil {
+		return errors.Wrap(err, "failed to submit 'provision_device' workflow")
+	}
+
+	defer func() {
+		if err != nil {
+			errDecommission := d.cOrch.SubmitDeviceDecommisioningJob(ctx,
+				orchestrator.DecommissioningReq{
+					DeviceId:  dev.Id,
+					RequestId: requestid.FromContext(ctx),
+					TenantID:  tenantID,
+				})
+			if errDecommission != nil {
+				l.Errorf("failed to decomission device '%s': %s",
+					dev.Id, errDecommission)
+			}
+		}
+	}()
+
+	// submit device status change job
+	b, _ := json.Marshal([]model.DeviceInventoryUpdate{{Id: dev.Id, Revision: dev.Revision}})
+
+	if err = d.cOrch.SubmitUpdateDeviceStatusJob(
+		ctx,
+		orchestrator.UpdateDeviceStatusReq{
+			RequestId: requestid.FromContext(ctx),
+			Devices:   string(b),
+			TenantId:  tenantID,
+			Status:    dev.Status,
+		}); err != nil {
+		return errors.Wrap(err, "update device status job error")
+	}
+
+	if err = d.setDeviceIdentity(ctx, dev, tenantID); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (d *DevAuth) RevokeToken(ctx context.Context, tokenID string) error {

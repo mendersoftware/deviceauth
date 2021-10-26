@@ -228,6 +228,40 @@ paths:
           schema:
            $ref: "#/definitions/Error"
 
+  /tenants/{tid}/devices/{did}/external:
+    post:
+      operationId: Provision External Device
+      tags:
+        - Internal API
+      summary: "Provision device from external vendor."
+      parameters:
+        - name: tid
+          in: path
+          description: Tenant identifier.
+          required: true
+          type: string
+        - name: did
+          in: path
+          description: Device identifier.
+          required: true
+          type: string
+        - name: device
+          in: body
+          description: External device descriptor.
+          required: true
+          schema:
+            $ref: "#/definitions/ExternalDevice"
+      responses:
+        201:
+          description: Device provisioned successfully.
+        400:
+          description: Bad request.
+        500:
+          description: Internal server error.
+          schema:
+           $ref: "#/definitions/Error"
+
+
   /tenants/{tid}/devices/{did}/status:
     get:
       operationId: Device Status
@@ -436,6 +470,27 @@ definitions:
       decommissioning:
         type: boolean
         description: Devices that are part of ongoing decomissioning process will return True
+  ExternalDevice:
+    type: object
+    description: "External device descriptor"
+    properties:
+      id:
+        type: string
+        description: "ID assigned by external provider"
+      name:
+        type: string
+        description: "Name of the device"
+      provider:
+        type: string
+        description: "Name of the external provider"
+      id_data:
+        type: string
+        description: "Optional custom ID data"
+    required:
+      - id
+      - name
+      - provider
+
   AuthSet:
     description: Authentication data set
     type: object
