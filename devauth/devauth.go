@@ -145,7 +145,8 @@ type Config struct {
 	DefaultTenantToken string
 	InventoryAddr      string
 
-	HaveAddons bool
+	EnableReporting bool
+	HaveAddons      bool
 }
 
 func NewDevAuth(d store.DataStore, co orchestrator.ClientRunner,
@@ -223,6 +224,11 @@ func (d *DevAuth) setDeviceIdentity(ctx context.Context, dev *model.Device, tena
 			Attributes: string(attrJson),
 		}); err != nil {
 		return errors.Wrap(err, "failed to start device inventory update job")
+	}
+	if d.config.EnableReporting {
+		if err := d.cOrch.SubmitReindexReporting(ctx, string(dev.Id)); err != nil {
+			return errors.Wrap(err, "reindex reporting job error")
+		}
 	}
 	return nil
 }
@@ -590,6 +596,13 @@ func (d *DevAuth) updateDeviceStatus(ctx context.Context, devId, status string, 
 		}); err != nil {
 		return errors.Wrap(err, "failed to update device status")
 	}
+
+	if d.config.EnableReporting {
+		if err := d.cOrch.SubmitReindexReporting(ctx, devId); err != nil {
+			return errors.Wrap(err, "reindex reporting job error")
+		}
+	}
+
 	return nil
 }
 
@@ -808,7 +821,17 @@ func (d *DevAuth) DeleteAuthSet(ctx context.Context, devID string, authId string
 		}
 
 		// delete device
-		return d.db.DeleteDevice(ctx, devID)
+		if err := d.db.DeleteDevice(ctx, devID); err != nil {
+			return err
+		}
+
+		if d.config.EnableReporting {
+			if err := d.cOrch.SubmitReindexReporting(ctx, devID); err != nil {
+				return errors.Wrap(err, "reindex reporting job error")
+			}
+		}
+
+		return nil
 	}
 
 	return d.updateDeviceStatus(ctx, devID, "", authSet.Status)
@@ -1159,6 +1182,7 @@ func (d *DevAuth) ProvisionDevice(ctx context.Context, dev *model.Device) (err e
 	if err = d.setDeviceIdentity(ctx, dev, tenantID); err != nil {
 		return err
 	}
+
 	return nil
 }
 
