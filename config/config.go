@@ -46,6 +46,9 @@ const (
 	SettingOrchestratorAddr        = "orchestrator_addr"
 	SettingOrchestratorAddrDefault = "http://mender-workflows-server:8080/"
 
+	SettingEnableReporting        = "enable_reporting"
+	SettingEnableReportingDefault = false
+
 	SettingTenantAdmAddr        = "tenantadm_addr"
 	SettingTenantAdmAddrDefault = ""
 
@@ -97,6 +100,7 @@ var (
 		{Key: SettingDevAdmAddr, Value: SettingDevAdmAddrDefault},
 		{Key: SettingInventoryAddr, Value: SettingInventoryAddrDefault},
 		{Key: SettingOrchestratorAddr, Value: SettingOrchestratorAddrDefault},
+		{Key: SettingEnableReporting, Value: SettingEnableReportingDefault},
 		{Key: SettingTenantAdmAddr, Value: SettingTenantAdmAddrDefault},
 		{Key: SettingDefaultTenantToken, Value: SettingDefaultTenantTokenDefault},
 		{Key: SettingServerPrivKeyPath, Value: SettingServerPrivKeyPathDefault},

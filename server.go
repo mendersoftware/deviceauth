@@ -99,6 +99,7 @@ func RunServer(c config.Reader) error {
 			DefaultTenantToken: c.GetString(dconfig.SettingDefaultTenantToken),
 			InventoryAddr:      config.Config.GetString(dconfig.SettingInventoryAddr),
 
+			EnableReporting: config.Config.GetBool(dconfig.SettingEnableReporting),
 			HaveAddons: config.Config.GetBool(dconfig.SettingHaveAddons) &&
 				tenantadmAddr != "",
 		})

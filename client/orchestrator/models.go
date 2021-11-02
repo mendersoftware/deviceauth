@@ -18,6 +18,10 @@ import (
 	"github.com/pkg/errors"
 )
 
+const (
+	ServiceDeviceauth = "deviceauth"
+)
+
 // DecomissioningReq contains request data of request to start decommissioning workflow
 type DecommissioningReq struct {
 	// Device ID
@@ -95,4 +99,11 @@ type UpdateDeviceInventoryReq struct {
 	Scope string `json:"scope"`
 	// Device inventory attributes
 	Attributes string `json:"attributes"`
+}
+
+type ReindexReportingWorkflow struct {
+	RequestID string `json:"request_id"`
+	TenantID  string `json:"tenant_id"`
+	DeviceID  string `json:"device_id"`
+	Service   string `json:"service"`
 }

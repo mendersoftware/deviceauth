@@ -989,10 +989,13 @@ func TestDevAuthPreauthorizeDevice(t *testing.T) {
 		desc string
 		req  *model.PreAuthReq
 
+		enableReporting bool
+
 		addDeviceErr  error
 		addAuthSetErr error
 		getDevByIdErr error
 		inventoryErr  error
+		reportingErr  error
 
 		updateDeviceStatus    bool
 		updateDeviceInventory bool
@@ -1006,6 +1009,14 @@ func TestDevAuthPreauthorizeDevice(t *testing.T) {
 			req:                   req,
 			updateDeviceStatus:    true,
 			updateDeviceInventory: true,
+			callDb:                true,
+		},
+		{
+			desc:                  "ok with reporting",
+			req:                   req,
+			updateDeviceStatus:    true,
+			updateDeviceInventory: true,
+			enableReporting:       true,
 			callDb:                true,
 		},
 		{
@@ -1090,6 +1101,8 @@ func TestDevAuthPreauthorizeDevice(t *testing.T) {
 			}
 
 			co := morchestrator.ClientRunner{}
+			defer co.AssertExpectations(t)
+
 			if tc.updateDeviceStatus {
 				co.On("SubmitUpdateDeviceStatusJob", ctxMatcher,
 					mock.AnythingOfType("orchestrator.UpdateDeviceStatusReq")).
@@ -1099,6 +1112,12 @@ func TestDevAuthPreauthorizeDevice(t *testing.T) {
 				co.On("SubmitUpdateDeviceInventoryJob", ctxMatcher,
 					mock.AnythingOfType("orchestrator.UpdateDeviceInventoryReq")).
 					Return(nil)
+			}
+			if tc.enableReporting {
+				co.On("SubmitReindexReporting",
+					ctxMatcher,
+					deviceID,
+				).Return(nil).Once()
 			}
 
 			if tc.err == ErrDeviceExists {
@@ -1117,7 +1136,9 @@ func TestDevAuthPreauthorizeDevice(t *testing.T) {
 					},
 					tc.getDevByIdErr)
 			}
-			devauth := NewDevAuth(&db, &co, nil, Config{})
+			devauth := NewDevAuth(&db, &co, nil, Config{
+				EnableReporting: tc.enableReporting,
+			})
 			dev, err := devauth.PreauthorizeDevice(context.Background(), tc.req)
 
 			if tc.err != nil {
@@ -1145,10 +1166,11 @@ func TestProvisionDevice(t *testing.T) {
 	type testCase struct {
 		Name string
 
-		CTX       context.Context
-		Device    *model.Device
-		DataStore func(t *testing.T, self *testCase) *mstore.DataStore
-		Workflows func(t *testing.T, self *testCase) *morchestrator.ClientRunner
+		CTX             context.Context
+		Device          *model.Device
+		EnableReporting bool
+		DataStore       func(t *testing.T, self *testCase) *mstore.DataStore
+		Workflows       func(t *testing.T, self *testCase) *morchestrator.ClientRunner
 
 		Error error
 	}
@@ -1203,6 +1225,69 @@ func TestProvisionDevice(t *testing.T) {
 						}
 					}
 				}).
+				Return(nil).
+				Once()
+			return wf
+		},
+
+		Error: nil,
+	}, {
+		Name:            "ok, reporting",
+		EnableReporting: true,
+
+		CTX: ctxWithNoLogs,
+		Device: &model.Device{
+			Id:     "428b4168-3c03-4cd7-95f6-b11381eee73f",
+			IdData: `{"mac": "00:11:22:33:44:55"}`,
+			PubKey: `pubkey`,
+			Status: model.DevStatusAccepted,
+		},
+		DataStore: func(t *testing.T, self *testCase) *mstore.DataStore {
+			ds := new(mstore.DataStore)
+			ds.On("AddDevice", self.CTX, *self.Device).
+				Return(nil)
+			return ds
+		},
+		Workflows: func(t *testing.T, self *testCase) *morchestrator.ClientRunner {
+			wf := new(morchestrator.ClientRunner)
+			wf.On("SubmitUpdateDeviceStatusJob",
+				self.CTX,
+				mock.AnythingOfType("orchestrator.UpdateDeviceStatusReq")).
+				Run(func(args mock.Arguments) {
+					req := args.Get(1).(orchestrator.UpdateDeviceStatusReq)
+					assert.Contains(t, req.Devices, self.Device.Id)
+					assert.Equal(t, model.DevStatusAccepted, req.Status)
+				}).
+				Return(nil).
+				Once().
+				On("SubmitProvisionDeviceJob",
+					self.CTX,
+					mock.AnythingOfType("orchestrator.ProvisionDeviceReq")).
+				Return(nil).
+				Once().
+				On("SubmitUpdateDeviceInventoryJob",
+					self.CTX,
+					mock.AnythingOfType("orchestrator.UpdateDeviceInventoryReq")).
+				Run(func(args mock.Arguments) {
+					req := args.Get(1).(orchestrator.UpdateDeviceInventoryReq)
+					var attrs []model.DeviceAttribute
+					err := json.Unmarshal([]byte(req.Attributes), &attrs)
+					if assert.NoError(t, err,
+						"invalid inventory update workflow request") {
+						assert.Len(t, attrs, len(self.Device.IdDataStruct))
+						for _, attr := range attrs {
+							assert.Equal(t,
+								self.Device.IdDataStruct[attr.Name],
+								attr.Value,
+								"inventory id_data attribute mismatch")
+						}
+					}
+				}).
+				Return(nil).
+				Once().
+				On("SubmitReindexReporting",
+					self.CTX,
+					"428b4168-3c03-4cd7-95f6-b11381eee73f").
 				Return(nil).
 				Once()
 			return wf
@@ -1389,6 +1474,81 @@ func TestProvisionDevice(t *testing.T) {
 
 		Error: errors.New("update device status job error: internal error"),
 	}, {
+		Name:            "error, failed to submit reporting reindex",
+		EnableReporting: true,
+
+		CTX: identity.WithContext(ctxWithNoLogs, &identity.Identity{
+			Subject: "imma-human-i-promise",
+			Tenant:  "123456789012345678901234",
+		}),
+		Device: &model.Device{
+			Id:     "428b4168-3c03-4cd7-95f6-b11381eee73f",
+			IdData: `{"mac": "00:11:22:33:44:55"}`,
+			PubKey: `pubkey`,
+			Status: model.DevStatusAccepted,
+		},
+		DataStore: func(t *testing.T, self *testCase) *mstore.DataStore {
+			ds := new(mstore.DataStore)
+			ds.On("AddDevice", self.CTX, *self.Device).
+				Return(nil).
+				Once().
+				On("DeleteDevice", self.CTX, self.Device.Id).
+				Return(errors.New("internal error")).
+				Once()
+			return ds
+		},
+		Workflows: func(t *testing.T, self *testCase) *morchestrator.ClientRunner {
+			wf := new(morchestrator.ClientRunner)
+			wf.On("SubmitUpdateDeviceStatusJob",
+				self.CTX,
+				mock.AnythingOfType("orchestrator.UpdateDeviceStatusReq")).
+				Run(func(args mock.Arguments) {
+					req := args.Get(1).(orchestrator.UpdateDeviceStatusReq)
+					assert.Contains(t, req.Devices, self.Device.Id)
+					assert.Equal(t, model.DevStatusAccepted, req.Status)
+				}).
+				Return(nil).
+				Once().
+				On("SubmitProvisionDeviceJob",
+					self.CTX,
+					mock.AnythingOfType("orchestrator.ProvisionDeviceReq")).
+				Return(nil).
+				Once().
+				On("SubmitUpdateDeviceInventoryJob",
+					self.CTX,
+					mock.AnythingOfType("orchestrator.UpdateDeviceInventoryReq")).
+				Run(func(args mock.Arguments) {
+					req := args.Get(1).(orchestrator.UpdateDeviceInventoryReq)
+					var attrs []model.DeviceAttribute
+					err := json.Unmarshal([]byte(req.Attributes), &attrs)
+					if assert.NoError(t, err,
+						"invalid inventory update workflow request") {
+						assert.Len(t, attrs, len(self.Device.IdDataStruct))
+						for _, attr := range attrs {
+							assert.Equal(t,
+								self.Device.IdDataStruct[attr.Name],
+								attr.Value,
+								"inventory id_data attribute mismatch")
+						}
+					}
+				}).
+				Return(nil).
+				Once().
+				On("SubmitReindexReporting",
+					self.CTX,
+					"428b4168-3c03-4cd7-95f6-b11381eee73f").
+				Return(errors.New("internal error")).
+				Once().
+				On("SubmitDeviceDecommisioningJob",
+					self.CTX,
+					mock.AnythingOfType("orchestrator.DecommissioningReq")).
+				Return(nil).
+				Once()
+			return wf
+		},
+
+		Error: errors.New("reindex reporting job error: internal error"),
+	}, {
 		Name: "error, fail to provision device",
 
 		CTX: identity.WithContext(ctxWithNoLogs, &identity.Identity{
@@ -1482,7 +1642,9 @@ func TestProvisionDevice(t *testing.T) {
 			wf := tc.Workflows(t, &tc)
 			defer wf.AssertExpectations(t)
 
-			app := NewDevAuth(ds, wf, nil, Config{})
+			app := NewDevAuth(ds, wf, nil, Config{
+				EnableReporting: tc.EnableReporting,
+			})
 
 			err := app.ProvisionDevice(tc.CTX, tc.Device)
 			if tc.Error != nil {
@@ -3265,9 +3427,10 @@ func TestDevAuthDeleteAuthSet(t *testing.T) {
 		devId  string
 		authId string
 
-		tenant         string
-		withCache      bool
-		cacheDeleteErr error
+		tenant          string
+		withCache       bool
+		cacheDeleteErr  error
+		enableReporting bool
 
 		dbGetAuthSetByIdErr         error
 		dbDeleteTokenByDevIdErr     error
@@ -3278,7 +3441,8 @@ func TestDevAuthDeleteAuthSet(t *testing.T) {
 		dbGetDeviceStatusErr        error
 		dbUpdateDeviceErr           error
 
-		orchestratorErr error
+		orchestratorErr          error
+		orchestratorReportingErr error
 
 		authSet *model.AuthSet
 
@@ -3367,6 +3531,29 @@ func TestDevAuthDeleteAuthSet(t *testing.T) {
 			dbGetDeviceStatus: "accepted",
 		},
 		{
+			devId:             oid.NewUUIDv5("devId12").String(),
+			authId:            oid.NewUUIDv5("authId12").String(),
+			dbGetDeviceStatus: "accepted",
+			enableReporting:   true,
+		},
+		{
+			devId:                    oid.NewUUIDv5("devId8").String(),
+			authId:                   oid.NewUUIDv5("authId8").String(),
+			authSet:                  &model.AuthSet{Status: model.DevStatusPreauth},
+			dbGetDeviceStatus:        "decommissioned",
+			enableReporting:          true,
+			orchestratorReportingErr: errors.New("orchestrator error"),
+			outErr:                   "reindex reporting job error: orchestrator error",
+		},
+		{
+			devId:                    oid.NewUUIDv5("devId12").String(),
+			authId:                   oid.NewUUIDv5("authId12").String(),
+			dbGetDeviceStatus:        "accepted",
+			enableReporting:          true,
+			orchestratorReportingErr: errors.New("orchestrator error"),
+			outErr:                   "reindex reporting job error: orchestrator error",
+		},
+		{
 			devId:                oid.NewUUIDv5("devId12").String(),
 			authId:               oid.NewUUIDv5("authId12").String(),
 			dbGetDeviceStatusErr: store.ErrAuthSetNotFound,
@@ -3448,7 +3635,16 @@ func TestDevAuthDeleteAuthSet(t *testing.T) {
 						}
 					})).Return(tc.orchestratorErr)
 
-			devauth := NewDevAuth(&db, &co, nil, Config{})
+			if tc.enableReporting {
+				co.On("SubmitReindexReporting",
+					ctx,
+					tc.devId,
+				).Return(tc.orchestratorReportingErr).Once()
+			}
+
+			devauth := NewDevAuth(&db, &co, nil, Config{
+				EnableReporting: tc.enableReporting,
+			})
 
 			c := &mcache.Cache{}
 			if tc.withCache {

@@ -54,6 +54,12 @@
 
 # orchestrator_addr:  http://mender-workflows-server:8080
 
+# Enable the integration with the reporting service
+# Defaults to: false
+# Overwrite with environment variable: DEVICEAUTH_ENABLE_REPORTING
+
+# enable_reporting: false
+
 # Tenant administration service address (optional)
 # Defaults to: none
 # Overwrite with environment variable: DEVICEAUTH_TENANTADM_ADDR
