@@ -729,15 +729,9 @@ func (d *DevAuthApiHandlers) GetTenantDeviceStatus(w rest.ResponseWriter, r *res
 
 func (d *DevAuthApiHandlers) GetTenantDevicesHandler(w rest.ResponseWriter, r *rest.Request) {
 	ctx := r.Context()
-	l := log.FromContext(ctx)
-
-	tid := r.PathParam("tid")
-	if tid == "" {
-		rest_utils.RestErrWithLog(w, r, l, errors.New("tenant id (tid) cannot be empty"), http.StatusBadRequest)
-		return
+	if tid := r.PathParam("tid"); tid != "" {
+		ctx = identity.WithContext(ctx, &identity.Identity{Tenant: tid})
 	}
-	// Inject tenant id into the request context
-	ctx = identity.WithContext(ctx, &identity.Identity{Tenant: tid})
 	r.Request = r.WithContext(ctx)
 
 	d.GetDevicesV2Handler(w, r)
@@ -745,15 +739,9 @@ func (d *DevAuthApiHandlers) GetTenantDevicesHandler(w rest.ResponseWriter, r *r
 
 func (d *DevAuthApiHandlers) GetTenantDevicesCountHandler(w rest.ResponseWriter, r *rest.Request) {
 	ctx := r.Context()
-	l := log.FromContext(ctx)
-
-	tid := r.PathParam("tid")
-	if tid == "" {
-		rest_utils.RestErrWithLog(w, r, l, errors.New("tenant id (tid) cannot be empty"), http.StatusBadRequest)
-		return
+	if tid := r.PathParam("tid"); tid != "" {
+		ctx = identity.WithContext(ctx, &identity.Identity{Tenant: tid})
 	}
-	// Inject tenant id into the request context
-	ctx = identity.WithContext(ctx, &identity.Identity{Tenant: tid})
 	r.Request = r.WithContext(ctx)
 
 	d.GetDevicesCountHandler(w, r)

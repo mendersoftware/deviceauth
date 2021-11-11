@@ -2297,6 +2297,14 @@ func TestApiDevAuthGetTenantDeviceCount(t *testing.T) {
 				nil,
 				model.Count{Count: 1}),
 		},
+		"ok, empty tenant ID": {
+			count: 1,
+
+			checker: mt.NewJSONResponse(
+				http.StatusOK,
+				nil,
+				model.Count{Count: 1}),
+		},
 		"ok, with status": {
 			tid:    "foo",
 			status: "accepted",
@@ -2307,12 +2315,6 @@ func TestApiDevAuthGetTenantDeviceCount(t *testing.T) {
 				http.StatusOK,
 				nil,
 				model.Count{Count: 1}),
-		},
-		"error: tenant id empty": {
-			checker: mt.NewJSONResponse(
-				http.StatusBadRequest,
-				nil,
-				restError("tenant id (tid) cannot be empty")),
 		},
 		"error: generic": {
 			tid: "foo",
@@ -2443,6 +2445,19 @@ func TestApiGetTenantDevicesV2(t *testing.T) {
 
 			filterMatch: mock.AnythingOfType("model.DeviceFilter"),
 		},
+		"ok with empty tenant ID": {
+			req: test.MakeSimpleRequest("GET",
+				"http://1.2.3.4/api/internal/v1/devauth/tenants//devices", nil),
+			code:      http.StatusOK,
+			devices:   devs,
+			err:       nil,
+			skip:      0,
+			limit:     rest_utils.PerPageDefault + 1,
+			body:      string(asJSON(outDevs)),
+			tenant_id: "powerpuff123",
+
+			filterMatch: mock.AnythingOfType("model.DeviceFilter"),
+		},
 		"ok with IDs": {
 			req: test.MakeSimpleRequest("GET",
 				"http://1.2.3.4/api/internal/v1/devauth/tenants/powerpuff123/devices?id=id1&id=id2", nil),
@@ -2500,15 +2515,6 @@ func TestApiGetTenantDevicesV2(t *testing.T) {
 
 			filterMatch: mock.AnythingOfType("model.DeviceFilter"),
 		},
-		"tenant_id not valid": {
-			req: test.MakeSimpleRequest("GET",
-				"http://1.2.3.4/api/internal/v1/devauth/tenants//devices", nil),
-			code: http.StatusBadRequest,
-			err:  errors.New("failed"),
-			body: RestError("tenant id (tid) cannot be empty"),
-
-			filterMatch: mock.AnythingOfType("model.DeviceFilter"),
-		},
 	}
 
 	for name := range tcases {
@@ -2519,7 +2525,7 @@ func TestApiGetTenantDevicesV2(t *testing.T) {
 			da := &mocks.App{}
 			da.On("GetDevices",
 				mock.MatchedBy(func(c context.Context) bool {
-					if identity.FromContext(c).Tenant != tc.tenant_id {
+					if id := identity.FromContext(c); id != nil && id.Tenant != tc.tenant_id {
 						assert.FailNow(t, "Tenant ID from request mismatch", identity.FromContext(c).Tenant)
 						return false
 					}
