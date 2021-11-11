@@ -2427,6 +2427,8 @@ func TestApiGetTenantDevicesV2(t *testing.T) {
 		skip      uint
 		limit     uint
 		tenant_id string
+
+		filterMatch interface{}
 	}{
 		"ok": {
 			req: test.MakeSimpleRequest("GET",
@@ -2438,6 +2440,25 @@ func TestApiGetTenantDevicesV2(t *testing.T) {
 			limit:     rest_utils.PerPageDefault + 1,
 			body:      string(asJSON(outDevs)),
 			tenant_id: "powerpuff123",
+
+			filterMatch: mock.AnythingOfType("model.DeviceFilter"),
+		},
+		"ok with IDs": {
+			req: test.MakeSimpleRequest("GET",
+				"http://1.2.3.4/api/internal/v1/devauth/tenants/powerpuff123/devices?id=id1&id=id2", nil),
+			code:      http.StatusOK,
+			devices:   devs[:2],
+			err:       nil,
+			skip:      0,
+			limit:     rest_utils.PerPageDefault + 1,
+			body:      string(asJSON(outDevs[:2])),
+			tenant_id: "powerpuff123",
+
+			filterMatch: mock.MatchedBy(func(filter model.DeviceFilter) bool {
+				assert.Equal(t, filter.IDs, []string{"id1", "id2"})
+
+				return true
+			}),
 		},
 		"no devices": {
 			req: test.MakeSimpleRequest("GET",
@@ -2449,6 +2470,8 @@ func TestApiGetTenantDevicesV2(t *testing.T) {
 			err:       nil,
 			body:      "[]",
 			tenant_id: "powerpuff123",
+
+			filterMatch: mock.AnythingOfType("model.DeviceFilter"),
 		},
 		// this test does not check if the devices were skipped
 		// it is only checking if endpoint limits number of devices in the response
@@ -2462,6 +2485,8 @@ func TestApiGetTenantDevicesV2(t *testing.T) {
 			// reqquested 2 devices per page, so expect only 2
 			body:      string(asJSON(outDevs[:2])),
 			tenant_id: "powerpuff123",
+
+			filterMatch: mock.AnythingOfType("model.DeviceFilter"),
 		},
 		"internal error": {
 			req: test.MakeSimpleRequest("GET",
@@ -2472,6 +2497,8 @@ func TestApiGetTenantDevicesV2(t *testing.T) {
 			err:       errors.New("failed"),
 			body:      RestError("internal error"),
 			tenant_id: "powerpuff123",
+
+			filterMatch: mock.AnythingOfType("model.DeviceFilter"),
 		},
 		"tenant_id not valid": {
 			req: test.MakeSimpleRequest("GET",
@@ -2479,6 +2506,8 @@ func TestApiGetTenantDevicesV2(t *testing.T) {
 			code: http.StatusBadRequest,
 			err:  errors.New("failed"),
 			body: RestError("tenant id (tid) cannot be empty"),
+
+			filterMatch: mock.AnythingOfType("model.DeviceFilter"),
 		},
 	}
 
@@ -2496,8 +2525,10 @@ func TestApiGetTenantDevicesV2(t *testing.T) {
 					}
 					return true
 				}),
-				tc.skip, tc.limit, mock.AnythingOfType("model.DeviceFilter")).Return(
-				tc.devices, tc.err)
+				tc.skip,
+				tc.limit,
+				tc.filterMatch,
+			).Return(tc.devices, tc.err)
 
 			apih := makeMockApiHandler(t, da, nil)
 			runTestRequest(t, apih, tc.req, tc.code, tc.body)

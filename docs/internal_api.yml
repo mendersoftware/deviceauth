@@ -325,6 +325,14 @@ paths:
             - rejected
             - preauthorized
             - noauth
+        - name: id
+          in: query
+          description: Device ID filter. Can be repeated to query a set of devices.
+          required: false
+          type: array
+          items:
+            type: string
+          collectionFormat: multi
         - name: page
           in: query
           description: Results page number
@@ -356,7 +364,7 @@ paths:
         500:
           description: Unexpected error
           schema:
-            $ref: '#/definitions/Error'  
+            $ref: '#/definitions/Error'
 
   /tenants/{tid}/devices/count:
     get:
@@ -548,4 +556,3 @@ definitions:
       mac: "00:01:02:03:04:05"
       sku: "My Device 1"
       sn:  "SN1234567890"
-
