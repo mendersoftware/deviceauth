@@ -48,9 +48,12 @@ paths:
             - noauth
         - name: id
           in: query
-          description: |
-            Device ID filter. Can be repeated to query a set of devices.
-          type: string
+          description: Device ID filter. Can be repeated to query a set of devices.
+          required: false
+          type: array
+          items:
+            type: string
+          collectionFormat: multi
         - name: page
           in: query
           description: Results page number
@@ -206,7 +209,7 @@ paths:
       parameters:
         - name: id
           in: path
-          description: Device identifier
+          description: Device identifier.
           required: true
           type: string
       responses:
