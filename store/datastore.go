@@ -1,4 +1,4 @@
-// Copyright 2020 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -18,10 +18,11 @@ import (
 	"context"
 	"errors"
 
-	"github.com/mendersoftware/deviceauth/jwt"
-	"github.com/mendersoftware/deviceauth/model"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	"github.com/mendersoftware/go-lib-micro/mongo/oid"
+
+	"github.com/mendersoftware/deviceauth/jwt"
+	"github.com/mendersoftware/deviceauth/model"
 )
 
 var (
@@ -70,7 +71,12 @@ type DataStore interface {
 	GetDeviceByIdentityDataHash(ctx context.Context, idataHash []byte) (*model.Device, error)
 
 	// list devices
-	GetDevices(ctx context.Context, skip, limit uint, filter model.DeviceFilter) ([]model.Device, error)
+	GetDevices(
+		ctx context.Context,
+		skip,
+		limit uint,
+		filter model.DeviceFilter,
+	) ([]model.Device, error)
 
 	AddDevice(ctx context.Context, d model.Device) error
 
@@ -82,7 +88,11 @@ type DataStore interface {
 
 	AddAuthSet(ctx context.Context, set model.AuthSet) error
 
-	GetAuthSetByIdDataHashKey(ctx context.Context, idDataHash []byte, key string) (*model.AuthSet, error)
+	GetAuthSetByIdDataHashKey(
+		ctx context.Context,
+		idDataHash []byte,
+		key string,
+	) (*model.AuthSet, error)
 
 	GetAuthSetById(ctx context.Context, id string) (*model.AuthSet, error)
 

@@ -1,4 +1,4 @@
-// Copyright 2020 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -15,9 +15,10 @@ package mongo
 
 import (
 	"context"
+	"time"
+
 	cinv "github.com/mendersoftware/deviceauth/client/inventory"
 	dconfig "github.com/mendersoftware/deviceauth/config"
-	"time"
 
 	"github.com/mendersoftware/go-lib-micro/config"
 	"github.com/mendersoftware/go-lib-micro/identity"
@@ -42,7 +43,8 @@ const (
 func (m *migration_1_7_0) updateDevicesStatus(ctx context.Context, status string) error {
 	inv := config.Config.GetString(dconfig.SettingInventoryAddr)
 	c := cinv.NewClient(inv, true)
-	collectionDevices := m.ms.client.Database(ctxstore.DbFromContext(m.ctx, DbName)).Collection(DbDevicesColl)
+	collectionDevices := m.ms.client.Database(ctxstore.DbFromContext(m.ctx, DbName)).
+		Collection(DbDevicesColl)
 	opts := options.FindOptions{}
 	opts.SetNoCursorTimeout(true)
 	cur, err := collectionDevices.Find(ctx, bson.M{"status": status}, &opts)
@@ -57,6 +59,9 @@ func (m *migration_1_7_0) updateDevicesStatus(ctx context.Context, status string
 	for cur.Next(ctx) {
 		var d model.Device
 		err = cur.Decode(&d)
+		if err != nil {
+			return err
+		}
 		if i >= devicesBatchSize {
 			err = c.SetDeviceStatus(ctx, id.Tenant, deviceUpdates, status)
 			if err != nil {
@@ -81,12 +86,19 @@ func (m *migration_1_7_0) updateDevicesStatus(ctx context.Context, status string
 func (m *migration_1_7_0) Up(from migrate.Version) error {
 	ctx, cancel := context.WithTimeout(context.Background(), migrationContextTimeouts*time.Second)
 	defer cancel()
-	m.updateDevicesStatus(ctx, "accepted")
-	m.updateDevicesStatus(ctx, "pending")
-	m.updateDevicesStatus(ctx, "rejected")
-	m.updateDevicesStatus(ctx, "preauthorized")
 
-	return nil
+	err := m.updateDevicesStatus(ctx, "accepted")
+	if err == nil {
+		err = m.updateDevicesStatus(ctx, "pending")
+	}
+	if err == nil {
+		err = m.updateDevicesStatus(ctx, "rejected")
+	}
+	if err == nil {
+		err = m.updateDevicesStatus(ctx, "preauthorized")
+	}
+
+	return err
 }
 
 func (m *migration_1_7_0) Version() migrate.Version {

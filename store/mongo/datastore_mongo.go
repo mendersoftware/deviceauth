@@ -203,7 +203,12 @@ func (fltr DeviceFilter) MarshalBSON() (b []byte, err error) {
 	return bson.Marshal(doc)
 }
 
-func (db *DataStoreMongo) GetDevices(ctx context.Context, skip, limit uint, filter model.DeviceFilter) ([]model.Device, error) {
+func (db *DataStoreMongo) GetDevices(
+	ctx context.Context,
+	skip,
+	limit uint,
+	filter model.DeviceFilter,
+) ([]model.Device, error) {
 	const MaxInt64 = int64(^uint64(1 << 63))
 	var (
 		res  = []model.Device{}
@@ -231,12 +236,16 @@ func (db *DataStoreMongo) GetDevices(ctx context.Context, skip, limit uint, filt
 	return res, nil
 }
 
-func (db *DataStoreMongo) StoreMigrationVersion(ctx context.Context, version *migrate.Version) error {
+func (db *DataStoreMongo) StoreMigrationVersion(
+	ctx context.Context,
+	version *migrate.Version,
+) error {
 	if version == nil {
 		return errors.New("version cant be nil.")
 	}
 
-	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(migrate.DbMigrationsColl)
+	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).
+		Collection(migrate.DbMigrationsColl)
 
 	migrationInfo := migrate.MigrationEntry{
 		Version:   *version,
@@ -265,8 +274,10 @@ func (db *DataStoreMongo) GetDeviceById(ctx context.Context, id string) (*model.
 	return &res, nil
 }
 
-func (db *DataStoreMongo) GetDeviceByIdentityDataHash(ctx context.Context, idataHash []byte) (*model.Device, error) {
-
+func (db *DataStoreMongo) GetDeviceByIdentityDataHash(
+	ctx context.Context,
+	idataHash []byte,
+) (*model.Device, error) {
 	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
 
 	filter := bson.M{"id_data_sha256": idataHash}
@@ -555,7 +566,11 @@ func (db *DataStoreMongo) AddAuthSet(ctx context.Context, set model.AuthSet) err
 	return nil
 }
 
-func (db *DataStoreMongo) GetAuthSetByIdDataHashKey(ctx context.Context, idDataHash []byte, key string) (*model.AuthSet, error) {
+func (db *DataStoreMongo) GetAuthSetByIdDataHashKey(
+	ctx context.Context,
+	idDataHash []byte,
+	key string,
+) (*model.AuthSet, error) {
 	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
 
 	filter := model.AuthSet{
@@ -576,7 +591,10 @@ func (db *DataStoreMongo) GetAuthSetByIdDataHashKey(ctx context.Context, idDataH
 	return &res, nil
 }
 
-func (db *DataStoreMongo) GetAuthSetById(ctx context.Context, auth_id string) (*model.AuthSet, error) {
+func (db *DataStoreMongo) GetAuthSetById(
+	ctx context.Context,
+	auth_id string,
+) (*model.AuthSet, error) {
 	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
 
 	res := model.AuthSet{}
@@ -592,7 +610,10 @@ func (db *DataStoreMongo) GetAuthSetById(ctx context.Context, auth_id string) (*
 	return &res, nil
 }
 
-func (db *DataStoreMongo) GetAuthSetsForDevice(ctx context.Context, devid string) ([]model.AuthSet, error) {
+func (db *DataStoreMongo) GetAuthSetsForDevice(
+	ctx context.Context,
+	devid string,
+) ([]model.AuthSet, error) {
 	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
 
 	res := []model.AuthSet{}
@@ -611,7 +632,11 @@ func (db *DataStoreMongo) GetAuthSetsForDevice(ctx context.Context, devid string
 	return res, nil
 }
 
-func (db *DataStoreMongo) UpdateAuthSet(ctx context.Context, filter interface{}, mod model.AuthSetUpdate) error {
+func (db *DataStoreMongo) UpdateAuthSet(
+	ctx context.Context,
+	filter interface{},
+	mod model.AuthSetUpdate,
+) error {
 	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
 
 	update := bson.M{"$set": mod}
@@ -625,7 +650,11 @@ func (db *DataStoreMongo) UpdateAuthSet(ctx context.Context, filter interface{},
 	return nil
 }
 
-func (db *DataStoreMongo) UpdateAuthSetById(ctx context.Context, id string, mod model.AuthSetUpdate) error {
+func (db *DataStoreMongo) UpdateAuthSetById(
+	ctx context.Context,
+	id string,
+	mod model.AuthSetUpdate,
+) error {
 	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
 	res, err := c.UpdateOne(ctx, bson.M{"_id": id}, bson.M{"$set": mod})
 	if err != nil {
@@ -654,7 +683,11 @@ func (db *DataStoreMongo) DeleteAuthSetsForDevice(ctx context.Context, devid str
 	return nil
 }
 
-func (db *DataStoreMongo) DeleteAuthSetForDevice(ctx context.Context, devId string, authId string) error {
+func (db *DataStoreMongo) DeleteAuthSetForDevice(
+	ctx context.Context,
+	devId string,
+	authId string,
+) error {
 	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
 
 	filter := model.AuthSet{Id: authId, DeviceId: devId}

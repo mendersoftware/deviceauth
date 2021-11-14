@@ -33,17 +33,27 @@ import (
 
 const (
 	urlHealth             = "/api/internal/v1/inventory/health"
-	urlPatchAttrs         = "/api/internal/v2/inventory/devices/:id"
 	urlUpdateDeviceStatus = "/api/internal/v1/inventory/tenants/:tid/devices/status/"
-	urlSetDeviceAttribute = "/api/internal/v1/inventory/tenants/:tid/device/:did/attribute/scope/:scope"
-	defaultTimeout        = 10 * time.Second
+	urlSetDeviceAttribute = "/api/internal/v1/inventory/tenants/:tid/device/" +
+		":did/attribute/scope/:scope"
+	defaultTimeout = 10 * time.Second
 )
 
 //go:generate ../../utils/mockgen.sh
 type Client interface {
 	CheckHealth(ctx context.Context) error
-	SetDeviceStatus(ctx context.Context, tenantId string, deviceUpdates []model.DeviceInventoryUpdate, status string) error
-	SetDeviceIdentity(ctx context.Context, tenantId, deviceId string, idData map[string]interface{}) error
+	SetDeviceStatus(
+		ctx context.Context,
+		tenantId string,
+		deviceUpdates []model.DeviceInventoryUpdate,
+		status string,
+	) error
+	SetDeviceIdentity(
+		ctx context.Context,
+		tenantId,
+		deviceId string,
+		idData map[string]interface{},
+	) error
 }
 
 type client struct {
@@ -84,6 +94,7 @@ func (c *client) CheckHealth(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	defer rsp.Body.Close()
 	if rsp.StatusCode >= http.StatusOK && rsp.StatusCode < 300 {
 		return nil
 	}
@@ -95,7 +106,12 @@ func (c *client) CheckHealth(ctx context.Context) error {
 	return &apiErr
 }
 
-func (c *client) SetDeviceStatus(ctx context.Context, tenantId string, deviceUpdates []model.DeviceInventoryUpdate, status string) error {
+func (c *client) SetDeviceStatus(
+	ctx context.Context,
+	tenantId string,
+	deviceUpdates []model.DeviceInventoryUpdate,
+	status string,
+) error {
 	l := log.FromContext(ctx)
 
 	if len(deviceUpdates) < 1 {
@@ -143,7 +159,12 @@ func (c *client) SetDeviceStatus(ctx context.Context, tenantId string, deviceUpd
 	return nil
 }
 
-func (c *client) SetDeviceIdentity(ctx context.Context, tenantId, deviceId string, idData map[string]interface{}) error {
+func (c *client) SetDeviceIdentity(
+	ctx context.Context,
+	tenantId,
+	deviceId string,
+	idData map[string]interface{},
+) error {
 	l := log.FromContext(ctx)
 
 	if deviceId == "" {

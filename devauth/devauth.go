@@ -94,7 +94,12 @@ type App interface {
 	HealthCheck(ctx context.Context) error
 	SubmitAuthRequest(ctx context.Context, r *model.AuthReq) (string, error)
 
-	GetDevices(ctx context.Context, skip, limit uint, filter model.DeviceFilter) ([]model.Device, error)
+	GetDevices(
+		ctx context.Context,
+		skip,
+		limit uint,
+		filter model.DeviceFilter,
+	) ([]model.Device, error)
 	GetDevice(ctx context.Context, dev_id string) (*model.Device, error)
 	DecommissionDevice(ctx context.Context, dev_id string) error
 	DeleteAuthSet(ctx context.Context, dev_id string, auth_id string) error
@@ -233,7 +238,10 @@ func (d *DevAuth) setDeviceIdentity(ctx context.Context, dev *model.Device, tena
 	return nil
 }
 
-func (d *DevAuth) getDeviceFromAuthRequest(ctx context.Context, r *model.AuthReq) (*model.Device, error) {
+func (d *DevAuth) getDeviceFromAuthRequest(
+	ctx context.Context,
+	r *model.AuthReq,
+) (*model.Device, error) {
 	dev := model.NewDevice("", r.IdData, r.PubKey)
 
 	l := log.FromContext(ctx)
@@ -323,7 +331,11 @@ func (d *DevAuth) doVerifyTenant(ctx context.Context, token string) (*tenant.Ten
 	return t, nil
 }
 
-func (d *DevAuth) getTenantWithDefault(ctx context.Context, tenantToken, defaultToken string) (context.Context, *tenant.Tenant, error) {
+func (d *DevAuth) getTenantWithDefault(
+	ctx context.Context,
+	tenantToken,
+	defaultToken string,
+) (context.Context, *tenant.Tenant, error) {
 	l := log.FromContext(ctx)
 
 	if tenantToken == "" && defaultToken == "" {
@@ -463,7 +475,10 @@ func (d *DevAuth) SubmitAuthRequest(ctx context.Context, r *model.AuthReq) (stri
 
 }
 
-func (d *DevAuth) processPreAuthRequest(ctx context.Context, r *model.AuthReq) (*model.AuthSet, error) {
+func (d *DevAuth) processPreAuthRequest(
+	ctx context.Context,
+	r *model.AuthReq,
+) (*model.AuthSet, error) {
 	var deviceAlreadyAccepted bool
 
 	_, idDataSha256, err := parseIdData(r.IdData)
@@ -536,7 +551,12 @@ func (d *DevAuth) processPreAuthRequest(ctx context.Context, r *model.AuthReq) (
 		return nil, errors.Wrap(err, "failed to update auth set status")
 	}
 
-	if err := d.updateDeviceStatus(ctx, aset.DeviceId, model.DevStatusAccepted, currentStatus); err != nil {
+	if err := d.updateDeviceStatus(
+		ctx,
+		aset.DeviceId,
+		model.DevStatusAccepted,
+		currentStatus,
+	); err != nil {
 		return nil, err
 	}
 
@@ -544,7 +564,12 @@ func (d *DevAuth) processPreAuthRequest(ctx context.Context, r *model.AuthReq) (
 	return aset, nil
 }
 
-func (d *DevAuth) updateDeviceStatus(ctx context.Context, devId, status string, currentStatus string) error {
+func (d *DevAuth) updateDeviceStatus(
+	ctx context.Context,
+	devId,
+	status string,
+	currentStatus string,
+) error {
 	newStatus, err := d.db.GetDeviceStatus(ctx, devId)
 	if currentStatus == newStatus {
 		return nil
@@ -609,7 +634,10 @@ func (d *DevAuth) updateDeviceStatus(ctx context.Context, devId, status string, 
 // processAuthRequest will process incoming auth request and record authentication
 // data information it contains. Returns a tupe (auth set, error). If no errors were
 // present, model.AuthSet.Status will indicate the status of device admission
-func (d *DevAuth) processAuthRequest(ctx context.Context, r *model.AuthReq) (*model.AuthSet, error) {
+func (d *DevAuth) processAuthRequest(
+	ctx context.Context,
+	r *model.AuthReq,
+) (*model.AuthSet, error) {
 
 	l := log.FromContext(ctx)
 
@@ -657,7 +685,12 @@ func (d *DevAuth) processAuthRequest(ctx context.Context, r *model.AuthReq) (*mo
 	return areq, nil
 }
 
-func (d *DevAuth) GetDevices(ctx context.Context, skip, limit uint, filter model.DeviceFilter) ([]model.Device, error) {
+func (d *DevAuth) GetDevices(
+	ctx context.Context,
+	skip,
+	limit uint,
+	filter model.DeviceFilter,
+) ([]model.Device, error) {
 	devs, err := d.db.GetDevices(ctx, skip, limit, filter)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list devices")
@@ -733,7 +766,8 @@ func (d *DevAuth) DecommissionDevice(ctx context.Context, devID string) error {
 	}
 
 	// delete device authorization sets
-	if err := d.db.DeleteAuthSetsForDevice(ctx, devID); err != nil && err != store.ErrAuthSetNotFound {
+	if err := d.db.DeleteAuthSetsForDevice(ctx, devID); err != nil &&
+		err != store.ErrAuthSetNotFound {
 		return errors.Wrap(err, "db delete device authorization sets error")
 	}
 
@@ -933,7 +967,8 @@ func (d *DevAuth) setAuthSetStatus(
 
 	currentStatus := aset.Status
 
-	if aset.Status == model.DevStatusAccepted && (status == model.DevStatusRejected || status == model.DevStatusPending) {
+	if aset.Status == model.DevStatusAccepted &&
+		(status == model.DevStatusRejected || status == model.DevStatusPending) {
 		deviceOID := oid.FromString(aset.DeviceId)
 		// delete device token
 		err := d.db.DeleteTokenByDevId(ctx, deviceOID)
@@ -1012,7 +1047,11 @@ func parseIdData(idData string) (map[string]interface{}, []byte, error) {
 
 	err := json.Unmarshal([]byte(idData), &idDataStruct)
 	if err != nil {
-		return idDataStruct, idDataSha256, errors.Wrapf(err, "failed to parse identity data: %s", idData)
+		return idDataStruct, idDataSha256, errors.Wrapf(
+			err,
+			"failed to parse identity data: %s",
+			idData,
+		)
 	}
 
 	hash := sha256.New()
@@ -1022,11 +1061,15 @@ func parseIdData(idData string) (map[string]interface{}, []byte, error) {
 	return idDataStruct, idDataSha256, nil
 }
 
-func (d *DevAuth) PreauthorizeDevice(ctx context.Context, req *model.PreAuthReq) (*model.Device, error) {
+func (d *DevAuth) PreauthorizeDevice(
+	ctx context.Context,
+	req *model.PreAuthReq,
+) (*model.Device, error) {
 	// try add device, if a device with the given id_data exists -
 	// the unique index on id_data will prevent it (conflict)
 	// this is the only safeguard against id data conflict - we won't try to handle it
-	// additionally on inserting the auth set (can't add an id data index on auth set - would prevent key rotation)
+	// additionally on inserting the auth set (can't add an id data index on auth set - would
+	// prevent key rotation)
 
 	// FIXME: tenant_token is "" on purpose, will be removed
 
@@ -1201,7 +1244,11 @@ func (d *DevAuth) RevokeToken(ctx context.Context, tokenID string) error {
 
 	if err == nil && d.cache != nil {
 		err = d.cacheDeleteToken(ctx, token.Claims.Subject.String())
-		err = errors.Wrapf(err, "failed to delete token for %s from cache", token.Claims.Subject.String())
+		err = errors.Wrapf(
+			err,
+			"failed to delete token for %s from cache",
+			token.Claims.Subject.String(),
+		)
 	}
 	return err
 }
@@ -1329,7 +1376,13 @@ func purgeUriArgs(uri string) string {
 	return strings.Split(uri, "?")[0]
 }
 
-func (d *DevAuth) cacheThrottleVerify(ctx context.Context, token *jwt.Token, originalRaw, origMethod, origUri string) (string, error) {
+func (d *DevAuth) cacheThrottleVerify(
+	ctx context.Context,
+	token *jwt.Token,
+	originalRaw,
+	origMethod,
+	origUri string,
+) (string, error) {
 	if d.cache == nil {
 		return "", nil
 	}
@@ -1371,7 +1424,11 @@ func (d *DevAuth) cacheSetToken(ctx context.Context, token *jwt.Token, raw strin
 		expireIn)
 }
 
-func (d *DevAuth) getApiLimits(ctx context.Context, tid, did string) (*ratelimits.ApiLimits, error) {
+func (d *DevAuth) getApiLimits(
+	ctx context.Context,
+	tid,
+	did string,
+) (*ratelimits.ApiLimits, error) {
 	limits, err := d.cache.GetLimits(ctx, tid, did, cache.IdTypeDevice)
 	if err != nil {
 		return nil, err
@@ -1463,7 +1520,11 @@ func (d *DevAuth) GetLimit(ctx context.Context, name string) (*model.Limit, erro
 	}
 }
 
-func (d *DevAuth) GetTenantLimit(ctx context.Context, name, tenant_id string) (*model.Limit, error) {
+func (d *DevAuth) GetTenantLimit(
+	ctx context.Context,
+	name,
+	tenant_id string,
+) (*model.Limit, error) {
 	ctx = identity.WithContext(ctx, &identity.Identity{
 		Tenant: tenant_id,
 	})
@@ -1571,14 +1632,23 @@ func (d *DevAuth) DeleteTokens(
 		err = d.db.DeleteTokenByDevId(ctx, deviceOID)
 	} else {
 		if err := d.cacheFlush(ctx); err != nil {
-			return errors.Wrapf(err, "failed to flush cache when cleaning tokens for tenant %v", tenantID)
+			return errors.Wrapf(
+				err,
+				"failed to flush cache when cleaning tokens for tenant %v",
+				tenantID,
+			)
 		}
 
 		err = d.db.DeleteTokens(ctx)
 	}
 
 	if err != nil && err != store.ErrTokenNotFound {
-		return errors.Wrapf(err, "failed to delete tokens for tenant: %v, device id: %v", tenantID, deviceID)
+		return errors.Wrapf(
+			err,
+			"failed to delete tokens for tenant: %v, device id: %v",
+			tenantID,
+			deviceID,
+		)
 	}
 
 	return nil
@@ -1602,7 +1672,11 @@ func (d *DevAuth) ProvisionTenant(ctx context.Context, tenant_id string) error {
 	return d.db.WithAutomigrate().MigrateTenant(tenantCtx, dbname, mongo.DbVersion)
 }
 
-func (d *DevAuth) GetTenantDeviceStatus(ctx context.Context, tenantId, deviceId string) (*model.Status, error) {
+func (d *DevAuth) GetTenantDeviceStatus(
+	ctx context.Context,
+	tenantId,
+	deviceId string,
+) (*model.Status, error) {
 	if tenantId != "" {
 		ctx = identity.WithContext(ctx, &identity.Identity{
 			Tenant: tenantId,

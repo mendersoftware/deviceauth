@@ -1,4 +1,4 @@
-// Copyright 2020 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -25,8 +25,6 @@ import (
 	"github.com/mendersoftware/deviceauth/store"
 )
 
-const noCollectionErrMsg = "ns doesn't exist"
-
 // Retrieves devices with decommissioning flag set
 func (db *DataStoreMongo) GetDevicesBeingDecommissioned(dbName string) ([]model.Device, error) {
 	c := db.client.Database(dbName).Collection(DbDevicesColl)
@@ -47,7 +45,8 @@ func (db *DataStoreMongo) GetDevicesBeingDecommissioned(dbName string) ([]model.
 	return devices, nil
 }
 
-// Retrieves Ids of the auth sets owned by devices that are in decommissioning state or not owned by any device.
+// Retrieves Ids of the auth sets owned by devices that are in decommissioning state or not owned by
+// any device.
 func (db *DataStoreMongo) GetBrokenAuthSets(dbName string) ([]string, error) {
 	c := db.client.Database(dbName).Collection(DbAuthSetColl)
 
@@ -138,14 +137,15 @@ func (db *DataStoreMongo) DeleteBrokenAuthSets(dbName string) error {
 		return err
 	}
 
-	// delete authsets for non-exisitent devices
+	// delete authsets for non-existent devices
+	ctx := context.Background()
 	for _, as := range authSets {
-		_, err := collAuthSets.DeleteOne(nil, model.AuthSet{Id: as})
+		_, err := collAuthSets.DeleteOne(ctx, model.AuthSet{Id: as})
 		if err != nil {
 			return errors.Wrapf(err, "database %s, failed to delete authentication sets", dbName)
 		}
 		// Attempt to delete token (may have already expired).
-		collTokens.DeleteOne(nil, bson.M{"_id": as})
+		_, _ = collTokens.DeleteOne(ctx, bson.M{"_id": as})
 	}
 
 	return nil
@@ -153,7 +153,10 @@ func (db *DataStoreMongo) DeleteBrokenAuthSets(dbName string) error {
 
 // Filters list of device ids.
 // Result is the list of ids of non-existent devices and devices with decommissioning flag set.
-func (db *DataStoreMongo) filterNonExistentDevices(dbName string, devIds []string) ([]string, error) {
+func (db *DataStoreMongo) filterNonExistentDevices(
+	dbName string,
+	devIds []string,
+) ([]string, error) {
 	c := db.client.Database(dbName).Collection(DbDevicesColl)
 
 	nonexistentDevices := []string{}
@@ -171,7 +174,7 @@ func (db *DataStoreMongo) filterNonExistentDevices(dbName string, devIds []strin
 			}
 		}
 
-		if res.Decommissioning == true {
+		if res.Decommissioning {
 			nonexistentDevices = append(nonexistentDevices, devId)
 		}
 	}

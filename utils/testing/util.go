@@ -1,4 +1,4 @@
-// Copyright 2020 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -59,7 +59,9 @@ func AuthReqSign(data []byte, privkey crypto.PrivateKey, t *testing.T) []byte {
 		signature, err = rsa.SignPKCS1v15(
 			rand.Reader, pkey, crypto.SHA256, digest,
 		)
-
+		if err != nil {
+			panic(err)
+		}
 	case *ecdsa.PrivateKey:
 		r, s, err := ecdsa.Sign(rand.Reader, pkey, digest)
 		if err != nil {

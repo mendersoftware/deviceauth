@@ -15,9 +15,7 @@ package cmd
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"sort"
 
 	"github.com/mendersoftware/go-lib-micro/config"
 	"github.com/mendersoftware/go-lib-micro/identity"
@@ -108,7 +106,12 @@ func Maintenance(decommissioningCleanupFlag bool, tenant string, dryRunFlag bool
 	return maintenanceWithDataStore(decommissioningCleanupFlag, tenant, dryRunFlag, db)
 }
 
-func maintenanceWithDataStore(decommissioningCleanupFlag bool, tenant string, dryRunFlag bool, db *mongo.DataStoreMongo) error {
+func maintenanceWithDataStore(
+	decommissioningCleanupFlag bool,
+	tenant string,
+	dryRunFlag bool,
+	db *mongo.DataStoreMongo,
+) error {
 	// cleanup devauth database from leftovers after failed decommissioning
 	if decommissioningCleanupFlag {
 		return decommissioningCleanup(db, tenant, dryRunFlag)
@@ -123,15 +126,23 @@ func decommissioningCleanup(db *mongo.DataStoreMongo, tenant string, dryRunFlag 
 		if err != nil {
 			return errors.Wrap(err, "failed to retrieve tenant DBs")
 		}
-		decommissioningCleanupWithDbs(db, append(tdbs, mongo.DbName), dryRunFlag)
+		_ = decommissioningCleanupWithDbs(db, append(tdbs, mongo.DbName), dryRunFlag)
 	} else {
-		decommissioningCleanupWithDbs(db, []string{mstore.DbNameForTenant(tenant, mongo.DbName)}, dryRunFlag)
+		_ = decommissioningCleanupWithDbs(
+			db,
+			[]string{mstore.DbNameForTenant(tenant, mongo.DbName)},
+			dryRunFlag,
+		)
 	}
 
 	return nil
 }
 
-func decommissioningCleanupWithDbs(db *mongo.DataStoreMongo, tenantDbs []string, dryRunFlag bool) error {
+func decommissioningCleanupWithDbs(
+	db *mongo.DataStoreMongo,
+	tenantDbs []string,
+	dryRunFlag bool,
+) error {
 	for _, dbName := range tenantDbs {
 		println("database: ", dbName)
 		if err := decommissioningCleanupWithDb(db, dbName, dryRunFlag); err != nil {
@@ -193,7 +204,13 @@ func decommissioningCleanupExecute(db *mongo.DataStoreMongo, dbName string) erro
 	return nil
 }
 
-func PropagateStatusesInventory(db store.DataStore, c cinv.Client, tenant string, migrationVersion string, dryRun bool) error {
+func PropagateStatusesInventory(
+	db store.DataStore,
+	c cinv.Client,
+	tenant string,
+	migrationVersion string,
+	dryRun bool,
+) error {
 	l := log.NewEmpty()
 
 	dbs, err := selectDbs(db, tenant)
@@ -270,7 +287,14 @@ const (
 	devicesBatchSize = 512
 )
 
-func updateDevicesStatus(ctx context.Context, db store.DataStore, c cinv.Client, tenant string, status string, dryRun bool) error {
+func updateDevicesStatus(
+	ctx context.Context,
+	db store.DataStore,
+	c cinv.Client,
+	tenant string,
+	status string,
+	dryRun bool,
+) error {
 	var skip uint
 
 	skip = 0
@@ -311,7 +335,13 @@ func updateDevicesStatus(ctx context.Context, db store.DataStore, c cinv.Client,
 	return nil
 }
 
-func updateDevicesIdData(ctx context.Context, db store.DataStore, c cinv.Client, tenant string, dryRun bool) error {
+func updateDevicesIdData(
+	ctx context.Context,
+	db store.DataStore,
+	c cinv.Client,
+	tenant string,
+	dryRun bool,
+) error {
 	var skip uint
 
 	skip = 0
@@ -343,7 +373,13 @@ func updateDevicesIdData(ctx context.Context, db store.DataStore, c cinv.Client,
 	return nil
 }
 
-func tryPropagateStatusesInventoryForDb(db store.DataStore, c cinv.Client, dbname string, migrationVersion string, dryRun bool) error {
+func tryPropagateStatusesInventoryForDb(
+	db store.DataStore,
+	c cinv.Client,
+	dbname string,
+	migrationVersion string,
+	dryRun bool,
+) error {
 	l := log.NewEmpty()
 
 	l.Infof("propagating device statuses to inventory from DB: %s", dbname)
@@ -362,7 +398,12 @@ func tryPropagateStatusesInventoryForDb(db store.DataStore, c cinv.Client, dbnam
 	for _, status := range model.DevStatuses {
 		err = updateDevicesStatus(ctx, db, c, tenant, status, dryRun)
 		if err != nil {
-			l.Infof("Done with DB %s status=%s, but there were errors: %s.", dbname, status, err.Error())
+			l.Infof(
+				"Done with DB %s status=%s, but there were errors: %s.",
+				dbname,
+				status,
+				err.Error(),
+			)
 			errReturned = err
 		} else {
 			l.Infof("Done with DB %s status=%s", dbname, status)
@@ -370,14 +411,23 @@ func tryPropagateStatusesInventoryForDb(db store.DataStore, c cinv.Client, dbnam
 	}
 	if migrationVersion != "" && !dryRun {
 		if errReturned != nil {
-			l.Warnf("Will not store %s migration version in %s.migration_info due to errors.", migrationVersion, dbname)
+			l.Warnf(
+				"Will not store %s migration version in %s.migration_info due to errors.",
+				migrationVersion,
+				dbname,
+			)
 		} else {
 			version, err := migrate.NewVersion(migrationVersion)
 			if version == nil || err != nil {
-				l.Warnf("Will not store %s migration version in %s.migration_info due to bad version provided.", migrationVersion, dbname)
+				l.Warnf(
+					"Will not store %s migration version in %s.migration_info due to bad version"+
+						" provided.",
+					migrationVersion,
+					dbname,
+				)
 				errReturned = err
 			} else {
-				db.StoreMigrationVersion(ctx, version)
+				_ = db.StoreMigrationVersion(ctx, version)
 			}
 		}
 	}
@@ -385,7 +435,12 @@ func tryPropagateStatusesInventoryForDb(db store.DataStore, c cinv.Client, dbnam
 	return errReturned
 }
 
-func tryPropagateIdDataInventoryForDb(db store.DataStore, c cinv.Client, dbname string, dryRun bool) error {
+func tryPropagateIdDataInventoryForDb(
+	db store.DataStore,
+	c cinv.Client,
+	dbname string,
+	dryRun bool,
+) error {
 	l := log.NewEmpty()
 
 	l.Infof("propagating device id_data to inventory from DB: %s", dbname)
@@ -407,31 +462,6 @@ func tryPropagateIdDataInventoryForDb(db store.DataStore, c cinv.Client, dbname 
 	}
 
 	return err
-}
-
-func idDataToInventoryAttrs(id map[string]interface{}) ([]cinv.Attribute, error) {
-	var out []cinv.Attribute
-
-	for k, v := range id {
-		a := cinv.Attribute{
-			Name:  k,
-			Scope: "identity",
-		}
-		venc, err := json.Marshal(v)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to encode attribute %s, value: %v", k, v)
-		}
-
-		a.Value = string(venc)
-		out = append(out, a)
-	}
-
-	// mostly for testability tbh - iteration over map = random order
-	sort.Slice(out, func(i, j int) bool {
-		return out[i].Name < out[j].Name
-	})
-
-	return out, nil
 }
 
 const (

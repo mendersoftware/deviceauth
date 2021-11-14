@@ -1,4 +1,4 @@
-// Copyright 2020 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -109,6 +109,7 @@ func (c *Client) CheckHealth(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	defer rsp.Body.Close()
 	if rsp.StatusCode >= http.StatusOK && rsp.StatusCode < 300 {
 		return nil
 	}
@@ -224,7 +225,12 @@ func (tc *Client) GetTenantUsers(ctx context.Context, tenantID string) ([]User, 
 			"tenantID: cannot be empty")
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "GET", utils.JoinURL(tc.conf.TenantAdmAddr, TenantUsersURI), nil)
+	req, err := http.NewRequestWithContext(
+		ctx,
+		"GET",
+		utils.JoinURL(tc.conf.TenantAdmAddr, TenantUsersURI),
+		nil,
+	)
 	if err != nil {
 		return nil, errors.Wrap(err, "tenantadm: failed to prepare request")
 	}

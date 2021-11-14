@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -49,7 +49,12 @@ func (m *migration_1_3_0) Up(from migrate.Version) error {
 		newKey, err := normalizeKey(set.PubKey)
 
 		if err != nil {
-			return errors.Wrapf(err, "failed to normalize key of auth set %v: %v", set.Id, set.PubKey)
+			return errors.Wrapf(
+				err,
+				"failed to normalize key of auth set %v: %v",
+				set.Id,
+				set.PubKey,
+			)
 		}
 
 		update := bson.M{

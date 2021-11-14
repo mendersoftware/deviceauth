@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -45,11 +45,15 @@ func (m *migration_1_6_0) Up(from migrate.Version) error {
 			Unique:     &_true,
 		},
 	}
-	cAuthSets := m.ms.client.Database(ctxstore.DbFromContext(m.ctx, DbName)).Collection(DbAuthSetColl)
+	cAuthSets := m.ms.client.Database(ctxstore.DbFromContext(m.ctx, DbName)).
+		Collection(DbAuthSetColl)
 	authSetIndexes := cAuthSets.Indexes()
 	_, err := authSetIndexes.CreateOne(m.ctx, authSetUniqueIndex)
 	if err != nil {
-		return errors.Wrap(err, "failed to create index containing IdDataSha256 and PubKey on auth sets")
+		return errors.Wrap(
+			err,
+			"failed to create index containing IdDataSha256 and PubKey on auth sets",
+		)
 	}
 
 	return nil

@@ -1,4 +1,4 @@
-// Copyright 2020 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -19,7 +19,8 @@
 //
 // 1. Quota enforcement
 //
-// Based on https://redislabs.com/redis-best-practices/basic-rate-limiting/, but with a flexible interval (ratelimits.ApiQuota.IntervalSec).
+// Based on https://redislabs.com/redis-best-practices/basic-rate-limiting/, but with a flexible
+// interval (ratelimits.ApiQuota.IntervalSec).
 // Current usage for a device lives under key:
 //
 // `tenant:<tid>:device:<did>:quota:<interval_num>: <num_reqs>`
@@ -48,9 +49,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/pkg/errors"
 	"strconv"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/go-redis/redis/v8"
 	"github.com/mendersoftware/go-lib-micro/ratelimits"
@@ -70,11 +72,21 @@ var (
 //go:generate ../utils/mockgen.sh
 type Cache interface {
 	// Throttle applies desired api limits and retrieves a cached token.
-	// These ops are bundled because the implementation will pipeline them for a single network roundtrip for max performance.
+	// These ops are bundled because the implementation will pipeline them for a single network
+	// roundtrip for max performance.
 	// Returns:
 	// - the token (if any)
 	// - potentially ErrTooManyRequests (other errors: internal)
-	Throttle(ctx context.Context, rawToken string, l ratelimits.ApiLimits, tid, id, idtype, url, action string) (string, error)
+	Throttle(
+		ctx context.Context,
+		rawToken string,
+		l ratelimits.ApiLimits,
+		tid,
+		id,
+		idtype,
+		url,
+		action string,
+	) (string, error)
 
 	// CacheToken caches the token under designated key, with expiration
 	CacheToken(ctx context.Context, tid, id, idtype, token string, expireSec time.Duration) error
@@ -99,7 +111,14 @@ type RedisCache struct {
 	clock           utils.Clock
 }
 
-func NewRedisCache(addr, user, pass string, db int, timeoutSec, limitsExpireSec int) (*RedisCache, error) {
+func NewRedisCache(
+	addr,
+	user,
+	pass string,
+	db int,
+	timeoutSec,
+	limitsExpireSec int,
+) (*RedisCache, error) {
 	c := redis.NewClient(&redis.Options{
 		Addr:     addr,
 		Username: user,
@@ -122,7 +141,16 @@ func (rl *RedisCache) WithClock(c utils.Clock) *RedisCache {
 	return rl
 }
 
-func (rl *RedisCache) Throttle(ctx context.Context, rawToken string, l ratelimits.ApiLimits, tid, id, idtype, url, action string) (string, error) {
+func (rl *RedisCache) Throttle(
+	ctx context.Context,
+	rawToken string,
+	l ratelimits.ApiLimits,
+	tid,
+	id,
+	idtype,
+	url,
+	action string,
+) (string, error) {
 	now := rl.clock.Now().Unix()
 
 	var tokenGet *redis.StringCmd
@@ -152,6 +180,9 @@ func (rl *RedisCache) Throttle(ctx context.Context, rawToken string, l ratelimit
 
 	// collect quota/burst control and token fetch results
 	tok, err := rl.checkToken(tokenGet, rawToken)
+	if err != nil {
+		return "", err
+	}
 
 	err = rl.checkQuota(l, quotaInc, quotaExp)
 	if err != nil {
@@ -166,7 +197,13 @@ func (rl *RedisCache) Throttle(ctx context.Context, rawToken string, l ratelimit
 	return tok, nil
 }
 
-func (rl *RedisCache) pipeToken(ctx context.Context, pipe redis.Pipeliner, tid, id, idtype string) *redis.StringCmd {
+func (rl *RedisCache) pipeToken(
+	ctx context.Context,
+	pipe redis.Pipeliner,
+	tid,
+	id,
+	idtype string,
+) *redis.StringCmd {
 	key := KeyToken(tid, id, idtype)
 	return pipe.Get(ctx, key)
 }
@@ -191,7 +228,15 @@ func (rl *RedisCache) checkToken(cmd *redis.StringCmd, raw string) (string, erro
 	}
 }
 
-func (rl *RedisCache) pipeQuota(ctx context.Context, pipe redis.Pipeliner, l ratelimits.ApiLimits, tid, id, idtype string, now int64) (*redis.IntCmd, *redis.BoolCmd) {
+func (rl *RedisCache) pipeQuota(
+	ctx context.Context,
+	pipe redis.Pipeliner,
+	l ratelimits.ApiLimits,
+	tid,
+	id,
+	idtype string,
+	now int64,
+) (*redis.IntCmd, *redis.BoolCmd) {
 	var incr *redis.IntCmd
 	var expire *redis.BoolCmd
 
@@ -206,7 +251,11 @@ func (rl *RedisCache) pipeQuota(ctx context.Context, pipe redis.Pipeliner, l rat
 	return incr, expire
 }
 
-func (rl *RedisCache) checkQuota(l ratelimits.ApiLimits, incr *redis.IntCmd, expire *redis.BoolCmd) error {
+func (rl *RedisCache) checkQuota(
+	l ratelimits.ApiLimits,
+	incr *redis.IntCmd,
+	expire *redis.BoolCmd,
+) error {
 	if incr == nil && expire == nil {
 		return nil
 	}
@@ -272,7 +321,14 @@ func (rl *RedisCache) checkBurst(get *redis.StringCmd, set *redis.StatusCmd) err
 	return nil
 }
 
-func (rl *RedisCache) CacheToken(ctx context.Context, tid, id, idtype, token string, expire time.Duration) error {
+func (rl *RedisCache) CacheToken(
+	ctx context.Context,
+	tid,
+	id,
+	idtype,
+	token string,
+	expire time.Duration,
+) error {
 	res := rl.c.Set(ctx, KeyToken(tid, id, idtype),
 		token,
 		expire)
@@ -284,7 +340,12 @@ func (rl *RedisCache) DeleteToken(ctx context.Context, tid, id, idtype string) e
 	return res.Err()
 }
 
-func (rl *RedisCache) GetLimits(ctx context.Context, tid, id, idtype string) (*ratelimits.ApiLimits, error) {
+func (rl *RedisCache) GetLimits(
+	ctx context.Context,
+	tid,
+	id,
+	idtype string,
+) (*ratelimits.ApiLimits, error) {
 	res := rl.c.Get(ctx, KeyLimits(tid, id, idtype))
 
 	if res.Err() != nil {
@@ -304,13 +365,24 @@ func (rl *RedisCache) GetLimits(ctx context.Context, tid, id, idtype string) (*r
 	return &limits, nil
 }
 
-func (rl *RedisCache) CacheLimits(ctx context.Context, l ratelimits.ApiLimits, tid, id, idtype string) error {
+func (rl *RedisCache) CacheLimits(
+	ctx context.Context,
+	l ratelimits.ApiLimits,
+	tid,
+	id,
+	idtype string,
+) error {
 	enc, err := json.Marshal(l)
 	if err != nil {
 		return err
 	}
 
-	res := rl.c.Set(ctx, KeyLimits(tid, id, idtype), enc, time.Duration(rl.LimitsExpireSec)*time.Second)
+	res := rl.c.Set(
+		ctx,
+		KeyLimits(tid, id, idtype),
+		enc,
+		time.Duration(rl.LimitsExpireSec)*time.Second,
+	)
 
 	return res.Err()
 }
