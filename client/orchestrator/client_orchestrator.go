@@ -106,6 +106,7 @@ func (c *Client) CheckHealth(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	defer rsp.Body.Close()
 	if rsp.StatusCode >= http.StatusOK && rsp.StatusCode < 300 {
 		return nil
 	}
@@ -117,7 +118,10 @@ func (c *Client) CheckHealth(ctx context.Context) error {
 	return &apiErr
 }
 
-func (co *Client) SubmitDeviceDecommisioningJob(ctx context.Context, decommissioningReq DecommissioningReq) error {
+func (co *Client) SubmitDeviceDecommisioningJob(
+	ctx context.Context,
+	decommissioningReq DecommissioningReq,
+) error {
 
 	l := log.FromContext(ctx)
 
@@ -164,7 +168,10 @@ func (co *Client) SubmitDeviceDecommisioningJob(ctx context.Context, decommissio
 	return nil
 }
 
-func (co *Client) SubmitProvisionDeviceJob(ctx context.Context, provisionDeviceReq ProvisionDeviceReq) error {
+func (co *Client) SubmitProvisionDeviceJob(
+	ctx context.Context,
+	provisionDeviceReq ProvisionDeviceReq,
+) error {
 
 	l := log.FromContext(ctx)
 
@@ -211,7 +218,10 @@ func (co *Client) SubmitProvisionDeviceJob(ctx context.Context, provisionDeviceR
 	return nil
 }
 
-func (co *Client) SubmitUpdateDeviceStatusJob(ctx context.Context, updateDeviceStatusReq UpdateDeviceStatusReq) error {
+func (co *Client) SubmitUpdateDeviceStatusJob(
+	ctx context.Context,
+	updateDeviceStatusReq UpdateDeviceStatusReq,
+) error {
 	l := log.FromContext(ctx)
 
 	l.Debugf("Submit update device status job for devices: %v", updateDeviceStatusReq.Devices)
@@ -302,7 +312,10 @@ func (co *Client) SubmitDeviceLimitWarning(
 	return nil
 }
 
-func (co *Client) SubmitUpdateDeviceInventoryJob(ctx context.Context, updateDeviceInventoryReq UpdateDeviceInventoryReq) error {
+func (co *Client) SubmitUpdateDeviceInventoryJob(
+	ctx context.Context,
+	updateDeviceInventoryReq UpdateDeviceInventoryReq,
+) error {
 	l := log.FromContext(ctx)
 
 	l.Debugf("Submit update device inventory job for device: %q", updateDeviceInventoryReq.DeviceId)

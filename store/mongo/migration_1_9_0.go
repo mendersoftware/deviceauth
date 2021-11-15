@@ -1,4 +1,4 @@
-// Copyright 2020 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -63,7 +63,8 @@ func (m *migration_1_9_0) Up(from migrate.Version) error {
 	}
 
 	// drop authset index on raw identity data, if exists
-	cAuthsets := m.ds.client.Database(ctxstore.DbFromContext(m.ctx, DbName)).Collection(DbAuthSetColl)
+	cAuthsets := m.ds.client.Database(ctxstore.DbFromContext(m.ctx, DbName)).
+		Collection(DbAuthSetColl)
 	asetIndexes := cAuthsets.Indexes()
 	_, err = asetIndexes.DropOne(m.ctx, indexAuthSet_DeviceId_IdentityData_PubKey)
 	if err != nil && !isIndexNotFound(err) {

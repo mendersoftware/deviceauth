@@ -132,7 +132,8 @@ type DeviceUpdate struct {
 	Status          string                 `json:"-" bson:",omitempty"`
 	Decommissioning *bool                  `json:"-" bson:",omitempty"`
 	UpdatedTs       *time.Time             `json:"updated_ts" bson:"updated_ts,omitempty"`
-	ExternalName    string                 `json:"external_name,omitempty" bson:"external.name,omitempty"`
+	//nolint:lll
+	ExternalName string `json:"external_name,omitempty" bson:"external.name,omitempty"`
 }
 
 func NewDevice(id, id_data, pubkey string) *Device {

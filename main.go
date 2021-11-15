@@ -44,8 +44,9 @@ func doMain(args []string) {
 
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
-			Name:        "config",
-			Usage:       "Configuration `FILE`. Supports JSON, TOML, YAML and HCL formatted configs.",
+			Name: "config",
+			Usage: "Configuration `FILE`." +
+				" Supports JSON, TOML, YAML and HCL formatted configs.",
 			Destination: &configPath,
 		},
 		cli.BoolFlag{
@@ -101,8 +102,9 @@ func doMain(args []string) {
 					Usage: "Migration version to be stored in migration_info collection.",
 				},
 				cli.BoolFlag{
-					Name:  "dry-run",
-					Usage: "Do not perform any inventory modifications, just scan and print devices.",
+					Name: "dry-run",
+					Usage: "Do not perform any inventory modifications," +
+						" just scan and print devices.",
 				},
 			},
 
@@ -117,8 +119,9 @@ func doMain(args []string) {
 					Usage: "Tenant ID (optional) - propagate for just a single tenant.",
 				},
 				cli.BoolFlag{
-					Name:  "dry-run",
-					Usage: "Do not perform any inventory modifications, just scan and print devices.",
+					Name: "dry-run",
+					Usage: "Do not perform any inventory modifications," +
+						" just scan and print devices.",
 				},
 			},
 
@@ -137,8 +140,9 @@ func doMain(args []string) {
 					Usage: "Tenant ID (optional).",
 				},
 				cli.BoolFlag{
-					Name:  "dry-run",
-					Usage: "Do not perform any modifications and serves only as a way to inspect changes and detect if any are necessary",
+					Name: "dry-run",
+					Usage: "Do not perform any modifications and serves" +
+						" only as a way to inspect changes and detect if any are necessary",
 				},
 			},
 
@@ -182,7 +186,7 @@ func doMain(args []string) {
 		return nil
 	}
 
-	app.Run(args)
+	_ = app.Run(args)
 }
 
 func cmdServer(args *cli.Context) error {
@@ -237,7 +241,11 @@ func cmdMigrate(args *cli.Context) error {
 }
 
 func cmdMaintenance(args *cli.Context) error {
-	err := cmd.Maintenance(args.Bool("decommissioning-cleanup"), args.String("tenant"), args.Bool("dry-run"))
+	err := cmd.Maintenance(
+		args.Bool("decommissioning-cleanup"),
+		args.String("tenant"),
+		args.Bool("dry-run"),
+	)
 	if err != nil {
 		return cli.NewExitError(err, 6)
 	}
@@ -246,6 +254,9 @@ func cmdMaintenance(args *cli.Context) error {
 
 func cmdPropagateStatusesInventory(args *cli.Context) error {
 	db, err := mongo.NewDataStoreMongo(makeDataStoreConfig())
+	if err != nil {
+		return err
+	}
 
 	inv := config.Config.GetString(dconfig.SettingInventoryAddr)
 	c := cinv.NewClient(inv, false)
@@ -263,6 +274,9 @@ func cmdPropagateStatusesInventory(args *cli.Context) error {
 
 func cmdPropagateIdDataInventory(args *cli.Context) error {
 	db, err := mongo.NewDataStoreMongo(makeDataStoreConfig())
+	if err != nil {
+		return err
+	}
 
 	inv := config.Config.GetString(dconfig.SettingInventoryAddr)
 	c := cinv.NewClient(inv, false)

@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -47,7 +47,12 @@ func (m *migration_1_2_0) Up(from migrate.Version) error {
 		}
 		newIdData, err := utils.JsonSort(set.IdData)
 		if err != nil {
-			return errors.Wrapf(err, "failed to sort id data of auth set  %v: %v", set.Id, set.IdData)
+			return errors.Wrapf(
+				err,
+				"failed to sort id data of auth set  %v: %v",
+				set.Id,
+				set.IdData,
+			)
 		}
 
 		update := bson.M{

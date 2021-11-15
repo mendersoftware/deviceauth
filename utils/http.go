@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -32,9 +32,7 @@ func ReadBodyRaw(r *rest.Request) ([]byte, error) {
 }
 
 func JoinURL(base, url string) string {
-	if strings.HasPrefix(url, "/") {
-		url = url[1:]
-	}
+	url = strings.TrimPrefix(url, "/")
 	if !strings.HasSuffix(base, "/") {
 		base = base + "/"
 	}

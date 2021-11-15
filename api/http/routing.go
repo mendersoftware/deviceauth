@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -45,7 +45,7 @@ func AutogenOptionsRoutes(routes []*rest.Route, gen HttpOptionsGenerator) []*res
 	for _, route := range routes {
 		methods, ok := methodGroups[route.PathExp]
 		if !ok {
-			methods = make([]string, 0, 0)
+			methods = make([]string, 0)
 		}
 
 		methodGroups[route.PathExp] = append(methods, route.HttpMethod)
@@ -54,7 +54,7 @@ func AutogenOptionsRoutes(routes []*rest.Route, gen HttpOptionsGenerator) []*res
 	options := make([]*rest.Route, 0, len(methodGroups))
 	for route, methods := range methodGroups {
 		// skip if there's a handler for OPTIONS already
-		if supportsMethod(http.MethodOptions, methods) == false {
+		if !supportsMethod(http.MethodOptions, methods) {
 			options = append(options,
 				rest.Options(route, gen(methods)))
 		}

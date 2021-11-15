@@ -1,4 +1,4 @@
-// Copyright 2020 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -79,7 +79,12 @@ func NewDevAdmAuthSet(a AuthSet) (*DevAdmAuthSet, error) {
 	// decode them on the fly for the time being
 	err := json.Unmarshal([]byte(a.IdData), &as.Attributes)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to decode attributes for device %s, auth set %s", a.DeviceId, a.Id)
+		return nil, errors.Wrapf(
+			err,
+			"failed to decode attributes for device %s, auth set %s",
+			a.DeviceId,
+			a.Id,
+		)
 	}
 
 	return as, nil

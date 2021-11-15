@@ -186,13 +186,26 @@ func (d *DevAuthApiHandlers) SubmitAuthRequestHandler(w rest.ResponseWriter, r *
 	//verify signature
 	signature := r.Header.Get(HdrAuthReqSign)
 	if signature == "" {
-		rest_utils.RestErrWithLog(w, r, l, errors.New("missing request signature header"), http.StatusBadRequest)
+		rest_utils.RestErrWithLog(
+			w,
+			r,
+			l,
+			errors.New("missing request signature header"),
+			http.StatusBadRequest,
+		)
 		return
 	}
 
 	err = utils.VerifyAuthReqSign(signature, authreq.PubKeyStruct, body)
 	if err != nil {
-		rest_utils.RestErrWithLogMsg(w, r, l, err, http.StatusUnauthorized, "signature verification failed")
+		rest_utils.RestErrWithLogMsg(
+			w,
+			r,
+			l,
+			err,
+			http.StatusUnauthorized,
+			"signature verification failed",
+		)
 		return
 	}
 
@@ -218,7 +231,7 @@ func (d *DevAuthApiHandlers) SubmitAuthRequestHandler(w rest.ResponseWriter, r *
 			http.StatusUnauthorized, "unauthorized")
 		return
 	case nil:
-		w.(http.ResponseWriter).Write([]byte(token))
+		_, _ = w.(http.ResponseWriter).Write([]byte(token))
 		w.Header().Set("Content-Type", "application/jwt")
 		return
 	default:
@@ -253,7 +266,7 @@ func (d *DevAuthApiHandlers) PostDevicesV2Handler(w rest.ResponseWriter, r *rest
 	case devauth.ErrDeviceExists:
 		l.Error(err)
 		w.WriteHeader(http.StatusConflict)
-		w.WriteJson(device)
+		_ = w.WriteJson(device)
 	default:
 		rest_utils.RestErrWithLogInternal(w, r, l, err)
 	}
@@ -347,7 +360,13 @@ func (d *DevAuthApiHandlers) GetDevicesCountHandler(w rest.ResponseWriter, r *re
 		model.DevStatusNoAuth,
 		"":
 	default:
-		rest_utils.RestErrWithLog(w, r, l, errors.New("status must be one of: pending, accepted, rejected, preauthorized, noauth"), http.StatusBadRequest)
+		rest_utils.RestErrWithLog(
+			w,
+			r,
+			l,
+			errors.New("status must be one of: pending, accepted, rejected, preauthorized, noauth"),
+			http.StatusBadRequest,
+		)
 		return
 	}
 
@@ -358,7 +377,7 @@ func (d *DevAuthApiHandlers) GetDevicesCountHandler(w rest.ResponseWriter, r *re
 		return
 	}
 
-	w.WriteJson(model.Count{Count: count})
+	_ = w.WriteJson(model.Count{Count: count})
 }
 
 func (d *DevAuthApiHandlers) GetDeviceV2Handler(w rest.ResponseWriter, r *rest.Request) {
@@ -375,7 +394,7 @@ func (d *DevAuthApiHandlers) GetDeviceV2Handler(w rest.ResponseWriter, r *rest.R
 		rest_utils.RestErrWithLog(w, r, l, err, http.StatusNotFound)
 	case dev != nil:
 		apiDev, _ := deviceV2FromDbModel(dev)
-		w.WriteJson(apiDev)
+		_ = w.WriteJson(apiDev)
 	default:
 		rest_utils.RestErrWithLogInternal(w, r, l, err)
 	}
@@ -612,7 +631,7 @@ func (d *DevAuthApiHandlers) GetTenantLimitHandler(w rest.ResponseWriter, r *res
 		return
 	}
 
-	w.WriteJson(LimitValue{lim.Value})
+	_ = w.WriteJson(LimitValue{lim.Value})
 }
 
 func (d *DevAuthApiHandlers) GetLimitHandler(w rest.ResponseWriter, r *rest.Request) {
@@ -635,7 +654,7 @@ func (d *DevAuthApiHandlers) GetLimitHandler(w rest.ResponseWriter, r *rest.Requ
 		return
 	}
 
-	w.WriteJson(LimitValue{lim.Value})
+	_ = w.WriteJson(LimitValue{lim.Value})
 }
 
 func (d *DevAuthApiHandlers) DeleteTokensHandler(w rest.ResponseWriter, r *rest.Request) {
@@ -646,7 +665,13 @@ func (d *DevAuthApiHandlers) DeleteTokensHandler(w rest.ResponseWriter, r *rest.
 
 	tenantId := r.URL.Query().Get("tenant_id")
 	if tenantId == "" {
-		rest_utils.RestErrWithLog(w, r, l, errors.New("tenant_id must be provided"), http.StatusBadRequest)
+		rest_utils.RestErrWithLog(
+			w,
+			r,
+			l,
+			errors.New("tenant_id must be provided"),
+			http.StatusBadRequest,
+		)
 		return
 	}
 	devId := r.URL.Query().Get("device_id")
@@ -671,7 +696,7 @@ func (d *DevAuthApiHandlers) GetAuthSetStatusHandler(w rest.ResponseWriter, r *r
 	aset, err := d.db.GetAuthSetById(ctx, authid)
 	switch err {
 	case nil:
-		w.WriteJson(&model.Status{Status: aset.Status})
+		_ = w.WriteJson(&model.Status{Status: aset.Status})
 	case store.ErrDevNotFound, store.ErrAuthSetNotFound:
 		rest_utils.RestErrWithLog(w, r, l, store.ErrAuthSetNotFound, http.StatusNotFound)
 	default:
@@ -712,14 +737,20 @@ func (d *DevAuthApiHandlers) GetTenantDeviceStatus(w rest.ResponseWriter, r *res
 	did := r.PathParam("did")
 
 	if did == "" {
-		rest_utils.RestErrWithLog(w, r, l, errors.New("device id (did) cannot be empty"), http.StatusBadRequest)
+		rest_utils.RestErrWithLog(
+			w,
+			r,
+			l,
+			errors.New("device id (did) cannot be empty"),
+			http.StatusBadRequest,
+		)
 		return
 	}
 
 	status, err := d.devAuth.GetTenantDeviceStatus(ctx, tid, did)
 	switch err {
 	case nil:
-		w.WriteJson(status)
+		_ = w.WriteJson(status)
 	case devauth.ErrDeviceNotFound:
 		rest_utils.RestErrWithLog(w, r, l, err, http.StatusNotFound)
 	default:
