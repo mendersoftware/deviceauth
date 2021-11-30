@@ -80,8 +80,8 @@ type DataStore interface {
 
 	AddDevice(ctx context.Context, d model.Device) error
 
-	// updates a single device with ID `d.Id`, using data from `up`
-	UpdateDevice(ctx context.Context, d model.Device, up model.DeviceUpdate) error
+	// updates a single device with deviceID, using data from `up`
+	UpdateDevice(ctx context.Context, deviceID string, up model.DeviceUpdate) error
 
 	// deletes device
 	DeleteDevice(ctx context.Context, id string) error

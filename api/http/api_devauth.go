@@ -48,6 +48,7 @@ const (
 	uriTokens                = "/api/internal/v1/devauth/tokens"
 	uriTenants               = "/api/internal/v1/devauth/tenants"
 	uriTenantDeviceStatus    = "/api/internal/v1/devauth/tenants/:tid/devices/:did/status"
+	uriTenantDeviceExternal  = "/api/internal/v1/devauth/tenants/:tid/devices/:did/external"
 	uriTenantDevices         = "/api/internal/v1/devauth/tenants/:tid/devices"
 	uriTenantDevicesCount    = "/api/internal/v1/devauth/tenants/:tid/devices/count"
 	uriTenantDevicesExternal = "/api/internal/v1/devauth/tenants/:tid/devices/external"
@@ -107,6 +108,7 @@ func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
 		rest.Get(uriTenantDeviceStatus, d.GetTenantDeviceStatus),
 		rest.Get(uriTenantDevices, d.GetTenantDevicesHandler),
 		rest.Get(uriTenantDevicesCount, d.GetTenantDevicesCountHandler),
+		rest.Put(uriTenantDeviceExternal, d.SetExternalIdentity),
 		rest.Post(uriTenantDevicesExternal, d.ProvisionDeviceExternal),
 
 		// API v2
@@ -813,6 +815,52 @@ func (d *DevAuthApiHandlers) ProvisionDeviceExternal(w rest.ResponseWriter, r *r
 		w.WriteHeader(http.StatusCreated)
 	case devauth.ErrDeviceExists:
 		rest_utils.RestErrWithLog(w, r, l, err, http.StatusConflict)
+	default:
+		rest_utils.RestErrWithLog(w, r, l, err, http.StatusInternalServerError)
+	}
+
+}
+
+// PUT /api/internal/v1/devauth/tenants/{tenant}/devices/{device_id}/external
+func (d *DevAuthApiHandlers) SetExternalIdentity(w rest.ResponseWriter, r *rest.Request) {
+	var external model.ExternalDevice
+	tenantID := r.PathParam("tid")
+	deviceID := r.PathParam("did")
+	ctx := r.Context()
+	if tenantID != "" {
+		ctx = identity.WithContext(ctx, &identity.Identity{
+			Tenant: tenantID,
+		})
+	}
+	l := log.FromContext(ctx)
+	if err := r.DecodeJsonPayload(&external); err != nil {
+		rest_utils.RestErrWithLog(w, r, l,
+			errors.Wrap(err, "malformed request body"),
+			http.StatusBadRequest,
+		)
+		return
+	} else if !external.IsZero() {
+		if err = external.Validate(); err != nil {
+			rest_utils.RestErrWithLog(w, r, l,
+				errors.Wrap(err, "invalid request body"),
+				http.StatusBadRequest,
+			)
+			return
+		}
+	} else if deviceID == "" {
+		rest_utils.RestErrWithLog(w, r, l,
+			errors.New("path parameter 'device_id' cannot be blank"),
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	err := d.devAuth.SetExternalIdentity(ctx, deviceID, &external)
+	switch errors.Cause(err) {
+	case nil:
+		w.WriteHeader(http.StatusNoContent)
+	case devauth.ErrDeviceNotFound:
+		rest_utils.RestErrWithLog(w, r, l, err, http.StatusNotFound)
 	default:
 		rest_utils.RestErrWithLog(w, r, l, err, http.StatusInternalServerError)
 	}

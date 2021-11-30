@@ -124,6 +124,7 @@ type App interface {
 	ProvisionDevice(ctx context.Context, dev *model.Device) (err error)
 
 	GetTenantDeviceStatus(ctx context.Context, tenantId, deviceId string) (*model.Status, error)
+	SetExternalIdentity(context.Context, string, *model.ExternalDevice) error
 }
 
 type DevAuth struct {
@@ -596,25 +597,31 @@ func (d *DevAuth) updateDeviceStatus(
 	if idData != nil {
 		tenantId = idData.Tenant
 	}
-	b, err := json.Marshal([]model.DeviceInventoryUpdate{{Id: dev.Id, Revision: dev.Revision + 1}})
-	if err != nil {
-		return errors.New("internal error: cannot marshal array into json")
+	req := orchestrator.UpdateDeviceStatusReq{
+		RequestId: requestid.FromContext(ctx),
+		Devices: []model.DeviceInventoryUpdate{{
+			Id:       dev.Id,
+			Revision: dev.Revision + 1,
+		}},
+		TenantId: tenantId,
+		Status:   status,
 	}
-	if err := d.cOrch.SubmitUpdateDeviceStatusJob(
-		ctx,
-		orchestrator.UpdateDeviceStatusReq{
-			RequestId: requestid.FromContext(ctx),
-			Devices:   string(b),
-			TenantId:  tenantId,
-			Status:    status,
-		}); err != nil {
+	if dev.External != nil && dev.External.Provider == model.ProviderAzure {
+		switch status {
+		case model.DevStatusAccepted:
+			req.AzureDevices = []string{dev.External.ID}
+			req.AzureStatus = "enabled"
+		case model.DevStatusRejected:
+			req.AzureDevices = []string{dev.External.ID}
+			req.AzureStatus = "disabled"
+		}
+	}
+	if err := d.cOrch.SubmitUpdateDeviceStatusJob(ctx, req); err != nil {
 		return errors.Wrap(err, "update device status job error")
 	}
 
 	if err := d.db.UpdateDevice(ctx,
-		model.Device{
-			Id: devId,
-		},
+		devId,
 		model.DeviceUpdate{
 			Status:    status,
 			UpdatedTs: uto.TimePtr(time.Now().UTC()),
@@ -741,7 +748,7 @@ func (d *DevAuth) DecommissionDevice(ctx context.Context, devID string) error {
 		Decommissioning: uto.BoolPtr(true),
 	}
 	if err := d.db.UpdateDevice(
-		ctx, model.Device{Id: devID}, updev,
+		ctx, devID, updev,
 	); err != nil {
 		return err
 	}
@@ -839,18 +846,13 @@ func (d *DevAuth) DeleteAuthSet(ctx context.Context, devID string, authId string
 		if idData != nil {
 			tenantID = idData.Tenant
 		}
-		b, err := json.Marshal([]model.DeviceInventoryUpdate{{Id: devID}})
-		if err != nil {
-			return errors.New("internal error: cannot marshal array into json")
+		req := orchestrator.UpdateDeviceStatusReq{
+			RequestId: requestid.FromContext(ctx),
+			Devices:   []model.DeviceInventoryUpdate{{Id: devID}},
+			TenantId:  tenantID,
+			Status:    "decommissioned",
 		}
-		if err = d.cOrch.SubmitUpdateDeviceStatusJob(
-			ctx,
-			orchestrator.UpdateDeviceStatusReq{
-				RequestId: requestid.FromContext(ctx),
-				Devices:   string(b),
-				TenantId:  tenantID,
-				Status:    "decommissioned",
-			}); err != nil {
+		if err = d.cOrch.SubmitUpdateDeviceStatusJob(ctx, req); err != nil {
 			return errors.Wrap(err, "update device status job error")
 		}
 
@@ -872,8 +874,6 @@ func (d *DevAuth) DeleteAuthSet(ctx context.Context, devID string, authId string
 }
 
 func (d *DevAuth) AcceptDeviceAuth(ctx context.Context, device_id string, auth_id string) error {
-	var deviceAlreadyAccepted bool
-
 	l := log.FromContext(ctx)
 
 	aset, err := d.db.GetAuthSetById(ctx, auth_id)
@@ -900,9 +900,6 @@ func (d *DevAuth) AcceptDeviceAuth(ctx context.Context, device_id string, auth_i
 	if err != nil {
 		return err
 	}
-	if dev.Status == model.DevStatusAccepted {
-		deviceAlreadyAccepted = true
-	}
 
 	// possible race, consider accept-count-unaccept pattern if that's problematic
 	allow, err := d.canAcceptDevice(ctx)
@@ -918,7 +915,9 @@ func (d *DevAuth) AcceptDeviceAuth(ctx context.Context, device_id string, auth_i
 		return err
 	}
 
-	if deviceAlreadyAccepted {
+	if dev.Status != model.DevStatusPending {
+		// Device already exist in all services
+		// We're done...
 		return nil
 	}
 
@@ -1101,26 +1100,22 @@ func (d *DevAuth) PreauthorizeDevice(
 		return nil, errors.Wrap(err, "failed to add device")
 	}
 
-	// submit device status change job
-	b, err := json.Marshal([]model.DeviceInventoryUpdate{{Id: dev.Id, Revision: dev.Revision}})
-	if err != nil {
-		return nil, errors.New("internal error: cannot marshal array into json")
-	}
-
 	tenantId := ""
 	idData := identity.FromContext(ctx)
 	if idData != nil {
 		tenantId = idData.Tenant
 	}
 
-	if err = d.cOrch.SubmitUpdateDeviceStatusJob(
-		ctx,
-		orchestrator.UpdateDeviceStatusReq{
-			RequestId: requestid.FromContext(ctx),
-			Devices:   string(b),
-			TenantId:  tenantId,
-			Status:    dev.Status,
-		}); err != nil {
+	wfReq := orchestrator.UpdateDeviceStatusReq{
+		RequestId: requestid.FromContext(ctx),
+		Devices: []model.DeviceInventoryUpdate{{
+			Id:       dev.Id,
+			Revision: dev.Revision,
+		}},
+		TenantId: tenantId,
+		Status:   dev.Status,
+	}
+	if err = d.cOrch.SubmitUpdateDeviceStatusJob(ctx, wfReq); err != nil {
 		return nil, errors.Wrap(err, "update device status job error")
 	}
 
@@ -1208,16 +1203,16 @@ func (d *DevAuth) ProvisionDevice(ctx context.Context, dev *model.Device) (err e
 		}
 	}()
 
-	// submit device status change job
-	b, _ := json.Marshal([]model.DeviceInventoryUpdate{{Id: dev.Id, Revision: dev.Revision}})
-
 	if err = d.cOrch.SubmitUpdateDeviceStatusJob(
 		ctx,
 		orchestrator.UpdateDeviceStatusReq{
 			RequestId: requestid.FromContext(ctx),
-			Devices:   string(b),
-			TenantId:  tenantID,
-			Status:    dev.Status,
+			Devices: []model.DeviceInventoryUpdate{{
+				Id:       dev.Id,
+				Revision: dev.Revision,
+			}},
+			TenantId: tenantID,
+			Status:   dev.Status,
 		}); err != nil {
 		return errors.Wrap(err, "update device status job error")
 	}
@@ -1227,6 +1222,22 @@ func (d *DevAuth) ProvisionDevice(ctx context.Context, dev *model.Device) (err e
 	}
 
 	return nil
+}
+
+func (d *DevAuth) SetExternalIdentity(
+	ctx context.Context,
+	deviceID string,
+	ext *model.ExternalDevice,
+) error {
+	err := d.db.UpdateDevice(ctx, deviceID, model.DeviceUpdate{
+		External: ext,
+	})
+	switch errors.Cause(err) {
+	case store.ErrDevNotFound:
+		return ErrDeviceNotFound
+	default:
+		return err
+	}
 }
 
 func (d *DevAuth) RevokeToken(ctx context.Context, tokenID string) error {

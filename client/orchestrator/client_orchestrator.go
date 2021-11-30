@@ -233,7 +233,8 @@ func (co *Client) SubmitUpdateDeviceStatusJob(
 
 	contentReader := bytes.NewReader(UpdateDeviceStatusReqJson)
 
-	req, err := http.NewRequest(
+	req, err := http.NewRequestWithContext(
+		ctx,
 		http.MethodPost,
 		utils.JoinURL(co.conf.OrchestratorAddr, UpdateDeviceStatusOrchestratorUri),
 		contentReader)

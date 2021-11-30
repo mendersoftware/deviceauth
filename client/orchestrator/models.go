@@ -15,6 +15,8 @@
 package orchestrator
 
 import (
+	"github.com/mendersoftware/deviceauth/model"
+
 	"github.com/pkg/errors"
 )
 
@@ -48,11 +50,15 @@ type UpdateDeviceStatusReq struct {
 	// Request ID
 	RequestId string `json:"request_id"`
 	// Device IDs
-	Devices string `json:"devices"`
+	Devices []model.DeviceInventoryUpdate `json:"devices"`
 	// Tenant ID
 	TenantId string `json:"tenant_id"`
 	// new status
 	Status string `json:"device_status"`
+	// External ID of devices living in Azure Iothub
+	AzureDevices []string `json:"azure_devices"`
+	// External status of devices living in Azure Iothub
+	AzureStatus string `json:"azure_status"`
 }
 
 type DeviceLimitWarning struct {
