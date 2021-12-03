@@ -523,13 +523,13 @@ func (_m *DataStore) UpdateAuthSetById(ctx context.Context, authId string, mod m
 	return r0
 }
 
-// UpdateDevice provides a mock function with given fields: ctx, d, up
-func (_m *DataStore) UpdateDevice(ctx context.Context, d model.Device, up model.DeviceUpdate) error {
-	ret := _m.Called(ctx, d, up)
+// UpdateDevice provides a mock function with given fields: ctx, deviceID, up
+func (_m *DataStore) UpdateDevice(ctx context.Context, deviceID string, up model.DeviceUpdate) error {
+	ret := _m.Called(ctx, deviceID, up)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, model.Device, model.DeviceUpdate) error); ok {
-		r0 = rf(ctx, d, up)
+	if rf, ok := ret.Get(0).(func(context.Context, string, model.DeviceUpdate) error); ok {
+		r0 = rf(ctx, deviceID, up)
 	} else {
 		r0 = ret.Error(0)
 	}

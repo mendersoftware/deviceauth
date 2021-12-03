@@ -342,6 +342,20 @@ func (_m *App) RevokeToken(ctx context.Context, tokenID string) error {
 	return r0
 }
 
+// SetExternalIdentity provides a mock function with given fields: _a0, _a1, _a2
+func (_m *App) SetExternalIdentity(_a0 context.Context, _a1 string, _a2 *model.ExternalDevice) error {
+	ret := _m.Called(_a0, _a1, _a2)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, *model.ExternalDevice) error); ok {
+		r0 = rf(_a0, _a1, _a2)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // SetTenantLimit provides a mock function with given fields: ctx, tenant_id, limit
 func (_m *App) SetTenantLimit(ctx context.Context, tenant_id string, limit model.Limit) error {
 	ret := _m.Called(ctx, tenant_id, limit)
