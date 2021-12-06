@@ -833,34 +833,36 @@ func (d *DevAuthApiHandlers) SetExternalIdentity(w rest.ResponseWriter, r *rest.
 		})
 	}
 	l := log.FromContext(ctx)
-	if err := r.DecodeJsonPayload(&external); err != nil {
-		rest_utils.RestErrWithLog(w, r, l,
-			errors.Wrap(err, "malformed request body"),
-			http.StatusBadRequest,
-		)
-		return
-	} else if !external.IsZero() {
-		if err = external.Validate(); err != nil {
-			rest_utils.RestErrWithLog(w, r, l,
-				errors.Wrap(err, "invalid request body"),
-				http.StatusBadRequest,
-			)
-			return
-		}
-	} else if deviceID == "" {
+	if deviceID == "" {
 		rest_utils.RestErrWithLog(w, r, l,
 			errors.New("path parameter 'device_id' cannot be blank"),
 			http.StatusBadRequest,
 		)
 		return
 	}
+	if err := r.DecodeJsonPayload(&external); err != nil {
+		rest_utils.RestErrWithLog(w, r, l,
+			errors.Wrap(err, "malformed request body"),
+			http.StatusBadRequest,
+		)
+		return
+	}
+	if !external.IsZero() {
+		if err := external.Validate(); err != nil {
+			rest_utils.RestErrWithLog(w, r, l,
+				errors.Wrap(err, "invalid request body"),
+				http.StatusBadRequest,
+			)
+			return
+		}
+	}
 
 	err := d.devAuth.SetExternalIdentity(ctx, deviceID, &external)
-	switch errors.Cause(err) {
+	switch cause := errors.Cause(err); cause {
 	case nil:
 		w.WriteHeader(http.StatusNoContent)
 	case devauth.ErrDeviceNotFound:
-		rest_utils.RestErrWithLog(w, r, l, err, http.StatusNotFound)
+		rest_utils.RestErrWithLog(w, r, l, cause, http.StatusNotFound)
 	default:
 		rest_utils.RestErrWithLog(w, r, l, err, http.StatusInternalServerError)
 	}
