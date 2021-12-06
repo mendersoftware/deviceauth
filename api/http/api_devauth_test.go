@@ -666,7 +666,7 @@ func TestProvisionDeviceExternal(t *testing.T) {
 		},
 
 		StatusCode: http.StatusBadRequest,
-		Error:      errors.New("invalid request parameter: name: cannot be blank; provider: cannot be blank."),
+		Error:      errors.New("invalid request parameter: provider: cannot be blank."),
 	}, {
 		Name: "error, device exists",
 

@@ -623,7 +623,7 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 				mock.AnythingOfType("string")).Return(
 				"pending", nil)
 			db.On("UpdateDevice", ctxMatcher,
-				mock.AnythingOfType("model.Device"),
+				devId,
 				mock.AnythingOfType("model.DeviceUpdate")).Return(nil)
 			db.On("GetDeviceById", ctxMatcher,
 				mock.AnythingOfType("string")).Return(&model.Device{}, nil)
@@ -905,11 +905,7 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 			// at the end of processing, updates the device status to 'accepted'
 			db.On("UpdateDevice",
 				ctxMatcher,
-				mock.MatchedBy(
-					func(m model.Device) bool {
-						return m.Id == dummyDevId
-
-					}),
+				dummyDevId,
 				mock.MatchedBy(
 					func(u model.DeviceUpdate) bool {
 						return u.Status == model.DevStatusAccepted
@@ -1197,7 +1193,7 @@ func TestProvisionDevice(t *testing.T) {
 				mock.AnythingOfType("orchestrator.UpdateDeviceStatusReq")).
 				Run(func(args mock.Arguments) {
 					req := args.Get(1).(orchestrator.UpdateDeviceStatusReq)
-					assert.Contains(t, req.Devices, self.Device.Id)
+					assert.Equal(t, self.Device.Id, req.Devices[0].Id)
 					assert.Equal(t, model.DevStatusAccepted, req.Status)
 				}).
 				Return(nil).
@@ -1255,7 +1251,7 @@ func TestProvisionDevice(t *testing.T) {
 				mock.AnythingOfType("orchestrator.UpdateDeviceStatusReq")).
 				Run(func(args mock.Arguments) {
 					req := args.Get(1).(orchestrator.UpdateDeviceStatusReq)
-					assert.Contains(t, req.Devices, self.Device.Id)
+					assert.Equal(t, self.Device.Id, req.Devices[0].Id)
 					assert.Equal(t, model.DevStatusAccepted, req.Status)
 				}).
 				Return(nil).
@@ -1320,7 +1316,7 @@ func TestProvisionDevice(t *testing.T) {
 				mock.AnythingOfType("orchestrator.UpdateDeviceStatusReq")).
 				Run(func(args mock.Arguments) {
 					req := args.Get(1).(orchestrator.UpdateDeviceStatusReq)
-					assert.Contains(t, req.Devices, self.Device.Id)
+					assert.Equal(t, self.Device.Id, req.Devices[0].Id)
 					assert.Equal(t, model.DevStatusAccepted, req.Status)
 				}).
 				Return(nil).
@@ -1389,7 +1385,7 @@ func TestProvisionDevice(t *testing.T) {
 					mock.AnythingOfType("orchestrator.UpdateDeviceStatusReq")).
 				Run(func(args mock.Arguments) {
 					req := args.Get(1).(orchestrator.UpdateDeviceStatusReq)
-					assert.Contains(t, req.Devices, self.Device.Id)
+					assert.Equal(t, self.Device.Id, req.Devices[0].Id)
 					assert.Equal(t, model.DevStatusAccepted, req.Status)
 				}).
 				Return(nil).
@@ -1459,7 +1455,7 @@ func TestProvisionDevice(t *testing.T) {
 				).
 				Run(func(args mock.Arguments) {
 					req := args.Get(1).(orchestrator.UpdateDeviceStatusReq)
-					assert.Contains(t, req.Devices, self.Device.Id)
+					assert.Equal(t, self.Device.Id, req.Devices[0].Id)
 					assert.Equal(t, model.DevStatusAccepted, req.Status)
 				}).
 				Return(errors.New("internal error")).
@@ -1504,7 +1500,7 @@ func TestProvisionDevice(t *testing.T) {
 				mock.AnythingOfType("orchestrator.UpdateDeviceStatusReq")).
 				Run(func(args mock.Arguments) {
 					req := args.Get(1).(orchestrator.UpdateDeviceStatusReq)
-					assert.Contains(t, req.Devices, self.Device.Id)
+					assert.Equal(t, self.Device.Id, req.Devices[0].Id)
 					assert.Equal(t, model.DevStatusAccepted, req.Status)
 				}).
 				Return(nil).
@@ -1899,7 +1895,7 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 				dummyDevID).
 				Return(tc.dev, tc.dbGetDeviceByIdErr)
 			db.On("UpdateDevice", context.Background(),
-				mock.AnythingOfType("model.Device"),
+				dummyDevID,
 				mock.AnythingOfType("model.DeviceUpdate")).Return(nil)
 			db.On("GetDeviceStatus", context.Background(),
 				dummyDevID).Return(
@@ -2060,7 +2056,7 @@ func TestDevAuthRejectDevice(t *testing.T) {
 				dummyDevID).
 				Return("accpted", nil)
 			db.On("UpdateDevice", ctx,
-				mock.AnythingOfType("model.Device"),
+				dummyDevID,
 				mock.AnythingOfType("model.DeviceUpdate")).Return(nil)
 			db.On("GetDeviceById", ctx,
 				mock.AnythingOfType("string")).Return(&model.Device{}, nil)
@@ -2288,7 +2284,12 @@ func TestDevAuthResetDevice(t *testing.T) {
 				dummyDevID).Return(
 				"accpted", nil)
 			db.On("UpdateDevice", context.Background(),
-				mock.AnythingOfType("model.Device"),
+				func() interface{} {
+					if tc.aset != nil {
+						return tc.aset.DeviceId
+					}
+					return mock.AnythingOfType("string")
+				}(),
 				mock.AnythingOfType("model.DeviceUpdate")).Return(nil)
 			db.On("GetDeviceById", context.Background(),
 				mock.AnythingOfType("string")).Return(&model.Device{}, nil)
@@ -2990,7 +2991,7 @@ func TestDevAuthDecommissionDevice(t *testing.T) {
 			db := mstore.DataStore{}
 			devUUID := oid.FromString(tc.devId)
 			db.On("UpdateDevice", ctx,
-				model.Device{Id: tc.devId},
+				tc.devId,
 				model.DeviceUpdate{
 					Decommissioning: uto.BoolPtr(true),
 				}).Return(
@@ -3612,7 +3613,7 @@ func TestDevAuthDeleteAuthSet(t *testing.T) {
 				tc.dbGetDeviceStatus,
 				tc.dbGetDeviceStatusErr)
 			db.On("UpdateDevice", ctx,
-				mock.AnythingOfType("model.Device"),
+				tc.devId,
 				mock.AnythingOfType("model.DeviceUpdate")).Return(tc.dbUpdateDeviceErr)
 			db.On("GetDeviceById", ctx,
 				mock.AnythingOfType("string")).Return(&model.Device{Id: tc.devId}, nil)
@@ -3621,15 +3622,12 @@ func TestDevAuthDeleteAuthSet(t *testing.T) {
 			co.On("SubmitUpdateDeviceStatusJob", ctx,
 				mock.MatchedBy(
 					func(req orchestrator.UpdateDeviceStatusReq) bool {
-						var updates []model.DeviceInventoryUpdate
-						err := json.Unmarshal([]byte(req.Devices), &updates)
-						assert.NoError(t, err)
 						if tc.dbGetDeviceStatusErr == store.ErrAuthSetNotFound {
-							assert.Equal(t, tc.devId, updates[0].Id)
+							assert.Equal(t, tc.devId, req.Devices[0].Id)
 							assert.Equal(t, "noauth", req.Status)
 							return true
 						} else {
-							assert.Equal(t, tc.devId, updates[0].Id)
+							assert.Equal(t, tc.devId, req.Devices[0].Id)
 							assert.Equal(t, tc.dbGetDeviceStatus, req.Status)
 							return true
 						}
