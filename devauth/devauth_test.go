@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	ctxhttpheader "github.com/mendersoftware/go-lib-micro/context/httpheader"
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/log"
@@ -4065,4 +4066,64 @@ func TestPurgeUriArgs(t *testing.T) {
 
 	out = purgeUriArgs("/api/devices/v1/deployments/device/deployments/next")
 	assert.Equal(t, "/api/devices/v1/deployments/device/deployments/next", out)
+}
+
+func TestSetExternalIdentity(t *testing.T) {
+	t.Parallel()
+	deviceID := uuid.NewSHA1(uuid.NameSpaceDNS, []byte("testing.mender.io"))
+	testCases := []struct {
+		Name string
+
+		StoreError error
+
+		Error error
+	}{{
+		Name: "ok",
+	}, {
+		Name: "error/device not found",
+
+		StoreError: store.ErrDevNotFound,
+		Error:      ErrDeviceNotFound,
+	}, {
+		Name: "error/internal",
+
+		StoreError: errors.New("internal error"),
+		Error:      errors.New("internal error"),
+	}}
+	for i := range testCases {
+		tc := testCases[i]
+		t.Run(tc.Name, func(t *testing.T) {
+			t.Parallel()
+			ctx := context.Background()
+			ext := &model.ExternalDevice{
+				Provider: model.ExternalProvider("Test"),
+				ID:       "57f69fa1-c1b6-4a68-8f13-d00fe8af05de",
+				Name:     "foo",
+			}
+
+			store := new(mstore.DataStore)
+			defer store.AssertExpectations(t)
+			store.On("UpdateDevice",
+				ctx,
+				deviceID.String(),
+				model.DeviceUpdate{
+					External: ext,
+				},
+			).Return(tc.StoreError)
+			app := NewDevAuth(store, nil, nil, Config{})
+			err := app.SetExternalIdentity(ctx, deviceID.String(), ext)
+
+			if tc.Error == nil {
+				assert.NoError(t, err)
+			} else {
+				if assert.Error(t, err) {
+					assert.Regexp(t,
+						tc.Error.Error(),
+						err.Error(),
+						"error message does not match expected pattern",
+					)
+				}
+			}
+		})
+	}
 }
