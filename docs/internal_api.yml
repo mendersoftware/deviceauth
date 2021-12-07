@@ -228,7 +228,7 @@ paths:
           schema:
            $ref: "#/definitions/Error"
 
-  /tenants/{tid}/devices/{did}/external:
+  /tenants/{tid}/devices/external:
     post:
       operationId: Provision External Device
       tags:
@@ -261,6 +261,38 @@ paths:
           schema:
            $ref: "#/definitions/Error"
 
+  /tenants/{tid}/devices/{did}/external:
+    put:
+      operationId: Set external identity
+      tags:
+        - Internal API
+      summary: "Replace the external identity of a device."
+      parameters:
+        - name: tid
+          in: path
+          description: Tenant identifier.
+          required: true
+          type: string
+        - name: did
+          in: path
+          description: Device identifier.
+          required: true
+          type: string
+        - name: device
+          in: body
+          description: External device descriptor.
+          required: true
+          schema:
+            $ref: "#/definitions/ExternalDevice"
+      responses:
+        204:
+          description: Device identity updated successfully.
+        400:
+          description: Bad request.
+        500:
+          description: Internal server error.
+          schema:
+           $ref: "#/definitions/Error"
 
   /tenants/{tid}/devices/{did}/status:
     get:
