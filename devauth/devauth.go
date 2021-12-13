@@ -611,7 +611,7 @@ func (d *DevAuth) updateDeviceStatus(
 		case model.DevStatusAccepted:
 			req.AzureDevices = []string{dev.External.ID}
 			req.AzureStatus = "enabled"
-		case model.DevStatusRejected:
+		case model.DevStatusRejected, model.DevStatusNoAuth:
 			req.AzureDevices = []string{dev.External.ID}
 			req.AzureStatus = "disabled"
 		}
