@@ -70,17 +70,27 @@ type Device struct {
 	Revision uint `json:"-" bson:"revision"`
 }
 
+type ExternalProvider string
+
+const (
+	ProviderAzure ExternalProvider = "Azure"
+)
+
 type ExternalDevice struct {
-	ID       string `json:"id" bson:"id"`
-	Provider string `json:"provider" bson:"provider"`
-	Name     string `json:"name,omitempty" bson:"name,omitempty"`
+	Provider ExternalProvider `json:"provider" bson:"provider"`
+	ID       string           `json:"id" bson:"id"`
+	Name     string           `json:"name,omitempty" bson:"name,omitempty"`
+}
+
+func (ext ExternalDevice) IsZero() bool {
+	return ext.Provider == "" && ext.ID == "" && ext.Name == ""
 }
 
 func (ext ExternalDevice) Validate() error {
 	return validation.ValidateStruct(&ext,
 		validation.Field(&ext.ID, validation.Required),
 		validation.Field(&ext.Provider, validation.Required),
-		validation.Field(&ext.Name, validation.Required),
+		validation.Field(&ext.Name),
 	)
 }
 
@@ -132,8 +142,8 @@ type DeviceUpdate struct {
 	Status          string                 `json:"-" bson:",omitempty"`
 	Decommissioning *bool                  `json:"-" bson:",omitempty"`
 	UpdatedTs       *time.Time             `json:"updated_ts" bson:"updated_ts,omitempty"`
-	//nolint:lll
-	ExternalName string `json:"external_name,omitempty" bson:"external.name,omitempty"`
+
+	External *ExternalDevice `json:"external,omitempty" bson:"external,omitempty"`
 }
 
 func NewDevice(id, id_data, pubkey string) *Device {

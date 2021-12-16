@@ -490,7 +490,7 @@ func TestStoreUpdateDevice(t *testing.T) {
 				})
 			}
 
-			err = d.UpdateDevice(ctx, model.Device{Id: tc.id}, tc.update)
+			err = d.UpdateDevice(ctx, tc.id, tc.update)
 			if tc.outErr != "" {
 				assert.EqualError(t, err, tc.outErr)
 			} else {

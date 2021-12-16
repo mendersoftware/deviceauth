@@ -18,11 +18,11 @@ import (
 	"context"
 	"crypto"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -36,6 +36,7 @@ import (
 	"github.com/mendersoftware/go-lib-micro/requestid"
 	"github.com/mendersoftware/go-lib-micro/requestlog"
 	"github.com/mendersoftware/go-lib-micro/rest_utils"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
@@ -666,7 +667,7 @@ func TestProvisionDeviceExternal(t *testing.T) {
 		},
 
 		StatusCode: http.StatusBadRequest,
-		Error:      errors.New("invalid request parameter: name: cannot be blank; provider: cannot be blank."),
+		Error:      errors.New("invalid request parameter: provider: cannot be blank."),
 	}, {
 		Name: "error, device exists",
 
@@ -2538,6 +2539,241 @@ func TestApiGetTenantDevicesV2(t *testing.T) {
 
 			apih := makeMockApiHandler(t, da, nil)
 			runTestRequest(t, apih, tc.req, tc.code, tc.body)
+		})
+	}
+}
+
+func TestSetExternalIdentity(t *testing.T) {
+	t.Parallel()
+	contextMatcher := mock.MatchedBy(func(context.Context) bool { return true })
+	type testCase struct {
+		Name string
+
+		TenantID string
+		DeviceID string
+		ReqBody  interface{}
+		App      func(t *testing.T, self *testCase) *mocks.App
+
+		StatusCode int
+		RspBody    interface{}
+	}
+	testCases := []testCase{{
+		Name: "ok",
+
+		TenantID: "123456789012345678901234",
+		DeviceID: "6a957fc1-c32d-4d4a-95f4-433de067a93a",
+
+		ReqBody: &model.ExternalDevice{
+			Provider: model.ProviderAzure,
+			ID:       "externalID",
+			Name:     "foobar",
+		},
+		App: func(t *testing.T, self *testCase) *mocks.App {
+			app := new(mocks.App)
+			app.On("SetExternalIdentity",
+				contextMatcher,
+				self.DeviceID,
+				self.ReqBody.(*model.ExternalDevice),
+			).Return(nil)
+			return app
+		},
+
+		StatusCode: http.StatusNoContent,
+	}, {
+		Name: "ok/unset",
+
+		TenantID: "123456789012345678901234",
+		DeviceID: "6a957fc1-c32d-4d4a-95f4-433de067a93a",
+
+		ReqBody: struct{}{},
+		App: func(t *testing.T, self *testCase) *mocks.App {
+			app := new(mocks.App)
+			app.On("SetExternalIdentity",
+				contextMatcher,
+				self.DeviceID,
+				&model.ExternalDevice{},
+			).Return(nil)
+			return app
+		},
+
+		StatusCode: http.StatusNoContent,
+	}, {
+		Name: "ok/no tenant id",
+
+		TenantID: "",
+		DeviceID: "6a957fc1-c32d-4d4a-95f4-433de067a93a",
+
+		ReqBody: &model.ExternalDevice{
+			Provider: model.ProviderAzure,
+			ID:       "externalID",
+			Name:     "foobar",
+		},
+		App: func(t *testing.T, self *testCase) *mocks.App {
+			app := new(mocks.App)
+			app.On("SetExternalIdentity",
+				contextMatcher,
+				self.DeviceID,
+				self.ReqBody.(*model.ExternalDevice),
+			).Return(nil)
+			return app
+		},
+
+		StatusCode: http.StatusNoContent,
+	}, {
+		Name: "error/no device ID",
+
+		TenantID: "123456789012345678901234",
+		DeviceID: "",
+
+		ReqBody: &model.ExternalDevice{
+			Provider: model.ProviderAzure,
+			ID:       "externalID",
+			Name:     "foobar",
+		},
+		App: func(t *testing.T, self *testCase) *mocks.App {
+			return new(mocks.App)
+		},
+
+		StatusCode: http.StatusBadRequest,
+		RspBody: rest_utils.ApiError{
+			Err:   "path parameter 'device_id' cannot be blank",
+			ReqId: "test",
+		},
+	}, {
+		Name: "error/malformed request body",
+
+		TenantID: "123456789012345678901234",
+		DeviceID: "6a957fc1-c32d-4d4a-95f4-433de067a93a",
+
+		ReqBody: []byte("malformed JSON"),
+		App: func(t *testing.T, self *testCase) *mocks.App {
+			return new(mocks.App)
+		},
+
+		StatusCode: http.StatusBadRequest,
+		RspBody: regexp.MustCompile(
+			`{.*"error":\s?"malformed\ request\ body:.+".*}`,
+		),
+	}, {
+		Name: "error, invalid request schema",
+
+		TenantID: "123456789012345678901234",
+		DeviceID: "6a957fc1-c32d-4d4a-95f4-433de067a93a",
+
+		ReqBody: &model.ExternalDevice{
+			Provider: model.ProviderAzure,
+		},
+		App: func(t *testing.T, self *testCase) *mocks.App {
+			return new(mocks.App)
+		},
+
+		StatusCode: http.StatusBadRequest,
+		RspBody: regexp.MustCompile(
+			`{.*"error":\s?"invalid\ request\ body:.+".*}`,
+		),
+	}, {
+		Name: "error/device not found",
+
+		TenantID: "123456789012345678901234",
+		DeviceID: "6a957fc1-c32d-4d4a-95f4-433de067a93a",
+
+		ReqBody: &model.ExternalDevice{
+			Provider: model.ProviderAzure,
+			ID:       "externalID",
+			Name:     "foobar",
+		},
+		App: func(t *testing.T, self *testCase) *mocks.App {
+			app := new(mocks.App)
+			app.On("SetExternalIdentity",
+				contextMatcher,
+				self.DeviceID,
+				self.ReqBody.(*model.ExternalDevice),
+			).Return(errors.Wrap(devauth.ErrDeviceNotFound, "wrapped error"))
+			return app
+		},
+
+		StatusCode: http.StatusNotFound,
+		RspBody: rest_utils.ApiError{
+			Err:   devauth.ErrDeviceNotFound.Error(),
+			ReqId: "test",
+		},
+	}, {
+		Name: "error/internal error",
+
+		TenantID: "123456789012345678901234",
+		DeviceID: "6a957fc1-c32d-4d4a-95f4-433de067a93a",
+
+		ReqBody: &model.ExternalDevice{
+			Provider: model.ProviderAzure,
+			ID:       "externalID",
+			Name:     "foobar",
+		},
+		App: func(t *testing.T, self *testCase) *mocks.App {
+			app := new(mocks.App)
+			app.On("SetExternalIdentity",
+				contextMatcher,
+				self.DeviceID,
+				self.ReqBody.(*model.ExternalDevice),
+			).Return(errors.New("internal error"))
+			return app
+		},
+
+		StatusCode: http.StatusInternalServerError,
+		RspBody:    regexp.MustCompile(`"error":\s?"internal error"`),
+	}}
+	for i := range testCases {
+		tc := testCases[i]
+		t.Run(tc.Name, func(t *testing.T) {
+			t.Parallel()
+			app := tc.App(t, &tc)
+			defer app.AssertExpectations(t)
+
+			var body []byte
+			switch t := tc.ReqBody.(type) {
+			case []byte:
+				body = t
+			default:
+				body, _ = json.Marshal(t)
+			}
+			repl := strings.NewReplacer(
+				":tid", tc.TenantID,
+				":did", tc.DeviceID,
+			)
+			req, _ := http.NewRequest(
+				http.MethodPut,
+				"http://localhost"+
+					repl.Replace(uriTenantDeviceExternal),
+				bytes.NewReader(body),
+			)
+			t.Log(req.URL)
+			req.Header.Set("X-Men-Requestid", "test")
+			w := httptest.NewRecorder()
+			apih := makeMockApiHandler(t, app, nil)
+			apih.ServeHTTP(w, req)
+
+			assert.Equal(t,
+				tc.StatusCode,
+				w.Code,
+				"unexpected HTTP status code",
+			)
+			switch expected := tc.RspBody.(type) {
+			case *regexp.Regexp:
+				assert.Regexp(t,
+					expected,
+					w.Body.String(),
+					"Response body did not match expected pattern",
+				)
+			case nil:
+				assert.Empty(t, w.Body.Bytes())
+
+			default:
+				b, _ := json.Marshal(expected)
+				assert.JSONEq(t,
+					string(b),
+					w.Body.String(),
+					"Response did not match expected JSON object",
+				)
+			}
 		})
 	}
 }

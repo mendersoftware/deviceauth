@@ -314,7 +314,7 @@ func (db *DataStoreMongo) AddDevice(ctx context.Context, d model.Device) error {
 }
 
 func (db *DataStoreMongo) UpdateDevice(ctx context.Context,
-	d model.Device, updev model.DeviceUpdate) error {
+	deviceID string, updev model.DeviceUpdate) error {
 
 	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
 
@@ -326,7 +326,7 @@ func (db *DataStoreMongo) UpdateDevice(ctx context.Context,
 		"$set": updev,
 	}
 
-	res, err := c.UpdateOne(ctx, bson.M{"_id": d.Id}, update)
+	res, err := c.UpdateOne(ctx, bson.M{"_id": deviceID}, update)
 	if err != nil {
 		return errors.Wrap(err, "failed to update device")
 	} else if res.MatchedCount < 1 {
