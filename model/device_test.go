@@ -178,23 +178,3 @@ func TestDeviceFilterUnmarshalJSON(t *testing.T) {
 		})
 	}
 }
-
-func TestExternalDevice(t *testing.T) {
-	t.Parallel()
-
-	req := ExternalDeviceRequest{
-		ExternalDevice: ExternalDevice{
-			ID:       "eb825a71-61fc-422b-ba09-35e8c65fed6e",
-			Name:     "foo",
-			Provider: "bar",
-		},
-	}
-	assert.NoError(t, req.Validate())
-	dev := req.NewDevice()
-	if assert.NotNil(t, dev.External) {
-		assert.Equal(t, *dev.External, req.ExternalDevice)
-	}
-	assert.Equal(t, dev.IdDataStruct, req.ExternalDevice.IDData())
-	assert.Equal(t, dev.Status, DevStatusAccepted)
-	assert.NotEmpty(t, dev.Id)
-}

@@ -27,7 +27,6 @@ type deviceV2 struct {
 	CreatedTs       time.Time              `json:"created_ts"`
 	UpdatedTs       time.Time              `json:"updated_ts"`
 	AuthSets        []authSetV2            `json:"auth_sets"`
-	External        *model.ExternalDevice  `json:"external,omitempty"`
 }
 
 func deviceV2FromDbModel(dbDevice *model.Device) (*deviceV2, error) {
@@ -43,7 +42,6 @@ func deviceV2FromDbModel(dbDevice *model.Device) (*deviceV2, error) {
 		CreatedTs:       dbDevice.CreatedTs,
 		UpdatedTs:       dbDevice.UpdatedTs,
 		AuthSets:        authSets,
-		External:        dbDevice.External,
 	}, nil
 }
 
