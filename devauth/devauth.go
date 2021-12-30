@@ -124,7 +124,6 @@ type App interface {
 	ProvisionDevice(ctx context.Context, dev *model.Device) (err error)
 
 	GetTenantDeviceStatus(ctx context.Context, tenantId, deviceId string) (*model.Status, error)
-	SetExternalIdentity(context.Context, string, *model.ExternalDevice) error
 }
 
 type DevAuth struct {
@@ -605,16 +604,6 @@ func (d *DevAuth) updateDeviceStatus(
 		}},
 		TenantId: tenantId,
 		Status:   status,
-	}
-	if dev.External != nil && dev.External.Provider == model.ProviderAzure {
-		switch status {
-		case model.DevStatusAccepted:
-			req.AzureDevices = []string{dev.External.ID}
-			req.AzureStatus = "enabled"
-		case model.DevStatusRejected, model.DevStatusNoAuth:
-			req.AzureDevices = []string{dev.External.ID}
-			req.AzureStatus = "disabled"
-		}
 	}
 	if err := d.cOrch.SubmitUpdateDeviceStatusJob(ctx, req); err != nil {
 		return errors.Wrap(err, "update device status job error")
@@ -1222,22 +1211,6 @@ func (d *DevAuth) ProvisionDevice(ctx context.Context, dev *model.Device) (err e
 	}
 
 	return nil
-}
-
-func (d *DevAuth) SetExternalIdentity(
-	ctx context.Context,
-	deviceID string,
-	ext *model.ExternalDevice,
-) error {
-	err := d.db.UpdateDevice(ctx, deviceID, model.DeviceUpdate{
-		External: ext,
-	})
-	switch errors.Cause(err) {
-	case store.ErrDevNotFound:
-		return ErrDeviceNotFound
-	default:
-		return err
-	}
 }
 
 func (d *DevAuth) RevokeToken(ctx context.Context, tokenID string) error {
