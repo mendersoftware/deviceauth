@@ -110,7 +110,7 @@ paths:
           description: Device submitted.
           headers:
             Location:
-              description: URL of the newly created user-ID.
+              description: URL of the newly created device.
               type: string
         400:
           description: Missing/malformed request params.

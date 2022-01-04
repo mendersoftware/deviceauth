@@ -1,4 +1,4 @@
-// Copyright 2021 Northern.tech AS
+// Copyright 2022 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -62,7 +62,7 @@ type Device struct {
 	//ApiLimits override tenant-wide quota/burst config
 	ApiLimits ratelimits.ApiLimits `json:"-" bson:"api_limits"`
 
-	//object revision which we use when synchronizint status with inventory service
+	//object revision which we use when synchronizing status with inventory service
 	Revision uint `json:"-" bson:"revision"`
 }
 
