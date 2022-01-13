@@ -1,4 +1,4 @@
-// Copyright 2021 Northern.tech AS
+// Copyright 2022 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -36,9 +36,6 @@ const (
 
 	SettingDbUsername = "mongo_username"
 	SettingDbPassword = "mongo_password"
-
-	SettingDevAdmAddr        = "devadm_addr"
-	SettingDevAdmAddrDefault = "http://mender-device-adm:8080/"
 
 	SettingInventoryAddr        = "inventory_addr"
 	SettingInventoryAddrDefault = "http://mender-inventory:8080/"
@@ -97,7 +94,6 @@ var (
 		{Key: SettingListen, Value: SettingListenDefault},
 		{Key: SettingMiddleware, Value: SettingMiddlewareDefault},
 		{Key: SettingDb, Value: SettingDbDefault},
-		{Key: SettingDevAdmAddr, Value: SettingDevAdmAddrDefault},
 		{Key: SettingInventoryAddr, Value: SettingInventoryAddrDefault},
 		{Key: SettingOrchestratorAddr, Value: SettingOrchestratorAddrDefault},
 		{Key: SettingEnableReporting, Value: SettingEnableReportingDefault},
