@@ -1,12 +1,12 @@
-swagger: '2.0'
+swagger: "2.0"
 info:
-  version: '2'
+  version: "2"
   title: Device authentication
   description: |
-      An API for device authentication handling.
+    An API for device authentication handling.
 
-basePath: '/api/management/v2/devauth/'
-host: 'hosted.mender.io'
+basePath: "/api/management/v2/devauth/"
+host: "hosted.mender.io"
 schemes:
   - https
 
@@ -73,7 +73,7 @@ paths:
           schema:
             type: array
             items:
-                $ref: '#/definitions/Device'
+              $ref: "#/definitions/Device"
           headers:
             Link:
               type: string
@@ -81,11 +81,11 @@ paths:
         400:
           description: Missing/malformed request params.
           schema:
-            $ref: '#/definitions/Error'
+            $ref: "#/definitions/Error"
         500:
           description: Unexpected error
           schema:
-            $ref: '#/definitions/Error'
+            $ref: "#/definitions/Error"
     post:
       operationId: Preauthorize
       security:
@@ -115,15 +115,15 @@ paths:
         400:
           description: Missing/malformed request params.
           schema:
-            $ref: '#/definitions/Error'
+            $ref: "#/definitions/Error"
         409:
           description: Device already exists. Response contains conflicting device.
           schema:
-            $ref: '#/definitions/Device'
+            $ref: "#/definitions/Device"
         500:
           description: Unexpected error
           schema:
-            $ref: '#/definitions/Error'
+            $ref: "#/definitions/Error"
 
   /devices/search:
     post:
@@ -184,7 +184,7 @@ paths:
             description: Array of devices
             type: array
             items:
-                $ref: '#/definitions/Device'
+              $ref: "#/definitions/Device"
           headers:
             Link:
               type: string
@@ -192,11 +192,11 @@ paths:
         400:
           description: Missing/malformed request params.
           schema:
-            $ref: '#/definitions/Error'
+            $ref: "#/definitions/Error"
         500:
           description: Unexpected error
           schema:
-            $ref: '#/definitions/Error'
+            $ref: "#/definitions/Error"
 
   /devices/{id}:
     get:
@@ -216,15 +216,15 @@ paths:
         200:
           description: Device found.
           schema:
-            $ref: '#/definitions/Device'
+            $ref: "#/definitions/Device"
         404:
           description: Device not found.
           schema:
-            $ref: '#/definitions/Error'
+            $ref: "#/definitions/Error"
         500:
           description: Unexpected error
           schema:
-            $ref: '#/definitions/Error'
+            $ref: "#/definitions/Error"
     delete:
       operationId: Decommission device
       security:
@@ -317,14 +317,14 @@ paths:
           description: New status.
           required: true
           schema:
-            $ref: '#/definitions/Status'
+            $ref: "#/definitions/Status"
       responses:
         204:
           description: The device authentication data set status was successfully updated.
         400:
           description: Bad request.
           schema:
-            $ref: '#/definitions/Error'
+            $ref: "#/definitions/Error"
         404:
           description: The device was not found.
           schema:
@@ -391,15 +391,15 @@ paths:
         200:
           description: Device count.
           schema:
-            $ref: '#/definitions/Count'
+            $ref: "#/definitions/Count"
         400:
           description: Missing/malformed request params.
           schema:
-            $ref: '#/definitions/Error'
+            $ref: "#/definitions/Error"
         500:
           description: Unexpected error
           schema:
-            $ref: '#/definitions/Error'
+            $ref: "#/definitions/Error"
   /tokens/{id}:
     delete:
       operationId: Revoke API Token
@@ -424,11 +424,11 @@ paths:
         404:
           description: The token was not found.
           schema:
-            $ref: '#/definitions/Error'
+            $ref: "#/definitions/Error"
         500:
           description: Internal server error.
           schema:
-            $ref: '#/definitions/Error'
+            $ref: "#/definitions/Error"
 
   /limits/max_devices:
     get:
@@ -442,11 +442,11 @@ paths:
         200:
           description: Usage statistics and limits.
           schema:
-            $ref: '#/definitions/Limit'
+            $ref: "#/definitions/Limit"
         500:
           description: Internal server error.
           schema:
-            $ref: '#/definitions/Error'
+            $ref: "#/definitions/Error"
 
 definitions:
   Status:
@@ -566,7 +566,7 @@ definitions:
       identity_data:
         mac: "00:01:02:03:04:05"
         sku: "My Device 1"
-        sn:  "SN1234567890"
+        sn: "SN1234567890"
       pubkey: "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAzogVU7RGDilbsoUt/DdH\nVJvcepl0A5+xzGQ50cq1VE/Dyyy8Zp0jzRXCnnu9nu395mAFSZGotZVr+sWEpO3c\nyC3VmXdBZmXmQdZqbdD/GuixJOYfqta2ytbIUPRXFN7/I7sgzxnXWBYXYmObYvdP\nokP0mQanY+WKxp7Q16pt1RoqoAd0kmV39g13rFl35muSHbSBoAW3GBF3gO+mF5Ty\n1ddp/XcgLOsmvNNjY+2HOD5F/RX0fs07mWnbD7x+xz7KEKjF+H7ZpkqCwmwCXaf0\niyYyh1852rti3Afw4mDxuVSD7sd9ggvYMc0QHIpQNkD4YWOhNiE1AB0zH57VbUYG\nUwIDAQAB\n-----END PUBLIC KEY-----\n"
   IdentityData:
     description: |
@@ -589,4 +589,4 @@ definitions:
     example:
       mac: "00:01:02:03:04:05"
       sku: "My Device 1"
-      sn:  "SN1234567890"
+      sn: "SN1234567890"
