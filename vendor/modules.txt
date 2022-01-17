@@ -102,7 +102,6 @@ github.com/mendersoftware/go-lib-micro/context
 github.com/mendersoftware/go-lib-micro/context/httpheader
 github.com/mendersoftware/go-lib-micro/identity
 github.com/mendersoftware/go-lib-micro/log
-github.com/mendersoftware/go-lib-micro/log/testing
 github.com/mendersoftware/go-lib-micro/mongo/dbtest
 github.com/mendersoftware/go-lib-micro/mongo/migrate
 github.com/mendersoftware/go-lib-micro/mongo/oid

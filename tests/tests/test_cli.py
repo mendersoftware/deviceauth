@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright 2021 Northern.tech AS
+# Copyright 2022 Northern.tech AS
 #
 #    Licensed under the Apache License, Version 2.0 (the "License");
 #    you may not use this file except in compliance with the License.
@@ -114,14 +114,16 @@ class TestListTenants:
     def test_ok(self, cli, migrated_tenant_dbs):
         dbs = list(MIGRATED_TENANT_DBS.keys())
         dbs.sort()
-        listedTenants = cli.list_tenants()
+        code, stdout, stderr = cli.list_tenants()
+        assert code == 0
+        listedTenants = stdout.decode("utf-8")
         listedTenantsList = listedTenants.split("\n")
         listedTenantsList.remove("")
         listedTenantsList.sort()
         assert dbs == listedTenantsList
 
     def test_no_tenants(self, cli):
-        assert cli.list_tenants() == ""
+        assert not cli.list_tenants()[1], "expected no tenants (empty output)"
 
 
 # runs 'last' since it drops/reinits the default db, which breaks deviceauth under test:
@@ -132,22 +134,26 @@ class TestListTenants:
 @pytest.mark.last
 class TestCliMigrate:
     def test_ok_no_db(self, cli, clean_db, mongo):
-        cli.migrate()
+        code, _, _ = cli.migrate()
+        assert code == 0
         TestMigration.verify(cli, mongo, DB_NAME, DB_VERSION)
 
     @pytest.mark.parametrize("fake_migrated_db", ["0.0.1"], indirect=True)
     def test_ok_stale_db(self, cli, fake_migrated_db, mongo):
-        cli.migrate()
+        code, _, _ = cli.migrate()
+        assert code == 0
         TestMigration.verify(cli, mongo, DB_NAME, DB_VERSION)
 
     @pytest.mark.parametrize("fake_migrated_db", ["1.10.0"], indirect=True)
     def test_ok_current_db(self, cli, fake_migrated_db, mongo):
-        cli.migrate()
+        code, _, _ = cli.migrate()
+        assert code == 0
         TestMigration.verify(cli, mongo, DB_NAME, DB_VERSION)
 
     @pytest.mark.parametrize("fake_migrated_db", ["2.0.0"], indirect=True)
     def test_ok_future_db(self, cli, fake_migrated_db, mongo):
-        cli.migrate()
+        code, _, _ = cli.migrate()
+        assert code == 0
         TestMigration.verify(cli, mongo, DB_NAME, "2.0.0")
 
 
@@ -157,7 +163,8 @@ class TestCliMigrateEnterprise:
         "tenant_id", list(MIGRATED_TENANT_DBS) + ["tenant-new-1", "tenant-new-2"]
     )
     def test_ok(self, cli, mongo, migrated_tenant_dbs, tenant_id):
-        cli.migrate(tenant_id)
+        code, _, _ = cli.migrate(tenant_id)
+        assert code == 0
 
         dbname = make_tenant_db(tenant_id)
         # a 'future' version won't be migrated, make an exception
@@ -324,7 +331,8 @@ class TestCheckDeviceLimitsEnterprise:
                     # POST /api/v1/workflows/device_limit_email
                     rsp_q_wflows.put_nowait(verify_workflow)
 
-            cli.check_device_limits()
+            code, stdout, stderr = cli.check_device_limits()
+            assert code == 0
 
             # All pushed mock responses should be consumed at this point.
             assert (
