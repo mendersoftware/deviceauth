@@ -532,6 +532,9 @@ definitions:
         type: string
         format: date-time
         description: Created timestamp
+      device_id:
+        type: string
+        description: Device ID connected to authentication data set
   Count:
     description: Counter type
     type: object
