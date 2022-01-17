@@ -1,4 +1,4 @@
-# Copyright 2021 Northern.tech AS
+# Copyright 2022 Northern.tech AS
 #
 #    Licensed under the Apache License, Version 2.0 (the "License");
 #    you may not use this file except in compliance with the License.
@@ -87,7 +87,7 @@ def request_token(device, dev_auth, url, tenant_addons=[]):
     return device.token
 
 
-@pytest.yield_fixture(scope="function")
+@pytest.fixture(scope="function")
 def accepted_device(device_api, management_api, clean_migrated_db):
     """Fixture that sets up an accepted device. Yields a tuple:
     (device ID, instance of Device, instance of DevAuthorizer)"""
@@ -125,7 +125,7 @@ def accept_device(device_api, management_api, tenant_token=None):
     return devid, d, da
 
 
-@pytest.yield_fixture(scope="function")
+@pytest.fixture(scope="function")
 def device_token(accepted_device, device_api):
     devid, d, da = accepted_device
 
@@ -140,7 +140,7 @@ def device_token(accepted_device, device_api):
     yield token
 
 
-@pytest.yield_fixture(scope="session")
+@pytest.fixture(scope="session")
 def token_verify_url(internal_api):
     verify_url = internal_api.make_api_url("/tokens/verify")
     print("verify URL:", verify_url)
