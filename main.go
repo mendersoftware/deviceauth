@@ -40,7 +40,7 @@ func doMain(args []string) {
 	var debug bool
 
 	app := cli.NewApp()
-	app.Usage = "Device Authentication Service"
+	app.Usage = "Device Authentication Service."
 
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
