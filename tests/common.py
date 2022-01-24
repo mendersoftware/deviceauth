@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright 2021 Northern.tech AS
+# Copyright 2022 Northern.tech AS
 #
 #    Licensed under the Apache License, Version 2.0 (the "License");
 #    you may not use this file except in compliance with the License.
@@ -169,7 +169,7 @@ def mongo_cleanup(mongo):
         mongo.drop_database(d)
 
 
-@pytest.yield_fixture(scope="function")
+@pytest.fixture(scope="function")
 def clean_db(mongo):
     """Fixture setting up a clean (i.e. empty database). Yields
     pymongo.MongoClient connected to the DB."""
@@ -178,21 +178,21 @@ def clean_db(mongo):
     mongo_cleanup(mongo)
 
 
-@pytest.yield_fixture(scope="function")
+@pytest.fixture(scope="function")
 def clean_migrated_db(clean_db, cli):
     """Clean database with migrations applied. Yields pymongo.MongoClient connected to the DB."""
     cli.migrate()
     yield clean_db
 
 
-@pytest.yield_fixture(scope="function")
+@pytest.fixture(scope="function")
 def tenant_foobar_clean_migrated_db(clean_db, cli):
     """Clean 'foobar' database with migrations applied. Yields pymongo.MongoClient connected to the DB."""
     cli.migrate(tenant="foobar")
     yield clean_db
 
 
-@pytest.yield_fixture(scope="session")
+@pytest.fixture(scope="session")
 def management_api(request):
     yield SimpleManagementClient(
         request.config.getoption("--host"),
@@ -200,7 +200,7 @@ def management_api(request):
     )
 
 
-@pytest.yield_fixture(scope="session")
+@pytest.fixture(scope="session")
 def internal_api(request):
     yield SimpleInternalClient(
         request.config.getoption("--host"),
@@ -208,7 +208,7 @@ def internal_api(request):
     )
 
 
-@pytest.yield_fixture(scope="session")
+@pytest.fixture(scope="session")
 def device_api(request):
     yield BaseDevicesApiClient(request.config.getoption("--host"))
 
@@ -256,7 +256,7 @@ def make_devices(device_api, devcount=1, tenant_token=""):
     return out_devices
 
 
-@pytest.yield_fixture(scope="function")
+@pytest.fixture(scope="function")
 def devices(device_api, clean_migrated_db, request):
     """Make unauthorized devices. The fixture can be parametrized a number of
     devices to make. Yields a list of tuples:
@@ -269,7 +269,7 @@ def devices(device_api, clean_migrated_db, request):
     yield make_devices(device_api, devcount)
 
 
-@pytest.yield_fixture(scope="function")
+@pytest.fixture(scope="function")
 def tenant_foobar_devices(device_api, management_api, tenant_foobar, request):
     """Make unauthorized devices owned by tenant with ID 'foobar'. The fixture can
     be parametrized a number of devices to make. Yields a list of tuples:

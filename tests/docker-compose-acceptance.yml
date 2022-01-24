@@ -6,6 +6,7 @@ services:
             - mender
         volumes:
             - "${TESTS_DIR}:/testing"
+            - "/var/run/docker.sock:/var/run/docker.sock"
         depends_on:
             - mender-device-auth
         command: -k 'not Enterprise'
@@ -18,6 +19,7 @@ services:
             image: mendersoftware/deviceauth:prtest
             volumes:
                 - "${TESTS_DIR}:/testing"
+            working_dir: /testing
             environment:
                 # acceptance container will be running mocks for a couple of
                 # services, direct deviceauth there

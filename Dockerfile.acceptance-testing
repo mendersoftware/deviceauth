@@ -2,14 +2,15 @@ FROM golang:1.16.5-alpine3.12 as builder
 RUN mkdir -p /go/src/github.com/mendersoftware/deviceauth
 COPY . /go/src/github.com/mendersoftware/deviceauth
 RUN cd /go/src/github.com/mendersoftware/deviceauth && \
-    env CGO_ENABLED=0 go test -c -o deviceauth-test -coverpkg $(go list ./... | grep -v vendor | grep -v mock | grep -v test | tr  '\n' ,)
+    env CGO_ENABLED=0 go test -c -o deviceauth -tags main \
+    -coverpkg $(go list ./... | grep -v vendor | grep -v mock | grep -v test | tr  '\n' ,)
 
 FROM alpine:3.15.0
 
 EXPOSE 8080
 
-COPY  --from=builder /go/src/github.com/mendersoftware/deviceauth/deviceauth-test /usr/bin/
-COPY ./config.yaml /usr/bin/
-STOPSIGNAL SIGINT
+COPY  --from=builder /go/src/github.com/mendersoftware/deviceauth/deviceauth /usr/bin/
+COPY ./config.yaml /etc/deviceauth/
+ENTRYPOINT ["/usr/bin/deviceauth", "--config", "/etc/deviceauth/config.yaml"]
 
-ENTRYPOINT ["/usr/bin/deviceauth-test", "-test.coverprofile=/testing/coverage-acceptance.txt", "-acceptance-tests", "-test.run=TestRunMain", "-cli-args=server --automigrate"]
+STOPSIGNAL SIGINT

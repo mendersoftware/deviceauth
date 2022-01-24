@@ -1,4 +1,4 @@
-# Copyright 2021 Northern.tech AS
+# Copyright 2022 Northern.tech AS
 #
 #    Licensed under the Apache License, Version 2.0 (the "License");
 #    you may not use this file except in compliance with the License.
@@ -95,7 +95,7 @@ def verify_token(token, status_code, url):
     assert rsp.status_code == status_code
 
 
-@pytest.yield_fixture(scope="function")
+@pytest.fixture(scope="function")
 def accepted_tenants_devices(
     device_api, management_api, clean_migrated_db, cli, request
 ):

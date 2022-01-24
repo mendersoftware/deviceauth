@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright 2021 Northern.tech AS
+# Copyright 2022 Northern.tech AS
 #
 #    Licensed under the Apache License, Version 2.0 (the "License");
 #    you may not use this file except in compliance with the License.
@@ -12,17 +12,18 @@
 #    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
-import os.path
-import logging
 import json
-import urllib.parse as up
-import requests
+import logging
+import os.path
+import socket
 import subprocess
 
-import pytest
-from bravado.swagger_model import load_file
+import docker
+import pytest  # noqa
+import requests
+
 from bravado.client import SwaggerClient, RequestsClient
-from requests.utils import parse_header_links
+from bravado.swagger_model import load_file
 
 
 class BaseApiClient:
@@ -234,26 +235,40 @@ class SimpleManagementClient(ManagementClient):
 
 
 class CliClient:
-    cmd = "/testing/deviceauth"
+    exec_path = "/usr/bin/deviceauth"
 
-    def migrate(self, tenant=None):
-        args = [self.cmd, "migrate"]
+    def __init__(self):
+        self.docker = docker.from_env()
+        _self = self.docker.containers.list(filters={"id": socket.gethostname()})[0]
+
+        project = _self.labels.get("com.docker.compose.project")
+        self.device_auth = self.docker.containers.list(
+            filters={
+                "label": [
+                    f"com.docker.compose.project={project}",
+                    "com.docker.compose.service=mender-device-auth",
+                ]
+            },
+            limit=1,
+        )[0]
+
+    def migrate(self, tenant=None, **kwargs):
+        cmd = [self.exec_path, "migrate"]
 
         if tenant is not None:
-            args.extend(["--tenant", tenant])
+            cmd.extend(["--tenant", tenant])
 
-        subprocess.run(args, check=True)
+        code, (stdout, stderr) = self.device_auth.exec_run(cmd, demux=True, **kwargs)
+        return code, stdout, stderr
 
-    def check_device_limits(self, threshold=90.0):
-        args = [self.cmd, "check-device-limits", "--threshold", "%.2f" % threshold]
+    def check_device_limits(self, threshold=90.0, **kwargs):
+        cmd = [self.exec_path, "check-device-limits", "--threshold", "%.2f" % threshold]
 
-        return subprocess.run(args, check=True, stdout=subprocess.PIPE).stdout.decode(
-            "utf-8"
-        )
+        code, (stdout, stderr) = self.device_auth.exec_run(cmd, demux=True, **kwargs)
+        return code, stdout, stderr
 
-    def list_tenants(self, tenant=None):
-        args = [self.cmd, "migrate", "--list-tenants"]
+    def list_tenants(self, tenant=None, **kwargs):
+        cmd = [self.exec_path, "migrate", "--list-tenants"]
 
-        return subprocess.run(args, check=True, stdout=subprocess.PIPE).stdout.decode(
-            "utf-8"
-        )
+        code, (stdout, stderr) = self.device_auth.exec_run(cmd, demux=True, **kwargs)
+        return code, stdout, stderr
