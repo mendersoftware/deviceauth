@@ -46,7 +46,6 @@ b8514c577c1c4b46cee454d5a882b15fa411e72c5bd7f801f241591789fce61a  vendor/github.
 012d0f6caf604aedba723982c0d8a28f664ecd957de5131bc22c87a0d36b7115  vendor/github.com/asaskevich/govalidator/LICENSE
 a55959c4e3e8917bfa857359bb641115336276a6cc97408fd8197e079fb18470  vendor/github.com/cpuguy83/go-md2man/v2/LICENSE.md
 f566a9f97bacdaf00d9f21dd991e81dc11201c4e016c86b470799429a1c9a79c  vendor/github.com/cespare/xxhash/v2/LICENSE.txt
-f71d43124a8b70fbaef7c835d1639e89a7acdb252b05dda35652247902880724  vendor/github.com/dgrijalva/jwt-go/LICENSE
 11f46ac1bc076fc405c06fd087226e5dd87b9c2e6b8dfda5153c79b5b6f01362  vendor/github.com/dgryski/go-rendezvous/LICENSE
 03458b6d5828e1be1127ca2adf122572eb574fc47b56190c3b38203b8b2a98d0  vendor/github.com/gin-contrib/sse/LICENSE
 03458b6d5828e1be1127ca2adf122572eb574fc47b56190c3b38203b8b2a98d0  vendor/github.com/gin-gonic/gin/LICENSE
@@ -54,6 +53,7 @@ a1a5ca382f9e8c646fa05240a74a6554bbc3084b5675f84c9eaafd3d95686612  vendor/github.
 a55d0c6e1a35ee6cf13afb4bbc3c8801cc570d7ac8edcd5e4503892f1c7ff4f7  vendor/github.com/go-playground/universal-translator/LICENSE
 9e321f6a1db81616a6c344d3aefddf9834fef23bdd913eae0db283dfa6753dff  vendor/github.com/go-playground/validator/v10/LICENSE
 9e203bd56d54ad11a8106e63e7a738363634f23ac91e14bddb2e35c5e7545a72  vendor/github.com/go-stack/stack/LICENSE.md
+fe26ca41577b9b2b4448050a24b25e5753af66b5d5945d5d36094e7790bfcb2f  vendor/github.com/golang-jwt/jwt/v4/LICENSE
 3247931083f058b00760a3c32a9ca0962c05e4d562ad2ffcc1753451fa8d4486  vendor/github.com/json-iterator/go/LICENSE
 f566a9f97bacdaf00d9f21dd991e81dc11201c4e016c86b470799429a1c9a79c  vendor/github.com/klauspost/compress/zstd/internal/xxhash/LICENSE.txt
 fe81a9072afbfe0fe32b0bc99a852d697d14fbbca99b0b1878ac8f5dcbdd6ee6  vendor/github.com/leodido/go-urn/LICENSE
