@@ -87,7 +87,7 @@ class TestMigration:
         dbs = client.list_database_names()
         assert dbname in dbs
 
-        colls = client[dbname].collection_names()
+        colls = client[dbname].list_collection_names()
         assert DB_MIGRATION_COLLECTION in colls
 
     @staticmethod
