@@ -1,4 +1,4 @@
-# Copyright 2021 Northern.tech AS
+# Copyright 2022 Northern.tech AS
 #
 #    Licensed under the Apache License, Version 2.0 (the "License");
 #    you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ class TestInternalApi:
         assert r.status_code == 201
 
         assert "deviceauth-foobar" in clean_db.list_database_names()
-        assert "migration_info" in clean_db["deviceauth-foobar"].collection_names()
+        assert "migration_info" in clean_db["deviceauth-foobar"].list_collection_names()
 
     def test_create_tenant_twice(self, internal_api, clean_db):
         _, r = internal_api.create_tenant("foobar")
