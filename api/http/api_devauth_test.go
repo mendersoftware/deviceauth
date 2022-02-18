@@ -1,4 +1,4 @@
-// Copyright 2021 Northern.tech AS
+// Copyright 2022 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -559,7 +559,6 @@ func TestApiV2DevAuthUpdateStatusDevice(t *testing.T) {
 		"123,456": {
 			dev: &model.Device{
 				Id:     "foo",
-				PubKey: "foobar",
 				Status: "accepted",
 				IdData: "deadcafe",
 			},
@@ -576,7 +575,6 @@ func TestApiV2DevAuthUpdateStatusDevice(t *testing.T) {
 		"567,890": {
 			dev: &model.Device{
 				Id:     "foo",
-				PubKey: "foobar",
 				Status: "pending",
 				IdData: "deadcafe",
 			},
@@ -866,7 +864,6 @@ func TestApiV2GetDevice(t *testing.T) {
 		IdDataStruct: map[string]interface{}{
 			"mac": "00:00:00:01",
 		},
-		PubKey: "pubkey",
 		Status: model.DevStatusPending,
 		AuthSets: []model.AuthSet{
 			{
@@ -968,9 +965,7 @@ func TestSearchDevices(t *testing.T) {
 			IDs: []string{"123456789012345678901234"},
 		},
 		AppDevices: []model.Device{{
-			Id: "123456789012345678901234",
-			PubKey: "----------SUCH PUBLIC----------\n" +
-				"----------MUCH ENCRYPTION----------",
+			Id:        "123456789012345678901234",
 			Status:    "accepted",
 			CreatedTs: time.Unix(1606942069, 0),
 		}},
@@ -979,9 +974,7 @@ func TestSearchDevices(t *testing.T) {
 		Headers:    http.Header{"X-Men-Requestid": []string{"test"}},
 		Body: func() []byte {
 			dev := []model.Device{{
-				Id: "123456789012345678901234",
-				PubKey: "----------SUCH PUBLIC----------\n" +
-					"----------MUCH ENCRYPTION----------",
+				Id:        "123456789012345678901234",
 				Status:    "accepted",
 				CreatedTs: time.Unix(1606942069, 0),
 			}}
@@ -1007,9 +1000,7 @@ func TestSearchDevices(t *testing.T) {
 			Status: []string{"accepted"},
 		},
 		AppDevices: []model.Device{{
-			Id: "123456789012345678901234",
-			PubKey: "----------SUCH PUBLIC----------\n" +
-				"----------MUCH ENCRYPTION----------",
+			Id:        "123456789012345678901234",
 			Status:    "accepted",
 			CreatedTs: time.Unix(1606942069, 0),
 		}},
@@ -1018,9 +1009,7 @@ func TestSearchDevices(t *testing.T) {
 		Headers:    http.Header{"X-Men-Requestid": []string{"test"}},
 		Body: func() []byte {
 			dev := []model.Device{{
-				Id: "123456789012345678901234",
-				PubKey: "----------SUCH PUBLIC----------\n" +
-					"----------MUCH ENCRYPTION----------",
+				Id:        "123456789012345678901234",
 				Status:    "accepted",
 				CreatedTs: time.Unix(1606942069, 0),
 			}}
@@ -1192,27 +1181,22 @@ func TestApiV2GetDevices(t *testing.T) {
 	devs := []model.Device{
 		{
 			Id:     "id1",
-			PubKey: "pubkey",
 			Status: model.DevStatusPending,
 		},
 		{
 			Id:     "id2",
-			PubKey: "pubkey2",
 			Status: model.DevStatusRejected,
 		},
 		{
 			Id:     "id3",
-			PubKey: "pubkey3",
 			Status: model.DevStatusRejected,
 		},
 		{
 			Id:     "id4",
-			PubKey: "pubkey4",
 			Status: model.DevStatusAccepted,
 		},
 		{
 			Id:     "id5",
-			PubKey: "pubkey5",
 			Status: model.DevStatusPreauth,
 		},
 	}
@@ -2170,27 +2154,22 @@ func TestApiGetTenantDevicesV2(t *testing.T) {
 	devs := []model.Device{
 		{
 			Id:     "id1",
-			PubKey: "pubkey",
 			Status: model.DevStatusPending,
 		},
 		{
 			Id:     "id2",
-			PubKey: "pubkey2",
 			Status: model.DevStatusRejected,
 		},
 		{
 			Id:     "id3",
-			PubKey: "pubkey3",
 			Status: model.DevStatusRejected,
 		},
 		{
 			Id:     "id4",
-			PubKey: "pubkey4",
 			Status: model.DevStatusAccepted,
 		},
 		{
 			Id:     "id5",
-			PubKey: "pubkey5",
 			Status: model.DevStatusPreauth,
 		},
 	}
