@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2022 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -77,7 +77,6 @@ UwIDAQAB
 		{
 			Id:              "1",
 			IdData:          "{\"sn\":\"0001\",\"mac\":\"00:00:00:01\"}",
-			PubKey:          pubKey,
 			Status:          "accepted",
 			Decommissioning: false,
 			CreatedTs:       ts,
@@ -86,7 +85,6 @@ UwIDAQAB
 		{
 			Id:              "2",
 			IdData:          "{\"sn\":\"0002\",\"attr\":\"foo1\",\"mac\":\"00:00:00:02\"}",
-			PubKey:          pubKey,
 			Status:          "pending",
 			Decommissioning: false,
 			CreatedTs:       ts,
@@ -95,7 +93,6 @@ UwIDAQAB
 		{
 			Id:              "3",
 			IdData:          "{\"sn\":\"0003\",\"attr\":\"foo3\",\"mac\":\"00:00:00:03\"}",
-			PubKey:          pubKey,
 			Status:          "rejected",
 			Decommissioning: false,
 			CreatedTs:       ts,

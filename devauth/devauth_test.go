@@ -1,4 +1,4 @@
-// Copyright 2021 Northern.tech AS
+// Copyright 2022 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -580,7 +580,6 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 				func(ctx context.Context, idDataHash []byte) *model.Device {
 					if tc.getDevByIdErr == nil {
 						return &model.Device{
-							PubKey:       tc.getDevByIdKey,
 							IdDataSha256: idDataHash,
 							IdDataStruct: idDataStruct,
 							Id:           devId,
@@ -1079,8 +1078,7 @@ func TestDevAuthPreauthorizeDevice(t *testing.T) {
 					mock.MatchedBy(
 						func(d model.Device) bool {
 							return (d.IdData == tc.req.IdData) &&
-								(d.Id == tc.req.DeviceId) &&
-								(d.PubKey == tc.req.PubKey)
+								(d.Id == tc.req.DeviceId)
 						})).Return(tc.addDeviceErr)
 
 				if tc.addDeviceErr == nil {
@@ -1123,7 +1121,6 @@ func TestDevAuthPreauthorizeDevice(t *testing.T) {
 					func(ctx context.Context, idDataHash []byte) *model.Device {
 						if tc.getDevByIdErr == nil {
 							return &model.Device{
-								PubKey:       "dummy_key",
 								IdDataSha256: idDataSha256,
 								Id:           deviceID,
 							}
@@ -1177,7 +1174,6 @@ func TestProvisionDevice(t *testing.T) {
 		Device: &model.Device{
 			Id:     "428b4168-3c03-4cd7-95f6-b11381eee73f",
 			IdData: `{"mac": "00:11:22:33:44:55"}`,
-			PubKey: `pubkey`,
 			Status: model.DevStatusAccepted,
 		},
 		DataStore: func(t *testing.T, self *testCase) *mstore.DataStore {
@@ -1235,7 +1231,6 @@ func TestProvisionDevice(t *testing.T) {
 		Device: &model.Device{
 			Id:     "428b4168-3c03-4cd7-95f6-b11381eee73f",
 			IdData: `{"mac": "00:11:22:33:44:55"}`,
-			PubKey: `pubkey`,
 			Status: model.DevStatusAccepted,
 		},
 		DataStore: func(t *testing.T, self *testCase) *mstore.DataStore {
@@ -1300,7 +1295,6 @@ func TestProvisionDevice(t *testing.T) {
 		Device: &model.Device{
 			Id:     "428b4168-3c03-4cd7-95f6-b11381eee73f",
 			IdData: `{"mac": "00:11:22:33:44:55"}`,
-			PubKey: `pubkey`,
 			Status: model.DevStatusAccepted,
 		},
 		DataStore: func(t *testing.T, self *testCase) *mstore.DataStore {
@@ -1360,7 +1354,6 @@ func TestProvisionDevice(t *testing.T) {
 		Device: &model.Device{
 			Id:     "428b4168-3c03-4cd7-95f6-b11381eee73f",
 			IdData: `{"mac": "00:11:22:33:44:55"}`,
-			PubKey: `pubkey`,
 			Status: model.DevStatusAccepted,
 		},
 		DataStore: func(t *testing.T, self *testCase) *mstore.DataStore {
@@ -1429,7 +1422,6 @@ func TestProvisionDevice(t *testing.T) {
 		Device: &model.Device{
 			Id:     "428b4168-3c03-4cd7-95f6-b11381eee73f",
 			IdData: `{"mac": "00:11:22:33:44:55"}`,
-			PubKey: `pubkey`,
 			Status: model.DevStatusAccepted,
 		},
 		DataStore: func(t *testing.T, self *testCase) *mstore.DataStore {
@@ -1480,7 +1472,6 @@ func TestProvisionDevice(t *testing.T) {
 		Device: &model.Device{
 			Id:     "428b4168-3c03-4cd7-95f6-b11381eee73f",
 			IdData: `{"mac": "00:11:22:33:44:55"}`,
-			PubKey: `pubkey`,
 			Status: model.DevStatusAccepted,
 		},
 		DataStore: func(t *testing.T, self *testCase) *mstore.DataStore {
@@ -1554,7 +1545,6 @@ func TestProvisionDevice(t *testing.T) {
 		Device: &model.Device{
 			Id:     "428b4168-3c03-4cd7-95f6-b11381eee73f",
 			IdData: `{"mac": "00:11:22:33:44:55"}`,
-			PubKey: `pubkey`,
 			Status: model.DevStatusAccepted,
 		},
 		DataStore: func(t *testing.T, self *testCase) *mstore.DataStore {
@@ -1588,7 +1578,6 @@ func TestProvisionDevice(t *testing.T) {
 		Device: &model.Device{
 			Id:     "428b4168-3c03-4cd7-95f6-b11381eee73f",
 			IdData: `{"mac": "00:11:22:33:44:55"}`,
-			PubKey: `pubkey`,
 			Status: model.DevStatusAccepted,
 		},
 		DataStore: func(t *testing.T, self *testCase) *mstore.DataStore {
@@ -1613,7 +1602,6 @@ func TestProvisionDevice(t *testing.T) {
 		Device: &model.Device{
 			Id:     "428b4168-3c03-4cd7-95f6-b11381eee73f",
 			IdData: `{"mac": "00:11:22:33:44:55"}`,
-			PubKey: `pubkey`,
 			Status: model.DevStatusAccepted,
 		},
 		DataStore: func(t *testing.T, self *testCase) *mstore.DataStore {

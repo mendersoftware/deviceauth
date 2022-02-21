@@ -1,4 +1,4 @@
-// Copyright 2020 Northern.tech AS
+// Copyright 2022 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -64,14 +64,12 @@ func TestMaintenanceWithDataStore(t *testing.T) {
 		model.Device{
 			Id:              oid.NewUUIDv5("001").String(),
 			IdData:          "001",
-			PubKey:          "001",
 			Status:          model.DevStatusPending,
 			Decommissioning: false,
 		},
 		model.Device{
 			Id:              oid.NewUUIDv5("002").String(),
 			IdData:          "002",
-			PubKey:          "002",
 			Status:          model.DevStatusPending,
 			Decommissioning: true,
 		},

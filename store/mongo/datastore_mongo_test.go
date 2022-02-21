@@ -1,4 +1,4 @@
-// Copyright 2021 Northern.tech AS
+// Copyright 2022 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -136,7 +136,6 @@ func getDb(ctx context.Context) *DataStoreMongo {
 // custom Device comparison with 'compareTime'
 func compareDevices(expected *model.Device, actual *model.Device, t *testing.T) {
 	assert.Equal(t, expected.Id, actual.Id)
-	assert.Equal(t, expected.PubKey, actual.PubKey)
 	assert.Equal(t, expected.IdData, actual.IdData)
 	assert.Equal(t, expected.IdDataStruct, actual.IdDataStruct)
 	assert.Equal(t, expected.IdDataSha256, actual.IdDataSha256)
@@ -363,7 +362,6 @@ func TestStoreAddDevice(t *testing.T) {
 
 	//setup
 	dev := &model.Device{
-		PubKey:       "pubkey",
 		IdData:       "iddata",
 		IdDataSha256: getIdDataHash("iddata"),
 		Status:       "pending",
@@ -1083,7 +1081,6 @@ func TestStoreGetDevices(t *testing.T) {
 		dev := model.Device{
 			Id:     fmt.Sprintf("%04d", i),
 			IdData: fmt.Sprintf("foo-%04d", i),
-			PubKey: fmt.Sprintf("pubkey-%04d", i),
 			Status: randDevStatus(),
 		}
 
@@ -2058,12 +2055,9 @@ func getDevsWithStatuses(accepted, preauthorized, pending, rejected, noauth int)
 
 func getDevWithStatus(id int, status string) (*model.Device, []model.AuthSet) {
 	iddata := fmt.Sprintf("foo-%04d", id)
-	pubkey := fmt.Sprintf("pubkey-%04d", id)
-
 	dev := model.Device{
 		Id:     fmt.Sprintf("%d", id),
 		IdData: iddata,
-		PubKey: pubkey,
 		Status: status,
 	}
 
@@ -2086,7 +2080,7 @@ func getAuthSetsForStatus(dev *model.Device, status string) []model.AuthSet {
 	for i := 0; i < n; i++ {
 		set := model.AuthSet{
 			IdData:    dev.IdData,
-			PubKey:    fmt.Sprintf("%s-%04d", dev.PubKey, i),
+			PubKey:    fmt.Sprintf("%s-%04d", dev.IdData, i),
 			DeviceId:  dev.Id,
 			Timestamp: uto.TimePtr(time.Now()),
 			Status:    "rejected",

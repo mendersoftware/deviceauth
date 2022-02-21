@@ -1,4 +1,4 @@
-// Copyright 2021 Northern.tech AS
+// Copyright 2022 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -37,7 +37,7 @@ import (
 )
 
 const (
-	DbVersion     = "1.10.0"
+	DbVersion     = "1.11.0"
 	DbName        = "deviceauth"
 	DbDevicesColl = "devices"
 	DbAuthSetColl = "auth_sets"
@@ -530,6 +530,10 @@ func (db *DataStoreMongo) MigrateTenant(ctx context.Context, database, version s
 			ctx: ctx,
 		},
 		&migration_1_10_0{
+			ds:  db,
+			ctx: ctx,
+		},
+		&migration_1_11_0{
 			ds:  db,
 			ctx: ctx,
 		},

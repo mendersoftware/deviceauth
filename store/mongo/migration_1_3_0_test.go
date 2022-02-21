@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2022 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -56,7 +56,6 @@ UwIDAQAB
 				{
 					Id:              "1",
 					IdData:          "{\"sn\":\"0001\"}",
-					PubKey:          goodKey,
 					Status:          "pending",
 					Decommissioning: false,
 					CreatedTs:       ts,
@@ -87,20 +86,6 @@ UwIDAQAB
 				},
 			},
 			err: errors.New("failed to normalize key of auth set 1: iyYyh1852rb: cannot decode public key"),
-		},
-		"error, device": {
-			devs: []model.Device{
-				{
-					Id:              "1",
-					IdData:          "{\"sn\":\"0001\"}",
-					PubKey:          badKey,
-					Status:          "pending",
-					Decommissioning: false,
-					CreatedTs:       ts,
-					UpdatedTs:       ts,
-				},
-			},
-			err: errors.New("failed to normalize key of device 1: iyYyh1852rb: cannot decode public key"),
 		},
 	}
 
@@ -183,14 +168,6 @@ func verify(t *testing.T, ctx context.Context, db *DataStoreMongo, devs []model.
 	for _, d := range devs {
 		err := c.FindOne(ctx, bson.M{"_id": d.Id}).Decode(&dev)
 		assert.NoError(t, err)
-
-		_, err = utils.ParsePubKey(dev.PubKey)
-		assert.NoError(t, err)
-
-		newKey, err := normalizeKey(d.PubKey)
-		d.PubKey = newKey
-
-		compareDevices(&d, &dev, t)
 	}
 
 }

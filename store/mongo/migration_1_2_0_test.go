@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2022 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -48,7 +48,6 @@ func TestMigration_1_2_0(t *testing.T) {
 	devs := []model.Device{
 		{
 			Id:              "1",
-			PubKey:          "pubkey-1",
 			IdData:          "{\"sn\":\"0001\",\"mac\":\"00:00:00:01\"}",
 			Status:          "pending",
 			Decommissioning: false,
@@ -57,7 +56,6 @@ func TestMigration_1_2_0(t *testing.T) {
 		},
 		{
 			Id:              "2",
-			PubKey:          "pubkey-1",
 			IdData:          "{\"sn\":\"0002\",\"attr\":\"foo1\",\"mac\":\"00:00:00:02\"}",
 			Status:          "active",
 			Decommissioning: false,

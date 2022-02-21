@@ -1,4 +1,4 @@
-// Copyright 2021 Northern.tech AS
+// Copyright 2022 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -32,7 +32,6 @@ type migration_1_3_0 struct {
 }
 
 func (m *migration_1_3_0) Up(from migrate.Version) error {
-	devColl := m.ms.client.Database(ctxstore.DbFromContext(m.ctx, DbName)).Collection(DbDevicesColl)
 	asColl := m.ms.client.Database(ctxstore.DbFromContext(m.ctx, DbName)).Collection(DbAuthSetColl)
 
 	cursor, err := asColl.Find(m.ctx, bson.M{})
@@ -67,40 +66,6 @@ func (m *migration_1_3_0) Up(from migrate.Version) error {
 		if err != nil {
 			return errors.Wrapf(err, "failed to update auth set  %v", set.Id)
 		}
-	}
-
-	if err := cursor.Close(m.ctx); err != nil {
-		return errors.Wrap(err, "failed to close DB iterator")
-	}
-
-	cursor, err = devColl.Find(m.ctx, bson.M{})
-	if err != nil {
-		return err
-	}
-
-	var dev model.Device
-
-	for cursor.Next(m.ctx) {
-		if err = cursor.Decode(&dev); err != nil {
-			continue
-		}
-		newKey, err := normalizeKey(dev.PubKey)
-
-		if err != nil {
-			return errors.Wrapf(err, "failed to normalize key of device %v: %v", dev.Id, dev.PubKey)
-		}
-
-		update := bson.M{
-			"$set": model.DeviceUpdate{
-				PubKey: newKey,
-			},
-		}
-
-		_, err = devColl.UpdateOne(m.ctx, bson.M{"_id": dev.Id}, update)
-		if err != nil {
-			return errors.Wrapf(err, "failed to update device %v", dev.Id)
-		}
-
 	}
 
 	if err := cursor.Close(m.ctx); err != nil {

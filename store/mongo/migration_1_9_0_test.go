@@ -1,4 +1,4 @@
-// Copyright 2020 Northern.tech AS
+// Copyright 2022 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -43,7 +43,6 @@ func TestMigration_1_9_0(t *testing.T) {
 			Id:              "1",
 			IdData:          "{\"sn\":\"0001\",\"mac\":\"00:00:00:01\"}",
 			IdDataSha256:    getIdDataHash("{\"sn\":\"0001\",\"mac\":\"00:00:00:01\"}"),
-			PubKey:          "key1",
 			Status:          "accepted",
 			Decommissioning: false,
 			CreatedTs:       ts,
@@ -53,7 +52,6 @@ func TestMigration_1_9_0(t *testing.T) {
 			Id:              "2",
 			IdData:          "{\"sn\":\"0002\",\"attr\":\"foo1\",\"mac\":\"00:00:00:02\"}",
 			IdDataSha256:    getIdDataHash("{\"sn\":\"0002\",\"attr\":\"foo1\",\"mac\":\"00:00:00:02\"}"),
-			PubKey:          "key2",
 			Status:          "accepted",
 			Decommissioning: false,
 			CreatedTs:       ts,
@@ -99,7 +97,6 @@ func TestMigration_1_9_0(t *testing.T) {
 		Id:              "3",
 		IdData:          idData,
 		IdDataSha256:    getIdDataHash(idData),
-		PubKey:          "key3",
 		Status:          "accepted",
 		Decommissioning: false,
 		CreatedTs:       ts,

@@ -50,7 +50,6 @@ var (
 // otherwise the underscore will be removed upon write to mongo
 type Device struct {
 	Id              string                 `json:"id" bson:"_id,omitempty"`
-	PubKey          string                 `json:"-" bson:",omitempty"`
 	IdData          string                 `json:"id_data" bson:"id_data,omitempty"`
 	IdDataStruct    map[string]interface{} `bson:"id_data_struct,omitempty"`
 	IdDataSha256    []byte                 `bson:"id_data_sha256,omitempty"`
@@ -82,7 +81,6 @@ func NewDevice(id, id_data, pubkey string) *Device {
 	return &Device{
 		Id:              id,
 		IdData:          id_data,
-		PubKey:          pubkey,
 		Status:          DevStatusNoAuth,
 		Decommissioning: false,
 		CreatedTs:       now,
