@@ -1,4 +1,4 @@
-// Copyright 2021 Northern.tech AS
+// Copyright 2022 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -25,8 +25,6 @@ import (
 	"github.com/pkg/errors"
 
 	cinv "github.com/mendersoftware/deviceauth/client/inventory"
-	"github.com/mendersoftware/deviceauth/client/orchestrator"
-	"github.com/mendersoftware/deviceauth/client/tenant"
 	dconfig "github.com/mendersoftware/deviceauth/config"
 	"github.com/mendersoftware/deviceauth/model"
 	"github.com/mendersoftware/deviceauth/store"
@@ -462,96 +460,4 @@ func tryPropagateIdDataInventoryForDb(
 	}
 
 	return err
-}
-
-const (
-	WorkflowsDeviceLimitText    = "@/etc/workflows-enterprise/data/device_limit_email.txt"
-	WorkflowsDeviceLimitHTML    = "@/etc/workflows-enterprise/data/device_limit_email.html"
-	WorkflowsDeviceLimitSubject = "Device limit almost reached"
-)
-
-func warnTenantUsers(
-	ctx context.Context,
-	tenantID string,
-	tadm tenant.ClientRunner,
-	wflows orchestrator.ClientRunner,
-	remainingDevices uint,
-) error {
-	users, err := tadm.GetTenantUsers(ctx, tenantID)
-	if err != nil {
-		// Log the event and continue with the other tenants
-		return err
-	}
-	for i := range users {
-		warnWFlow := orchestrator.DeviceLimitWarning{
-			RequestID:      "deviceAuthAdmin",
-			RecipientEmail: users[i].Email,
-
-			Subject:          WorkflowsDeviceLimitSubject,
-			Body:             WorkflowsDeviceLimitText,
-			BodyHTML:         WorkflowsDeviceLimitHTML,
-			RemainingDevices: &remainingDevices,
-		}
-		err = wflows.SubmitDeviceLimitWarning(ctx, warnWFlow)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// CheckDeviceLimits goes through all tenant databases and checks if the number
-// of accepted devices is above a given threshold (in %) and sends an email
-// to all registered users registered under the given tenant.
-func CheckDeviceLimits(
-	threshold float64,
-	ds store.DataStore,
-	tadm tenant.ClientRunner,
-	wflows orchestrator.ClientRunner,
-) error {
-	// Sanitize threshold
-	if threshold > 100.0 {
-		threshold = 100.0
-	} else if threshold < 0.0 {
-		threshold = 0.0
-	}
-	threshProportion := threshold / 100.0
-
-	// mapFunc is applied to all existing databases in datastore.
-	mapFunc := func(ctx context.Context) error {
-		id := identity.FromContext(ctx)
-		if id == nil || id.Tenant == "" {
-			// Not a tenant db - skip!
-			return nil
-		}
-		tenantID := id.Tenant
-		l := log.FromContext(ctx)
-
-		lim, err := ds.GetLimit(ctx, model.LimitMaxDeviceCount)
-		if err != nil {
-			return err
-		}
-		n, err := ds.GetDevCountByStatus(ctx, model.DevStatusAccepted)
-		if err != nil {
-			return err
-		}
-		if float64(n) >= (float64(lim.Value) * threshProportion) {
-			// User is above limit
-
-			remainingUsers := uint(n) - uint(lim.Value)
-			err := warnTenantUsers(ctx, tenantID, tadm, wflows, remainingUsers)
-			if err != nil {
-				l.Warnf(`Failed to warn tenant "%s" `+
-					`users nearing device limit: %s`,
-					tenantID, err.Error(),
-				)
-			}
-		}
-		return nil
-	}
-	// Start looping through the databases.
-	return ds.ForEachDatabase(
-		context.Background(),
-		mapFunc,
-	)
 }

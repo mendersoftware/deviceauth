@@ -1,4 +1,4 @@
-// Copyright 2021 Northern.tech AS
+// Copyright 2022 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -49,18 +49,8 @@ type AuthSetFilter struct {
 	Status   string `bson:"status,omitempty"`
 }
 
-// MapFunc is the prototype for the function applied to each database in
-// ForEachDatabase. dbCtx contains a reference to the current database
-// MapFunc is applied to.
-type MapFunc func(dbCtx context.Context) error
-
 //go:generate ../utils/mockgen.sh
 type DataStore interface {
-	// ForEachDatabase loops over all databases and applies opFunc with
-	// for all existing databases. If opFunc returns an error for one of
-	// the elements, this function aborts with the same error.
-	ForEachDatabase(parentCtx context.Context, opFunc MapFunc) error
-
 	Ping(ctx context.Context) error
 	// retrieve device by Mender-assigned device ID
 	//returns ErrDevNotFound if device not found

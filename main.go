@@ -1,4 +1,4 @@
-// Copyright 2021 Northern.tech AS
+// Copyright 2022 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -20,12 +20,9 @@ import (
 
 	"github.com/mendersoftware/go-lib-micro/config"
 	"github.com/mendersoftware/go-lib-micro/log"
-	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 
 	cinv "github.com/mendersoftware/deviceauth/client/inventory"
-	"github.com/mendersoftware/deviceauth/client/orchestrator"
-	"github.com/mendersoftware/deviceauth/client/tenant"
 	"github.com/mendersoftware/deviceauth/cmd"
 	dconfig "github.com/mendersoftware/deviceauth/config"
 	"github.com/mendersoftware/deviceauth/store/mongo"
@@ -147,24 +144,6 @@ func doMain(args []string) {
 			},
 
 			Action: cmdMaintenance,
-		}, {
-			Name:  "check-device-limits",
-			Usage: "Warn users if user is approaching device limit",
-			Description: "Loops through all tenant databases and " +
-				"checks if the number of devices is over a " +
-				"threshold of the allowed limit and sends an " +
-				"email asking the user to upgrade or decomission" +
-				"unused devices.",
-			Flags: []cli.Flag{
-				cli.Float64Flag{
-					Name:  "threshold, t",
-					Value: 90.0,
-					Usage: "Threshold in percent (%) of " +
-						"device limit that trigger " +
-						"email event.",
-				},
-			},
-			Action: cmdCheckDeviceLimits,
 		},
 	}
 
@@ -302,27 +281,4 @@ func makeDataStoreConfig() mongo.DataStoreMongoConfig {
 		Password: config.Config.GetString(dconfig.SettingDbPassword),
 	}
 
-}
-
-func cmdCheckDeviceLimits(args *cli.Context) error {
-	mgoConf := makeDataStoreConfig()
-	ds, err := mongo.NewDataStoreMongo(mgoConf)
-	if err != nil {
-		return errors.Wrap(err, "cmd: failed to initialize DataStore client")
-	}
-	// Initialize tenantadm and workflows clients.
-	tadm := tenant.NewClient(tenant.Config{
-		TenantAdmAddr: config.Config.GetString(
-			dconfig.SettingTenantAdmAddr,
-		),
-	})
-	wflows := orchestrator.NewClient(orchestrator.Config{
-		OrchestratorAddr: config.Config.GetString(
-			dconfig.SettingOrchestratorAddr,
-		),
-	})
-	return cmd.CheckDeviceLimits(
-		args.Float64("threshold"),
-		ds, tadm, wflows,
-	)
 }
