@@ -23,7 +23,7 @@ import (
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	"github.com/mendersoftware/go-lib-micro/mongo/oid"
-	ctxstore "github.com/mendersoftware/go-lib-micro/store"
+	ctxstore "github.com/mendersoftware/go-lib-micro/store/v2"
 	"github.com/pkg/errors"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -36,7 +36,7 @@ import (
 )
 
 const (
-	DbVersion     = "1.11.0"
+	DbVersion     = "2.0.0"
 	DbName        = "deviceauth"
 	DbDevicesColl = "devices"
 	DbAuthSetColl = "auth_sets"
@@ -53,6 +53,8 @@ var (
 	indexAuthSet_DeviceId_IdentityData_PubKey       = "auth_sets:DeviceId:IdData:PubKey"
 	indexAuthSet_DeviceId_IdentityDataSha256_PubKey = "auth_sets:IdDataSha256:PubKey"
 	indexAuthSet_IdentityDataSha256_PubKey          = "auth_sets:NoDeviceId:IdDataSha256:PubKey"
+	indexAuthSet_DeviceId                           = "auth_sets:DeviceId"
+	indexTokens_TokenExpiration                     = "tokens:TokenExpiration"
 )
 
 type DataStoreMongoConfig struct {
@@ -172,7 +174,7 @@ func (db *DataStoreMongo) GetDevices(
 		findOpts.SetLimit(int64(limit))
 	}
 
-	cursor, err := collDevs.Find(ctx, fltr, findOpts)
+	cursor, err := collDevs.Find(ctx, ctxstore.WithTenantID(ctx, fltr), findOpts)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to fetch device list")
 	}
@@ -208,7 +210,7 @@ func (db *DataStoreMongo) GetDeviceById(ctx context.Context, id string) (*model.
 
 	res := model.Device{}
 
-	err := c.FindOne(ctx, bson.M{"_id": id}).Decode(&res)
+	err := c.FindOne(ctx, ctxstore.WithTenantID(ctx, bson.M{"_id": id})).Decode(&res)
 
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
@@ -229,8 +231,7 @@ func (db *DataStoreMongo) GetDeviceByIdentityDataHash(
 
 	filter := bson.M{"id_data_sha256": idataHash}
 	res := model.Device{}
-
-	err := c.FindOne(ctx, filter).Decode(&res)
+	err := c.FindOne(ctx, ctxstore.WithTenantID(ctx, filter)).Decode(&res)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			return nil, store.ErrDevNotFound
@@ -250,8 +251,7 @@ func (db *DataStoreMongo) AddDevice(ctx context.Context, d model.Device) error {
 	}
 
 	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
-
-	if _, err := c.InsertOne(ctx, d); err != nil {
+	if _, err := c.InsertOne(ctx, ctxstore.WithTenantID(ctx, d)); err != nil {
 		if strings.Contains(err.Error(), "duplicate key error") {
 			return store.ErrObjectExists
 		}
@@ -273,7 +273,7 @@ func (db *DataStoreMongo) UpdateDevice(ctx context.Context,
 		"$set": updev,
 	}
 
-	res, err := c.UpdateOne(ctx, bson.M{"_id": deviceID}, update)
+	res, err := c.UpdateOne(ctx, ctxstore.WithTenantID(ctx, bson.M{"_id": deviceID}), update)
 	if err != nil {
 		return errors.Wrap(err, "failed to update device")
 	} else if res.MatchedCount < 1 {
@@ -288,7 +288,7 @@ func (db *DataStoreMongo) DeleteDevice(ctx context.Context, id string) error {
 	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
 
 	filter := bson.M{"_id": id}
-	result, err := c.DeleteOne(ctx, filter)
+	result, err := c.DeleteOne(ctx, ctxstore.WithTenantID(ctx, filter))
 	if err != nil {
 		return errors.Wrap(err, "failed to remove device")
 	} else if result.DeletedCount < 1 {
@@ -302,7 +302,14 @@ func (db *DataStoreMongo) AddToken(ctx context.Context, t *jwt.Token) error {
 	database := db.client.Database(ctxstore.DbFromContext(ctx, DbName))
 	collTokens := database.Collection(DbTokensColl)
 
-	filter := bson.M{"_id": t.Claims.ID}
+	var tenantId string
+	identity := identity.FromContext(ctx)
+	if identity != nil {
+		tenantId = identity.Tenant
+	}
+
+	filter := bson.M{"_id": t.Claims.ID, jwt.TokenTenantField: tenantId}
+	t.Tenant = tenantId
 	update := bson.M{"$set": t}
 	updateOpts := mopts.Update()
 	updateOpts.SetUpsert(true)
@@ -325,7 +332,12 @@ func (db *DataStoreMongo) GetToken(
 
 	res := jwt.Token{}
 
-	err := c.FindOne(ctx, bson.M{"_id": jti}).Decode(&res)
+	var tenantId string
+	identity := identity.FromContext(ctx)
+	if identity != nil {
+		tenantId = identity.Tenant
+	}
+	err := c.FindOne(ctx, bson.M{"_id": jti, jwt.TokenTenantField: tenantId}).Decode(&res)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			return nil, store.ErrTokenNotFound
@@ -341,7 +353,13 @@ func (db *DataStoreMongo) DeleteToken(ctx context.Context, jti oid.ObjectID) err
 	database := db.client.Database(ctxstore.DbFromContext(ctx, DbName))
 	collTokens := database.Collection(DbTokensColl)
 
-	filter := bson.M{"_id": jti}
+	var tenantId string
+	identity := identity.FromContext(ctx)
+	if identity != nil {
+		tenantId = identity.Tenant
+	}
+
+	filter := bson.M{"_id": jti, jwt.TokenTenantField: tenantId}
 	result, err := collTokens.DeleteOne(ctx, filter)
 	if err != nil {
 		return errors.Wrap(err, "failed to remove token")
@@ -355,7 +373,15 @@ func (db *DataStoreMongo) DeleteToken(ctx context.Context, jti oid.ObjectID) err
 func (db *DataStoreMongo) DeleteTokens(ctx context.Context) error {
 	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).
 		Collection(DbTokensColl)
-	_, err := c.DeleteMany(ctx, bson.D{})
+
+	var tenantId string
+	identity := identity.FromContext(ctx)
+	if identity != nil {
+		tenantId = identity.Tenant
+	}
+
+	filter := bson.M{jwt.TokenTenantField: tenantId}
+	_, err := c.DeleteMany(ctx, filter)
 
 	return err
 }
@@ -366,7 +392,14 @@ func (db *DataStoreMongo) DeleteTokenByDevId(
 ) error {
 	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).
 		Collection(DbTokensColl)
-	ci, err := c.DeleteMany(ctx, bson.M{"sub": devID})
+
+	var tenantId string
+	identity := identity.FromContext(ctx)
+	if identity != nil {
+		tenantId = identity.Tenant
+	}
+	filter := bson.M{"sub": devID, jwt.TokenTenantField: tenantId}
+	ci, err := c.DeleteMany(ctx, filter)
 
 	if err != nil {
 		return errors.Wrap(err, "failed to remove tokens")
@@ -387,7 +420,7 @@ func (db *DataStoreMongo) AddAuthSet(ctx context.Context, set model.AuthSet) err
 		set.Id = uid.String()
 	}
 
-	if _, err := c.InsertOne(ctx, set); err != nil {
+	if _, err := c.InsertOne(ctx, ctxstore.WithTenantID(ctx, set)); err != nil {
 		if strings.Contains(err.Error(), "duplicate key error") {
 			return store.ErrObjectExists
 		}
@@ -410,7 +443,7 @@ func (db *DataStoreMongo) GetAuthSetByIdDataHashKey(
 	}
 	res := model.AuthSet{}
 
-	err := c.FindOne(ctx, filter).Decode(&res)
+	err := c.FindOne(ctx, ctxstore.WithTenantID(ctx, filter)).Decode(&res)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			return nil, store.ErrAuthSetNotFound
@@ -429,7 +462,7 @@ func (db *DataStoreMongo) GetAuthSetById(
 	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
 
 	res := model.AuthSet{}
-	err := c.FindOne(ctx, bson.M{"_id": auth_id}).Decode(&res)
+	err := c.FindOne(ctx, ctxstore.WithTenantID(ctx, bson.M{"_id": auth_id})).Decode(&res)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			return nil, store.ErrAuthSetNotFound
@@ -449,7 +482,7 @@ func (db *DataStoreMongo) GetAuthSetsForDevice(
 
 	res := []model.AuthSet{}
 
-	cursor, err := c.Find(ctx, model.AuthSet{DeviceId: devid})
+	cursor, err := c.Find(ctx, ctxstore.WithTenantID(ctx, model.AuthSet{DeviceId: devid}))
 	if err != nil {
 		return nil, err
 	}
@@ -472,7 +505,7 @@ func (db *DataStoreMongo) UpdateAuthSet(
 
 	update := bson.M{"$set": mod}
 
-	if res, err := c.UpdateMany(ctx, filter, update); err != nil {
+	if res, err := c.UpdateMany(ctx, ctxstore.WithTenantID(ctx, filter), update); err != nil {
 		return errors.Wrap(err, "failed to update auth set")
 	} else if res.MatchedCount == 0 {
 		return store.ErrAuthSetNotFound
@@ -487,7 +520,11 @@ func (db *DataStoreMongo) UpdateAuthSetById(
 	mod model.AuthSetUpdate,
 ) error {
 	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
-	res, err := c.UpdateOne(ctx, bson.M{"_id": id}, bson.M{"$set": mod})
+	res, err := c.UpdateOne(
+		ctx,
+		ctxstore.WithTenantID(ctx, bson.M{"_id": id}),
+		bson.M{"$set": ctxstore.WithTenantID(ctx, mod)},
+	)
 	if err != nil {
 		return errors.Wrap(err, "failed to update auth set")
 	}
@@ -501,7 +538,7 @@ func (db *DataStoreMongo) UpdateAuthSetById(
 func (db *DataStoreMongo) DeleteAuthSetsForDevice(ctx context.Context, devid string) error {
 	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
 
-	ci, err := c.DeleteMany(ctx, model.AuthSet{DeviceId: devid})
+	ci, err := c.DeleteMany(ctx, ctxstore.WithTenantID(ctx, model.AuthSet{DeviceId: devid}))
 
 	if err != nil {
 		return errors.Wrap(err, "failed to remove authentication sets for device")
@@ -522,7 +559,7 @@ func (db *DataStoreMongo) DeleteAuthSetForDevice(
 	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
 
 	filter := model.AuthSet{Id: authId, DeviceId: devId}
-	result, err := c.DeleteOne(ctx, filter)
+	result, err := c.DeleteOne(ctx, ctxstore.WithTenantID(ctx, filter))
 	if err != nil {
 		return errors.Wrap(err, "failed to remove authentication set for device")
 	} else if result.DeletedCount < 1 {
@@ -556,7 +593,7 @@ func (db *DataStoreMongo) PutLimit(ctx context.Context, lim model.Limit) error {
 	updateOptions := mopts.Update()
 	updateOptions.SetUpsert(true)
 	if _, err := c.UpdateOne(
-		ctx, query, bson.M{"$set": lim}, updateOptions); err != nil {
+		ctx, ctxstore.WithTenantID(ctx, query), bson.M{"$set": lim}, updateOptions); err != nil {
 		return errors.Wrap(err, "failed to set or update limit")
 	}
 
@@ -572,7 +609,7 @@ func (db *DataStoreMongo) DeleteLimit(ctx context.Context, lim string) error {
 
 	query := bson.M{"_id": lim}
 
-	if _, err := c.DeleteOne(ctx, query); err != nil {
+	if _, err := c.DeleteOne(ctx, ctxstore.WithTenantID(ctx, query)); err != nil {
 		return errors.Wrap(err, "failed to delete limit")
 	}
 
@@ -584,7 +621,7 @@ func (db *DataStoreMongo) GetLimit(ctx context.Context, name string) (*model.Lim
 
 	var lim model.Limit
 
-	err := c.FindOne(ctx, bson.M{"_id": name}).Decode(&lim)
+	err := c.FindOne(ctx, ctxstore.WithTenantID(ctx, bson.M{"_id": name})).Decode(&lim)
 
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
@@ -608,7 +645,7 @@ func (db *DataStoreMongo) GetDevCountByStatus(ctx context.Context, status string
 	if status != "" {
 		fltr = bson.D{{Key: "status", Value: status}}
 	}
-	count, err := devsColl.CountDocuments(ctx, fltr)
+	count, err := devsColl.CountDocuments(ctx, ctxstore.WithTenantID(ctx, fltr))
 	if err != nil {
 		return 0, err
 	}
@@ -627,7 +664,7 @@ func (db *DataStoreMongo) GetDeviceStatus(ctx context.Context, devId string) (st
 	}
 
 	match := bson.D{
-		{Key: "$match", Value: filter},
+		{Key: "$match", Value: ctxstore.WithTenantID(ctx, filter)},
 	}
 	group := bson.D{
 		{Key: "$group", Value: bson.D{

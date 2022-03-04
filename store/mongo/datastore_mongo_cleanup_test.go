@@ -92,11 +92,6 @@ func TestGetDevicesBeingDecommissioned(t *testing.T) {
 
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
-			testDbName := DbName
-			if tc.tenant != "" {
-				testDbName = ctxstore.DbNameForTenant(tc.tenant, DbName)
-			}
-
 			ctx := context.Background()
 			if tc.tenant != "" {
 				ctx = identity.WithContext(ctx, &identity.Identity{
@@ -106,11 +101,11 @@ func TestGetDevicesBeingDecommissioned(t *testing.T) {
 
 			db := getDb(ctx)
 
-			coll := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
+			coll := db.client.Database(DbName).Collection(DbDevicesColl)
 			_, err := coll.InsertMany(ctx, tc.inDevices)
 			assert.NoError(t, err)
 
-			brokenDevices, err := db.GetDevicesBeingDecommissioned(testDbName)
+			brokenDevices, err := db.GetDevicesBeingDecommissioned(DbName)
 			assert.NoError(t, err)
 			assert.Equal(t, tc.outDevices[0].Id, brokenDevices[0].Id)
 		})
@@ -181,7 +176,7 @@ func TestDeleteDevicesBeingDecommissioned(t *testing.T) {
 
 			db := getDb(ctx)
 
-			coll := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
+			coll := db.client.Database(DbName).Collection(DbDevicesColl)
 			_, err := coll.InsertMany(ctx, tc.inDevices)
 			assert.NoError(t, err)
 
@@ -262,12 +257,14 @@ func TestGetBrokenAuthSets(t *testing.T) {
 				model.Device{
 					Id:              "001",
 					IdData:          "001",
+					IdDataSha256:    getIdDataHash("001"),
 					Status:          model.DevStatusPending,
 					Decommissioning: false,
 				},
 				model.Device{
 					Id:              "002",
 					IdData:          "002",
+					IdDataSha256:    getIdDataHash("002"),
 					Status:          model.DevStatusPending,
 					Decommissioning: false,
 				},
@@ -295,12 +292,14 @@ func TestGetBrokenAuthSets(t *testing.T) {
 				model.Device{
 					Id:              "001",
 					IdData:          "001",
+					IdDataSha256:    getIdDataHash("001"),
 					Status:          model.DevStatusPending,
 					Decommissioning: false,
 				},
 				model.Device{
 					Id:              "002",
 					IdData:          "002",
+					IdDataSha256:    getIdDataHash("002"),
 					Status:          model.DevStatusPending,
 					Decommissioning: true,
 				},
@@ -313,11 +312,6 @@ func TestGetBrokenAuthSets(t *testing.T) {
 
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
-			testDbName := DbName
-			if tc.tenant != "" {
-				testDbName = ctxstore.DbNameForTenant(tc.tenant, DbName)
-			}
-
 			ctx := context.Background()
 			if tc.tenant != "" {
 				ctx = identity.WithContext(ctx, &identity.Identity{
@@ -327,15 +321,15 @@ func TestGetBrokenAuthSets(t *testing.T) {
 
 			db := getDb(ctx)
 
-			coll := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
+			coll := db.client.Database(DbName).Collection(DbAuthSetColl)
 			_, err := coll.InsertMany(ctx, tc.inAuthSets)
 			assert.NoError(t, err)
 
-			coll = db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
+			coll = db.client.Database(DbName).Collection(DbDevicesColl)
 			_, err = coll.InsertMany(ctx, tc.inDevices)
 			assert.NoError(t, err)
 
-			brokenAuthSetsIds, err := db.GetBrokenAuthSets(testDbName)
+			brokenAuthSetsIds, err := db.GetBrokenAuthSets(DbName)
 			if tc.err != "" {
 				assert.Equal(t, tc.err, err.Error())
 			} else {
@@ -472,11 +466,11 @@ func TestDeleteBrokenAuthSets(t *testing.T) {
 
 			db := getDb(ctx)
 
-			coll := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
+			coll := db.client.Database(DbName).Collection(DbAuthSetColl)
 			_, err := coll.InsertMany(ctx, tc.inAuthSets)
 			assert.NoError(t, err)
 
-			coll = db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
+			coll = db.client.Database(DbName).Collection(DbDevicesColl)
 			_, err = coll.InsertMany(ctx, tc.inDevices)
 			assert.NoError(t, err)
 

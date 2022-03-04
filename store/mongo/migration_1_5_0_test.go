@@ -46,6 +46,8 @@ UwIDAQAB
 	})
 	db.Wipe()
 	db := NewDataStoreMongoWithClient(db.Client())
+	devsColl := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
+	authSetsColl := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
 
 	// prep base version
 	mig110 := migration_1_1_0{
@@ -73,8 +75,8 @@ UwIDAQAB
 	err = mig140.Up(migrate.MakeVersion(1, 4, 0))
 	assert.NoError(t, err)
 
-	devs := []model.Device{
-		{
+	devs := []interface{}{
+		model.Device{
 			Id:              "1",
 			IdData:          "{\"sn\":\"0001\",\"mac\":\"00:00:00:01\"}",
 			Status:          "accepted",
@@ -82,7 +84,7 @@ UwIDAQAB
 			CreatedTs:       ts,
 			UpdatedTs:       ts,
 		},
-		{
+		model.Device{
 			Id:              "2",
 			IdData:          "{\"sn\":\"0002\",\"attr\":\"foo1\",\"mac\":\"00:00:00:02\"}",
 			Status:          "pending",
@@ -90,7 +92,7 @@ UwIDAQAB
 			CreatedTs:       ts,
 			UpdatedTs:       ts,
 		},
-		{
+		model.Device{
 			Id:              "3",
 			IdData:          "{\"sn\":\"0003\",\"attr\":\"foo3\",\"mac\":\"00:00:00:03\"}",
 			Status:          "rejected",
@@ -100,8 +102,8 @@ UwIDAQAB
 		},
 	}
 
-	asets := []model.AuthSet{
-		{
+	asets := []interface{}{
+		model.AuthSet{
 			Id:        "1",
 			DeviceId:  "1",
 			IdData:    "{\"sn\":\"0001\",\"mac\":\"00:00:00:01\"}",
@@ -109,7 +111,7 @@ UwIDAQAB
 			PubKey:    pubKey,
 			Timestamp: &ts,
 		},
-		{
+		model.AuthSet{
 			Id:        "2",
 			DeviceId:  "2",
 			IdData:    "{\"sn\":\"0002\",\"attr\":\"foo\",\"mac\":\"00:00:00:02\"}",
@@ -117,7 +119,7 @@ UwIDAQAB
 			PubKey:    pubKey,
 			Timestamp: &ts,
 		},
-		{
+		model.AuthSet{
 			Id:        "3",
 			DeviceId:  "2",
 			IdData:    "{\"sn\":\"0002\",\"attr\":\"foo1\",\"mac\":\"00:00:00:02\"}",
@@ -125,7 +127,7 @@ UwIDAQAB
 			PubKey:    pubKey,
 			Timestamp: &ts,
 		},
-		{
+		model.AuthSet{
 			Id:        "4",
 			DeviceId:  "3",
 			IdData:    "{\"sn\":\"0003\",\"attr\":\"foo3\",\"mac\":\"00:00:00:03\"}",
@@ -135,15 +137,11 @@ UwIDAQAB
 		},
 	}
 
-	for _, d := range devs {
-		err = db.AddDevice(ctx, d)
-		assert.NoError(t, err)
-	}
+	_, err = devsColl.InsertMany(ctx, devs)
+	assert.NoError(t, err)
 
-	for _, a := range asets {
-		err = db.AddAuthSet(ctx, a)
-		assert.NoError(t, err)
-	}
+	_, err = authSetsColl.InsertMany(ctx, asets)
+	assert.NoError(t, err)
 
 	// test new version
 	mig150 := migration_1_5_0{
@@ -156,11 +154,12 @@ UwIDAQAB
 	var dev model.Device
 	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
 	for _, d := range devs {
+		d := d.(model.Device)
 		err := c.FindOne(ctx, bson.M{"_id": d.Id}).Decode(&dev)
 
 		assert.NoError(t, err)
 
-		status, err := db.GetDeviceStatus(ctx, dev.Id)
+		status, err := GetDeviceStatus(ctx, db, dev.Id)
 
 		assert.NoError(t, err)
 		assert.Equal(t, status, dev.Status)
@@ -182,6 +181,7 @@ UwIDAQAB
 	var set model.AuthSet
 	c = db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
 	for _, as := range asets {
+		as := as.(model.AuthSet)
 		err := c.FindOne(ctx, bson.M{"_id": as.Id}).Decode(&set)
 		assert.NoError(t, err)
 

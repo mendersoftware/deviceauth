@@ -1,6 +1,16 @@
 // Copyright 2022 Northern.tech AS
 //
-//    All Rights Reserved
+//    Licensed under the Apache License, Version 2.0 (the "License");
+//    you may not use this file except in compliance with the License.
+//    You may obtain a copy of the License at
+//
+//        http://www.apache.org/licenses/LICENSE-2.0
+//
+//    Unless required by applicable law or agreed to in writing, software
+//    distributed under the License is distributed on an "AS IS" BASIS,
+//    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//    See the License for the specific language governing permissions and
+//    limitations under the License.
 package mongo
 
 import (
@@ -14,7 +24,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	mopts "go.mongodb.org/mongo-driver/mongo/options"
 )
 
 func TestStoreMigrate(t *testing.T) {
@@ -41,28 +51,12 @@ func TestStoreMigrate(t *testing.T) {
 				"migration: deviceauth has version 0.0.0, " +
 				"needs version " + DbVersion,
 		},
-		DbVersion + " multitenant": {
-			automigrate: true,
-			tenantDbs:   []string{"deviceauth-tenant1id", "deviceauth-tenant2id"},
-			version:     DbVersion,
-			err:         "",
-		},
-		DbVersion + " multitenant, no automigrate": {
-			automigrate: false,
-			tenantDbs:   []string{"deviceauth-tenant1id", "deviceauth-tenant2id"},
-			version:     DbVersion,
-			err: "failed to apply migrations: db needs " +
-				"migration: deviceauth-tenant1id has version " +
-				"0.0.0, needs version " + DbVersion,
-		},
 		"0.1 error": {
 			automigrate: true,
 			version:     "0.1",
 			err:         "failed to parse service version: failed to parse Version: unexpected EOF",
 		},
 	}
-	_false := false
-	_true := true
 
 	for name, tc := range testCases {
 		t.Run(fmt.Sprintf("tc: %s", name), func(t *testing.T) {
@@ -118,21 +112,19 @@ func TestStoreMigrate(t *testing.T) {
 									Keys: bson.D{
 										{Key: model.DevKeyIdDataSha256, Value: 1},
 									},
-									Options: &options.IndexOptions{
-										Background: &_false,
-										Name:       &indexDevices_IdentityDataSha256,
-										Unique:     &_true,
-									},
+									Options: mopts.Index().
+										SetName(indexDevices_IdentityDataSha256).
+										SetUnique(true),
 								},
 								{
 									Keys: bson.D{
+										{Key: model.TenantIDField, Value: 1},
 										{Key: model.DevKeyStatus, Value: 1},
 										{Key: model.DevKeyId, Value: 1},
 									},
-									Options: &options.IndexOptions{
-										Background: &_false,
-										Name:       &indexDevices_Status,
-									},
+									Options: mopts.Index().
+										SetName(indexDevices_Status).
+										SetUnique(false),
 								},
 							},
 						)
@@ -140,26 +132,33 @@ func TestStoreMigrate(t *testing.T) {
 							[]mongo.IndexModel{
 								{
 									Keys: bson.D{
-										{Key: model.AuthSetKeyDeviceId, Value: 1},
-										{Key: model.AuthSetKeyIdDataSha256, Value: 1},
-										{Key: model.AuthSetKeyPubKey, Value: 1},
+										{Key: model.TenantIDField, Value: 1},
+										{Key: "device_id", Value: 1},
 									},
-									Options: &options.IndexOptions{
-										Background: &_false,
-										Name:       &indexAuthSet_DeviceId_IdentityDataSha256_PubKey,
-										Unique:     &_true,
-									},
+									Options: mopts.Index().
+										SetName(indexAuthSet_DeviceId),
 								},
 								{
 									Keys: bson.D{
+										{Key: model.TenantIDField, Value: 1},
 										{Key: model.AuthSetKeyIdDataSha256, Value: 1},
 										{Key: model.AuthSetKeyPubKey, Value: 1},
 									},
-									Options: &options.IndexOptions{
-										Background: &_false,
-										Name:       &indexAuthSet_IdentityDataSha256_PubKey,
-										Unique:     &_true,
+									Options: mopts.Index().
+										SetName(indexAuthSet_IdentityDataSha256_PubKey).
+										SetUnique(true),
+								},
+							},
+						)
+						verifyIndexes(t, db.client.Database(d).Collection(DbTokensColl),
+							[]mongo.IndexModel{
+								{
+									Keys: bson.D{
+										{Key: "exp.time", Value: 1},
 									},
+									Options: mopts.Index().
+										SetName(indexTokens_TokenExpiration).
+										SetExpireAfterSeconds(0),
 								},
 							},
 						)

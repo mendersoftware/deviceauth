@@ -1,4 +1,4 @@
-// Copyright 2021 Northern.tech AS
+// Copyright 2022 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -22,6 +22,10 @@ import (
 	"github.com/mendersoftware/go-lib-micro/mongo/oid"
 )
 
+var (
+	TokenTenantField = "tenant"
+)
+
 type Claims struct {
 	// ID is the unique jwt ID, also device AuthSet UUID. (Required)
 	ID oid.ObjectID `json:"jti,omitempty" bson:"_id"`
@@ -32,7 +36,7 @@ type Claims struct {
 	// Issuer holds the configurable issuer claim.
 	Issuer string `json:"iss,omitempty" bson:"iss,omitempty"`
 	// Tenant claim holds the tenant id this device belongs to.
-	Tenant string `json:"mender.tenant,omitempty" bson:"mender.tenant,omitempty"`
+	Tenant string `json:"mender.tenant,omitempty" bson:"tenant"`
 	// ExpiresAt is the timestamp when the token becomes invalid. (Required)
 	ExpiresAt Time `json:"exp,omitempty" bson:"exp"`
 	IssuedAt  Time `json:"iat,omitempty" bson:"iat,omitempty"`

@@ -22,6 +22,7 @@ import (
 
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
+	ctxstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/mendersoftware/deviceauth/model"
@@ -35,11 +36,13 @@ func TestMigration_1_9_0(t *testing.T) {
 	})
 	db.Wipe()
 	db := NewDataStoreMongoWithClient(db.Client())
+	devsColl := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
+	authSetsColl := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
 
 	prep_1_8_0(t, ctx, db)
 
-	devs := []model.Device{
-		{
+	devs := []interface{}{
+		model.Device{
 			Id:              "1",
 			IdData:          "{\"sn\":\"0001\",\"mac\":\"00:00:00:01\"}",
 			IdDataSha256:    getIdDataHash("{\"sn\":\"0001\",\"mac\":\"00:00:00:01\"}"),
@@ -48,7 +51,7 @@ func TestMigration_1_9_0(t *testing.T) {
 			CreatedTs:       ts,
 			UpdatedTs:       ts,
 		},
-		{
+		model.Device{
 			Id:              "2",
 			IdData:          "{\"sn\":\"0002\",\"attr\":\"foo1\",\"mac\":\"00:00:00:02\"}",
 			IdDataSha256:    getIdDataHash("{\"sn\":\"0002\",\"attr\":\"foo1\",\"mac\":\"00:00:00:02\"}"),
@@ -59,8 +62,8 @@ func TestMigration_1_9_0(t *testing.T) {
 		},
 	}
 
-	asets := []model.AuthSet{
-		{
+	asets := []interface{}{
+		model.AuthSet{
 			Id:        "1",
 			DeviceId:  "1",
 			IdData:    "{\"sn\":\"0001\",\"mac\":\"00:00:00:01\"}",
@@ -68,7 +71,7 @@ func TestMigration_1_9_0(t *testing.T) {
 			PubKey:    "key1",
 			Timestamp: &ts,
 		},
-		{
+		model.AuthSet{
 			Id:        "2",
 			DeviceId:  "2",
 			IdData:    "{\"sn\":\"0002\",\"attr\":\"foo\",\"mac\":\"00:00:00:02\"}",
@@ -78,15 +81,11 @@ func TestMigration_1_9_0(t *testing.T) {
 		},
 	}
 
-	for _, d := range devs {
-		err := db.AddDevice(ctx, d)
-		assert.NoError(t, err)
-	}
+	_, err := devsColl.InsertMany(ctx, devs)
+	assert.NoError(t, err)
 
-	for _, a := range asets {
-		err := db.AddAuthSet(ctx, a)
-		assert.NoError(t, err)
-	}
+	_, err = authSetsColl.InsertMany(ctx, asets)
+	assert.NoError(t, err)
 
 	// NOTE: after upgrading past mongodb 4.0 there are no longer
 	//       restrictions on Index Key Size
@@ -123,13 +122,13 @@ func TestMigration_1_9_0(t *testing.T) {
 		ds:  db,
 		ctx: ctx,
 	}
-	err := mig190.Up(migrate.MakeVersion(1, 9, 0))
+	err = mig190.Up(migrate.MakeVersion(1, 9, 0))
 	assert.NoError(t, err)
 
-	err = db.AddDevice(ctx, devTooLarge)
+	_, err = devsColl.InsertOne(ctx, devTooLarge)
 	assert.Nil(t, err)
 
-	err = db.AddAuthSet(ctx, asetTooLarge)
+	_, err = authSetsColl.InsertOne(ctx, asetTooLarge)
 	assert.Nil(t, err)
 
 	// verify our uniqueness invariants
@@ -138,8 +137,9 @@ func TestMigration_1_9_0(t *testing.T) {
 		Id:           "4",
 		IdDataSha256: getIdDataHash(idData),
 	}
-	err = db.AddDevice(ctx, dev)
-	assert.EqualError(t, err, "object exists")
+
+	_, err = devsColl.InsertOne(ctx, dev)
+	assert.Contains(t, err.Error(), "duplicate key error collection")
 
 	// can't add authset with duplicated dev id + id data sha + pubkey
 	aset := model.AuthSet{
@@ -148,8 +148,8 @@ func TestMigration_1_9_0(t *testing.T) {
 		IdDataSha256: getIdDataHash(idData),
 		PubKey:       "key3",
 	}
-	err = db.AddAuthSet(ctx, aset)
-	assert.EqualError(t, err, "object exists")
+	_, err = authSetsColl.InsertOne(ctx, aset)
+	assert.Contains(t, err.Error(), "duplicate key error collection")
 
 	// can't add authset with duplicated id data sha + pubkey
 	aset = model.AuthSet{
@@ -157,8 +157,8 @@ func TestMigration_1_9_0(t *testing.T) {
 		IdDataSha256: getIdDataHash(idData),
 		PubKey:       "key3",
 	}
-	err = db.AddAuthSet(ctx, aset)
-	assert.EqualError(t, err, "object exists")
+	_, err = authSetsColl.InsertOne(ctx, aset)
+	assert.Contains(t, err.Error(), "duplicate key error collection")
 }
 
 func TestMigration_1_9_0_NoFailDelete(t *testing.T) {

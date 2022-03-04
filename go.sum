@@ -304,8 +304,8 @@ github.com/mattn/go-isatty v0.0.12/go.mod h1:cbi8OIDigv2wuxKPP5vlRcQ1OAZbq2CE4Ky
 github.com/mattn/go-isatty v0.0.14 h1:yVuAays6BHfxijgZPzw+3Zlu5yQgKGP2/hcQbHb7S9Y=
 github.com/mattn/go-isatty v0.0.14/go.mod h1:7GGIvUiUoEMVVmxf/4nioHXj79iQHKdU27kJ6hsGG94=
 github.com/matttproud/golang_protobuf_extensions v1.0.1/go.mod h1:D8He9yQNgCq6Z5Ld7szi9bcBfOoFv/3dc6xSMkL2PC0=
-github.com/mendersoftware/go-lib-micro v0.0.0-20220302103938-7561c751e1fd h1:aJsoB9ItRxSIvn71GKJnQEQ042JoHe6e4L+D76ItGxI=
-github.com/mendersoftware/go-lib-micro v0.0.0-20220302103938-7561c751e1fd/go.mod h1:1NG7f/u9rWof6liv1rwLfdSfdIW6GHD8Bbi5TkOJuYE=
+github.com/mendersoftware/go-lib-micro v0.0.0-20220304124258-d8414885f1c3 h1:vdqx3x6hNK+g09NVN1vK02dQMQ0C0D4DAt8S/G0goXI=
+github.com/mendersoftware/go-lib-micro v0.0.0-20220304124258-d8414885f1c3/go.mod h1:1NG7f/u9rWof6liv1rwLfdSfdIW6GHD8Bbi5TkOJuYE=
 github.com/miekg/dns v1.1.26/go.mod h1:bPDLeHnStXmXAq1m/Ch/hvfNHr14JKNPMBo3VZKjuso=
 github.com/miekg/dns v1.1.41/go.mod h1:p6aan82bvRIyn+zDIv9xYNUpwa73JcSh9BKwknJysuI=
 github.com/mitchellh/cli v1.1.0/go.mod h1:xcISNoH86gajksDmfB23e/pu+B+GeFRMYmoHXxx3xhI=

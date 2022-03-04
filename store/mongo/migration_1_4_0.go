@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2022 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import (
 	ctxstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/pkg/errors"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 
 	"github.com/mendersoftware/deviceauth/model"
 	"github.com/mendersoftware/deviceauth/store"
@@ -47,7 +48,7 @@ func (m *migration_1_4_0) Up(from migrate.Version) error {
 			continue
 		}
 
-		status, err := m.ms.GetDeviceStatus(m.ctx, dev.Id)
+		status, err := GetDeviceStatus(m.ctx, m.ms, dev.Id)
 
 		if err != nil {
 			if err == store.ErrAuthSetNotFound {
@@ -78,4 +79,61 @@ func (m *migration_1_4_0) Up(from migrate.Version) error {
 
 func (m *migration_1_4_0) Version() migrate.Version {
 	return migrate.MakeVersion(1, 4, 0)
+}
+
+// GetDeviceStatus gets device status using old database name containing tenant ID
+func GetDeviceStatus(ctx context.Context, db *DataStoreMongo, devId string) (string, error) {
+	var statuses = map[string]int{}
+
+	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
+
+	// get device auth sets; group by status
+
+	filter := model.AuthSet{
+		DeviceId: devId,
+	}
+
+	match := bson.D{
+		{Key: "$match", Value: filter},
+	}
+	group := bson.D{
+		{Key: "$group", Value: bson.D{
+			{Key: "_id", Value: "$status"},
+			{Key: "count", Value: bson.M{"$sum": 1}}},
+		},
+	}
+
+	pipeline := []bson.D{
+		match,
+		group,
+	}
+	var result []struct {
+		Status string `bson:"_id"`
+		Value  int    `bson:"count"`
+	}
+	cursor, err := c.Aggregate(ctx, pipeline)
+	if err != nil {
+		return "", err
+	}
+	if err := cursor.All(ctx, &result); err != nil {
+		if err == mongo.ErrNoDocuments {
+			return "", store.ErrAuthSetNotFound
+		}
+		return "", err
+	}
+
+	if len(result) == 0 {
+		return "", store.ErrAuthSetNotFound
+	}
+
+	for _, res := range result {
+		statuses[res.Status] = res.Value
+	}
+
+	status, err := getDeviceStatus(statuses)
+	if err != nil {
+		return "", err
+	}
+
+	return status, nil
 }

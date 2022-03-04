@@ -1894,12 +1894,12 @@ func TestApiDeleteTokens(t *testing.T) {
 				nil,
 				nil),
 		},
-		"error, no tenant id": {
+		"ok, no tenant id": {
 			deviceId: "dev-foo",
 			checker: mt.NewJSONResponse(
-				http.StatusBadRequest,
+				http.StatusNoContent,
 				nil,
-				restError("tenant_id must be provided")),
+				nil),
 		},
 		"error, devauth": {
 			tenantId:   "foo",

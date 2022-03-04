@@ -31,6 +31,7 @@ const (
 	DevStatusNoAuth   = "noauth"
 
 	DevKeyId           = "_id"
+	TenantIDField      = "tenant_id"
 	DevKeyIdData       = "id_data"
 	DevKeyIdDataSha256 = "id_data_sha256"
 	DevKeyStatus       = "status"

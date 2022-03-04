@@ -307,7 +307,7 @@ class TestEnterpriseDeleteTokens:
             assert e.response.status_code == 204
 
     @pytest.mark.parametrize(
-        "accepted_tenants_devices", [[("foo", 2, 2), ("bar", 1, 3)]], indirect=True
+        "accepted_tenants_devices", [[("foo", 2, 2), ("bar", 1, 3), ("", 2, 2)]], indirect=True
     )
     def test_delete_tokens_by_non_existent_tenant_ok(
         self, accepted_tenants_devices, internal_api, management_api, device_api
@@ -350,12 +350,3 @@ class TestEnterpriseDeleteTokens:
             verify_token(token3, 200, verify_url)
         except bravado.exception.HTTPError as e:
             assert e.response.status_code == 204
-
-    def test_delete_tokens_no_tenant_id_bad_request(self, internal_api):
-        rsp = requests.delete(internal_api.make_api_url("/tokens"))
-        assert rsp.status_code == 400
-
-    def test_delete_tokens_by_device_no_tenant_id_bad_request(self, internal_api):
-        payload = {"device_id": "foo"}
-        rsp = requests.delete(internal_api.make_api_url("/tokens"), params=payload)
-        assert rsp.status_code == 400

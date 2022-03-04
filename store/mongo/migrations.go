@@ -124,6 +124,10 @@ func (db *DataStoreMongo) MigrateTenant(ctx context.Context, database, version s
 			ds:  db,
 			ctx: ctx,
 		},
+		&migration_2_0_0{
+			ds:  db,
+			ctx: ctx,
+		},
 	}
 
 	ver, err := migrate.NewVersion(version)

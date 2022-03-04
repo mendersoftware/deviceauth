@@ -1,4 +1,4 @@
-// Copyright 2021 Northern.tech AS
+// Copyright 2022 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -662,16 +662,6 @@ func (d *DevAuthApiHandlers) DeleteTokensHandler(w rest.ResponseWriter, r *rest.
 	l := log.FromContext(ctx)
 
 	tenantId := r.URL.Query().Get("tenant_id")
-	if tenantId == "" {
-		rest_utils.RestErrWithLog(
-			w,
-			r,
-			l,
-			errors.New("tenant_id must be provided"),
-			http.StatusBadRequest,
-		)
-		return
-	}
 	devId := r.URL.Query().Get("device_id")
 
 	err := d.devAuth.DeleteTokens(ctx, tenantId, devId)
