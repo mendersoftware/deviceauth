@@ -5,7 +5,7 @@ RUN cd /go/src/github.com/mendersoftware/deviceauth && \
     env CGO_ENABLED=0 go test -c -o deviceauth -tags main \
     -coverpkg $(go list ./... | grep -v vendor | grep -v mock | grep -v test | tr  '\n' ,)
 
-FROM alpine:3.15.0
+FROM alpine:3.15.2
 
 EXPOSE 8080
 
