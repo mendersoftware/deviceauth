@@ -1,12 +1,10 @@
 FROM golang:1.16.5-alpine3.12 as builder
-RUN mkdir -p /go/src/github.com/mendersoftware/deviceauth
-COPY . /go/src/github.com/mendersoftware/deviceauth
-RUN cd /go/src/github.com/mendersoftware/deviceauth && \
-    env CGO_ENABLED=0 go test -c -o deviceauth -tags main \
+WORKDIR /go/src/github.com/mendersoftware/deviceauth
+COPY ./ .
+RUN env CGO_ENABLED=0 go test -c -o deviceauth -tags main \
     -coverpkg $(go list ./... | grep -v vendor | grep -v mock | grep -v test | tr  '\n' ,)
 
-FROM alpine:3.15.0
-
+FROM scratch
 EXPOSE 8080
 
 COPY  --from=builder /go/src/github.com/mendersoftware/deviceauth/deviceauth /usr/bin/
