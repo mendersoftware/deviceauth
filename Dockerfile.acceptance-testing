@@ -1,14 +1,20 @@
 FROM golang:1.16.5-alpine3.12 as builder
 WORKDIR /go/src/github.com/mendersoftware/deviceauth
+RUN mkdir -p /etc_extra
+RUN echo "nobody:x:65534:" > /etc_extra/group
+RUN echo "nobody:!::0:::::" > /etc_extra/shadow
+RUN echo "nobody:x:65534:65534:Nobody:/:" > /etc_extra/passwd
+RUN chown -R nobody:nobody /etc_extra
 COPY ./ .
 RUN env CGO_ENABLED=0 go test -c -o deviceauth -tags main \
     -coverpkg $(go list ./... | grep -v vendor | grep -v mock | grep -v test | tr  '\n' ,)
 
 FROM scratch
 EXPOSE 8080
-
-COPY  --from=builder /go/src/github.com/mendersoftware/deviceauth/deviceauth /usr/bin/
-COPY ./config.yaml /etc/deviceauth/
+COPY --from=builder /etc_extra/ /etc/
+USER 65534
+COPY --from=builder --chown=nobody /go/src/github.com/mendersoftware/deviceauth/deviceauth /usr/bin/
+COPY --chown=nobody ./config.yaml /etc/deviceauth/
 ENTRYPOINT ["/usr/bin/deviceauth", "--config", "/etc/deviceauth/config.yaml"]
 
 STOPSIGNAL SIGINT
