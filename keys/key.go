@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2022 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"io/ioutil"
+	"os"
 
 	"github.com/pkg/errors"
 )
@@ -25,24 +26,53 @@ import (
 const (
 	ErrMsgPrivKeyReadFailed    = "failed to read server private key file"
 	ErrMsgPrivKeyNotPEMEncoded = "server private key not PEM-encoded"
+
+	blockTypePKCS1 = "RSA PRIVATE KEY"
+	blockTypePKCS8 = "PRIVATE KEY"
 )
 
 func LoadRSAPrivate(privKeyPath string) (*rsa.PrivateKey, error) {
+	var (
+		err     error
+		pemData []byte
+		rsaKey  *rsa.PrivateKey
+	)
 	// read key from file
-	pemData, err := ioutil.ReadFile(privKeyPath)
+	pemData, err = ioutil.ReadFile(privKeyPath)
 	if err != nil {
 		return nil, errors.Wrap(err, ErrMsgPrivKeyReadFailed)
 	}
 	// decode pem key
 	block, _ := pem.Decode(pemData)
 	if block == nil {
-		return nil, errors.New(ErrMsgPrivKeyNotPEMEncoded)
+		return nil, &os.PathError{
+			Err:  errors.New(ErrMsgPrivKeyNotPEMEncoded),
+			Op:   "PEMDecode",
+			Path: privKeyPath,
+		}
 	}
-	// check if it is a RSA PRIVATE KEY
-	if got, want := block.Type, "RSA PRIVATE KEY"; got != want {
-		return nil, errors.Errorf(
-			"unknown server private key type; got: %s, want: %s", got, want)
+
+	switch block.Type {
+	case blockTypePKCS1:
+		rsaKey, err = x509.ParsePKCS1PrivateKey(block.Bytes)
+	case blockTypePKCS8:
+		var (
+			key interface{}
+			ok  bool
+		)
+		key, err = x509.ParsePKCS8PrivateKey(block.Bytes)
+		if rsaKey, ok = key.(*rsa.PrivateKey); !ok || rsaKey == nil {
+			err = errors.New("key type not supported")
+		}
+	default:
+		err = errors.Errorf("invalid PEM block header: %s", block.Type)
 	}
-	// return parsed key
-	return x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err != nil {
+		err = &os.PathError{
+			Err:  err,
+			Op:   "LoadRSAPrivate",
+			Path: privKeyPath,
+		}
+	}
+	return rsaKey, err
 }
