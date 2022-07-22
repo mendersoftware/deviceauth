@@ -1,4 +1,4 @@
-// Copyright 2021 Northern.tech AS
+// Copyright 2022 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -31,7 +31,7 @@ const (
 	TenantHealthURI = "/api/internal/v1/tenantadm/health"
 	// devices endpoint
 	TenantVerifyUri = "/api/internal/v1/tenantadm/tenants/verify"
-	TenantGetUri    = "/api/internal/v1/tenantadm/tenants/:tid"
+	TenantGetUri    = "/api/internal/v1/tenantadm/tenants/#tid"
 	TenantUsersURI  = "/api/internal/v1/tenantadm/tenants/users"
 	// default request timeout, 10s?
 	defaultReqTimeout = time.Duration(10) * time.Second
@@ -177,7 +177,7 @@ func (tc *Client) GetTenant(ctx context.Context, tid string) (*Tenant, error) {
 
 	l := log.FromContext(ctx)
 
-	repl := strings.NewReplacer(":tid", tid)
+	repl := strings.NewReplacer("#tid", tid)
 	uri := repl.Replace(TenantGetUri)
 
 	req, err := http.NewRequest(http.MethodGet,

@@ -1,4 +1,4 @@
-// Copyright 2020 Northern.tech AS
+// Copyright 2022 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -218,7 +218,7 @@ func TestClientSetDeviceStatus(t *testing.T) {
 						}
 
 						url := urlUpdateDeviceStatus + tc.status
-						url = strings.Replace(url, ":tid", tc.tid, 1)
+						url = strings.Replace(url, "#tid", tc.tid, 1)
 						assert.Equal(t,
 							r.URL.Path,
 							url)
@@ -255,7 +255,7 @@ func TestClientSetDeviceStatus(t *testing.T) {
 				assert.NoError(t, err)
 			} else {
 				url := urlUpdateDeviceStatus + tc.status
-				url = strings.Replace(url, ":tid", tc.tid, 1)
+				url = strings.Replace(url, "#tid", tc.tid, 1)
 				s := fmt.Sprintf("POST %s request failed with status %d %s", s.URL+url, tc.code, http.StatusText(tc.code))
 				assert.EqualError(t, err, s)
 			}
@@ -372,9 +372,9 @@ func TestClientSetDeviceIdentity(t *testing.T) {
 						}
 
 						url := urlSetDeviceAttribute
-						url = strings.Replace(url, ":tid", tc.tid, 1)
-						url = strings.Replace(url, ":did", tc.did, 1)
-						url = strings.Replace(url, ":scope", "identity", 1)
+						url = strings.Replace(url, "#tid", tc.tid, 1)
+						url = strings.Replace(url, "#did", tc.did, 1)
+						url = strings.Replace(url, "#scope", "identity", 1)
 						assert.Equal(t,
 							r.URL.Path,
 							url)
@@ -411,9 +411,9 @@ func TestClientSetDeviceIdentity(t *testing.T) {
 				assert.NoError(t, err)
 			} else {
 				url := urlSetDeviceAttribute
-				url = strings.Replace(url, ":tid", tc.tid, 1)
-				url = strings.Replace(url, ":did", tc.did, 1)
-				url = strings.Replace(url, ":scope", "identity", 1)
+				url = strings.Replace(url, "#tid", tc.tid, 1)
+				url = strings.Replace(url, "#did", tc.did, 1)
+				url = strings.Replace(url, "#scope", "identity", 1)
 				s := fmt.Sprintf("PATCH %s request failed with status %d %s", s.URL+url, tc.code, http.StatusText(tc.code))
 				assert.EqualError(t, err, s)
 			}
