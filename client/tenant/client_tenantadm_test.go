@@ -1,4 +1,4 @@
-// Copyright 2020 Northern.tech AS
+// Copyright 2022 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -355,7 +355,7 @@ func TestClientGetTenant(t *testing.T) {
 				assert.EqualError(t, err, tc.err.Error())
 			} else {
 				assert.NoError(t, err)
-				repl := strings.NewReplacer(":tid", tc.tid)
+				repl := strings.NewReplacer("#tid", tc.tid)
 				uri := repl.Replace(TenantGetUri)
 				assert.Equal(t, uri, rd.Url.Path)
 				assert.Equal(t, tc.tenant, tenant)

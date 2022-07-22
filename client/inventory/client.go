@@ -1,4 +1,4 @@
-// Copyright 2021 Northern.tech AS
+// Copyright 2022 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -33,9 +33,9 @@ import (
 
 const (
 	urlHealth             = "/api/internal/v1/inventory/health"
-	urlUpdateDeviceStatus = "/api/internal/v1/inventory/tenants/:tid/devices/status/"
-	urlSetDeviceAttribute = "/api/internal/v1/inventory/tenants/:tid/device/" +
-		":did/attribute/scope/:scope"
+	urlUpdateDeviceStatus = "/api/internal/v1/inventory/tenants/#tid/devices/status/"
+	urlSetDeviceAttribute = "/api/internal/v1/inventory/tenants/#tid/device/" +
+		"#did/attribute/scope/:scope"
 	defaultTimeout = 10 * time.Second
 )
 
@@ -125,7 +125,7 @@ func (c *client) SetDeviceStatus(
 	rd := bytes.NewReader(body)
 
 	url := utils.JoinURL(c.urlBase, urlUpdateDeviceStatus+status)
-	url = strings.Replace(url, ":tid", tenantId, 1)
+	url = strings.Replace(url, "#tid", tenantId, 1)
 
 	req, err := http.NewRequest(http.MethodPost, url, rd)
 	if err != nil {
@@ -205,9 +205,9 @@ func (c *client) SetDeviceIdentity(
 	rd := bytes.NewReader(body)
 
 	url := utils.JoinURL(c.urlBase, urlSetDeviceAttribute)
-	url = strings.Replace(url, ":tid", tenantId, 1)
-	url = strings.Replace(url, ":did", deviceId, 1)
-	url = strings.Replace(url, ":scope", "identity", 1)
+	url = strings.Replace(url, "#tid", tenantId, 1)
+	url = strings.Replace(url, "#did", deviceId, 1)
+	url = strings.Replace(url, "#scope", "identity", 1)
 
 	req, err := http.NewRequest(http.MethodPatch, url, rd)
 	if err != nil {
