@@ -1,4 +1,4 @@
-// Copyright 2021 Northern.tech AS
+// Copyright 2022 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -44,22 +44,22 @@ const (
 	uriAlive              = "/api/internal/v1/devauth/alive"
 	uriHealth             = "/api/internal/v1/devauth/health"
 	uriTokenVerify        = "/api/internal/v1/devauth/tokens/verify"
-	uriTenantLimit        = "/api/internal/v1/devauth/tenant/:id/limits/:name"
+	uriTenantLimit        = "/api/internal/v1/devauth/tenant/#id/limits/#name"
 	uriTokens             = "/api/internal/v1/devauth/tokens"
 	uriTenants            = "/api/internal/v1/devauth/tenants"
-	uriTenantDeviceStatus = "/api/internal/v1/devauth/tenants/:tid/devices/:did/status"
-	uriTenantDevices      = "/api/internal/v1/devauth/tenants/:tid/devices"
-	uriTenantDevicesCount = "/api/internal/v1/devauth/tenants/:tid/devices/count"
+	uriTenantDeviceStatus = "/api/internal/v1/devauth/tenants/#tid/devices/#did/status"
+	uriTenantDevices      = "/api/internal/v1/devauth/tenants/#tid/devices"
+	uriTenantDevicesCount = "/api/internal/v1/devauth/tenants/#tid/devices/count"
 
 	// management API v2
 	v2uriDevices             = "/api/management/v2/devauth/devices"
 	v2uriDevicesCount        = "/api/management/v2/devauth/devices/count"
 	v2uriDevicesSearch       = "/api/management/v2/devauth/devices/search"
-	v2uriDevice              = "/api/management/v2/devauth/devices/:id"
-	v2uriDeviceAuthSet       = "/api/management/v2/devauth/devices/:id/auth/:aid"
-	v2uriDeviceAuthSetStatus = "/api/management/v2/devauth/devices/:id/auth/:aid/status"
-	v2uriToken               = "/api/management/v2/devauth/tokens/:id"
-	v2uriDevicesLimit        = "/api/management/v2/devauth/limits/:name"
+	v2uriDevice              = "/api/management/v2/devauth/devices/#id"
+	v2uriDeviceAuthSet       = "/api/management/v2/devauth/devices/#id/auth/#aid"
+	v2uriDeviceAuthSetStatus = "/api/management/v2/devauth/devices/#id/auth/#aid/status"
+	v2uriToken               = "/api/management/v2/devauth/tokens/#id"
+	v2uriDevicesLimit        = "/api/management/v2/devauth/limits/#name"
 
 	HdrAuthReqSign = "X-MEN-Signature"
 )
