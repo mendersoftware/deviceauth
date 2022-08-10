@@ -35,7 +35,7 @@ const (
 	urlHealth             = "/api/internal/v1/inventory/health"
 	urlUpdateDeviceStatus = "/api/internal/v1/inventory/tenants/#tid/devices/status/"
 	urlSetDeviceAttribute = "/api/internal/v1/inventory/tenants/#tid/device/" +
-		"#did/attribute/scope/:scope"
+		"#did/attribute/scope/#scope"
 	defaultTimeout = 10 * time.Second
 )
 
