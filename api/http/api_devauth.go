@@ -317,11 +317,11 @@ func (d *DevAuthApiHandlers) SearchDevicesV2Handler(w rest.ResponseWriter, r *re
 		return
 	}
 
-	len := len(devs)
+	numDevs := len(devs)
 	hasNext := false
-	if uint64(len) > perPage {
+	if uint64(numDevs) > perPage {
 		hasNext = true
-		len = int(perPage)
+		numDevs = int(perPage)
 	}
 
 	links := rest_utils.MakePageLinkHdrs(r, page, perPage, hasNext)
@@ -330,13 +330,7 @@ func (d *DevAuthApiHandlers) SearchDevicesV2Handler(w rest.ResponseWriter, r *re
 		w.Header().Add("Link", l)
 	}
 
-	outDevs, err := devicesV2FromDbModel(devs[:len])
-	if err != nil {
-		rest_utils.RestErrWithLogInternal(w, r, l, err)
-		return
-	}
-
-	_ = w.WriteJson(outDevs)
+	_ = w.WriteJson(devs[:numDevs])
 }
 
 func (d *DevAuthApiHandlers) GetDevicesV2Handler(w rest.ResponseWriter, r *rest.Request) {
@@ -391,8 +385,7 @@ func (d *DevAuthApiHandlers) GetDeviceV2Handler(w rest.ResponseWriter, r *rest.R
 	case err == store.ErrDevNotFound:
 		rest_utils.RestErrWithLog(w, r, l, err, http.StatusNotFound)
 	case dev != nil:
-		apiDev, _ := deviceV2FromDbModel(dev)
-		_ = w.WriteJson(apiDev)
+		_ = w.WriteJson(dev)
 	default:
 		rest_utils.RestErrWithLogInternal(w, r, l, err)
 	}
