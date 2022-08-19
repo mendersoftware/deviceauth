@@ -525,24 +525,6 @@ func (d *DevAuth) processPreAuthRequest(
 		return nil, ErrMaxDeviceCountReached
 	}
 
-	if !deviceAlreadyAccepted {
-		reqId := requestid.FromContext(ctx)
-		var tenantID string
-		if idty := identity.FromContext(ctx); idty != nil {
-			tenantID = idty.Tenant
-		}
-
-		// submit device accepted job
-		if err := d.cOrch.SubmitProvisionDeviceJob(
-			ctx,
-			orchestrator.ProvisionDeviceReq{
-				RequestId: reqId,
-				DeviceID:  aset.DeviceId,
-				TenantID:  tenantID,
-			}); err != nil {
-			return nil, errors.Wrap(err, "submit device provisioning job error")
-		}
-	}
 	update := model.AuthSetUpdate{
 		Status: model.DevStatusAccepted,
 	}
@@ -561,6 +543,29 @@ func (d *DevAuth) processPreAuthRequest(
 	}
 
 	aset.Status = model.DevStatusAccepted
+	dev.Status = model.DevStatusAccepted
+	dev.AuthSets = append(dev.AuthSets, *aset)
+
+	if !deviceAlreadyAccepted {
+		reqId := requestid.FromContext(ctx)
+		var tenantID string
+		if idty := identity.FromContext(ctx); idty != nil {
+			tenantID = idty.Tenant
+		}
+
+		// submit device accepted job
+		if err := d.cOrch.SubmitProvisionDeviceJob(
+			ctx,
+			orchestrator.ProvisionDeviceReq{
+				RequestId: reqId,
+				DeviceID:  aset.DeviceId,
+				TenantID:  tenantID,
+				Device:    dev,
+				Status:    dev.Status,
+			}); err != nil {
+			return nil, errors.Wrap(err, "submit device provisioning job error")
+		}
+	}
 	return aset, nil
 }
 
@@ -910,6 +915,10 @@ func (d *DevAuth) AcceptDeviceAuth(ctx context.Context, device_id string, auth_i
 		return nil
 	}
 
+	dev.Status = model.DevStatusAccepted
+	aset.Status = model.DevStatusAccepted
+	dev.AuthSets = []model.AuthSet{*aset}
+
 	reqId := requestid.FromContext(ctx)
 
 	var tenantID string
@@ -924,6 +933,8 @@ func (d *DevAuth) AcceptDeviceAuth(ctx context.Context, device_id string, auth_i
 			RequestId: reqId,
 			DeviceID:  aset.DeviceId,
 			TenantID:  tenantID,
+			Device:    dev,
+			Status:    dev.Status,
 		}); err != nil {
 		return errors.Wrap(err, "submit device provisioning job error")
 	}
