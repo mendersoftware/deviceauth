@@ -877,8 +877,6 @@ func TestApiV2GetDevice(t *testing.T) {
 		},
 	}
 
-	apiDev, _ := deviceV2FromDbModel(dev)
-
 	tcases := []struct {
 		req *http.Request
 
@@ -895,7 +893,7 @@ func TestApiV2GetDevice(t *testing.T) {
 			err:    nil,
 
 			code: http.StatusOK,
-			body: string(asJSON(apiDev)),
+			body: string(asJSON(dev)),
 		},
 		{
 			req: test.MakeSimpleRequest("GET",
@@ -978,8 +976,7 @@ func TestSearchDevices(t *testing.T) {
 				Status:    "accepted",
 				CreatedTs: time.Unix(1606942069, 0),
 			}}
-			devV2, _ := devicesV2FromDbModel(dev)
-			b, _ := json.Marshal(devV2)
+			b, _ := json.Marshal(dev)
 			return b
 		}(),
 	}, {
@@ -1013,8 +1010,7 @@ func TestSearchDevices(t *testing.T) {
 				Status:    "accepted",
 				CreatedTs: time.Unix(1606942069, 0),
 			}}
-			devV2, _ := devicesV2FromDbModel(dev)
-			b, _ := json.Marshal(devV2)
+			b, _ := json.Marshal(dev)
 			return b
 		}(),
 	}, {
@@ -1201,9 +1197,6 @@ func TestApiV2GetDevices(t *testing.T) {
 		},
 	}
 
-	outDevs, err := devicesV2FromDbModel(devs)
-	assert.NoError(t, err)
-
 	tcases := map[string]struct {
 		req     *http.Request
 		code    int
@@ -1221,7 +1214,7 @@ func TestApiV2GetDevices(t *testing.T) {
 			err:     nil,
 			skip:    0,
 			limit:   rest_utils.PerPageDefault + 1,
-			body:    string(asJSON(outDevs)),
+			body:    string(asJSON(devs)),
 		},
 		"no devices": {
 			req: test.MakeSimpleRequest("GET",
@@ -1243,7 +1236,7 @@ func TestApiV2GetDevices(t *testing.T) {
 			limit:   3,
 			code:    http.StatusOK,
 			// reqquested 2 devices per page, so expect only 2
-			body: string(asJSON(outDevs[:2])),
+			body: string(asJSON(devs[:2])),
 		},
 		"internal error": {
 			req: test.MakeSimpleRequest("GET",
@@ -2174,9 +2167,6 @@ func TestApiGetTenantDevicesV2(t *testing.T) {
 		},
 	}
 
-	outDevs, err := devicesV2FromDbModel(devs)
-	assert.NoError(t, err)
-
 	tcases := map[string]struct {
 		req       *http.Request
 		code      int
@@ -2197,7 +2187,7 @@ func TestApiGetTenantDevicesV2(t *testing.T) {
 			err:       nil,
 			skip:      0,
 			limit:     rest_utils.PerPageDefault + 1,
-			body:      string(asJSON(outDevs)),
+			body:      string(asJSON(devs)),
 			tenant_id: "powerpuff123",
 
 			filterMatch: mock.AnythingOfType("model.DeviceFilter"),
@@ -2210,7 +2200,7 @@ func TestApiGetTenantDevicesV2(t *testing.T) {
 			err:       nil,
 			skip:      0,
 			limit:     rest_utils.PerPageDefault + 1,
-			body:      string(asJSON(outDevs)),
+			body:      string(asJSON(devs)),
 			tenant_id: "powerpuff123",
 
 			filterMatch: mock.AnythingOfType("model.DeviceFilter"),
@@ -2223,7 +2213,7 @@ func TestApiGetTenantDevicesV2(t *testing.T) {
 			err:       nil,
 			skip:      0,
 			limit:     rest_utils.PerPageDefault + 1,
-			body:      string(asJSON(outDevs[:2])),
+			body:      string(asJSON(devs[:2])),
 			tenant_id: "powerpuff123",
 
 			filterMatch: mock.MatchedBy(func(filter model.DeviceFilter) bool {
@@ -2255,7 +2245,7 @@ func TestApiGetTenantDevicesV2(t *testing.T) {
 			limit:   3,
 			code:    http.StatusOK,
 			// reqquested 2 devices per page, so expect only 2
-			body:      string(asJSON(outDevs[:2])),
+			body:      string(asJSON(devs[:2])),
 			tenant_id: "powerpuff123",
 
 			filterMatch: mock.AnythingOfType("model.DeviceFilter"),

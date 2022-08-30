@@ -50,10 +50,10 @@ var (
 // otherwise the underscore will be removed upon write to mongo
 type Device struct {
 	Id              string                 `json:"id" bson:"_id,omitempty"`
-	IdData          string                 `json:"id_data" bson:"id_data,omitempty"`
-	IdDataStruct    map[string]interface{} `bson:"id_data_struct,omitempty"`
-	IdDataSha256    []byte                 `bson:"id_data_sha256,omitempty"`
-	Status          string                 `json:"-" bson:",omitempty"`
+	IdData          string                 `json:"-" bson:"id_data,omitempty"`
+	IdDataStruct    map[string]interface{} `json:"identity_data" bson:"id_data_struct,omitempty"`
+	IdDataSha256    []byte                 `json:"-" bson:"id_data_sha256,omitempty"`
+	Status          string                 `json:"status" bson:",omitempty"`
 	Decommissioning bool                   `json:"decommissioning" bson:",omitempty"`
 	CreatedTs       time.Time              `json:"created_ts" bson:"created_ts,omitempty"`
 	UpdatedTs       time.Time              `json:"updated_ts" bson:"updated_ts,omitempty"`

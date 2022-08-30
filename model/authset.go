@@ -1,4 +1,4 @@
-// Copyright 2021 Northern.tech AS
+// Copyright 2022 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -30,18 +30,13 @@ const (
 
 type AuthSet struct {
 	Id           string                 `json:"id" bson:"_id,omitempty"`
-	IdData       string                 `json:"id_data" bson:"id_data,omitempty"`
-	IdDataStruct map[string]interface{} `bson:"id_data_struct,omitempty"`
-	IdDataSha256 []byte                 `bson:"id_data_sha256,omitempty"`
+	IdData       string                 `json:"-" bson:"id_data,omitempty"`
+	IdDataStruct map[string]interface{} `json:"identity_data" bson:"id_data_struct,omitempty"`
+	IdDataSha256 []byte                 `json:"-" bson:"id_data_sha256,omitempty"`
 	PubKey       string                 `json:"pubkey" bson:"pubkey,omitempty"`
 	DeviceId     string                 `json:"-" bson:"device_id,omitempty"`
 	Timestamp    *time.Time             `json:"ts" bson:"ts,omitempty"`
 	Status       string                 `json:"status" bson:"status,omitempty"`
-}
-
-type DevAuthSet struct {
-	Id       string `json:"id" bson:"_id,omitempty"`
-	DeviceId string `json:"device_id" bson:"device_id,omitempty"`
 }
 
 type AuthSetUpdate struct {
