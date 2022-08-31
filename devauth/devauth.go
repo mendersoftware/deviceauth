@@ -1,4 +1,4 @@
-// Copyright 2021 Northern.tech AS
+// Copyright 2022 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -89,6 +89,7 @@ func simpleApiClientGetter() apiclient.HttpRunner {
 }
 
 // this device auth service interface
+//
 //go:generate ../utils/mockgen.sh
 type App interface {
 	HealthCheck(ctx context.Context) error
@@ -121,7 +122,6 @@ type App interface {
 	GetDevCountByStatus(ctx context.Context, status string) (int, error)
 
 	ProvisionTenant(ctx context.Context, tenant_id string) error
-	ProvisionDevice(ctx context.Context, dev *model.Device) (err error)
 
 	GetTenantDeviceStatus(ctx context.Context, tenantId, deviceId string) (*model.Status, error)
 }
@@ -525,24 +525,6 @@ func (d *DevAuth) processPreAuthRequest(
 		return nil, ErrMaxDeviceCountReached
 	}
 
-	if !deviceAlreadyAccepted {
-		reqId := requestid.FromContext(ctx)
-		var tenantID string
-		if idty := identity.FromContext(ctx); idty != nil {
-			tenantID = idty.Tenant
-		}
-
-		// submit device accepted job
-		if err := d.cOrch.SubmitProvisionDeviceJob(
-			ctx,
-			orchestrator.ProvisionDeviceReq{
-				RequestId: reqId,
-				DeviceID:  aset.DeviceId,
-				TenantID:  tenantID,
-			}); err != nil {
-			return nil, errors.Wrap(err, "submit device provisioning job error")
-		}
-	}
 	update := model.AuthSetUpdate{
 		Status: model.DevStatusAccepted,
 	}
@@ -561,6 +543,29 @@ func (d *DevAuth) processPreAuthRequest(
 	}
 
 	aset.Status = model.DevStatusAccepted
+	dev.Status = model.DevStatusAccepted
+	dev.AuthSets = append(dev.AuthSets, *aset)
+
+	if !deviceAlreadyAccepted {
+		reqId := requestid.FromContext(ctx)
+		var tenantID string
+		if idty := identity.FromContext(ctx); idty != nil {
+			tenantID = idty.Tenant
+		}
+
+		// submit device accepted job
+		if err := d.cOrch.SubmitProvisionDeviceJob(
+			ctx,
+			orchestrator.ProvisionDeviceReq{
+				RequestId: reqId,
+				DeviceID:  aset.DeviceId,
+				TenantID:  tenantID,
+				Device:    dev,
+				Status:    dev.Status,
+			}); err != nil {
+			return nil, errors.Wrap(err, "submit device provisioning job error")
+		}
+	}
 	return aset, nil
 }
 
@@ -910,6 +915,10 @@ func (d *DevAuth) AcceptDeviceAuth(ctx context.Context, device_id string, auth_i
 		return nil
 	}
 
+	dev.Status = model.DevStatusAccepted
+	aset.Status = model.DevStatusAccepted
+	dev.AuthSets = []model.AuthSet{*aset}
+
 	reqId := requestid.FromContext(ctx)
 
 	var tenantID string
@@ -924,6 +933,8 @@ func (d *DevAuth) AcceptDeviceAuth(ctx context.Context, device_id string, auth_i
 			RequestId: reqId,
 			DeviceID:  aset.DeviceId,
 			TenantID:  tenantID,
+			Device:    dev,
+			Status:    dev.Status,
 		}); err != nil {
 		return errors.Wrap(err, "submit device provisioning job error")
 	}
@@ -1137,80 +1148,6 @@ func (d *DevAuth) PreauthorizeDevice(
 	default:
 		return nil, errors.Wrap(err, "failed to add auth set")
 	}
-}
-
-func (d *DevAuth) ProvisionDevice(ctx context.Context, dev *model.Device) (err error) {
-	var tenantID string
-	idData := identity.FromContext(ctx)
-	if idData != nil {
-		tenantID = idData.Tenant
-	}
-	l := log.FromContext(ctx)
-	err = d.db.AddDevice(ctx, *dev)
-	switch err {
-	case nil:
-		break
-	case store.ErrObjectExists:
-		return ErrDeviceExists
-	default:
-		return errors.Wrap(err, "failed to add device")
-	}
-	defer func() {
-		// Compensate device if we fail at this point
-		if err != nil {
-			errDel := d.db.DeleteDevice(ctx, dev.Id)
-			if errDel != nil {
-				l.Errorf("failed to resolve device data "+
-					"inconsistency for device '%s': %s",
-					dev.Id, errDel)
-			}
-		}
-	}()
-
-	// FIXME: merge 'update_status', 'submit_identity' and 'provision_device'
-	//        workflow into a single job.
-	if err = d.cOrch.SubmitProvisionDeviceJob(ctx, orchestrator.ProvisionDeviceReq{
-		DeviceID:  dev.Id,
-		RequestId: requestid.FromContext(ctx),
-		TenantID:  tenantID,
-	}); err != nil {
-		return errors.Wrap(err, "failed to submit 'provision_device' workflow")
-	}
-
-	defer func() {
-		if err != nil {
-			errDecommission := d.cOrch.SubmitDeviceDecommisioningJob(ctx,
-				orchestrator.DecommissioningReq{
-					DeviceId:  dev.Id,
-					RequestId: requestid.FromContext(ctx),
-					TenantID:  tenantID,
-				})
-			if errDecommission != nil {
-				l.Errorf("failed to decomission device '%s': %s",
-					dev.Id, errDecommission)
-			}
-		}
-	}()
-
-	if err = d.cOrch.SubmitUpdateDeviceStatusJob(
-		ctx,
-		orchestrator.UpdateDeviceStatusReq{
-			RequestId: requestid.FromContext(ctx),
-			Devices: []model.DeviceInventoryUpdate{{
-				Id:       dev.Id,
-				Revision: dev.Revision,
-			}},
-			TenantId: tenantID,
-			Status:   dev.Status,
-		}); err != nil {
-		return errors.Wrap(err, "update device status job error")
-	}
-
-	if err = d.setDeviceIdentity(ctx, dev, tenantID); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (d *DevAuth) RevokeToken(ctx context.Context, tokenID string) error {
