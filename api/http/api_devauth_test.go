@@ -69,7 +69,8 @@ func runTestRequest(t *testing.T, handler http.Handler, req *http.Request, code 
 }
 
 func makeMockApiHandler(t *testing.T, da devauth.App, db store.DataStore) http.Handler {
-	handlers := NewDevAuthApiHandlers(da, db)
+	defaultLimits := 128
+	handlers := NewDevAuthApiHandlers(da, db, Limits{MaxPreAuthElements: defaultLimits})
 	assert.NotNil(t, handlers)
 
 	app, err := handlers.GetApp()
@@ -393,6 +394,176 @@ func NewJSONResponseIDChecker(status int, headers map[string]string, body interf
 func (d *DevicePreauthReturnID) CheckHeaders(t *testing.T, recorded *test.Recorded) {
 	assert.Contains(t, recorded.Recorder.HeaderMap, "Location")
 	assert.Contains(t, recorded.Recorder.HeaderMap["Location"][0], "devices/")
+}
+
+func TestApiV2DevAuthBulkPreauthDevice(t *testing.T) {
+	t.Parallel()
+
+	// enforce specific field naming in errors returned by API
+	updateRestErrorFieldName()
+
+	pubkeyStr := mtest.LoadPubKeyStr("testdata/public.pem")
+
+	type brokenPreAuthReq struct {
+		IdData string `json:"identity_data"`
+		PubKey string `json:"pubkey"`
+	}
+
+	testCases := map[string]struct {
+		body interface{}
+
+		devAuthErr error
+		outDev     *model.Device
+
+		callApp bool
+
+		checker mt.ResponseChecker
+	}{
+		"ok": {
+			body: []preAuthReq{
+				{
+					IdData: map[string]interface{}{
+						"sn": "0001",
+					},
+					PubKey: pubkeyStr,
+				},
+			},
+			callApp: true,
+			checker: mt.NewJSONResponse(
+				http.StatusCreated,
+				nil,
+				nil),
+		},
+		"ok - verify Location header": {
+			body: []preAuthReq{
+				{
+					IdData: map[string]interface{}{
+						"sn": "0001",
+					},
+					PubKey: pubkeyStr,
+				},
+			},
+			callApp: true,
+			checker: NewJSONResponseIDChecker(
+				http.StatusCreated,
+				map[string]string{"Location": "devices/somegeneratedid"},
+				nil),
+		},
+		"invalid: id data is not json": {
+			body: []brokenPreAuthReq{
+				{
+					IdData: `"sn":"0001"`,
+					PubKey: pubkeyStr,
+				},
+			},
+			checker: mt.NewJSONResponse(
+				http.StatusBadRequest,
+				nil,
+				restError("failed to decode preauth request: json: cannot unmarshal string into Go struct field preAuthReq.identity_data of type map[string]interface {}")),
+		},
+		"invalid: no id data": {
+			body: []preAuthReq{
+				{
+					PubKey: pubkeyStr,
+				},
+			},
+			checker: mt.NewJSONResponse(
+				http.StatusBadRequest,
+				nil,
+				restError("failed to decode preauth request: identity_data: cannot be blank.")),
+		},
+		"invalid: no pubkey": {
+			body: []preAuthReq{
+				{
+					IdData: map[string]interface{}{
+						"sn": "0001",
+					},
+				},
+			},
+			checker: mt.NewJSONResponse(
+				http.StatusBadRequest,
+				nil,
+				restError("failed to decode preauth request: pubkey: cannot be blank.")),
+		},
+		"invalid: no body": {
+			checker: mt.NewJSONResponse(
+				http.StatusBadRequest,
+				nil,
+				restError("failed to decode preauth request: EOF")),
+		},
+		"invalid public key": {
+			body: []preAuthReq{
+				{
+					IdData: map[string]interface{}{
+						"sn": "0001",
+					},
+					PubKey: "invalid",
+				},
+			},
+			devAuthErr: devauth.ErrDeviceExists,
+			checker: mt.NewJSONResponse(
+				http.StatusBadRequest,
+				nil,
+				restError("failed to decode preauth request: cannot decode public key")),
+		},
+		"devauth: device exists": {
+			body: []preAuthReq{
+				{
+					IdData: map[string]interface{}{
+						"sn": "0001",
+					},
+					PubKey: pubkeyStr,
+				},
+			},
+			devAuthErr: devauth.ErrDeviceExists,
+			outDev:     &model.Device{Id: "foo"},
+			callApp:    true,
+			checker: mt.NewJSONResponse(
+				http.StatusConflict,
+				nil,
+				model.Device{Id: "foo"}),
+		},
+		"devauth: generic error": {
+			body: []preAuthReq{
+				{
+					IdData: map[string]interface{}{
+						"sn": "0001",
+					},
+					PubKey: pubkeyStr,
+				},
+			},
+			callApp:    true,
+			devAuthErr: errors.New("generic"),
+			checker: mt.NewJSONResponse(
+				http.StatusInternalServerError,
+				nil,
+				restError("internal error")),
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(fmt.Sprintf("tc %s", name), func(t *testing.T) {
+			da := &mocks.App{}
+			if tc.callApp {
+				da.On("PreauthorizeDevice",
+					mtest.ContextMatcher(),
+					mock.AnythingOfType("*model.PreAuthReq")).
+					Return(tc.outDev, tc.devAuthErr)
+			}
+
+			apih := makeMockApiHandler(t, da, nil)
+
+			//make request
+			req := makeReq("POST",
+				"http://1.2.3.4/api/management/v2/devauth/bulk/devices",
+				"",
+				tc.body)
+
+			recorded := test.RunRequest(t, apih, req)
+			mt.CheckResponse(t, tc.checker, recorded)
+			da.AssertExpectations(t)
+		})
+	}
 }
 
 func TestApiV2DevAuthPreauthDevice(t *testing.T) {

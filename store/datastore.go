@@ -80,6 +80,8 @@ type DataStore interface {
 
 	AddDevice(ctx context.Context, d model.Device) error
 
+	AddDevices(ctx context.Context, d []*model.Device) error
+
 	// updates a single device with deviceID, using data from `up`
 	UpdateDevice(ctx context.Context, deviceID string, up model.DeviceUpdate) error
 
@@ -87,6 +89,8 @@ type DataStore interface {
 	DeleteDevice(ctx context.Context, id string) error
 
 	AddAuthSet(ctx context.Context, set model.AuthSet) error
+
+	AddAuthSets(ctx context.Context, set []model.AuthSet) error
 
 	GetAuthSetByIdDataHashKey(
 		ctx context.Context,

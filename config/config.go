@@ -82,6 +82,9 @@ const (
 	SettingRedisLimitsExpSec        = "redis_limits_expire_sec"
 	SettingRedisLimitsExpSecDefault = "1800"
 
+	SettingMaxPreAuthElements        = "max_pre_auth_requests"
+	SettingMaxPreAuthElementsDefault = "128"
+
 	// SettingHaveAddons is a feature toggle for using addon restrictions.
 	// Has no effect if not running in multi-tenancy context.
 	SettingHaveAddons        = "have_addons"
@@ -112,6 +115,7 @@ var (
 		{Key: SettingRedisTimeoutSec, Value: SettingRedisTimeoutSecDefault},
 		{Key: SettingRedisDb, Value: SettingRedisDbDefault},
 		{Key: SettingRedisLimitsExpSec, Value: SettingRedisLimitsExpSecDefault},
+		{Key: SettingMaxPreAuthElements, Value: SettingMaxPreAuthElementsDefault},
 		{Key: SettingHaveAddons, Value: SettingHaveAddonsDefault},
 	}
 )
