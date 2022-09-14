@@ -1,4 +1,4 @@
-// Copyright 2020 Northern.tech AS
+// Copyright 2022 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -21,8 +21,8 @@ import (
 	"encoding/binary"
 	"encoding/json"
 
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
-	"github.com/satori/go.uuid"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/bsontype"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -36,6 +36,9 @@ const (
 	TypeBSONID
 	TypeString
 )
+
+// Size of a UUID in bytes.
+const Size = 16
 
 // ObjectID implements a bson compatible fusion of bson ObjectID, UUID and
 // string types. Depending on the initialization, this type marshals to the
@@ -52,13 +55,13 @@ func NewBSONID() ObjectID {
 // NewUUIDv4 creates a new ObjectID initialized with a UUID v4 (random).
 // In the rare event that the RNG returns an error, the null UUID is returned.
 func NewUUIDv4() ObjectID {
-	uid := uuid.NewV4()
+	uid, _ := uuid.NewRandom()
 	return ObjectID{id: uid}
 }
 
 // NewUUIDv5 returns a new version 5 uuid in the objectID namespace
 func NewUUIDv5(id string) ObjectID {
-	ret := uuid.NewV5(uuid.NamespaceOID, id)
+	ret := uuid.NewSHA1(uuid.NameSpaceOID, []byte(id))
 	return ObjectID{id: ret}
 }
 
@@ -76,7 +79,7 @@ func fromString(id string) interface{} {
 		}
 
 	case 32, 36, 38, 41, 45: // All valid hex-encoded uuid formats.
-		uid, e := uuid.FromString(id)
+		uid, e := uuid.Parse(id)
 		if e != nil {
 			// Fall back on using the string.
 			ret = id
@@ -97,8 +100,8 @@ func FromString(id string) ObjectID {
 }
 
 func marshalBSONUUID(u uuid.UUID) (bsontype.Type, []byte, error) {
-	buf := make([]byte, uuid.Size+4+1)
-	binary.LittleEndian.PutUint32(buf, uuid.Size)
+	buf := make([]byte, Size+4+1)
+	binary.LittleEndian.PutUint32(buf, Size)
 	buf[4] = bsontype.BinaryUUID
 	copy(buf[5:], u[:])
 	return bsontype.Binary, buf, nil
@@ -126,7 +129,7 @@ func (oid *ObjectID) UnmarshalBSONValue(t bsontype.Type, b []byte) error {
 	switch t {
 	case bsontype.Binary: // Assume UUID type
 		l := binary.LittleEndian.Uint32(b)
-		if l != uuid.Size {
+		if l != Size {
 			return errors.Errorf("illegal uuid length: %d", l)
 		}
 		if b[4] != bsontype.BinaryUUID {
