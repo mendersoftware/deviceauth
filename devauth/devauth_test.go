@@ -2380,10 +2380,7 @@ func TestDevAuthDecommissionDevice(t *testing.T) {
 		devId  string
 		tenant string
 
-		dbUpdateDeviceErr            error
-		dbDeleteAuthSetsForDeviceErr error
-		dbDeleteTokenByDevIdErr      error
-		dbDeleteDeviceErr            error
+		dbUpdateDeviceErr error
 
 		withCache      bool
 		cacheDeleteErr error
@@ -2402,55 +2399,43 @@ func TestDevAuthDecommissionDevice(t *testing.T) {
 		{
 			devId: oid.NewUUIDv5("devId2").String(),
 
-			dbDeleteAuthSetsForDeviceErr: errors.New("DeleteAuthSetsForDevice Error"),
-			outErr:                       "db delete device authorization sets error: DeleteAuthSetsForDevice Error",
-		},
-		{
-			devId: oid.NewUUIDv5("devId3").String(),
-
-			dbDeleteTokenByDevIdErr: errors.New("DeleteTokenByDevId Error"),
-			outErr:                  "db delete device tokens error: DeleteTokenByDevId Error",
-		},
-		{
-			devId: oid.NewUUIDv5("devId4").String(),
-
 			dbUpdateDeviceErr: errors.New("DeleteDevice Error"),
 			outErr:            "DeleteDevice Error",
 		},
 		{
-			devId: oid.NewUUIDv5("devId5").String(),
+			devId: oid.NewUUIDv5("devId3").String(),
 
 			coSubmitDeviceDecommisioningJobErr: errors.New("SubmitDeviceDecommisioningJob Error"),
 			outErr:                             "submit device decommissioning job error: SubmitDeviceDecommisioningJob Error",
 		},
 		{
-			devId:           oid.NewUUIDv5("devId6").String(),
+			devId:           oid.NewUUIDv5("devId4").String(),
 			coAuthorization: "Bearer foobar",
 		},
 		{
-			devId:           oid.NewUUIDv5("devId6").String(),
+			devId:           oid.NewUUIDv5("devId4").String(),
 			withCache:       true,
 			tenant:          "acme",
 			coAuthorization: "Bearer foobar",
 		},
 		{
-			devId:          oid.NewUUIDv5("devId6").String(),
+			devId:          oid.NewUUIDv5("devId4").String(),
 			withCache:      true,
 			tenant:         "acme",
 			cacheDeleteErr: errors.New("redis error"),
-			outErr:         "failed to delete token for 7266c2f5-7694-569d-b493-30c728a0d650 from cache: redis error",
+			outErr:         "failed to delete token for 725e564d-cde0-5b11-bace-b79393120089 from cache: redis error",
 		},
 		{
-			devId:          oid.NewUUIDv5("devId6").String(),
+			devId:          oid.NewUUIDv5("devId4").String(),
 			withCache:      true,
 			tenant:         "acme",
 			cacheDeleteErr: errors.New("redis error"),
-			outErr:         "failed to delete token for 7266c2f5-7694-569d-b493-30c728a0d650 from cache: redis error",
+			outErr:         "failed to delete token for 725e564d-cde0-5b11-bace-b79393120089 from cache: redis error",
 		},
 		{
-			devId:     oid.NewUUIDv5("devId6").String(),
+			devId:     oid.NewUUIDv5("devId4").String(),
 			withCache: true,
-			outErr:    "failed to delete token for 7266c2f5-7694-569d-b493-30c728a0d650 from cache: can't unpack tenant identity data from context",
+			outErr:    "failed to delete token for 725e564d-cde0-5b11-bace-b79393120089 from cache: can't unpack tenant identity data from context",
 		},
 	}
 
@@ -2483,22 +2468,12 @@ func TestDevAuthDecommissionDevice(t *testing.T) {
 				Return(tc.coSubmitDeviceDecommisioningJobErr)
 
 			db := mstore.DataStore{}
-			devUUID := oid.FromString(tc.devId)
 			db.On("UpdateDevice", ctx,
 				tc.devId,
 				model.DeviceUpdate{
 					Decommissioning: uto.BoolPtr(true),
 				}).Return(
 				tc.dbUpdateDeviceErr)
-			db.On("DeleteAuthSetsForDevice", ctx,
-				tc.devId).Return(
-				tc.dbDeleteAuthSetsForDeviceErr)
-			db.On("DeleteTokenByDevId", ctx,
-				devUUID).Return(
-				tc.dbDeleteTokenByDevIdErr)
-			db.On("DeleteDevice", ctx,
-				tc.devId).Return(
-				tc.dbDeleteDeviceErr)
 			db.On("UpdateDevice", ctx,
 				mock.AnythingOfType("model.Device"),
 				mock.AnythingOfType("model.DeviceUpdate")).Return(nil)
@@ -2535,6 +2510,97 @@ func TestDevAuthDecommissionDevice(t *testing.T) {
 			}
 
 			c.AssertExpectations(t)
+		})
+	}
+}
+
+func TestTestDevAuthDeleteDevice(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		devId  string
+		tenant string
+
+		dbDeleteAuthSetsForDeviceErr error
+		dbDeleteTokenByDevIdErr      error
+		dbDeleteDeviceErr            error
+
+		coSubmitDeviceDecommisioningJobErr error
+
+		outErr string
+	}{
+		{
+			devId: oid.NewUUIDv5("devId1").String(),
+
+			dbDeleteDeviceErr: store.ErrDevNotFound,
+			outErr:            "device not found",
+		},
+		{
+			devId: oid.NewUUIDv5("devId2").String(),
+
+			dbDeleteDeviceErr: errors.New("failed to remove device"),
+			outErr:            "failed to remove device",
+		},
+		{
+			devId: oid.NewUUIDv5("devId3").String(),
+
+			dbDeleteAuthSetsForDeviceErr: errors.New("DeleteAuthSetsForDevice Error"),
+			outErr:                       "db delete device authorization sets error: DeleteAuthSetsForDevice Error",
+		},
+		{
+			devId: oid.NewUUIDv5("devId4").String(),
+
+			dbDeleteAuthSetsForDeviceErr: store.ErrAuthSetNotFound,
+		},
+		{
+			devId: oid.NewUUIDv5("devId5").String(),
+
+			dbDeleteTokenByDevIdErr: errors.New("DeleteTokenByDevId Error"),
+			outErr:                  "db delete device tokens error: DeleteTokenByDevId Error",
+		},
+		{
+			devId: "",
+
+			outErr: "invalid device ID type",
+		},
+	}
+
+	for i := range testCases {
+		tc := testCases[i]
+		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			t.Parallel()
+
+			ctx := context.Background()
+
+			db := mstore.DataStore{}
+			devUUID := oid.FromString(tc.devId)
+			db.On("DeleteAuthSetsForDevice", ctx,
+				tc.devId).Return(
+				tc.dbDeleteAuthSetsForDeviceErr)
+			db.On("DeleteTokenByDevId", ctx,
+				devUUID).Return(
+				tc.dbDeleteTokenByDevIdErr)
+			db.On("DeleteDevice", ctx,
+				tc.devId).Return(
+				tc.dbDeleteDeviceErr)
+
+			co := morchestrator.ClientRunner{}
+			co.On("SubmitDeviceDecommisioningJob", ctx,
+				orchestrator.DecommissioningReq{
+					DeviceId: tc.devId,
+					TenantID: tc.tenant,
+				}).
+				Return(tc.coSubmitDeviceDecommisioningJobErr)
+
+			devauth := NewDevAuth(&db, &co, nil, Config{})
+
+			err := devauth.DeleteDevice(ctx, tc.devId)
+			if tc.outErr != "" {
+				assert.EqualError(t, err, tc.outErr)
+			} else {
+				assert.NoError(t, err)
+			}
+
 		})
 	}
 }
