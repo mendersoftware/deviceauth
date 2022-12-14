@@ -9,7 +9,7 @@ require (
 	github.com/asaskevich/govalidator v0.0.0-20200108200545-475eaeb16496
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/go-redis/redis/v8 v8.11.5
-	github.com/golang-jwt/jwt/v4 v4.4.2
+	github.com/golang-jwt/jwt/v4 v4.4.3
 	github.com/gomodule/redigo v1.8.8 // indirect
 	github.com/google/uuid v1.3.0
 	github.com/mendersoftware/go-lib-micro v0.0.0-20220620185918-c0dd57dbb00b
