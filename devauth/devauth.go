@@ -103,6 +103,7 @@ type App interface {
 	) ([]model.Device, error)
 	GetDevice(ctx context.Context, dev_id string) (*model.Device, error)
 	DecommissionDevice(ctx context.Context, dev_id string) error
+	DeleteDevice(ctx context.Context, dev_id string) error
 	DeleteAuthSet(ctx context.Context, dev_id string, auth_id string) error
 	AcceptDeviceAuth(ctx context.Context, dev_id string, auth_id string) error
 	RejectDeviceAuth(ctx context.Context, dev_id string, auth_id string) error
@@ -766,6 +767,11 @@ func (d *DevAuth) DecommissionDevice(ctx context.Context, devID string) error {
 		return errors.Wrap(err, "submit device decommissioning job error")
 	}
 
+	return err
+}
+
+// Delete a device and its tokens from deviceauth db
+func (d *DevAuth) DeleteDevice(ctx context.Context, devID string) error {
 	// delete device authorization sets
 	if err := d.db.DeleteAuthSetsForDevice(ctx, devID); err != nil &&
 		err != store.ErrAuthSetNotFound {

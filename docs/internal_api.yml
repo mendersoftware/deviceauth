@@ -228,12 +228,12 @@ paths:
           schema:
            $ref: "#/definitions/Error"
 
-  /tenants/{tid}/devices/external:
-    post:
-      operationId: Provision External Device
+  /tenants/{tid}/devices/{did}:
+    delete:
+      operationId: Delete Device
       tags:
         - Internal API
-      summary: "Provision device from external vendor."
+      summary: "Delete a device from deviceauth service."
       parameters:
         - name: tid
           in: path
@@ -245,15 +245,9 @@ paths:
           description: Device identifier.
           required: true
           type: string
-        - name: device
-          in: body
-          description: External device descriptor.
-          required: true
-          schema:
-            $ref: "#/definitions/ExternalDevice"
       responses:
         201:
-          description: Device provisioned successfully.
+          description: Device deleted successfully.
         400:
           description: Bad request.
         500:
