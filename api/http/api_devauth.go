@@ -47,6 +47,7 @@ const (
 	uriTenantLimit        = "/api/internal/v1/devauth/tenant/#id/limits/#name"
 	uriTokens             = "/api/internal/v1/devauth/tokens"
 	uriTenants            = "/api/internal/v1/devauth/tenants"
+	uriTenantDevice       = "/api/internal/v1/devauth/tenants/#tid/devices/#did"
 	uriTenantDeviceStatus = "/api/internal/v1/devauth/tenants/#tid/devices/#did/status"
 	uriTenantDevices      = "/api/internal/v1/devauth/tenants/#tid/devices"
 	uriTenantDevicesCount = "/api/internal/v1/devauth/tenants/#tid/devices/count"
@@ -106,6 +107,7 @@ func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
 		rest.Get(uriTenantDeviceStatus, d.GetTenantDeviceStatus),
 		rest.Get(uriTenantDevices, d.GetTenantDevicesHandler),
 		rest.Get(uriTenantDevicesCount, d.GetTenantDevicesCountHandler),
+		rest.Delete(uriTenantDevice, d.DeleteDeviceHandler),
 
 		// API v2
 		rest.Get(v2uriDevicesCount, d.GetDevicesCountHandler),
@@ -113,7 +115,7 @@ func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
 		rest.Post(v2uriDevicesSearch, d.SearchDevicesV2Handler),
 		rest.Post(v2uriDevices, d.PostDevicesV2Handler),
 		rest.Get(v2uriDevice, d.GetDeviceV2Handler),
-		rest.Delete(v2uriDevice, d.DeleteDeviceHandler),
+		rest.Delete(v2uriDevice, d.DecommissionDeviceHandler),
 		rest.Delete(v2uriDeviceAuthSet, d.DeleteDeviceAuthSetHandler),
 		rest.Put(v2uriDeviceAuthSetStatus, d.UpdateDeviceStatusHandler),
 		rest.Get(v2uriDeviceAuthSetStatus, d.GetAuthSetStatusHandler),
@@ -391,7 +393,7 @@ func (d *DevAuthApiHandlers) GetDeviceV2Handler(w rest.ResponseWriter, r *rest.R
 	}
 }
 
-func (d *DevAuthApiHandlers) DeleteDeviceHandler(w rest.ResponseWriter, r *rest.Request) {
+func (d *DevAuthApiHandlers) DecommissionDeviceHandler(w rest.ResponseWriter, r *rest.Request) {
 
 	ctx := r.Context()
 
@@ -767,6 +769,25 @@ func (d *DevAuthApiHandlers) GetTenantDevicesCountHandler(w rest.ResponseWriter,
 	r.Request = r.WithContext(ctx)
 
 	d.GetDevicesCountHandler(w, r)
+}
+
+func (d *DevAuthApiHandlers) DeleteDeviceHandler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+	l := log.FromContext(ctx)
+	did := r.PathParam("did")
+
+	err := d.devAuth.DeleteDevice(ctx, did)
+	switch err {
+	case nil:
+		w.WriteHeader(http.StatusNoContent)
+	case devauth.ErrInvalidDeviceID:
+		didErr := errors.New("device id (did) cannot be empty")
+		rest_utils.RestErrWithLog(w, r, l, didErr, http.StatusBadRequest)
+	case store.ErrDevNotFound:
+		w.WriteHeader(http.StatusNotFound)
+	default:
+		rest_utils.RestErrWithLogInternal(w, r, l, err)
+	}
 }
 
 // Validate status.

@@ -1,4 +1,4 @@
-// Copyright 2021 Northern.tech AS
+// Copyright 2022 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -64,6 +64,20 @@ func (_m *App) DeleteAuthSet(ctx context.Context, dev_id string, auth_id string)
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
 		r0 = rf(ctx, dev_id, auth_id)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// DeleteDevice provides a mock function with given fields: ctx, dev_id
+func (_m *App) DeleteDevice(ctx context.Context, dev_id string) error {
+	ret := _m.Called(ctx, dev_id)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = rf(ctx, dev_id)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -270,20 +284,6 @@ func (_m *App) PreauthorizeDevice(ctx context.Context, req *model.PreAuthReq) (*
 	}
 
 	return r0, r1
-}
-
-// ProvisionDevice provides a mock function with given fields: ctx, dev
-func (_m *App) ProvisionDevice(ctx context.Context, dev *model.Device) error {
-	ret := _m.Called(ctx, dev)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *model.Device) error); ok {
-		r0 = rf(ctx, dev)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
 }
 
 // ProvisionTenant provides a mock function with given fields: ctx, tenant_id
