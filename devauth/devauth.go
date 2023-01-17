@@ -1,4 +1,4 @@
-// Copyright 2022 Northern.tech AS
+// Copyright 2023 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -791,7 +791,17 @@ func (d *DevAuth) DeleteDevice(ctx context.Context, devID string) error {
 	}
 
 	// delete device
-	return d.db.DeleteDevice(ctx, devID)
+	if err := d.db.DeleteDevice(ctx, devID); err != nil {
+		return err
+	}
+
+	if d.config.EnableReporting {
+		if err := d.cOrch.SubmitReindexReporting(ctx, devID); err != nil {
+			return errors.Wrap(err, "reindex reporting job error")
+		}
+	}
+
+	return nil
 }
 
 // Deletes device authentication set, and optionally the device.
