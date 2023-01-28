@@ -128,6 +128,23 @@ func doMain(args []string) {
 			Action: cmdPropagateIdDataInventory,
 		},
 		{
+			Name:  "propagate-reporting",
+			Usage: "Trigger a reindex of all the devices in the reporting services ",
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:  "tenant_id",
+					Usage: "Tenant ID (optional) - propagate for just a single tenant.",
+				},
+				cli.BoolFlag{
+					Name: "dry-run",
+					Usage: "Do not perform any inventory modifications," +
+						" just scan and print devices.",
+				},
+			},
+
+			Action: cmdPropagateReporting,
+		},
+		{
 			Name:  "maintenance",
 			Usage: "Run maintenance operations and exit",
 			Flags: []cli.Flag{
@@ -285,6 +302,34 @@ func cmdPropagateIdDataInventory(args *cli.Context) error {
 		c,
 		args.String("tenant_id"),
 		args.Bool("dry-run"))
+	if err != nil {
+		return cli.NewExitError(err, 7)
+	}
+	return nil
+}
+
+func cmdPropagateReporting(args *cli.Context) error {
+	if !config.Config.GetBool(dconfig.SettingEnableReporting) {
+		return cli.NewExitError(errors.New("reporting support not enabled"), 1)
+	}
+
+	db, err := mongo.NewDataStoreMongo(makeDataStoreConfig())
+	if err != nil {
+		return err
+	}
+
+	wflows := orchestrator.NewClient(orchestrator.Config{
+		OrchestratorAddr: config.Config.GetString(
+			dconfig.SettingOrchestratorAddr,
+		),
+	})
+
+	err = cmd.PropagateReporting(
+		db,
+		wflows,
+		args.String("tenant_id"),
+		args.Bool("dry-run"),
+	)
 	if err != nil {
 		return cli.NewExitError(err, 7)
 	}
