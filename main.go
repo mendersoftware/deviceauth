@@ -1,16 +1,16 @@
-// Copyright 2021 Northern.tech AS
+// Copyright 2023 Northern.tech AS
 //
-//    Licensed under the Apache License, Version 2.0 (the "License");
-//    you may not use this file except in compliance with the License.
-//    You may obtain a copy of the License at
+//	Licensed under the Apache License, Version 2.0 (the "License");
+//	you may not use this file except in compliance with the License.
+//	You may obtain a copy of the License at
 //
-//        http://www.apache.org/licenses/LICENSE-2.0
+//	    http://www.apache.org/licenses/LICENSE-2.0
 //
-//    Unless required by applicable law or agreed to in writing, software
-//    distributed under the License is distributed on an "AS IS" BASIS,
-//    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//    See the License for the specific language governing permissions and
-//    limitations under the License.
+//	Unless required by applicable law or agreed to in writing, software
+//	distributed under the License is distributed on an "AS IS" BASIS,
+//	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//	See the License for the specific language governing permissions and
+//	limitations under the License.
 package main
 
 import (
@@ -126,6 +126,23 @@ func doMain(args []string) {
 			},
 
 			Action: cmdPropagateIdDataInventory,
+		},
+		{
+			Name:  "propagate-reporting",
+			Usage: "Trigger a reindex of all the devices in the reporting services ",
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:  "tenant_id",
+					Usage: "Tenant ID (optional) - propagate for just a single tenant.",
+				},
+				cli.BoolFlag{
+					Name: "dry-run",
+					Usage: "Do not perform any inventory modifications," +
+						" just scan and print devices.",
+				},
+			},
+
+			Action: cmdPropagateReporting,
 		},
 		{
 			Name:  "maintenance",
@@ -285,6 +302,34 @@ func cmdPropagateIdDataInventory(args *cli.Context) error {
 		c,
 		args.String("tenant_id"),
 		args.Bool("dry-run"))
+	if err != nil {
+		return cli.NewExitError(err, 7)
+	}
+	return nil
+}
+
+func cmdPropagateReporting(args *cli.Context) error {
+	if !config.Config.GetBool(dconfig.SettingEnableReporting) {
+		return cli.NewExitError(errors.New("reporting support not enabled"), 1)
+	}
+
+	db, err := mongo.NewDataStoreMongo(makeDataStoreConfig())
+	if err != nil {
+		return err
+	}
+
+	wflows := orchestrator.NewClient(orchestrator.Config{
+		OrchestratorAddr: config.Config.GetString(
+			dconfig.SettingOrchestratorAddr,
+		),
+	})
+
+	err = cmd.PropagateReporting(
+		db,
+		wflows,
+		args.String("tenant_id"),
+		args.Bool("dry-run"),
+	)
 	if err != nil {
 		return cli.NewExitError(err, 7)
 	}

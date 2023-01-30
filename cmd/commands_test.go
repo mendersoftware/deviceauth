@@ -1,16 +1,16 @@
-// Copyright 2022 Northern.tech AS
+// Copyright 2023 Northern.tech AS
 //
-//    Licensed under the Apache License, Version 2.0 (the "License");
-//    you may not use this file except in compliance with the License.
-//    You may obtain a copy of the License at
+//	Licensed under the Apache License, Version 2.0 (the "License");
+//	you may not use this file except in compliance with the License.
+//	You may obtain a copy of the License at
 //
-//        http://www.apache.org/licenses/LICENSE-2.0
+//	    http://www.apache.org/licenses/LICENSE-2.0
 //
-//    Unless required by applicable law or agreed to in writing, software
-//    distributed under the License is distributed on an "AS IS" BASIS,
-//    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//    See the License for the specific language governing permissions and
-//    limitations under the License.
+//	Unless required by applicable law or agreed to in writing, software
+//	distributed under the License is distributed on an "AS IS" BASIS,
+//	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//	See the License for the specific language governing permissions and
+//	limitations under the License.
 package cmd
 
 import (
@@ -358,7 +358,7 @@ func TestPropagateStatusesInventory(t *testing.T) {
 			}
 
 			// setup client
-			//(dry run, time source, no tenant/all tenants/selected tenant)
+			// (dry run, time source, no tenant/all tenants/selected tenant)
 			NowUnixMilis = func() int64 { return int64(123456) }
 
 			c := &minv.Client{}
@@ -385,6 +385,192 @@ func TestPropagateStatusesInventory(t *testing.T) {
 			}
 
 			err := PropagateStatusesInventory(db, c, tc.cmdTenant, tc.forcedVersion, tc.cmdDryRun)
+			if tc.err != nil {
+				assert.EqualError(t, err, tc.err.Error())
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestPropagateReporting(t *testing.T) {
+	devSet1 := []model.Device{
+		{
+			Id: "001",
+		},
+		{
+			Id: "002",
+		},
+	}
+
+	devSet2 := []model.Device{
+		{
+			Id: "003",
+		},
+		{
+			Id: "004",
+		},
+		{
+			Id: "005",
+		},
+	}
+
+	cases := map[string]struct {
+		dbDevs map[string][]model.Device
+
+		cmdTenant string
+		cmdDryRun bool
+
+		errDbTenants  error
+		errDbDevices  error
+		workflowError error
+
+		err error
+	}{
+		"ok, default db, no tenant": {
+			dbDevs: map[string][]model.Device{
+				"deviceauth": devSet1,
+			},
+		},
+		"ok, default db, no tenant, dry run": {
+			dbDevs: map[string][]model.Device{
+				"deviceauth": devSet1,
+			},
+			cmdDryRun: true,
+		},
+		"ok, >1 tenant, process all": {
+			dbDevs: map[string][]model.Device{
+				"deviceauth-tenant1": devSet1,
+				"deviceauth-tenant2": devSet2,
+			},
+		},
+		"ok, >1 tenant, process selected": {
+			dbDevs: map[string][]model.Device{
+				"deviceauth-tenant1": devSet1,
+				"deviceauth-tenant2": devSet2,
+			},
+			cmdTenant: "tenant1",
+		},
+		"error: store get tenant dbs, abort": {
+			dbDevs: map[string][]model.Device{
+				"deviceauth-tenant1": devSet1,
+				"deviceauth-tenant2": devSet2,
+			},
+			errDbTenants: errors.New("db failure"),
+			err:          errors.New("aborting: failed to retrieve tenant DBs: db failure"),
+		},
+		"error: store get devices, report but don't abort": {
+			dbDevs: map[string][]model.Device{
+				"deviceauth-tenant1": devSet1,
+				"deviceauth-tenant2": devSet2,
+			},
+			errDbDevices: errors.New("db failure"),
+			err:          errors.New("failed to get devices: db failure"),
+		},
+		"error: workflow": {
+			dbDevs: map[string][]model.Device{
+				"deviceauth-tenant1": devSet1,
+				"deviceauth-tenant2": devSet2,
+			},
+			workflowError: errors.New("service failure"),
+			err:           errors.New("service failure"),
+		},
+	}
+
+	for k := range cases {
+		tc := cases[k]
+		t.Run(fmt.Sprintf("tc %s", k), func(t *testing.T) {
+			db := &mstore.DataStore{}
+			// setup GetTenantDbs
+			// first, infer if we're in ST or MT
+			st := len(tc.dbDevs) == 1 && tc.dbDevs["deviceauth"] != nil
+			if st {
+				db.On("GetTenantDbs").Return([]string{}, tc.errDbTenants)
+			} else {
+				dbs := []string{}
+				for k := range tc.dbDevs {
+					dbs = append(dbs, k)
+				}
+				db.On("GetTenantDbs").Return(dbs, tc.errDbTenants)
+			}
+
+			// 'final' dbs to include based on ST vs MT + tenant selection
+			dbs := map[string][]model.Device{}
+			if st {
+				dbs["deviceauth"] = tc.dbDevs["deviceauth"]
+			} else {
+				if tc.cmdTenant != "" {
+					k := "deviceauth-" + tc.cmdTenant
+					dbs[k] = tc.dbDevs[k]
+				} else {
+					dbs = tc.dbDevs
+				}
+			}
+
+			// setup GetDevices
+			// only default db devs in ST, or
+			// all devs in all dbs if no tenant selected
+			// just one tenant dev set if tenant selected
+			if st {
+				db.On("GetDevices",
+					context.Background(),
+					uint(0),
+					uint(512),
+					model.DeviceFilter{},
+				).Return(
+					dbs["deviceauth"],
+					tc.errDbDevices,
+				)
+			} else {
+				for k, v := range dbs {
+					tname := ctxstore.TenantFromDbName(k, mongo.DbName)
+					m := mock.MatchedBy(func(c context.Context) bool {
+						id := identity.FromContext(c)
+						return id.Tenant == tname
+					})
+
+					db.On("GetDevices",
+						m,
+						uint(0),
+						uint(512),
+						model.DeviceFilter{},
+					).Return(
+						v,
+						tc.errDbDevices)
+				}
+			}
+
+			// setup client
+			// (dry run, time source, no tenant/all tenants/selected tenant)
+			NowUnixMilis = func() int64 { return int64(123456) }
+
+			wflows := &mwflows.ClientRunner{}
+			defer wflows.AssertExpectations(t)
+
+			if !tc.cmdDryRun && tc.errDbTenants == nil && tc.errDbDevices == nil {
+				for db := range tc.dbDevs {
+					if tc.cmdTenant != "" {
+						k := "deviceauth-" + tc.cmdTenant
+						if k != db {
+							continue
+						}
+					}
+					devicesIDs := make([]string, len(tc.dbDevs[db]))
+					for i, dev := range tc.dbDevs[db] {
+						devicesIDs[i] = dev.Id
+					}
+
+					wflows.On("SubmitReindexReportingBatch",
+						mock.MatchedBy(func(c context.Context) bool {
+							return true
+						}),
+						devicesIDs,
+					).Return(tc.workflowError)
+				}
+			}
+
+			err := PropagateReporting(db, wflows, tc.cmdTenant, tc.cmdDryRun)
 			if tc.err != nil {
 				assert.EqualError(t, err, tc.err.Error())
 			} else {

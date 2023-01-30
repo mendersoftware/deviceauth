@@ -1,4 +1,4 @@
-// Copyright 2021 Northern.tech AS
+// Copyright 2023 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -40,6 +40,7 @@ const (
 	HealthURI                            = "/api/v1/health"
 	DeviceLimitWarningURI                = "/api/v1/workflow/device_limit_email"
 	ReindexReportingURI                  = "/api/v1/workflow/reindex_reporting"
+	ReindexReportingBatchURI             = "/api/v1/workflow/reindex_reporting/batch"
 	// default request timeout, 10s?
 	defaultReqTimeout = time.Duration(10) * time.Second
 )
@@ -53,6 +54,7 @@ type Config struct {
 }
 
 // ClientRunner is an interface of orchestrator client
+//
 //go:generate ../../utils/mockgen.sh
 type ClientRunner interface {
 	CheckHealth(ctx context.Context) error
@@ -62,6 +64,7 @@ type ClientRunner interface {
 	SubmitDeviceLimitWarning(ctx context.Context, devWarn DeviceLimitWarning) error
 	SubmitUpdateDeviceInventoryJob(ctx context.Context, req UpdateDeviceInventoryReq) error
 	SubmitReindexReporting(c context.Context, device string) error
+	SubmitReindexReportingBatch(c context.Context, devices []string) error
 }
 
 // Client is an opaque implementation of orchestrator client. Implements
@@ -380,6 +383,54 @@ func (co *Client) SubmitReindexReporting(ctx context.Context, device string) err
 	req, err := http.NewRequestWithContext(ctx,
 		"POST",
 		utils.JoinURL(co.conf.OrchestratorAddr, ReindexReportingURI),
+		bytes.NewReader(payload),
+	)
+	if err != nil {
+		return errors.Wrap(err, "workflows: error preparing HTTP request")
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	rsp, err := co.http.Do(req)
+	if err != nil {
+		return errors.Wrap(err, "workflows: failed to submit reindex job")
+	}
+	defer rsp.Body.Close()
+
+	if rsp.StatusCode < 300 {
+		return nil
+	} else if rsp.StatusCode == http.StatusNotFound {
+		return errors.New(`workflows: workflow "reindex_reporting" not defined`)
+	}
+
+	return errors.Errorf(
+		"workflows: unexpected HTTP status from workflows service: %s",
+		rsp.Status,
+	)
+}
+
+func (co *Client) SubmitReindexReportingBatch(ctx context.Context, devices []string) error {
+	ctx, cancel := context.WithTimeout(ctx, co.conf.Timeout)
+	defer cancel()
+
+	tenantID := ""
+	if id := identity.FromContext(ctx); id != nil {
+		tenantID = id.Tenant
+	}
+	reqID := requestid.FromContext(ctx)
+	wflows := make([]ReindexReportingWorkflow, len(devices))
+	for i, device := range devices {
+		wflows[i] = ReindexReportingWorkflow{
+			RequestID: reqID,
+			TenantID:  tenantID,
+			DeviceID:  device,
+			Service:   ServiceDeviceauth,
+		}
+	}
+	payload, _ := json.Marshal(wflows)
+	req, err := http.NewRequestWithContext(ctx,
+		"POST",
+		utils.JoinURL(co.conf.OrchestratorAddr, ReindexReportingBatchURI),
 		bytes.NewReader(payload),
 	)
 	if err != nil {
