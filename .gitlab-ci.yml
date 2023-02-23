@@ -30,6 +30,9 @@ test:unit:
     DEVICEAUTH_MONGO: mongo
 
 test:acceptance_tests:
+  image: tiangolo/docker-with-compose:2022-12-26
+  services:
+    - docker:23.0.1-dind
   script:
     - rm -f tests/coverage-acceptance*.txt
     - export TESTS_DIR=$(pwd)/tests
