@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright 2022 Northern.tech AS
+# Copyright 2023 Northern.tech AS
 #
 #    Licensed under the Apache License, Version 2.0 (the "License");
 #    you may not use this file except in compliance with the License.
@@ -268,12 +268,8 @@ class TestCheckDeviceLimitsEnterprise:
         self, clean_db, cli, device_api, management_api, internal_api, test_case
     ):
 
-        rsp_q_tadm = asyncio.Queue(
-            maxsize=len(test_case["tenant"]["users"]) + test_case["device_count"]
-        )
-        rsp_q_wflows = asyncio.Queue(
-            maxsize=len(test_case["tenant"]["users"]) + test_case["device_count"]
-        )
+        rsp_q_tadm = asyncio.Queue(maxsize=100)
+        rsp_q_wflows = asyncio.Queue(maxsize=100)
         with self.init_service_mocks(wflows_rsp_q=rsp_q_wflows, tadm_rsp_q=rsp_q_tadm):
             tenant_token = make_fake_tenant_token(test_case["tenant"]["id"])
 
@@ -287,6 +283,12 @@ class TestCheckDeviceLimitsEnterprise:
                     (200, {}, '{"id": "%s", "sub": "user"}' % test_case["tenant"])
                 )
                 # POST /api/v1/workflows/update_device_inventory
+                rsp_q_wflows.put_nowait((201, {}, ""))
+                # POST /api/v1/workflows/reindex_reporting
+                rsp_q_wflows.put_nowait((201, {}, ""))
+                # POST /api/v1/workflows/update_device_status
+                rsp_q_wflows.put_nowait((201, {}, ""))
+                # POST /api/v1/workflows/reindex_reporting
                 rsp_q_wflows.put_nowait((201, {}, ""))
                 # POST /api/v1/workflows/provision_device
                 rsp_q_wflows.put_nowait((201, {}, ""))
