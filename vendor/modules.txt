@@ -160,7 +160,7 @@ github.com/spf13/viper/internal/encoding/toml
 github.com/spf13/viper/internal/encoding/yaml
 # github.com/stretchr/objx v0.5.0
 github.com/stretchr/objx
-# github.com/stretchr/testify v1.8.1
+# github.com/stretchr/testify v1.8.2
 ## explicit
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/mock
