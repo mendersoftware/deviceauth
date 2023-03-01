@@ -17,5 +17,5 @@ require (
 	github.com/stretchr/testify v1.8.1
 	github.com/urfave/cli v1.22.10
 	github.com/yuin/gopher-lua v0.0.0-20210529063254-f4c35e4016d9 // indirect
-	go.mongodb.org/mongo-driver v1.11.0
+	go.mongodb.org/mongo-driver v1.11.2
 )
