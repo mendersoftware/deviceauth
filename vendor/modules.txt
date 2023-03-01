@@ -51,7 +51,7 @@ github.com/go-redis/redis/v8/internal/pool
 github.com/go-redis/redis/v8/internal/proto
 github.com/go-redis/redis/v8/internal/rand
 github.com/go-redis/redis/v8/internal/util
-# github.com/golang-jwt/jwt/v4 v4.4.3
+# github.com/golang-jwt/jwt/v4 v4.5.0
 ## explicit
 github.com/golang-jwt/jwt/v4
 # github.com/golang/protobuf v1.5.2
