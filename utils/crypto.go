@@ -93,7 +93,7 @@ func VerifyAuthReqSign(signature string, pubkey crypto.PublicKey, content []byte
 	return nil
 }
 
-//ParsePubKey
+// ParsePubKey
 func ParsePubKey(pubkey string) (crypto.PublicKey, error) {
 	block, _ := pem.Decode([]byte(pubkey))
 	if block == nil || block.Type != PubKeyBlockType {

@@ -85,13 +85,13 @@ func Migrate(c config.Reader, tenant string, listTenantsFlag bool) error {
 }
 
 func listTenants(db *mongo.DataStoreMongo) error {
-	tdbs, err := db.GetTenantDbs()
+	tdbs, err := db.ListTenantsIds(context.Background())
 	if err != nil {
-		return errors.Wrap(err, "failed to retrieve tenant DBs")
+		return errors.Wrap(err, "failed to retrieve tenant ids")
 	}
 
 	for _, tenant := range tdbs {
-		fmt.Println(mstore.TenantFromDbName(tenant, mongo.DbName))
+		fmt.Println(tenant)
 	}
 
 	return nil
@@ -121,48 +121,16 @@ func maintenanceWithDataStore(
 }
 
 func decommissioningCleanup(db *mongo.DataStoreMongo, tenant string, dryRunFlag bool) error {
-	if tenant == "" {
-		tdbs, err := db.GetTenantDbs()
-		if err != nil {
-			return errors.Wrap(err, "failed to retrieve tenant DBs")
-		}
-		_ = decommissioningCleanupWithDbs(db, append(tdbs, mongo.DbName), dryRunFlag)
-	} else {
-		_ = decommissioningCleanupWithDbs(
-			db,
-			[]string{mstore.DbNameForTenant(tenant, mongo.DbName)},
-			dryRunFlag,
-		)
-	}
-
-	return nil
-}
-
-func decommissioningCleanupWithDbs(
-	db *mongo.DataStoreMongo,
-	tenantDbs []string,
-	dryRunFlag bool,
-) error {
-	for _, dbName := range tenantDbs {
-		println("database: ", dbName)
-		if err := decommissioningCleanupWithDb(db, dbName, dryRunFlag); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func decommissioningCleanupWithDb(db *mongo.DataStoreMongo, dbName string, dryRunFlag bool) error {
 	if dryRunFlag {
-		return decommissioningCleanupDryRun(db, dbName)
+		return decommissioningCleanupDryRun(db, tenant)
 	} else {
-		return decommissioningCleanupExecute(db, dbName)
+		return decommissioningCleanupExecute(db, tenant)
 	}
 }
 
-func decommissioningCleanupDryRun(db *mongo.DataStoreMongo, dbName string) error {
+func decommissioningCleanupDryRun(db *mongo.DataStoreMongo, tenantId string) error {
 	//devices
-	devices, err := db.GetDevicesBeingDecommissioned(dbName)
+	devices, err := db.GetDevicesBeingDecommissioned(tenantId)
 	if err != nil {
 		return err
 	}
@@ -174,7 +142,7 @@ func decommissioningCleanupDryRun(db *mongo.DataStoreMongo, dbName string) error
 	}
 
 	//auth sets
-	authSetIds, err := db.GetBrokenAuthSets(dbName)
+	authSetIds, err := db.GetBrokenAuthSets(tenantId)
 	if err != nil {
 		return err
 	}
@@ -188,16 +156,16 @@ func decommissioningCleanupDryRun(db *mongo.DataStoreMongo, dbName string) error
 	return nil
 }
 
-func decommissioningCleanupExecute(db *mongo.DataStoreMongo, dbName string) error {
-	if err := decommissioningCleanupDryRun(db, dbName); err != nil {
+func decommissioningCleanupExecute(db *mongo.DataStoreMongo, tenantOd string) error {
+	if err := decommissioningCleanupDryRun(db, tenantOd); err != nil {
 		return err
 	}
 
-	if err := db.DeleteDevicesBeingDecommissioned(dbName); err != nil {
+	if err := db.DeleteDevicesBeingDecommissioned(tenantOd); err != nil {
 		return err
 	}
 
-	if err := db.DeleteBrokenAuthSets(dbName); err != nil {
+	if err := db.DeleteBrokenAuthSets(tenantOd); err != nil {
 		return err
 	}
 
@@ -286,21 +254,6 @@ func selectDbs(db store.DataStore, tenant string) ([]string, error) {
 		l.Infof("propagating inventory for user-specified tenant %s", tenant)
 		n := mstore.DbNameForTenant(tenant, mongo.DbName)
 		dbs = []string{n}
-	} else {
-		l.Infof("propagating inventory for all tenants")
-
-		// infer if we're in ST or MT
-		tdbs, err := db.GetTenantDbs()
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to retrieve tenant DBs")
-		}
-
-		if len(tdbs) == 0 {
-			l.Infof("no tenant DBs found - will try the default database %s", mongo.DbName)
-			dbs = []string{mongo.DbName}
-		} else {
-			dbs = tdbs
-		}
 	}
 
 	return dbs, nil
@@ -640,7 +593,7 @@ func CheckDeviceLimits(
 		return nil
 	}
 	// Start looping through the databases.
-	return ds.ForEachDatabase(
+	return ds.ForEachTenant(
 		context.Background(),
 		mapFunc,
 	)

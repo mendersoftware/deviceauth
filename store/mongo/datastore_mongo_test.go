@@ -253,7 +253,7 @@ func TestForEachDatabase(t *testing.T) {
 				return tc.MapFunc(ctx)
 			}
 			// Run test:
-			err := ds.ForEachDatabase(tc.CTX, mapFunc)
+			err := ds.ForEachTenant(tc.CTX, mapFunc)
 			if tc.Error != nil {
 				if assert.Error(t, err) {
 					assert.Regexp(t, tc.Error.Error(), err.Error())

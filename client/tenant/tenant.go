@@ -19,7 +19,7 @@ import (
 	"github.com/mendersoftware/go-lib-micro/ratelimits"
 )
 
-//Tenant is a tenantadm-specific API struct
+// Tenant is a tenantadm-specific API struct
 type Tenant struct {
 	ID        string          `json:"id"`
 	Name      string          `json:"name"`

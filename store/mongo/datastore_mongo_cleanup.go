@@ -26,12 +26,12 @@ import (
 )
 
 // Retrieves devices with decommissioning flag set
-func (db *DataStoreMongo) GetDevicesBeingDecommissioned(dbName string) ([]model.Device, error) {
-	c := db.client.Database(dbName).Collection(DbDevicesColl)
+func (db *DataStoreMongo) GetDevicesBeingDecommissioned(tenantId string) ([]model.Device, error) {
+	c := db.client.Database(DbName).Collection(DbDevicesColl)
 
 	devices := []model.Device{}
 
-	cursor, err := c.Find(context.Background(), model.Device{Decommissioning: true})
+	cursor, err := c.Find(context.Background(), model.Device{Decommissioning: true, TenantID: tenantId})
 	if err != nil {
 		return nil, err
 	}
@@ -47,8 +47,8 @@ func (db *DataStoreMongo) GetDevicesBeingDecommissioned(dbName string) ([]model.
 
 // Retrieves Ids of the auth sets owned by devices that are in decommissioning state or not owned by
 // any device.
-func (db *DataStoreMongo) GetBrokenAuthSets(dbName string) ([]string, error) {
-	c := db.client.Database(dbName).Collection(DbAuthSetColl)
+func (db *DataStoreMongo) GetBrokenAuthSets(tenantId string) ([]string, error) {
+	c := db.client.Database(DbName).Collection(DbAuthSetColl)
 
 	deviceIds := []string{}
 	brokenAuthSets := []string{}
@@ -56,14 +56,20 @@ func (db *DataStoreMongo) GetBrokenAuthSets(dbName string) ([]string, error) {
 	ctx := context.Background()
 
 	// get all auth sets; group by device id
-
 	group := bson.D{
-		{Key: "$group", Value: bson.D{
-			{Key: "_id", Value: "$device_id"}},
+		{
+			Key: "$group", Value: bson.D{
+				{Key: "_id", Value: "$device_id"}},
 		},
 	}
 	pipeline := []bson.D{
 		group,
+		{
+			{
+				Key:   dbFieldTenantID,
+				Value: tenantId,
+			},
+		},
 	}
 	var result []struct {
 		DeviceId string `bson:"_id"`
@@ -85,7 +91,7 @@ func (db *DataStoreMongo) GetBrokenAuthSets(dbName string) ([]string, error) {
 	}
 
 	//check if devices exists
-	nonexistentDevices, err := db.filterNonExistentDevices(dbName, deviceIds)
+	nonexistentDevices, err := db.filterNonExistentDevices(tenantId, deviceIds)
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +101,7 @@ func (db *DataStoreMongo) GetBrokenAuthSets(dbName string) ([]string, error) {
 
 		authSets := []model.AuthSet{}
 
-		cursor, err := c.Find(ctx, bson.M{"device_id": dev})
+		cursor, err := c.Find(ctx, bson.M{"device_id": dev, dbFieldTenantID: tenantId})
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to fetch authentication sets")
 		}
@@ -114,10 +120,10 @@ func (db *DataStoreMongo) GetBrokenAuthSets(dbName string) ([]string, error) {
 }
 
 // Deletes devices with decommissioning flag set
-func (db *DataStoreMongo) DeleteDevicesBeingDecommissioned(dbName string) error {
-	c := db.client.Database(dbName).Collection(DbDevicesColl)
+func (db *DataStoreMongo) DeleteDevicesBeingDecommissioned(tenantId string) error {
+	c := db.client.Database(DbName).Collection(DbDevicesColl)
 
-	_, err := c.DeleteMany(context.Background(), model.Device{Decommissioning: true})
+	_, err := c.DeleteMany(context.Background(), model.Device{Decommissioning: true, TenantID: tenantId})
 	if err != nil {
 		return errors.Wrap(err, "failed to remove decommissioned devices")
 	}
@@ -127,12 +133,12 @@ func (db *DataStoreMongo) DeleteDevicesBeingDecommissioned(dbName string) error 
 
 // Deletes auth sets owned by devices that are in decommissioning state and auth sets not
 // owned by any device.
-func (db *DataStoreMongo) DeleteBrokenAuthSets(dbName string) error {
-	database := db.client.Database(dbName)
+func (db *DataStoreMongo) DeleteBrokenAuthSets(tenantId string) error {
+	database := db.client.Database(DbName)
 	collAuthSets := database.Collection(DbAuthSetColl)
 	collTokens := database.Collection(DbTokensColl)
 
-	authSets, err := db.GetBrokenAuthSets(dbName)
+	authSets, err := db.GetBrokenAuthSets(tenantId)
 	if err != nil {
 		return err
 	}
@@ -140,12 +146,12 @@ func (db *DataStoreMongo) DeleteBrokenAuthSets(dbName string) error {
 	// delete authsets for non-existent devices
 	ctx := context.Background()
 	for _, as := range authSets {
-		_, err := collAuthSets.DeleteOne(ctx, model.AuthSet{Id: as})
+		_, err := collAuthSets.DeleteOne(ctx, model.AuthSet{Id: as, TenantID: tenantId})
 		if err != nil {
-			return errors.Wrapf(err, "database %s, failed to delete authentication sets", dbName)
+			return errors.Wrapf(err, "tenant %s, failed to delete authentication sets", tenantId)
 		}
 		// Attempt to delete token (may have already expired).
-		_, _ = collTokens.DeleteOne(ctx, bson.M{"_id": as})
+		_, _ = collTokens.DeleteOne(ctx, bson.M{"_id": as, dbFieldTenantID: tenantId})
 	}
 
 	return nil
@@ -154,23 +160,23 @@ func (db *DataStoreMongo) DeleteBrokenAuthSets(dbName string) error {
 // Filters list of device ids.
 // Result is the list of ids of non-existent devices and devices with decommissioning flag set.
 func (db *DataStoreMongo) filterNonExistentDevices(
-	dbName string,
+	tenantId string,
 	devIds []string,
 ) ([]string, error) {
-	c := db.client.Database(dbName).Collection(DbDevicesColl)
+	c := db.client.Database(DbName).Collection(DbDevicesColl)
 
 	nonexistentDevices := []string{}
 
 	//check if device exists
 	for _, devId := range devIds {
 		res := model.Device{}
-		err := c.FindOne(context.Background(), bson.M{"_id": devId}).Decode(&res)
+		err := c.FindOne(context.Background(), bson.M{"_id": devId, dbFieldTenantID: tenantId}).Decode(&res)
 
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
 				nonexistentDevices = append(nonexistentDevices, devId)
 			} else {
-				return nil, errors.Wrapf(err, "db %s, failed to fetch device", dbName)
+				return nil, errors.Wrapf(err, "tenant %s, failed to fetch device", tenantId)
 			}
 		}
 

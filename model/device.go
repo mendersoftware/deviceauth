@@ -1,16 +1,16 @@
 // Copyright 2022 Northern.tech AS
 //
-//    Licensed under the Apache License, Version 2.0 (the "License");
-//    you may not use this file except in compliance with the License.
-//    You may obtain a copy of the License at
+//	Licensed under the Apache License, Version 2.0 (the "License");
+//	you may not use this file except in compliance with the License.
+//	You may obtain a copy of the License at
 //
-//        http://www.apache.org/licenses/LICENSE-2.0
+//	    http://www.apache.org/licenses/LICENSE-2.0
 //
-//    Unless required by applicable law or agreed to in writing, software
-//    distributed under the License is distributed on an "AS IS" BASIS,
-//    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//    See the License for the specific language governing permissions and
-//    limitations under the License.
+//	Unless required by applicable law or agreed to in writing, software
+//	distributed under the License is distributed on an "AS IS" BASIS,
+//	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//	See the License for the specific language governing permissions and
+//	limitations under the License.
 package model
 
 import (
@@ -62,7 +62,8 @@ type Device struct {
 	ApiLimits ratelimits.ApiLimits `json:"-" bson:"api_limits"`
 
 	//object revision which we use when synchronizing status with inventory service
-	Revision uint `json:"-" bson:"revision"`
+	Revision uint   `json:"-" bson:"revision"`
+	TenantID string `json:"tenant_id" bson:"tenant_id"`
 }
 
 type DeviceUpdate struct {
@@ -73,6 +74,7 @@ type DeviceUpdate struct {
 	Status          string                 `json:"-" bson:",omitempty"`
 	Decommissioning *bool                  `json:"-" bson:",omitempty"`
 	UpdatedTs       *time.Time             `json:"updated_ts" bson:"updated_ts,omitempty"`
+	TenantID        string                 `json:"tenant_id" bson:"tenant_id"`
 }
 
 func NewDevice(id, id_data, pubkey string) *Device {

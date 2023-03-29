@@ -24,7 +24,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-func TestMigration_1_11_0(t *testing.T) {
+func TestMigration_2_0_0(t *testing.T) {
 	ctx := identity.WithContext(context.Background(), &identity.Identity{
 		Tenant: "foo",
 	})
@@ -33,7 +33,7 @@ func TestMigration_1_11_0(t *testing.T) {
 	client := db.Client()
 	db := NewDataStoreMongoWithClient(client)
 
-	prep_1_10_0(t, ctx, db)
+	prep_2_0_0(t, ctx, db)
 
 	const (
 		devId  = "dev"
@@ -43,11 +43,11 @@ func TestMigration_1_11_0(t *testing.T) {
 	cDevs := db.client.Database(dbName).Collection(DbDevicesColl)
 	cDevs.InsertOne(ctx, bson.M{"_id": devId, pubkey: "dummy"})
 
-	mig1110 := migration_1_11_0{
+	mig200 := migration_2_0_0{
 		ds:  db,
 		ctx: ctx,
 	}
-	err := mig1110.Up(migrate.MakeVersion(1, 11, 0))
+	err := mig200.Up(migrate.MakeVersion(2, 0, 0))
 	assert.NoError(t, err)
 
 	count, err := cDevs.CountDocuments(ctx, bson.M{pubkey: bson.M{"$exists": true}})
@@ -55,7 +55,7 @@ func TestMigration_1_11_0(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func prep_1_10_0(t *testing.T, ctx context.Context, db *DataStoreMongo) {
+func prep_2_0_0(t *testing.T, ctx context.Context, db *DataStoreMongo) {
 
 	mig110 := migration_1_1_0{
 		ms:  db,
@@ -97,6 +97,10 @@ func prep_1_10_0(t *testing.T, ctx context.Context, db *DataStoreMongo) {
 		ds:  db,
 		ctx: ctx,
 	}
+	mig1110 := migration_1_11_0{
+		ds:  db,
+		ctx: ctx,
+	}
 
 	err := mig110.Up(migrate.MakeVersion(1, 1, 0))
 	assert.NoError(t, err)
@@ -117,5 +121,7 @@ func prep_1_10_0(t *testing.T, ctx context.Context, db *DataStoreMongo) {
 	err = mig190.Up(migrate.MakeVersion(1, 9, 0))
 	assert.NoError(t, err)
 	err = mig1100.Up(migrate.MakeVersion(1, 10, 0))
+	assert.NoError(t, err)
+	err = mig1110.Up(migrate.MakeVersion(1, 11, 0))
 	assert.NoError(t, err)
 }

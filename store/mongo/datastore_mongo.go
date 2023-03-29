@@ -24,7 +24,7 @@ import (
 	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	"github.com/mendersoftware/go-lib-micro/mongo/oid"
-	ctxstore "github.com/mendersoftware/go-lib-micro/store"
+	ctxstore "github.com/mendersoftware/go-lib-micro/store/v2"
 	"github.com/pkg/errors"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -37,7 +37,7 @@ import (
 )
 
 const (
-	DbVersion     = "1.11.0"
+	DbVersion     = "2.0.0"
 	DbName        = "deviceauth"
 	DbDevicesColl = "devices"
 	DbAuthSetColl = "auth_sets"
@@ -45,6 +45,14 @@ const (
 	DbLimitsColl  = "limits"
 
 	DbKeyDeviceRevision = "revision"
+	dbFieldID           = "_id"
+	dbFieldTenantID     = "tenant_id"
+	dbFieldIDDataSha    = "id_data_sha256"
+	dbFieldStatus       = "status"
+	dbFieldDeviceID     = "device_id"
+	dbFieldPubKey       = "pubkey"
+	dbFieldExpTime      = "exp.time"
+	dbFieldName         = "name"
 )
 
 var (
@@ -115,7 +123,7 @@ func NewDataStoreMongo(config DataStoreMongoConfig) (*DataStoreMongo, error) {
 	return NewDataStoreMongoWithClient(client), nil
 }
 
-func (db *DataStoreMongo) ForEachDatabase(
+func (db *DataStoreMongo) ForEachTenant(
 	ctx context.Context,
 	mapFunc store.MapFunc,
 ) error {
@@ -124,19 +132,15 @@ func (db *DataStoreMongo) ForEachDatabase(
 		err     error
 		errChan = make(chan error, 1)
 	)
-	databases, err := db.client.ListDatabaseNames(ctx, bson.D{{
-		Key: "name", Value: bson.D{{
-			Key: "$regex", Value: "^" + DbName}},
-	}})
+	tenantsIds, err := db.ListTenantsIds(ctx)
 	if err != nil {
-		return errors.Wrap(err, "store: failed to retrieve databases")
+		return errors.Wrap(err, "store: failed to retrieve tenants")
 	}
 	go func() {
-		for _, dbName := range databases {
+		for _, tenantID := range tenantsIds {
 			if ctx.Err() != nil {
 				return
 			}
-			tenantID := ctxstore.TenantFromDbName(dbName, DbName)
 			if tenantID != "" {
 				dbCtx = identity.WithContext(ctx,
 					&identity.Identity{
@@ -149,8 +153,8 @@ func (db *DataStoreMongo) ForEachDatabase(
 			err := mapFunc(dbCtx)
 			if err != nil {
 				errChan <- errors.Wrapf(err,
-					`store: failed to apply mapFunc to database "%s"`,
-					dbName,
+					`store: failed to apply mapFunc to tenant "%s"`,
+					tenantID,
 				)
 			}
 		}
@@ -215,8 +219,9 @@ func (db *DataStoreMongo) GetDevices(
 		fltr = DeviceFilter(filter)
 	)
 	collDevs := db.client.
-		Database(ctxstore.DbFromContext(ctx, DbName)).
+		Database(DbName).
 		Collection(DbDevicesColl)
+
 	findOpts := mopts.Find().
 		SetSort(bson.D{{Key: "_id", Value: 1}}).
 		SetSkip(int64(skip) & MaxInt64)
@@ -225,7 +230,7 @@ func (db *DataStoreMongo) GetDevices(
 		findOpts.SetLimit(int64(limit))
 	}
 
-	cursor, err := collDevs.Find(ctx, fltr, findOpts)
+	cursor, err := collDevs.Find(ctx, ctxstore.WithTenantID(ctx, fltr), findOpts)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to fetch device list")
 	}
@@ -244,7 +249,7 @@ func (db *DataStoreMongo) StoreMigrationVersion(
 		return errors.New("version cant be nil.")
 	}
 
-	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).
+	c := db.client.Database(DbName).
 		Collection(migrate.DbMigrationsColl)
 
 	migrationInfo := migrate.MigrationEntry{
@@ -257,11 +262,11 @@ func (db *DataStoreMongo) StoreMigrationVersion(
 
 func (db *DataStoreMongo) GetDeviceById(ctx context.Context, id string) (*model.Device, error) {
 
-	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
+	c := db.client.Database(DbName).Collection(DbDevicesColl)
 
 	res := model.Device{}
 
-	err := c.FindOne(ctx, bson.M{"_id": id}).Decode(&res)
+	err := c.FindOne(ctx, ctxstore.WithTenantID(ctx, bson.M{"_id": id})).Decode(&res)
 
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
@@ -278,9 +283,9 @@ func (db *DataStoreMongo) GetDeviceByIdentityDataHash(
 	ctx context.Context,
 	idataHash []byte,
 ) (*model.Device, error) {
-	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
+	c := db.client.Database(DbName).Collection(DbDevicesColl)
 
-	filter := bson.M{"id_data_sha256": idataHash}
+	filter := ctxstore.WithTenantID(ctx, bson.M{dbFieldIDDataSha: idataHash})
 	res := model.Device{}
 
 	err := c.FindOne(ctx, filter).Decode(&res)
@@ -301,8 +306,14 @@ func (db *DataStoreMongo) AddDevice(ctx context.Context, d model.Device) error {
 		uid := oid.NewUUIDv4()
 		d.Id = uid.String()
 	}
+	id := identity.FromContext(ctx)
+	tenantId := ""
+	if id != nil {
+		tenantId = id.Tenant
+	}
+	d.TenantID = tenantId
 
-	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
+	c := db.client.Database(DbName).Collection(DbDevicesColl)
 
 	if _, err := c.InsertOne(ctx, d); err != nil {
 		if strings.Contains(err.Error(), "duplicate key error") {
@@ -316,8 +327,14 @@ func (db *DataStoreMongo) AddDevice(ctx context.Context, d model.Device) error {
 func (db *DataStoreMongo) UpdateDevice(ctx context.Context,
 	deviceID string, updev model.DeviceUpdate) error {
 
-	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
+	c := db.client.Database(DbName).Collection(DbDevicesColl)
 
+	id := identity.FromContext(ctx)
+	tenantId := ""
+	if id != nil {
+		tenantId = id.Tenant
+	}
+	updev.TenantID = tenantId
 	updev.UpdatedTs = uto.TimePtr(time.Now().UTC())
 	update := bson.M{
 		"$inc": bson.M{
@@ -326,7 +343,7 @@ func (db *DataStoreMongo) UpdateDevice(ctx context.Context,
 		"$set": updev,
 	}
 
-	res, err := c.UpdateOne(ctx, bson.M{"_id": deviceID}, update)
+	res, err := c.UpdateOne(ctx, ctxstore.WithTenantID(ctx, bson.M{"_id": deviceID}), update)
 	if err != nil {
 		return errors.Wrap(err, "failed to update device")
 	} else if res.MatchedCount < 1 {
@@ -338,9 +355,9 @@ func (db *DataStoreMongo) UpdateDevice(ctx context.Context,
 
 func (db *DataStoreMongo) DeleteDevice(ctx context.Context, id string) error {
 
-	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
+	c := db.client.Database(DbName).Collection(DbDevicesColl)
 
-	filter := bson.M{"_id": id}
+	filter := ctxstore.WithTenantID(ctx, bson.M{"_id": id})
 	result, err := c.DeleteOne(ctx, filter)
 	if err != nil {
 		return errors.Wrap(err, "failed to remove device")
@@ -352,10 +369,16 @@ func (db *DataStoreMongo) DeleteDevice(ctx context.Context, id string) error {
 }
 
 func (db *DataStoreMongo) AddToken(ctx context.Context, t *jwt.Token) error {
-	database := db.client.Database(ctxstore.DbFromContext(ctx, DbName))
+	database := db.client.Database(DbName)
 	collTokens := database.Collection(DbTokensColl)
 
-	filter := bson.M{"_id": t.Claims.ID}
+	filter := ctxstore.WithTenantID(ctx, bson.M{"_id": t.Claims.ID})
+	id := identity.FromContext(ctx)
+	tenantId := ""
+	if id != nil {
+		tenantId = id.Tenant
+	}
+	t.TenantID = tenantId
 	update := bson.M{"$set": t}
 	updateOpts := mopts.Update()
 	updateOpts.SetUpsert(true)
@@ -374,11 +397,11 @@ func (db *DataStoreMongo) GetToken(
 	jti oid.ObjectID,
 ) (*jwt.Token, error) {
 
-	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbTokensColl)
+	c := db.client.Database(DbName).Collection(DbTokensColl)
 
 	res := jwt.Token{}
 
-	err := c.FindOne(ctx, bson.M{"_id": jti}).Decode(&res)
+	err := c.FindOne(ctx, ctxstore.WithTenantID(ctx, bson.M{"_id": jti})).Decode(&res)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			return nil, store.ErrTokenNotFound
@@ -391,10 +414,10 @@ func (db *DataStoreMongo) GetToken(
 }
 
 func (db *DataStoreMongo) DeleteToken(ctx context.Context, jti oid.ObjectID) error {
-	database := db.client.Database(ctxstore.DbFromContext(ctx, DbName))
+	database := db.client.Database(DbName)
 	collTokens := database.Collection(DbTokensColl)
 
-	filter := bson.M{"_id": jti}
+	filter := ctxstore.WithTenantID(ctx, bson.M{"_id": jti})
 	result, err := collTokens.DeleteOne(ctx, filter)
 	if err != nil {
 		return errors.Wrap(err, "failed to remove token")
@@ -406,9 +429,9 @@ func (db *DataStoreMongo) DeleteToken(ctx context.Context, jti oid.ObjectID) err
 }
 
 func (db *DataStoreMongo) DeleteTokens(ctx context.Context) error {
-	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).
+	c := db.client.Database(DbName).
 		Collection(DbTokensColl)
-	_, err := c.DeleteMany(ctx, bson.D{})
+	_, err := c.DeleteMany(ctx, ctxstore.WithTenantID(ctx, bson.D{}))
 
 	return err
 }
@@ -417,9 +440,9 @@ func (db *DataStoreMongo) DeleteTokenByDevId(
 	ctx context.Context,
 	devID oid.ObjectID,
 ) error {
-	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).
+	c := db.client.Database(DbName).
 		Collection(DbTokensColl)
-	ci, err := c.DeleteMany(ctx, bson.M{"sub": devID})
+	ci, err := c.DeleteMany(ctx, ctxstore.WithTenantID(ctx, bson.M{"sub": devID}))
 
 	if err != nil {
 		return errors.Wrap(err, "failed to remove tokens")
@@ -444,7 +467,7 @@ func (db *DataStoreMongo) Migrate(ctx context.Context, version string) error {
 		if err != nil {
 			return errors.Wrap(err, "failed go retrieve tenant DBs")
 		}
-		dbs = tdbs
+		dbs = append(dbs, tdbs...)
 	} else {
 		l.Infof("running migrations in single tenant mode")
 	}
@@ -459,11 +482,6 @@ func (db *DataStoreMongo) Migrate(ctx context.Context, version string) error {
 		// if not in multi tenant, then tenant will be "" and identity
 		// will be the same as default
 		tenant := ctxstore.TenantFromDbName(d, DbName)
-
-		if db.multitenant && tenant == "" {
-			// running in multitenant but failed to determine tenant ID
-			return errors.Errorf("failed to determine tenant from DB name %v", d)
-		}
 
 		tenantCtx := identity.WithContext(ctx, &identity.Identity{
 			Tenant: tenant,
@@ -537,6 +555,10 @@ func (db *DataStoreMongo) MigrateTenant(ctx context.Context, database, version s
 			ds:  db,
 			ctx: ctx,
 		},
+		&migration_2_0_0{
+			ds:  db,
+			ctx: ctx,
+		},
 	}
 
 	ver, err := migrate.NewVersion(version)
@@ -553,12 +575,18 @@ func (db *DataStoreMongo) MigrateTenant(ctx context.Context, database, version s
 }
 
 func (db *DataStoreMongo) AddAuthSet(ctx context.Context, set model.AuthSet) error {
-	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
+	c := db.client.Database(DbName).Collection(DbAuthSetColl)
 
 	if set.Id == "" {
 		uid := oid.NewUUIDv4()
 		set.Id = uid.String()
 	}
+	id := identity.FromContext(ctx)
+	tenantId := ""
+	if id != nil {
+		tenantId = id.Tenant
+	}
+	set.TenantID = tenantId
 
 	if _, err := c.InsertOne(ctx, set); err != nil {
 		if strings.Contains(err.Error(), "duplicate key error") {
@@ -575,11 +603,17 @@ func (db *DataStoreMongo) GetAuthSetByIdDataHashKey(
 	idDataHash []byte,
 	key string,
 ) (*model.AuthSet, error) {
-	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
+	c := db.client.Database(DbName).Collection(DbAuthSetColl)
 
+	id := identity.FromContext(ctx)
+	tenantId := ""
+	if id != nil {
+		tenantId = id.Tenant
+	}
 	filter := model.AuthSet{
 		IdDataSha256: idDataHash,
 		PubKey:       key,
+		TenantID:     tenantId,
 	}
 	res := model.AuthSet{}
 
@@ -599,10 +633,10 @@ func (db *DataStoreMongo) GetAuthSetById(
 	ctx context.Context,
 	auth_id string,
 ) (*model.AuthSet, error) {
-	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
+	c := db.client.Database(DbName).Collection(DbAuthSetColl)
 
 	res := model.AuthSet{}
-	err := c.FindOne(ctx, bson.M{"_id": auth_id}).Decode(&res)
+	err := c.FindOne(ctx, ctxstore.WithTenantID(ctx, bson.M{"_id": auth_id})).Decode(&res)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			return nil, store.ErrAuthSetNotFound
@@ -618,11 +652,16 @@ func (db *DataStoreMongo) GetAuthSetsForDevice(
 	ctx context.Context,
 	devid string,
 ) ([]model.AuthSet, error) {
-	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
+	c := db.client.Database(DbName).Collection(DbAuthSetColl)
 
 	res := []model.AuthSet{}
 
-	cursor, err := c.Find(ctx, model.AuthSet{DeviceId: devid})
+	id := identity.FromContext(ctx)
+	tenantId := ""
+	if id != nil {
+		tenantId = id.Tenant
+	}
+	cursor, err := c.Find(ctx, model.AuthSet{DeviceId: devid, TenantID: tenantId})
 	if err != nil {
 		return nil, err
 	}
@@ -641,11 +680,17 @@ func (db *DataStoreMongo) UpdateAuthSet(
 	filter interface{},
 	mod model.AuthSetUpdate,
 ) error {
-	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
+	c := db.client.Database(DbName).Collection(DbAuthSetColl)
 
+	id := identity.FromContext(ctx)
+	tenantId := ""
+	if id != nil {
+		tenantId = id.Tenant
+	}
+	mod.TenantID = tenantId
 	update := bson.M{"$set": mod}
 
-	if res, err := c.UpdateMany(ctx, filter, update); err != nil {
+	if res, err := c.UpdateMany(ctx, ctxstore.WithTenantID(ctx, filter), update); err != nil {
 		return errors.Wrap(err, "failed to update auth set")
 	} else if res.MatchedCount == 0 {
 		return store.ErrAuthSetNotFound
@@ -659,8 +704,14 @@ func (db *DataStoreMongo) UpdateAuthSetById(
 	id string,
 	mod model.AuthSetUpdate,
 ) error {
-	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
-	res, err := c.UpdateOne(ctx, bson.M{"_id": id}, bson.M{"$set": mod})
+	c := db.client.Database(DbName).Collection(DbAuthSetColl)
+	identity := identity.FromContext(ctx)
+	tenantId := ""
+	if identity != nil {
+		tenantId = identity.Tenant
+	}
+	mod.TenantID = tenantId
+	res, err := c.UpdateOne(ctx, ctxstore.WithTenantID(ctx, bson.M{"_id": id}), bson.M{"$set": mod})
 	if err != nil {
 		return errors.Wrap(err, "failed to update auth set")
 	}
@@ -672,9 +723,14 @@ func (db *DataStoreMongo) UpdateAuthSetById(
 }
 
 func (db *DataStoreMongo) DeleteAuthSetsForDevice(ctx context.Context, devid string) error {
-	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
+	c := db.client.Database(DbName).Collection(DbAuthSetColl)
 
-	ci, err := c.DeleteMany(ctx, model.AuthSet{DeviceId: devid})
+	id := identity.FromContext(ctx)
+	tenantId := ""
+	if id != nil {
+		tenantId = id.Tenant
+	}
+	ci, err := c.DeleteMany(ctx, model.AuthSet{DeviceId: devid, TenantID: tenantId})
 
 	if err != nil {
 		return errors.Wrap(err, "failed to remove authentication sets for device")
@@ -692,9 +748,14 @@ func (db *DataStoreMongo) DeleteAuthSetForDevice(
 	devId string,
 	authId string,
 ) error {
-	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
+	c := db.client.Database(DbName).Collection(DbAuthSetColl)
 
-	filter := model.AuthSet{Id: authId, DeviceId: devId}
+	id := identity.FromContext(ctx)
+	tenantId := ""
+	if id != nil {
+		tenantId = id.Tenant
+	}
+	filter := model.AuthSet{Id: authId, DeviceId: devId, TenantID: tenantId}
 	result, err := c.DeleteOne(ctx, filter)
 	if err != nil {
 		return errors.Wrap(err, "failed to remove authentication set for device")
@@ -722,9 +783,15 @@ func (db *DataStoreMongo) PutLimit(ctx context.Context, lim model.Limit) error {
 		return errors.New("empty limit name")
 	}
 
-	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbLimitsColl)
+	c := db.client.Database(DbName).Collection(DbLimitsColl)
+	id := identity.FromContext(ctx)
+	tenantId := ""
+	if id != nil {
+		tenantId = id.Tenant
+	}
 
-	query := bson.M{"_id": lim.Name}
+	lim.TenantID = tenantId
+	query := ctxstore.WithTenantID(ctx, bson.M{dbFieldName: lim.Name})
 
 	updateOptions := mopts.Update()
 	updateOptions.SetUpsert(true)
@@ -741,9 +808,9 @@ func (db *DataStoreMongo) DeleteLimit(ctx context.Context, lim string) error {
 		return errors.New("empty limit name")
 	}
 
-	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbLimitsColl)
+	c := db.client.Database(DbName).Collection(DbLimitsColl)
 
-	query := bson.M{"_id": lim}
+	query := ctxstore.WithTenantID(ctx, bson.M{dbFieldName: lim})
 
 	if _, err := c.DeleteOne(ctx, query); err != nil {
 		return errors.Wrap(err, "failed to delete limit")
@@ -753,11 +820,11 @@ func (db *DataStoreMongo) DeleteLimit(ctx context.Context, lim string) error {
 }
 
 func (db *DataStoreMongo) GetLimit(ctx context.Context, name string) (*model.Limit, error) {
-	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbLimitsColl)
+	c := db.client.Database(DbName).Collection(DbLimitsColl)
 
 	var lim model.Limit
 
-	err := c.FindOne(ctx, bson.M{"_id": name}).Decode(&lim)
+	err := c.FindOne(ctx, ctxstore.WithTenantID(ctx, bson.M{dbFieldName: name})).Decode(&lim)
 
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
@@ -774,14 +841,14 @@ func (db *DataStoreMongo) GetDevCountByStatus(ctx context.Context, status string
 	var (
 		fltr     = bson.D{}
 		devsColl = db.client.
-				Database(ctxstore.DbFromContext(ctx, DbName)).
+				Database(DbName).
 				Collection(DbDevicesColl)
 	)
 
 	if status != "" {
 		fltr = bson.D{{Key: "status", Value: status}}
 	}
-	count, err := devsColl.CountDocuments(ctx, fltr)
+	count, err := devsColl.CountDocuments(ctx, ctxstore.WithTenantID(ctx, fltr))
 	if err != nil {
 		return 0, err
 	}
@@ -791,12 +858,18 @@ func (db *DataStoreMongo) GetDevCountByStatus(ctx context.Context, status string
 func (db *DataStoreMongo) GetDeviceStatus(ctx context.Context, devId string) (string, error) {
 	var statuses = map[string]int{}
 
-	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
+	c := db.client.Database(DbName).Collection(DbAuthSetColl)
 
 	// get device auth sets; group by status
 
+	id := identity.FromContext(ctx)
+	tenantId := ""
+	if id != nil {
+		tenantId = id.Tenant
+	}
 	filter := model.AuthSet{
 		DeviceId: devId,
+		TenantID: tenantId,
 	}
 
 	match := bson.D{
@@ -868,6 +941,23 @@ func getDeviceStatus(statuses map[string]int) (string, error) {
 	return "", store.ErrDevStatusBroken
 }
 
-func (db *DataStoreMongo) GetTenantDbs() ([]string, error) {
-	return migrate.GetTenantDbs(context.Background(), db.client, ctxstore.IsTenantDb(DbName))
+func (db *DataStoreMongo) ListTenantsIds(
+	ctx context.Context,
+) ([]string, error) {
+	collDevs := db.client.
+		Database(DbName).
+		Collection(DbDevicesColl)
+
+	results, err := collDevs.Distinct(ctx, dbFieldTenantID, bson.D{})
+	if err != nil {
+		return []string{}, nil
+	}
+	if len(results) < 1 {
+		return []string{}, mongo.ErrNoDocuments
+	}
+	ids := make([]string, len(results))
+	for i, id := range results {
+		ids[i] = id.(string)
+	}
+	return ids, nil
 }

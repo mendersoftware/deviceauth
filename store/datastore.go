@@ -17,8 +17,8 @@ package store
 import (
 	"context"
 	"errors"
-
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
+
 	"github.com/mendersoftware/go-lib-micro/mongo/oid"
 
 	"github.com/mendersoftware/deviceauth/jwt"
@@ -59,7 +59,7 @@ type DataStore interface {
 	// ForEachDatabase loops over all databases and applies opFunc with
 	// for all existing databases. If opFunc returns an error for one of
 	// the elements, this function aborts with the same error.
-	ForEachDatabase(parentCtx context.Context, opFunc MapFunc) error
+	ForEachTenant(parentCtx context.Context, opFunc MapFunc) error
 
 	Ping(ctx context.Context) error
 	// retrieve device by Mender-assigned device ID
@@ -141,11 +141,12 @@ type DataStore interface {
 	// gets device status
 	GetDeviceStatus(ctx context.Context, dev_id string) (string, error)
 
-	GetTenantDbs() ([]string, error)
-
 	MigrateTenant(ctx context.Context, version string, tenant string) error
 	WithAutomigrate() DataStore
 	//call this one if you really know what you are doing. This is supposed to be called only
 	//from cmdPropagateStatusesInventory
 	StoreMigrationVersion(ctx context.Context, version *migrate.Version) error
+	ListTenantsIds(
+		ctx context.Context,
+	) ([]string, error)
 }
