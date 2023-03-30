@@ -1,4 +1,4 @@
-// Copyright 2021 Northern.tech AS
+// Copyright 2023 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -49,6 +49,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"strconv"
 	"time"
 
@@ -66,6 +67,9 @@ const (
 )
 
 var (
+	ErrNoPositiveInteger = errors.New("must be a positive integer")
+	ErrNegativeInteger   = errors.New("cannot be a negative integer")
+
 	ErrTooManyRequests = errors.New("too many requests")
 )
 
@@ -119,16 +123,22 @@ func NewRedisCache(
 	timeoutSec,
 	limitsExpireSec int,
 ) (*RedisCache, error) {
+	_, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return nil, errors.WithMessage(err, "redis: invalid address")
+	} else if db < 0 {
+		return nil, errors.WithMessage(ErrNegativeInteger, "redis: database")
+	} else if timeoutSec <= 0 {
+		return nil, errors.WithMessage(ErrNoPositiveInteger, "redis: timeout seconds")
+	} else if limitsExpireSec <= 0 {
+		return nil, errors.WithMessage(ErrNoPositiveInteger, "redis: limit expire seconds")
+	}
 	c := redis.NewClient(&redis.Options{
 		Addr:     addr,
 		Username: user,
 		Password: pass,
 		DB:       db,
-	})
-
-	c = c.WithTimeout(time.Duration(timeoutSec) * time.Second)
-
-	_, err := c.Ping(context.TODO()).Result()
+	}).WithTimeout(time.Duration(timeoutSec) * time.Second)
 	return &RedisCache{
 		c:               c,
 		LimitsExpireSec: limitsExpireSec,
