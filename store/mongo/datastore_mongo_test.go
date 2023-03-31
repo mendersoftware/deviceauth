@@ -112,13 +112,15 @@ func setUpDevices(ctx context.Context, client *mongo.Client) error {
 }
 
 // setup tokens
-func setUpTokens(ctx context.Context, client *mongo.Client) error {
+func setUpTokens(ctx context.Context, client *mongo.Client, tenantId string) error {
 	inputTokens := bson.A{
 		token1,
 		token2,
 	}
-	c := client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbTokensColl)
+	c := client.Database(DbName).Collection(DbTokensColl)
 	_, err := c.InsertMany(ctx, inputTokens)
+	c.UpdateOne(ctx, bson.M{dbFieldID:token1.ID},bson.M{"$set":bson.M{dbFieldTenantID:tenantId}})
+	c.UpdateOne(ctx, bson.M{dbFieldID:token2.ID},bson.M{"$set":bson.M{dbFieldTenantID:tenantId}})
 	return err
 }
 
@@ -544,7 +546,7 @@ func TestStoreGetToken(t *testing.T) {
 	})
 	d := getDb(dbCtx)
 
-	err := setUpTokens(dbCtx, d.client)
+	err := setUpTokens(dbCtx, d.client, tenant)
 	assert.NoError(t, err, "failed to setup input data")
 
 	testCases := []struct {
@@ -611,7 +613,7 @@ func TestStoreDeleteToken(t *testing.T) {
 	})
 	d := getDb(dbCtx)
 
-	err := setUpTokens(dbCtx, d.client)
+	err := setUpTokens(dbCtx, d.client, tenant)
 	assert.NoError(t, err, "failed to setup input data")
 
 	testCases := []struct {
