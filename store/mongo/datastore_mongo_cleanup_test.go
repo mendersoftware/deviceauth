@@ -71,6 +71,7 @@ func TestGetDevicesBeingDecommissioned(t *testing.T) {
 					Status:          model.DevStatusPending,
 					Decommissioning: false,
 					IdDataSha256:    getIdDataHash("001"),
+					TenantID: tenant,
 				},
 				model.Device{
 					Id:              "002",
@@ -78,12 +79,14 @@ func TestGetDevicesBeingDecommissioned(t *testing.T) {
 					Status:          model.DevStatusPending,
 					Decommissioning: true,
 					IdDataSha256:    getIdDataHash("002"),
+					TenantID: tenant,
 				},
 			},
 			outDevices: []model.Device{
 				{
 					Id:           "002",
 					IdDataSha256: getIdDataHash("002"),
+					TenantID: tenant,
 				},
 			},
 			tenant: tenant,
@@ -92,11 +95,6 @@ func TestGetDevicesBeingDecommissioned(t *testing.T) {
 
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
-			testDbName := DbName
-			if tc.tenant != "" {
-				testDbName = ctxstore.DbNameForTenant(tc.tenant, DbName)
-			}
-
 			ctx := context.Background()
 			if tc.tenant != "" {
 				ctx = identity.WithContext(ctx, &identity.Identity{
@@ -106,11 +104,11 @@ func TestGetDevicesBeingDecommissioned(t *testing.T) {
 
 			db := getDb(ctx)
 
-			coll := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
+			coll := db.client.Database(DbName).Collection(DbDevicesColl)
 			_, err := coll.InsertMany(ctx, tc.inDevices)
 			assert.NoError(t, err)
 
-			brokenDevices, err := db.GetDevicesBeingDecommissioned(testDbName)
+			brokenDevices, err := db.GetDevicesBeingDecommissioned(tc.tenant)
 			assert.NoError(t, err)
 			assert.Equal(t, tc.outDevices[0].Id, brokenDevices[0].Id)
 		})
