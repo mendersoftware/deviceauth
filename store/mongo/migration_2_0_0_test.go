@@ -15,44 +15,97 @@ package mongo
 
 import (
 	"context"
+	"math/rand"
 	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"go.mongodb.org/mongo-driver/bson"
 
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
+	"github.com/mendersoftware/go-lib-micro/mongo/oid"
 	ctxstore "github.com/mendersoftware/go-lib-micro/store"
-	"github.com/stretchr/testify/assert"
-	"go.mongodb.org/mongo-driver/bson"
+	ctxstore2 "github.com/mendersoftware/go-lib-micro/store/v2"
+
+	"github.com/mendersoftware/deviceauth/model"
 )
 
 func TestMigration_2_0_0(t *testing.T) {
-	ctx := identity.WithContext(context.Background(), &identity.Identity{
-		Tenant: "foo",
-	})
-	db.Wipe()
+	var tenantIds []string
+	var ctxs []context.Context
+	const maxTenants = 63
+	const minTenants = 15
+	const maxDevicesPerTenant = 512
+	const minDevicesPerTenant = 128
 
+	db.Wipe()
 	client := db.Client()
 	db := NewDataStoreMongoWithClient(client)
 
-	prep_2_0_0(t, ctx, db)
-
-	const (
-		devId  = "dev"
-		pubkey = "pubkey"
-	)
-	dbName := ctxstore.DbFromContext(ctx, DbName)
-	cDevs := db.client.Database(dbName).Collection(DbDevicesColl)
-	cDevs.InsertOne(ctx, bson.M{"_id": devId, pubkey: "dummy"})
-
-	mig200 := migration_2_0_0{
-		ds:  db,
-		ctx: ctx,
+	tenantIds = make([]string, rand.Intn(maxTenants)+minTenants)
+	ctxs = make([]context.Context, len(tenantIds))
+	for i := 0; i < len(tenantIds); i++ {
+		tenantIds[i] = oid.NewUUIDv4().String()
+		ctx := identity.WithContext(context.Background(), &identity.Identity{
+			Tenant: tenantIds[i],
+		})
+		ctxs[i] = ctx
+		prep_2_0_0(t, ctx, db)
 	}
-	err := mig200.Up(migrate.MakeVersion(2, 0, 0))
-	assert.NoError(t, err)
 
-	count, err := cDevs.CountDocuments(ctx, bson.M{pubkey: bson.M{"$exists": true}})
-	assert.Equal(t, int64(0), count)
-	assert.NoError(t, err)
+
+	tenantDeviceCount := make([]int64, len(tenantIds))
+	for i := 0; i < len(tenantIds); i++ {
+		ctx := ctxs[i]
+		for j := 0; j < rand.Intn(maxDevicesPerTenant)+minDevicesPerTenant; j++ {
+			dbName := ctxstore.DbFromContext(ctx, DbName)
+			devicesCollection := db.client.Database(dbName).Collection(DbDevicesColl)
+			_, err := devicesCollection.InsertOne(ctx, model.Device{
+				Id:              oid.NewUUIDv4().String(),
+				IdData:          oid.NewUUIDv4().String(),
+				IdDataStruct:    map[string]interface{}{
+					"key": oid.NewUUIDv4().String(),
+					"value": oid.NewUUIDv4().String(),
+				},
+				IdDataSha256:    []byte(oid.NewUUIDv4().String()),
+				Status:          "accepted",
+				Decommissioning: false,
+				CreatedTs:       time.Now(),
+				UpdatedTs:       time.Now(),
+				TenantID:        "",
+			})
+			if err == nil {
+				tenantDeviceCount[i]++
+			}
+			_,err=devicesCollection.UpdateMany(ctx,bson.M{},bson.M{"$unset":bson.M{dbFieldTenantID:1}})
+			assert.NoError(t, err)
+		}
+	}
+	for i := 0; i < len(tenantIds); i++ {
+		ctx := ctxs[i]
+		mig200 := migration_2_0_0{
+			ds:  db,
+			ctx: ctx,
+		}
+		err := mig200.Up(migrate.MakeVersion(2, 0, 0))
+		assert.NoError(t, err)
+	}
+
+	devicesCollection := db.client.Database(DbName).Collection(DbDevicesColl)
+	for i := 0; i < len(tenantIds); i++ {
+		count, err := devicesCollection.CountDocuments(
+			ctxs[i],
+			ctxstore2.WithTenantID(
+				ctxs[i],
+				bson.M{
+					"status": "accepted",
+				},
+			),
+		)
+		assert.NoError(t, err)
+		assert.Equal(t, tenantDeviceCount[i], count)
+	}
 }
 
 func prep_2_0_0(t *testing.T, ctx context.Context, db *DataStoreMongo) {
