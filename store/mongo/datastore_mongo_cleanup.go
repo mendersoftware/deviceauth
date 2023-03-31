@@ -182,7 +182,13 @@ func (db *DataStoreMongo) filterNonExistentDevices(
 	//check if device exists
 	for _, devId := range devIds {
 		res := model.Device{}
-		err := c.FindOne(context.Background(), bson.M{"_id": devId, dbFieldTenantID: tenantId}).Decode(&res)
+		err := c.FindOne(
+			context.Background(),
+			bson.M{
+				"_id":           devId,
+				dbFieldTenantID: tenantId,
+			},
+		).Decode(&res)
 
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
