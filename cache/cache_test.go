@@ -1,4 +1,4 @@
-// Copyright 2020 Northern.tech AS
+// Copyright 2023 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@ package cache
 
 import (
 	"context"
+	"net"
 	"testing"
 	"time"
 
@@ -26,8 +27,45 @@ import (
 	"github.com/mendersoftware/deviceauth/utils"
 )
 
-func init() {
-	testing.Init()
+func TestNewRedisCache(t *testing.T) {
+	t.Parallel()
+
+	t.Run("ok", func(t *testing.T) {
+		_, err := NewRedisCache(
+			"localhost:6379", "admin", "password",
+			123, 123, 123,
+		)
+		assert.NoError(t, err)
+	})
+	t.Run("error/invalid address", func(t *testing.T) {
+		_, err := NewRedisCache(
+			"foo bar", "admin", "password",
+			123, 123, 123,
+		)
+		var addrErr *net.AddrError
+		assert.ErrorAs(t, err, &addrErr)
+	})
+	t.Run("error/database negative", func(t *testing.T) {
+		_, err := NewRedisCache(
+			"localhost:6379", "admin", "password",
+			-123, 123, 123,
+		)
+		assert.ErrorIs(t, err, ErrNegativeInteger)
+	})
+	t.Run("error/invalid timeout", func(t *testing.T) {
+		_, err := NewRedisCache(
+			"localhost:6379", "admin", "password",
+			123, 0, 123,
+		)
+		assert.ErrorIs(t, err, ErrNoPositiveInteger)
+	})
+	t.Run("error/invalid limit", func(t *testing.T) {
+		_, err := NewRedisCache(
+			"localhost:6379", "admin", "password",
+			123, 123, 0,
+		)
+		assert.ErrorIs(t, err, ErrNoPositiveInteger)
+	})
 }
 
 func TestRedisCacheThrottleToken(t *testing.T) {
