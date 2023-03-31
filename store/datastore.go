@@ -17,8 +17,8 @@ package store
 import (
 	"context"
 	"errors"
-	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 
+	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	"github.com/mendersoftware/go-lib-micro/mongo/oid"
 
 	"github.com/mendersoftware/deviceauth/jwt"
