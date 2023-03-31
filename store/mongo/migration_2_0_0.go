@@ -15,13 +15,15 @@ package mongo
 
 import (
 	"context"
-	"github.com/mendersoftware/go-lib-micro/identity"
-	"github.com/mendersoftware/go-lib-micro/mongo/oid"
-	"go.mongodb.org/mongo-driver/mongo"
-	mopts "go.mongodb.org/mongo-driver/mongo/options"
 	"strings"
 
+	"github.com/pkg/errors"
+	"go.mongodb.org/mongo-driver/mongo"
+	mopts "go.mongodb.org/mongo-driver/mongo/options"
+
+	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
+	"github.com/mendersoftware/go-lib-micro/mongo/oid"
 	mstorev1 "github.com/mendersoftware/go-lib-micro/store"
 	mstore "github.com/mendersoftware/go-lib-micro/store/v2"
 	"go.mongodb.org/mongo-driver/bson"
@@ -63,7 +65,12 @@ func (m *migration_2_0_0) Up(from migrate.Version) error {
 						{Key: dbFieldPubKey, Value: 1},
 					},
 					Options: mopts.Index().
-						SetName(strings.Join([]string{mstore.FieldTenantID, dbFieldDeviceID, dbFieldIDDataSha, dbFieldPubKey}, "_")).
+						SetName(strings.Join([]string{
+							mstore.FieldTenantID,
+							dbFieldDeviceID,
+							dbFieldIDDataSha,
+							dbFieldPubKey,
+						}, "_")).
 						SetUnique(true),
 				},
 				{
@@ -73,7 +80,11 @@ func (m *migration_2_0_0) Up(from migrate.Version) error {
 						{Key: dbFieldPubKey, Value: 1},
 					},
 					Options: mopts.Index().
-						SetName(strings.Join([]string{mstore.FieldTenantID, dbFieldIDDataSha, dbFieldPubKey}, "_")).
+						SetName(strings.Join([]string{
+							mstore.FieldTenantID,
+							dbFieldIDDataSha,
+							dbFieldPubKey,
+						}, "_")).
 						SetUnique(true),
 				},
 			},
@@ -188,6 +199,9 @@ func (m *migration_2_0_0) Up(from migrate.Version) error {
 				id := cur.Current.Lookup(dbFieldID)
 				var currentId string
 				err = id.Unmarshal(&currentId)
+				if err != nil {
+					return errors.Wrap(err, "the id found is un-parsable")
+				}
 				var item bson.D
 				if err = cur.Decode(&item); err != nil {
 					return err

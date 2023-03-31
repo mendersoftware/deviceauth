@@ -31,7 +31,13 @@ func (db *DataStoreMongo) GetDevicesBeingDecommissioned(tenantId string) ([]mode
 
 	devices := []model.Device{}
 
-	cursor, err := c.Find(context.Background(), model.Device{Decommissioning: true, TenantID: tenantId})
+	cursor, err := c.Find(
+		context.Background(),
+		model.Device{
+			Decommissioning: true,
+			TenantID:        tenantId,
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +129,13 @@ func (db *DataStoreMongo) GetBrokenAuthSets(tenantId string) ([]string, error) {
 func (db *DataStoreMongo) DeleteDevicesBeingDecommissioned(tenantId string) error {
 	c := db.client.Database(DbName).Collection(DbDevicesColl)
 
-	_, err := c.DeleteMany(context.Background(), model.Device{Decommissioning: true, TenantID: tenantId})
+	_, err := c.DeleteMany(
+		context.Background(),
+		model.Device{
+			Decommissioning: true,
+			TenantID:        tenantId,
+		},
+	)
 	if err != nil {
 		return errors.Wrap(err, "failed to remove decommissioned devices")
 	}
