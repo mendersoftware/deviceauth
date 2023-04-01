@@ -1701,7 +1701,14 @@ func TestStoreDeleteAuthSetsForDevice(t *testing.T) {
 
 			db := getDb(ctx)
 
-			c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
+			c := db.client.Database(DbName).Collection(DbAuthSetColl)
+			id:=identity.FromContext(ctx)
+			for i,_:=range authSets {
+				var as model.AuthSet
+				as=authSets[i].(model.AuthSet)
+				as.TenantID=id.Tenant
+				authSets[i]=as
+			}
 			_, err := c.InsertMany(ctx, authSets)
 			assert.NoError(t, err)
 
@@ -1715,6 +1722,10 @@ func TestStoreDeleteAuthSetsForDevice(t *testing.T) {
 				assert.NoError(t, err)
 				err = cursor.All(ctx, &out)
 				assert.NoError(t, err)
+				id:=identity.FromContext(ctx)
+				for i,_:=range tc.outAuthSets {
+					tc.outAuthSets[i].TenantID=id.Tenant
+				}
 				assert.Equal(t, tc.outAuthSets, out)
 			}
 		})
