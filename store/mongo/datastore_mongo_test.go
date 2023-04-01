@@ -867,21 +867,15 @@ func verifyIndexes(t *testing.T, coll *mongo.Collection, expected []mongo.IndexM
 				var fieldPresent bool
 				_, fieldPresent = idx["background"]
 				if expectedIdx.Options.Background == nil {
-					if fieldPresent {
-						t.Logf("this will fail")
-					}
 					assert.False(t, fieldPresent)
 				} else {
-					assert.Equal(t, *expectedIdx.Options.Background, fieldPresent)
+					assert.Equal(t, *expectedIdx.Options.Background, idx["background"])
 				}
 				_, fieldPresent = idx["unique"]
 				if expectedIdx.Options.Unique == nil {
-					if fieldPresent {
-						t.Logf("this will fail")
-					}
 					assert.False(t, fieldPresent)
 				} else {
-					assert.Equal(t, *expectedIdx.Options.Unique, fieldPresent)
+					assert.Equal(t, *expectedIdx.Options.Unique, idx["unique"])
 				}
 				break
 			}
