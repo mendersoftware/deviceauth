@@ -19,12 +19,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mendersoftware/go-lib-micro/identity"
-	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
-	ctxstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/pkg/errors"
+
+	ctxstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
+
+	"github.com/mendersoftware/go-lib-micro/identity"
+	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 
 	"github.com/mendersoftware/deviceauth/model"
 	"github.com/mendersoftware/deviceauth/utils"
@@ -46,14 +48,14 @@ UwIDAQAB
 	ts := time.Now()
 
 	cases := map[string]struct {
-		sets []model.AuthSet
-		devs []model.Device
+		sets []interface{}
+		devs []interface{}
 
 		err error
 	}{
 		"ok": {
-			devs: []model.Device{
-				{
+			devs: []interface{}{
+				model.Device{
 					Id:              "1",
 					IdData:          "{\"sn\":\"0001\"}",
 					Status:          "pending",
@@ -63,8 +65,8 @@ UwIDAQAB
 				},
 			},
 
-			sets: []model.AuthSet{
-				{
+			sets: []interface{}{
+				model.AuthSet{
 					Id:        "1",
 					DeviceId:  "1",
 					IdData:    "{\"sn\":\"0001\"}",
@@ -75,8 +77,8 @@ UwIDAQAB
 			},
 		},
 		"error, authset": {
-			sets: []model.AuthSet{
-				{
+			sets: []interface{}{
+				model.AuthSet{
 					Id:        "1",
 					DeviceId:  "1",
 					IdData:    "{\"sn\":\"0001\"}",
@@ -97,25 +99,26 @@ UwIDAQAB
 
 			db.Wipe()
 			db := NewDataStoreMongoWithClient(db.Client())
+			devsColl := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
 
 			prep_1_2_0(t, ctx, db)
 
-			for _, d := range tc.devs {
-				err := db.AddDevice(ctx, d)
+			if len(tc.devs) > 0 {
+				_, err := devsColl.InsertMany(ctx, tc.devs)
 				assert.NoError(t, err)
 			}
 
-			for _, a := range tc.sets {
-				err := db.AddAuthSet(ctx, a)
-				assert.NoError(t, err)
-			}
+			authSetsColl := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
+			_, err := authSetsColl.InsertMany(ctx, tc.sets)
+			assert.NoError(t, err)
 
 			mig130 := migration_1_3_0{
 				ms:  db,
 				ctx: ctx,
 			}
 
-			err := mig130.Up(migrate.MakeVersion(1, 2, 0))
+			// there was 1,2,0 here, which must have been a mistake
+			err = mig130.Up(migrate.MakeVersion(1, 3, 0))
 
 			if tc.err == nil {
 				assert.NoError(t, err)
@@ -147,10 +150,11 @@ func prep_1_2_0(t *testing.T, ctx context.Context, db *DataStoreMongo) {
 	}
 }
 
-func verify(t *testing.T, ctx context.Context, db *DataStoreMongo, devs []model.Device, sets []model.AuthSet) {
+func verify(t *testing.T, ctx context.Context, db *DataStoreMongo, devs []interface{}, sets []interface{}) {
 	var set model.AuthSet
 	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
-	for _, a := range sets {
+	for _, as := range sets {
+		a := as.(model.AuthSet)
 		err := c.FindOne(ctx, bson.M{"_id": a.Id}).Decode(&set)
 		assert.NoError(t, err)
 
@@ -165,7 +169,8 @@ func verify(t *testing.T, ctx context.Context, db *DataStoreMongo, devs []model.
 
 	var dev model.Device
 	c = db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
-	for _, d := range devs {
+	for _, ds := range devs {
+		d := ds.(model.Device)
 		err := c.FindOne(ctx, bson.M{"_id": d.Id}).Decode(&dev)
 		assert.NoError(t, err)
 	}
