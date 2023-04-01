@@ -1851,29 +1851,37 @@ func TestDeleteLimit(t *testing.T) {
 	})
 	db := getDb(dbCtx)
 
-	coll := db.client.Database(ctxstore.DbFromContext(dbCtx, DbName)).Collection(DbLimitsColl)
+	coll := db.client.Database(DbName).Collection(DbLimitsColl)
+	id := identity.FromContext(dbCtx)
+	lim1.TenantID = id.Tenant
+	lim2.TenantID = id.Tenant
 	_, err := coll.InsertMany(dbCtx, bson.A{lim1, lim2})
 	assert.NoError(t, err)
 
 	dbCtxOtherTenant := identity.WithContext(context.Background(), &identity.Identity{
 		Tenant: "other-" + tenant,
 	})
-	collOtherTenant := db.client.Database(ctxstore.DbFromContext(dbCtxOtherTenant, DbName)).Collection(DbLimitsColl)
-	_, err = collOtherTenant.InsertMany(dbCtx, bson.A{lim1, lim2})
+	collOtherTenant := db.client.Database(DbName).Collection(DbLimitsColl)
+	id = identity.FromContext(dbCtxOtherTenant)
+	lim1.TenantID = id.Tenant
+	lim2.TenantID = id.Tenant
+	// there was an error here, dbCtxOtherTenant was unused
+	_, err = collOtherTenant.InsertMany(dbCtxOtherTenant, bson.A{lim1, lim2})
 	assert.NoError(t, err)
 
 	var lim model.Limit
-	assert.NoError(t, coll.FindOne(dbCtx, bson.M{"_id": lim1.Name}).Decode(&lim))
+	assert.NoError(t, coll.FindOne(dbCtx, ctxstore2.WithTenantID(dbCtxOtherTenant, bson.M{dbFieldName: lim1.Name})).Decode(&lim))
 
 	// delete the limit
 	err = db.DeleteLimit(dbCtx, lim.Name)
 	assert.NoError(t, err)
 
 	// limit not found
-	assert.Error(t, coll.FindOne(dbCtx, bson.M{"_id": lim1.Name}).Decode(&lim))
+	assert.Error(t, coll.FindOne(dbCtx, ctxstore2.WithTenantID(dbCtx, bson.M{dbFieldName: lim1.Name})).Decode(&lim))
 
 	// the other-tenant limit 'foo' was not modified
-	assert.NoError(t, collOtherTenant.FindOne(dbCtx, bson.M{"_id": lim1.Name}).Decode(&lim))
+	assert.NoError(t, collOtherTenant.FindOne(dbCtx, ctxstore2.WithTenantID(dbCtxOtherTenant, bson.M{dbFieldName: lim1.Name})).Decode(&lim))
+	lim.Id = ""
 	assert.EqualValues(t, lim1, lim)
 }
 
