@@ -19,6 +19,8 @@ import (
 	"fmt"
 	"math/rand"
 	"sort"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -1480,8 +1482,11 @@ func TestUpdateAuthSetBson(t *testing.T) {
 	asets, err := db.GetAuthSetsForDevice(ctx, "1")
 	assert.NoError(t, err)
 	assert.Len(t, asets, 7)
-	for idx, aset := range asets {
-		if idx < 5 {
+	for _, aset := range asets {
+		key:=strings.TrimPrefix(aset.PubKey,"pubkey-")
+		value,e:=strconv.Atoi(key)
+		assert.NoError(t, e)
+		if value < 5 {
 			assert.Equal(t, model.DevStatusPending, aset.Status)
 		} else {
 			// last 2 are rejected
