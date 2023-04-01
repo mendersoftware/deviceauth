@@ -1255,7 +1255,7 @@ func TestStoreAuthSet(t *testing.T) {
 		PubKey:       "pubkey-1",
 		DeviceId:     "1",
 		Timestamp:    uto.TimePtr(time.Now()),
-		TenantID: tenant,
+		TenantID:     tenant,
 	}
 	err := db.AddAuthSet(ctx, asin)
 	assert.NoError(t, err)
@@ -1334,7 +1334,7 @@ func TestUpdateAuthSetMultiple(t *testing.T) {
 	}
 
 	ctx := identity.WithContext(context.Background(), &identity.Identity{
-		Tenant: "foo",
+		Tenant: tenant,
 	})
 	db := getDb(ctx)
 
@@ -1350,6 +1350,7 @@ func TestUpdateAuthSetMultiple(t *testing.T) {
 		IdData:   "foobar",
 		DeviceId: "1",
 		Status:   model.DevStatusAccepted,
+		TenantID: tenant,
 	}
 	// add 5 auth sets, all with status 'accepted'
 	for i := 0; i < 5; i++ {
@@ -1365,6 +1366,7 @@ func TestUpdateAuthSetMultiple(t *testing.T) {
 		DeviceId:  "1",
 		Status:    model.DevStatusPending,
 		Timestamp: uto.TimePtr(time.Now()),
+		TenantID:  tenant,
 	})
 	assert.NoError(t, err)
 
@@ -1372,6 +1374,7 @@ func TestUpdateAuthSetMultiple(t *testing.T) {
 	err = db.UpdateAuthSet(ctx, model.AuthSet{
 		DeviceId: "1",
 		Status:   model.DevStatusAccepted,
+		TenantID: tenant,
 	}, model.AuthSetUpdate{
 		Status: model.DevStatusRejected,
 	})
