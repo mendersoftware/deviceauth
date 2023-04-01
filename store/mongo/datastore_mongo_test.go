@@ -1484,8 +1484,8 @@ func TestUpdateAuthSetBson(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, asets, 7)
 	for _, aset := range asets {
-		key:=strings.TrimPrefix(aset.PubKey,"pubkey-")
-		value,e:=strconv.Atoi(key)
+		key := strings.TrimPrefix(aset.PubKey, "pubkey-")
+		value, e := strconv.Atoi(key)
 		assert.NoError(t, e)
 		if value < 5 {
 			assert.Equal(t, model.DevStatusPending, aset.Status)
@@ -1511,11 +1511,11 @@ func TestStoreDeleteDevice(t *testing.T) {
 		dev1,
 		dev2,
 	}
-	id:=identity.FromContext(dbCtx)
-	dev1.TenantID=id.Tenant
-	dev1.IdDataSha256=getIdDataHash(dev1.IdData)
-	dev2.TenantID=id.Tenant
-	dev2.IdDataSha256=getIdDataHash(dev2.IdData)
+	id := identity.FromContext(dbCtx)
+	dev1.TenantID = id.Tenant
+	dev1.IdDataSha256 = getIdDataHash(dev1.IdData)
+	dev2.TenantID = id.Tenant
+	dev2.IdDataSha256 = getIdDataHash(dev2.IdData)
 	c := db.client.Database(DbName).Collection(DbDevicesColl)
 	_, err := c.InsertMany(dbCtx, inputDevices)
 	assert.NoError(t, err, "failed to setup input data")
@@ -1564,7 +1564,7 @@ func TestStoreDeleteDevice(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 				var found model.Device
-				err := coll.FindOne(ctx, ctxstore2.WithTenantID(ctx,bson.M{dbFieldID: tc.devId})).Decode(&found)
+				err := coll.FindOne(ctx, ctxstore2.WithTenantID(ctx, bson.M{dbFieldID: tc.devId})).Decode(&found)
 				if assert.Error(t, err) {
 					assert.Equal(t, err.Error(), mongo.ErrNoDocuments.Error())
 				}
@@ -1713,12 +1713,12 @@ func TestStoreDeleteAuthSetsForDevice(t *testing.T) {
 			db := getDb(ctx)
 
 			c := db.client.Database(DbName).Collection(DbAuthSetColl)
-			id:=identity.FromContext(ctx)
-			for i,_:=range authSets {
+			id := identity.FromContext(ctx)
+			for i, _ := range authSets {
 				var as model.AuthSet
-				as=authSets[i].(model.AuthSet)
-				as.TenantID=id.Tenant
-				authSets[i]=as
+				as = authSets[i].(model.AuthSet)
+				as.TenantID = id.Tenant
+				authSets[i] = as
 			}
 			_, err := c.InsertMany(ctx, authSets)
 			assert.NoError(t, err)
@@ -1733,9 +1733,9 @@ func TestStoreDeleteAuthSetsForDevice(t *testing.T) {
 				assert.NoError(t, err)
 				err = cursor.All(ctx, &out)
 				assert.NoError(t, err)
-				id:=identity.FromContext(ctx)
-				for i,_:=range tc.outAuthSets {
-					tc.outAuthSets[i].TenantID=id.Tenant
+				id := identity.FromContext(ctx)
+				for i, _ := range tc.outAuthSets {
+					tc.outAuthSets[i].TenantID = id.Tenant
 				}
 				assert.Equal(t, tc.outAuthSets, out)
 			}
