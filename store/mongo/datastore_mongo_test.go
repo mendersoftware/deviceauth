@@ -2610,10 +2610,14 @@ func TestStoreUpdateuthSetById(t *testing.T) {
 
 			coll := db.client.Database(DbName).Collection(DbAuthSetColl)
 			id := identity.FromContext(ctx)
+			tenantId := ""
+			if id != nil {
+				tenantId = id.Tenant
+			}
 			for j, _ := range input {
 				var a model.AuthSet
 				a = input[j].(model.AuthSet)
-				a.TenantID = id.Tenant
+				a.TenantID = tenantId
 				input[j] = a
 			}
 			_, err := coll.InsertMany(ctx, input)
