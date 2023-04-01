@@ -1714,11 +1714,11 @@ func TestStoreDeleteAuthSetsForDevice(t *testing.T) {
 
 			c := db.client.Database(DbName).Collection(DbAuthSetColl)
 			id := identity.FromContext(ctx)
-			for i, _ := range authSets {
+			for j, _ := range authSets {
 				var as model.AuthSet
-				as = authSets[i].(model.AuthSet)
+				as = authSets[j].(model.AuthSet)
 				as.TenantID = id.Tenant
-				authSets[i] = as
+				authSets[j] = as
 			}
 			_, err := c.InsertMany(ctx, authSets)
 			assert.NoError(t, err)
@@ -1734,8 +1734,8 @@ func TestStoreDeleteAuthSetsForDevice(t *testing.T) {
 				err = cursor.All(ctx, &out)
 				assert.NoError(t, err)
 				id := identity.FromContext(ctx)
-				for i, _ := range tc.outAuthSets {
-					tc.outAuthSets[i].TenantID = id.Tenant
+				for j, _ := range tc.outAuthSets {
+					tc.outAuthSets[j].TenantID = id.Tenant
 				}
 				assert.Equal(t, tc.outAuthSets, out)
 			}
@@ -2601,7 +2601,14 @@ func TestStoreUpdateuthSetById(t *testing.T) {
 			}
 			db := getDb(ctx)
 
-			coll := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
+			coll := db.client.Database(DbName).Collection(DbAuthSetColl)
+			id := identity.FromContext(ctx)
+			for j, _ := range input {
+				var a model.AuthSet
+				a = input[j].(model.AuthSet)
+				a.TenantID = id.Tenant
+				input[j] = a
+			}
 			_, err := coll.InsertMany(ctx, input)
 			assert.NoError(t, err, "failed to setup input data")
 
@@ -2613,8 +2620,8 @@ func TestStoreUpdateuthSetById(t *testing.T) {
 				assert.NoError(t, err)
 
 				var found model.AuthSet
-				coll := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
-				err := coll.FindOne(ctx, bson.M{"_id": tc.aid}).Decode(&found)
+				coll := db.client.Database(DbName).Collection(DbAuthSetColl)
+				err := coll.FindOne(ctx, ctxstore2.WithTenantID(ctx, bson.M{"_id": tc.aid})).Decode(&found)
 				assert.NoError(t, err)
 
 				compareAuthSet(tc.out, &found, t)
