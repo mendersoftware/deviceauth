@@ -99,14 +99,16 @@ func assertEqualTokens(t *testing.T, expected, actual []jwt.Token) bool {
 }
 
 // setup devices
-func setUpDevices(ctx context.Context, client *mongo.Client) error {
+func setUpDevices(ctx context.Context, client *mongo.Client, tenantId string) error {
 	dev1.IdDataSha256 = getIdDataHash(dev1.IdData)
 	dev2.IdDataSha256 = getIdDataHash(dev2.IdData)
+	dev1.TenantID=tenantId
+	dev2.TenantID=tenantId
 	inputDevices := bson.A{
 		dev1,
 		dev2,
 	}
-	c := client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
+	c := client.Database(DbName).Collection(DbDevicesColl)
 	_, err := c.InsertMany(ctx, inputDevices)
 	return err
 }
@@ -294,7 +296,7 @@ func TestStoreGetDeviceByIdentityDataHash(t *testing.T) {
 
 	d := getDb(dbCtx)
 
-	err := setUpDevices(dbCtx, d.client)
+	err := setUpDevices(dbCtx, d.client, tenant)
 	assert.NoError(t, err, "failed to setup input data")
 
 	testCases := []struct {
@@ -428,7 +430,7 @@ func TestStoreUpdateDevice(t *testing.T) {
 	})
 	d := getDb(dbCtx)
 
-	err := setUpDevices(dbCtx, d.client)
+	err := setUpDevices(dbCtx, d.client, tenant)
 	assert.NoError(t, err, "failed to setup input data")
 
 	now := time.Now().UTC()
@@ -530,7 +532,7 @@ func TestStoreAddToken(t *testing.T) {
 	//verify
 	var found jwt.Token
 
-	c := d.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbTokensColl)
+	c := d.client.Database(DbName).Collection(DbTokensColl)
 	err = c.FindOne(ctx, bson.M{"_id": token1.ID}).Decode(&found)
 	assert.NoError(t, err, "failed to find token")
 	assertEqualTokens(t, []jwt.Token{*token1}, []jwt.Token{found})
