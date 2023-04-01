@@ -699,10 +699,10 @@ func TestStoreDeleteTokens(t *testing.T) {
 		inTokens bson.A
 		tenant   string
 	}{
-		//"ok": {
-		//	inTokens: someTokens,
-		//},
-		//"ok, empty": {},
+		"ok": {
+			inTokens: someTokens,
+		},
+		"ok, empty": {},
 		"ok, MT": {
 			inTokens: someTokens,
 			tenant:   "foo",
@@ -724,10 +724,12 @@ func TestStoreDeleteTokens(t *testing.T) {
 				c := d.client.Database(DbName).Collection(DbTokensColl)
 				_, err := c.InsertMany(ctx, tc.inTokens)
 				assert.NoError(t, err)
-				for _, token := range tc.inTokens {
-					tokenId := token.(*jwt.Token).ID
-					_, err := c.UpdateOne(ctx, bson.M{dbFieldID: tokenId}, bson.M{"$set": bson.M{dbFieldTenantID: tc.tenant}})
-					assert.NoError(t, err)
+				if tc.tenant != "" {
+					for _, token := range tc.inTokens {
+						tokenId := token.(*jwt.Token).ID
+						_, err := c.UpdateOne(ctx, bson.M{dbFieldID: tokenId}, bson.M{"$set": bson.M{dbFieldTenantID: tc.tenant}})
+						assert.NoError(t, err)
+					}
 				}
 			}
 
@@ -816,9 +818,14 @@ func TestStoreDeleteTokenByDevId(t *testing.T) {
 
 			d := getDb(ctx)
 
-			c := d.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbTokensColl)
+			c := d.client.Database(DbName).Collection(DbTokensColl)
 			_, err := c.InsertMany(ctx, inTokens)
 			assert.NoError(t, err)
+			for _, token := range inTokens {
+				tokenId := token.(*jwt.Token).ID
+				_, err := c.UpdateOne(ctx, bson.M{dbFieldID: tokenId}, bson.M{"$set": bson.M{dbFieldTenantID: tc.tenant}})
+				assert.NoError(t, err)
+			}
 
 			err = d.DeleteTokenByDevId(ctx, tc.devID)
 			if tc.err != nil {
