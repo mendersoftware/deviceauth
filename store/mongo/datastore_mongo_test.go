@@ -1412,10 +1412,13 @@ func TestUpdateAuthSetMultiple(t *testing.T) {
 	asets, err = db.GetAuthSetsForDevice(ctx, "1")
 	assert.NoError(t, err)
 	assert.Len(t, asets, 6)
-	for idx, aset := range asets {
+	for _, aset := range asets {
+		key := strings.TrimPrefix(aset.PubKey, "pubkey-")
+		value, e := strconv.Atoi(key)
+		assert.NoError(t, e)
 		if aset.Id == but_last.Id {
 			assert.Equal(t, model.DevStatusAccepted, aset.Status)
-		} else if idx < 5 {
+		} else if value < 5 {
 			assert.Equal(t, model.DevStatusRejected, aset.Status)
 		} else {
 			assert.Equal(t, model.DevStatusPending, aset.Status)
