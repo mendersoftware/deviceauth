@@ -22,7 +22,7 @@ var (
 )
 
 type Limit struct {
-	Id       string `bson:"_id" json:"-"`
+	Id       string `bson:"_id,omitempty" json:"-"`
 	Name     string `bson:"name"`
 	Value    uint64 `bson:"value" json:"value"`
 	TenantID string `json:"tenant_id" bson:"tenant_id"`

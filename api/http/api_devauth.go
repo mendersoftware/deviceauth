@@ -20,11 +20,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mendersoftware/go-lib-micro/identity"
-	"github.com/mendersoftware/go-lib-micro/mongo/oid"
-
 	"github.com/ant0ine/go-json-rest/rest"
 	ctxhttpheader "github.com/mendersoftware/go-lib-micro/context/httpheader"
+	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/mendersoftware/go-lib-micro/rest_utils"
 	"github.com/pkg/errors"
@@ -569,7 +567,6 @@ func (d *DevAuthApiHandlers) PutTenantLimitHandler(w rest.ResponseWriter, r *res
 	}
 
 	limit := model.Limit{
-		Id:    oid.NewUUIDv4().String(),
 		Value: value.Limit,
 		Name:  reqLimitName,
 	}

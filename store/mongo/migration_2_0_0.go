@@ -127,6 +127,15 @@ func (m *migration_2_0_0) Up(from migrate.Version) error {
 					Options: mopts.Index().
 						SetName(mstore.FieldTenantID + "_" + dbFieldID),
 				},
+				{
+					Keys: bson.D{
+						{Key: mstore.FieldTenantID, Value: 1},
+						{Key: dbFieldName, Value: 1},
+					},
+					Options: mopts.Index().
+						SetName(mstore.FieldTenantID + "_" + dbFieldName).
+						SetUnique(true),
+				},
 			},
 		},
 		DbTokensColl: {

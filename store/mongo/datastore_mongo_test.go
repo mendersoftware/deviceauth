@@ -1764,20 +1764,26 @@ func TestPutLimit(t *testing.T) {
 	})
 	db := getDb(dbCtx)
 
-	coll := db.client.Database(ctxstore.DbFromContext(dbCtx, DbName)).Collection(DbLimitsColl)
+	coll := db.client.Database(DbName).Collection(DbLimitsColl)
+	id := identity.FromContext(dbCtx)
+	lim1.TenantID = id.Tenant
+	lim2.TenantID = id.Tenant
 	_, err := coll.InsertMany(dbCtx, bson.A{lim1, lim2})
 	assert.NoError(t, err)
 
 	dbCtxOtherTenant := identity.WithContext(context.Background(), &identity.Identity{
 		Tenant: "other-" + tenant,
 	})
-	collOtherTenant := db.client.Database(ctxstore.DbFromContext(dbCtxOtherTenant, DbName)).Collection(DbLimitsColl)
+	id = identity.FromContext(dbCtxOtherTenant)
+	lim1.TenantID = id.Tenant
+	lim2.TenantID = id.Tenant
+	collOtherTenant := db.client.Database(DbName).Collection(DbLimitsColl)
 	_, err = collOtherTenant.InsertMany(dbCtx, bson.A{lim1, lim2})
 	assert.NoError(t, err)
 
 	var lim model.Limit
 
-	assert.NoError(t, coll.FindOne(dbCtx, bson.M{"_id": "foo"}).Decode(&lim))
+	assert.NoError(t, coll.FindOne(dbCtx, bson.M{dbFieldName: "foo"}).Decode(&lim))
 
 	// empty limit name
 	err = db.PutLimit(dbCtx, model.Limit{Name: "", Value: 123})
@@ -1786,30 +1792,46 @@ func TestPutLimit(t *testing.T) {
 	// update
 	err = db.PutLimit(dbCtx, model.Limit{Name: "foo", Value: 999})
 	assert.NoError(t, err)
-	assert.NoError(t, coll.FindOne(dbCtx, bson.M{"_id": "foo"}).Decode(&lim))
-	assert.EqualValues(t, model.Limit{Name: "foo", Value: 999}, lim)
+	assert.NoError(t, coll.FindOne(dbCtx, bson.M{dbFieldName: "foo"}).Decode(&lim))
+	lim.Id = ""
+	id = identity.FromContext(dbCtx)
+	tenantId := id.Tenant
+	assert.EqualValues(t, model.Limit{Name: "foo", Value: 999, TenantID: tenantId}, lim)
 
 	// insert
 	err = db.PutLimit(dbCtx, model.Limit{Name: "baz", Value: 9809899990})
 	assert.NoError(t, err)
-	assert.NoError(t, coll.FindOne(dbCtx, bson.M{"_id": "baz"}).Decode(&lim))
-	assert.EqualValues(t, model.Limit{Name: "baz", Value: 9809899990}, lim)
+	assert.NoError(t, coll.FindOne(dbCtx, bson.M{dbFieldName: "baz"}).Decode(&lim))
+	id = identity.FromContext(dbCtx)
+	tenantId = id.Tenant
+	lim.Id = ""
+	assert.EqualValues(t, model.Limit{Name: "baz", Value: 9809899990, TenantID: tenantId}, lim)
 
 	// switch tenants
 
 	// the other-tenant limit 'foo' was not modified
-	assert.NoError(t, collOtherTenant.FindOne(dbCtx, bson.M{"_id": "foo"}).Decode(&lim))
+	id = identity.FromContext(dbCtxOtherTenant)
+	tenantId = id.Tenant
+	assert.NoError(t, collOtherTenant.FindOne(dbCtx, bson.M{dbFieldName: "foo", dbFieldTenantID: tenantId}).Decode(&lim))
+	lim.Id = ""
 	assert.EqualValues(t, lim1, lim)
 
 	// update
 	err = db.PutLimit(dbCtxOtherTenant, model.Limit{Name: "bar", Value: 1234})
 	assert.NoError(t, err)
-	assert.NoError(t, collOtherTenant.FindOne(dbCtx, bson.M{"_id": "bar"}).Decode(&lim))
-	assert.EqualValues(t, model.Limit{Name: "bar", Value: 1234}, lim)
+	id = identity.FromContext(dbCtxOtherTenant)
+	tenantId = id.Tenant
+	assert.NoError(t, collOtherTenant.FindOne(dbCtx, bson.M{dbFieldName: "bar", dbFieldTenantID: tenantId}).Decode(&lim))
+	lim.Id = ""
+	assert.EqualValues(t, model.Limit{Name: "bar", Value: 1234, TenantID: tenantId}, lim)
 	// original tenant is unmodified
-	assert.NoError(t, coll.FindOne(dbCtx, bson.M{"_id": "bar"}).Decode(&lim))
+	id = identity.FromContext(dbCtx)
+	tenantId = id.Tenant
+	lim2.TenantID = id.Tenant // we are reusing those, we originally inserted with this tenant
+	lim2.Id = ""              // let's not compare the ids, since we have not supplied them
+	assert.NoError(t, coll.FindOne(dbCtx, bson.M{dbFieldName: "bar", dbFieldTenantID: tenantId}).Decode(&lim))
+	lim.Id = ""
 	assert.EqualValues(t, lim2, lim)
-
 }
 
 func TestDeleteLimit(t *testing.T) {
