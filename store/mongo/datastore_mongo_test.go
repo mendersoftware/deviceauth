@@ -2449,7 +2449,16 @@ func TestStoreGetDeviceStatus(t *testing.T) {
 			db := getDb(ctx)
 
 			if len(tc.inAuthSets) > 0 {
-				coll := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
+				coll := db.client.Database(DbName).Collection(DbAuthSetColl)
+				id := identity.FromContext(ctx)
+				for i, _ := range tc.inAuthSets {
+					var a model.AuthSet
+					a = tc.inAuthSets[i].(model.AuthSet)
+					a.TenantID = id.Tenant
+					a.IdData = oid.NewUUIDv4().String()
+					a.IdDataSha256 = getIdDataHash(a.IdData)
+					tc.inAuthSets[i] = a
+				}
 				_, err := coll.InsertMany(ctx, tc.inAuthSets)
 				assert.NoError(t, err)
 			}
