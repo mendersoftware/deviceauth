@@ -45,7 +45,8 @@ var DbDevicesCollectionIndices = []mongo.IndexModel{
 			{Key: dbFieldID, Value: 1},
 		},
 		Options: mopts.Index().
-			SetName(mstore.FieldTenantID + "_" + dbFieldID),
+			SetName(mstore.FieldTenantID + "_" + dbFieldID).
+			SetUnique(true),
 	},
 	{
 		Keys: bson.D{
@@ -53,7 +54,8 @@ var DbDevicesCollectionIndices = []mongo.IndexModel{
 			{Key: dbFieldIDDataSha, Value: 1},
 		},
 		Options: mopts.Index().
-			SetName(mstore.FieldTenantID + "_" + dbFieldIDDataSha),
+			SetName(mstore.FieldTenantID + "_" + dbFieldIDDataSha).
+			SetUnique(true),
 	},
 	{
 		Keys: bson.D{
