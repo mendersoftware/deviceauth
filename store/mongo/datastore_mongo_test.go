@@ -388,7 +388,7 @@ func TestStoreAddDevice(t *testing.T) {
 		Tenant: "foo",
 	})
 	d := getDb(ctx)
-	d.MigrateTenant(ctx, ctxstore.DbFromContext(ctx, DbName), DbVersion)
+	d.MigrateTenant(ctx, DbName, DbVersion)
 
 	err := d.AddDevice(ctx, *dev)
 	assert.NoError(t, err, "failed to add device")
@@ -415,7 +415,6 @@ func TestStoreAddDevice(t *testing.T) {
 	ctx = identity.WithContext(context.Background(), &identity.Identity{
 		Tenant: "bar",
 	})
-	d.MigrateTenant(ctx, ctxstore.DbFromContext(ctx, DbName), DbVersion)
 
 	err = d.AddDevice(ctx, model.Device{
 		Id:     "foobar",
