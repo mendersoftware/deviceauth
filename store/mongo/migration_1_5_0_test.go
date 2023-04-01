@@ -19,13 +19,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	ctxstore "github.com/mendersoftware/go-lib-micro/store"
-	"github.com/stretchr/testify/assert"
-	"go.mongodb.org/mongo-driver/bson"
 
 	"github.com/mendersoftware/deviceauth/model"
+	"github.com/mendersoftware/deviceauth/store"
 )
 
 func TestMigration_1_5_0(t *testing.T) {
@@ -46,6 +49,8 @@ UwIDAQAB
 	})
 	db.Wipe()
 	db := NewDataStoreMongoWithClient(db.Client())
+	devsColl := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
+	authSetsColl := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
 
 	// prep base version
 	mig110 := migration_1_1_0{
@@ -73,8 +78,8 @@ UwIDAQAB
 	err = mig140.Up(migrate.MakeVersion(1, 4, 0))
 	assert.NoError(t, err)
 
-	devs := []model.Device{
-		{
+	devs := []interface{}{
+		model.Device{
 			Id:              "1",
 			IdData:          "{\"sn\":\"0001\",\"mac\":\"00:00:00:01\"}",
 			Status:          "accepted",
@@ -82,7 +87,7 @@ UwIDAQAB
 			CreatedTs:       ts,
 			UpdatedTs:       ts,
 		},
-		{
+		model.Device{
 			Id:              "2",
 			IdData:          "{\"sn\":\"0002\",\"attr\":\"foo1\",\"mac\":\"00:00:00:02\"}",
 			Status:          "pending",
@@ -90,7 +95,7 @@ UwIDAQAB
 			CreatedTs:       ts,
 			UpdatedTs:       ts,
 		},
-		{
+		model.Device{
 			Id:              "3",
 			IdData:          "{\"sn\":\"0003\",\"attr\":\"foo3\",\"mac\":\"00:00:00:03\"}",
 			Status:          "rejected",
@@ -100,8 +105,8 @@ UwIDAQAB
 		},
 	}
 
-	asets := []model.AuthSet{
-		{
+	asets := []interface{}{
+		model.AuthSet{
 			Id:        "1",
 			DeviceId:  "1",
 			IdData:    "{\"sn\":\"0001\",\"mac\":\"00:00:00:01\"}",
@@ -109,7 +114,7 @@ UwIDAQAB
 			PubKey:    pubKey,
 			Timestamp: &ts,
 		},
-		{
+		model.AuthSet{
 			Id:        "2",
 			DeviceId:  "2",
 			IdData:    "{\"sn\":\"0002\",\"attr\":\"foo\",\"mac\":\"00:00:00:02\"}",
@@ -117,7 +122,7 @@ UwIDAQAB
 			PubKey:    pubKey,
 			Timestamp: &ts,
 		},
-		{
+		model.AuthSet{
 			Id:        "3",
 			DeviceId:  "2",
 			IdData:    "{\"sn\":\"0002\",\"attr\":\"foo1\",\"mac\":\"00:00:00:02\"}",
@@ -125,7 +130,7 @@ UwIDAQAB
 			PubKey:    pubKey,
 			Timestamp: &ts,
 		},
-		{
+		model.AuthSet{
 			Id:        "4",
 			DeviceId:  "3",
 			IdData:    "{\"sn\":\"0003\",\"attr\":\"foo3\",\"mac\":\"00:00:00:03\"}",
@@ -135,15 +140,11 @@ UwIDAQAB
 		},
 	}
 
-	for _, d := range devs {
-		err = db.AddDevice(ctx, d)
-		assert.NoError(t, err)
-	}
+	_, err = devsColl.InsertMany(ctx, devs)
+	assert.NoError(t, err)
 
-	for _, a := range asets {
-		err = db.AddAuthSet(ctx, a)
-		assert.NoError(t, err)
-	}
+	_, err = authSetsColl.InsertMany(ctx, asets)
+	assert.NoError(t, err)
 
 	// test new version
 	mig150 := migration_1_5_0{
@@ -155,12 +156,13 @@ UwIDAQAB
 
 	var dev model.Device
 	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
-	for _, d := range devs {
+	for _, ds := range devs {
+		d := ds.(model.Device)
 		err := c.FindOne(ctx, bson.M{"_id": d.Id}).Decode(&dev)
 
 		assert.NoError(t, err)
 
-		status, err := db.GetDeviceStatus(ctx, dev.Id)
+		status, err := getDeviceStatusDB(db, ctxstore.DbFromContext(ctx, DbName), ctx, dev.Id)
 
 		assert.NoError(t, err)
 		assert.Equal(t, status, dev.Status)
@@ -181,7 +183,8 @@ UwIDAQAB
 
 	var set model.AuthSet
 	c = db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
-	for _, as := range asets {
+	for _, a := range asets {
+		as := a.(model.AuthSet)
 		err := c.FindOne(ctx, bson.M{"_id": as.Id}).Decode(&set)
 		assert.NoError(t, err)
 
@@ -197,4 +200,60 @@ UwIDAQAB
 
 		compareAuthSet(&as, &set, t)
 	}
+}
+
+func getDeviceStatusDB(db *DataStoreMongo, dbName string, ctx context.Context, devId string) (string, error) {
+	var statuses = map[string]int{}
+
+	c := db.client.Database(dbName).Collection(DbAuthSetColl)
+
+	// get device auth sets; group by status
+
+	filter := model.AuthSet{
+		DeviceId: devId,
+	}
+
+	match := bson.D{
+		{Key: "$match", Value: filter},
+	}
+	group := bson.D{
+		{Key: "$group", Value: bson.D{
+			{Key: "_id", Value: "$status"},
+			{Key: "count", Value: bson.M{"$sum": 1}}},
+		},
+	}
+
+	pipeline := []bson.D{
+		match,
+		group,
+	}
+	var result []struct {
+		Status string `bson:"_id"`
+		Value  int    `bson:"count"`
+	}
+	cursor, err := c.Aggregate(ctx, pipeline)
+	if err != nil {
+		return "", err
+	}
+	if err := cursor.All(ctx, &result); err != nil {
+		if err == mongo.ErrNoDocuments {
+			return "", store.ErrAuthSetNotFound
+		}
+		return "", err
+	}
+
+	if len(result) == 0 {
+		return "", store.ErrAuthSetNotFound
+	}
+
+	for _, res := range result {
+		statuses[res.Status] = res.Value
+	}
+
+	status, err := getDeviceStatus(statuses)
+	if err != nil {
+		return "", err
+	}
+
+	return status, nil
 }
