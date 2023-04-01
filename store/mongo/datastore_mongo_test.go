@@ -158,7 +158,7 @@ func compareTime(expected time.Time, actual time.Time, t *testing.T) {
 	assert.Equal(t, expected.Unix(), actual.Unix())
 }
 
-func TestForEachDatabase(t *testing.T) {
+func TestForEachTenant(t *testing.T) {
 	testCases := []struct {
 		Name string
 
@@ -187,8 +187,7 @@ func TestForEachDatabase(t *testing.T) {
 		},
 
 		Error: errors.New(
-			`store: failed to apply mapFunc to database ` +
-				`"deviceauth-tenant": internal error`,
+			"store: failed to apply mapFunc to tenant \"tenant\": internal error",
 		),
 	}, {
 		Name: "error, context already canceled",
@@ -204,7 +203,7 @@ func TestForEachDatabase(t *testing.T) {
 		},
 
 		Error: errors.Wrap(context.Canceled,
-			`store: failed to retrieve databases`,
+			`store: database operations stopped prematurely`,
 		),
 	}, {
 		Name: "error, context timeout",
@@ -238,12 +237,24 @@ func TestForEachDatabase(t *testing.T) {
 			db.Wipe()
 			// Initialize databases in our test setup
 			for _, tenantID := range tc.TenantIDs {
-				dbName := ctxstore.DbNameForTenant(tenantID, DbName)
-				err := client.Database(dbName).
-					CreateCollection(setupCtx, "test")
-				if !assert.NoError(t, err) {
-					panic(err)
-				}
+				c := client.Database(DbName).Collection(DbDevicesColl)
+				_, err := c.InsertMany(setupCtx, bson.A{
+					model.Device{
+						Id:              oid.NewUUIDv4().String(),
+						IdData:          oid.NewUUIDv4().String(),
+						IdDataStruct:    map[string]interface{}{"k0":"v0"},
+						IdDataSha256:    []byte(oid.NewUUIDv4().String()),
+						Status:          "accepted",
+						Decommissioning: false,
+						CreatedTs:       time.Now(),
+						UpdatedTs:       time.Now(),
+						AuthSets:        nil,
+						ApiLimits:       ratelimits.ApiLimits{},
+						Revision:        0,
+						TenantID:        tenantID,
+					},
+				})
+				assert.NoError(t, err)
 			}
 			ds := NewDataStoreMongoWithClient(client)
 
@@ -251,9 +262,11 @@ func TestForEachDatabase(t *testing.T) {
 			// database legitimacy.
 			mapFunc := func(ctx context.Context) error {
 				numCalled++
-				dbName := ctxstore.DbFromContext(ctx, DbName)
-				tenantID := ctxstore.TenantFromDbName(dbName, DbName)
-				assert.Contains(t, tc.TenantIDs, tenantID)
+				id := identity.FromContext(ctx)
+				if id!=nil {
+					tenantID := id.Tenant
+					assert.Contains(t, tc.TenantIDs, tenantID)
+				}
 				return tc.MapFunc(ctx)
 			}
 			// Run test:
