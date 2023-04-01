@@ -119,8 +119,8 @@ func setUpTokens(ctx context.Context, client *mongo.Client, tenantId string) err
 	}
 	c := client.Database(DbName).Collection(DbTokensColl)
 	_, err := c.InsertMany(ctx, inputTokens)
-	c.UpdateOne(ctx, bson.M{dbFieldID:token1.ID},bson.M{"$set":bson.M{dbFieldTenantID:tenantId}})
-	c.UpdateOne(ctx, bson.M{dbFieldID:token2.ID},bson.M{"$set":bson.M{dbFieldTenantID:tenantId}})
+	c.UpdateOne(ctx, bson.M{dbFieldID: token1.ID}, bson.M{"$set": bson.M{dbFieldTenantID: tenantId}})
+	c.UpdateOne(ctx, bson.M{dbFieldID: token2.ID}, bson.M{"$set": bson.M{dbFieldTenantID: tenantId}})
 	return err
 }
 
@@ -1080,9 +1080,11 @@ func TestStoreGetDevices(t *testing.T) {
 	// populate DB with a set of devices
 	for i := 0; i < devCount; i++ {
 		dev := model.Device{
-			Id:     fmt.Sprintf("%04d", i),
-			IdData: fmt.Sprintf("foo-%04d", i),
-			Status: randDevStatus(),
+			Id:           fmt.Sprintf("%04d", i),
+			IdData:       fmt.Sprintf("foo-%04d", i),
+			IdDataSha256: []byte(fmt.Sprintf("foo-%04d", i)),
+			Status:       randDevStatus(),
+			TenantID:     "foo",
 		}
 
 		devsList = append(devsList, dev)
@@ -1253,6 +1255,7 @@ func TestStoreAuthSet(t *testing.T) {
 		PubKey:       "pubkey-1",
 		DeviceId:     "1",
 		Timestamp:    uto.TimePtr(time.Now()),
+		TenantID: tenant,
 	}
 	err := db.AddAuthSet(ctx, asin)
 	assert.NoError(t, err)

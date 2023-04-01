@@ -156,16 +156,16 @@ func decommissioningCleanupDryRun(db *mongo.DataStoreMongo, tenantId string) err
 	return nil
 }
 
-func decommissioningCleanupExecute(db *mongo.DataStoreMongo, tenantOd string) error {
-	if err := decommissioningCleanupDryRun(db, tenantOd); err != nil {
+func decommissioningCleanupExecute(db *mongo.DataStoreMongo, tenantId string) error {
+	if err := decommissioningCleanupDryRun(db, tenantId); err != nil {
 		return err
 	}
 
-	if err := db.DeleteDevicesBeingDecommissioned(tenantOd); err != nil {
+	if err := db.DeleteDevicesBeingDecommissioned(tenantId); err != nil {
 		return err
 	}
 
-	if err := db.DeleteBrokenAuthSets(tenantOd); err != nil {
+	if err := db.DeleteBrokenAuthSets(tenantId); err != nil {
 		return err
 	}
 

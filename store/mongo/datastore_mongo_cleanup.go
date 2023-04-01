@@ -62,6 +62,12 @@ func (db *DataStoreMongo) GetBrokenAuthSets(tenantId string) ([]string, error) {
 	ctx := context.Background()
 
 	// get all auth sets; group by device id
+	match := bson.D{
+		{
+			Key: "$match", Value: bson.D{
+				{Key: dbFieldTenantID, Value: tenantId}},
+		},
+	}
 	group := bson.D{
 		{
 			Key: "$group", Value: bson.D{
@@ -69,13 +75,8 @@ func (db *DataStoreMongo) GetBrokenAuthSets(tenantId string) ([]string, error) {
 		},
 	}
 	pipeline := []bson.D{
+		match,
 		group,
-		{
-			{
-				Key:   dbFieldTenantID,
-				Value: tenantId,
-			},
-		},
 	}
 	var result []struct {
 		DeviceId string `bson:"_id"`

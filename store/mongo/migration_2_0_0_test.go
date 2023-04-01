@@ -54,7 +54,6 @@ func TestMigration_2_0_0(t *testing.T) {
 		prep_2_0_0(t, ctx, db)
 	}
 
-
 	tenantDeviceCount := make([]int64, len(tenantIds))
 	for i := 0; i < len(tenantIds); i++ {
 		ctx := ctxs[i]
@@ -62,10 +61,10 @@ func TestMigration_2_0_0(t *testing.T) {
 			dbName := ctxstore.DbFromContext(ctx, DbName)
 			devicesCollection := db.client.Database(dbName).Collection(DbDevicesColl)
 			_, err := devicesCollection.InsertOne(ctx, model.Device{
-				Id:              oid.NewUUIDv4().String(),
-				IdData:          oid.NewUUIDv4().String(),
-				IdDataStruct:    map[string]interface{}{
-					"key": oid.NewUUIDv4().String(),
+				Id:     oid.NewUUIDv4().String(),
+				IdData: oid.NewUUIDv4().String(),
+				IdDataStruct: map[string]interface{}{
+					"key":   oid.NewUUIDv4().String(),
 					"value": oid.NewUUIDv4().String(),
 				},
 				IdDataSha256:    []byte(oid.NewUUIDv4().String()),
@@ -78,7 +77,7 @@ func TestMigration_2_0_0(t *testing.T) {
 			if err == nil {
 				tenantDeviceCount[i]++
 			}
-			_,err=devicesCollection.UpdateMany(ctx,bson.M{},bson.M{"$unset":bson.M{dbFieldTenantID:1}})
+			_, err = devicesCollection.UpdateMany(ctx, bson.M{}, bson.M{"$unset": bson.M{dbFieldTenantID: 1}})
 			assert.NoError(t, err)
 		}
 	}
