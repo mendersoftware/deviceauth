@@ -38,6 +38,114 @@ type migration_2_0_0 struct {
 	ctx context.Context
 }
 
+var DbDevicesCollectionIndices = []mongo.IndexModel{
+	{
+		Keys: bson.D{
+			{Key: mstore.FieldTenantID, Value: 1},
+			{Key: dbFieldID, Value: 1},
+		},
+		Options: mopts.Index().
+			SetName(mstore.FieldTenantID + "_" + dbFieldID),
+	},
+	{
+		Keys: bson.D{
+			{Key: mstore.FieldTenantID, Value: 1},
+			{Key: dbFieldIDDataSha, Value: 1},
+		},
+		Options: mopts.Index().
+			SetName(mstore.FieldTenantID + "_" + dbFieldIDDataSha),
+	},
+	{
+		Keys: bson.D{
+			{Key: mstore.FieldTenantID, Value: 1},
+			{Key: dbFieldStatus, Value: 1},
+		},
+		Options: mopts.Index().
+			SetName(mstore.FieldTenantID + "_" + dbFieldStatus),
+	},
+}
+
+var DbAuthSetsCollectionIndices = []mongo.IndexModel{
+	{
+		Keys: bson.D{
+			{Key: mstore.FieldTenantID, Value: 1},
+			{Key: dbFieldID, Value: 1},
+		},
+		Options: mopts.Index().
+			SetName(mstore.FieldTenantID + "_" + dbFieldID).
+			SetUnique(true),
+	},
+	{
+		Keys: bson.D{
+			{Key: mstore.FieldTenantID, Value: 1},
+			{Key: dbFieldDeviceID, Value: 1},
+			{Key: dbFieldIDDataSha, Value: 1},
+			{Key: dbFieldPubKey, Value: 1},
+		},
+		Options: mopts.Index().
+			SetName(strings.Join([]string{
+				mstore.FieldTenantID,
+				dbFieldDeviceID,
+				dbFieldIDDataSha,
+				dbFieldPubKey,
+			}, "_")).
+			SetUnique(true),
+	},
+	{
+		Keys: bson.D{
+			{Key: mstore.FieldTenantID, Value: 1},
+			{Key: dbFieldIDDataSha, Value: 1},
+			{Key: dbFieldPubKey, Value: 1},
+		},
+		Options: mopts.Index().
+			SetName(strings.Join([]string{
+				mstore.FieldTenantID,
+				dbFieldIDDataSha,
+				dbFieldPubKey,
+			}, "_")).
+			SetUnique(true),
+	},
+}
+
+var DbLimitsCollectionIndices = []mongo.IndexModel{
+	{
+		Keys: bson.D{
+			{Key: mstore.FieldTenantID, Value: 1},
+			{Key: dbFieldID, Value: 1},
+		},
+		Options: mopts.Index().
+			SetName(mstore.FieldTenantID + "_" + dbFieldID),
+	},
+	{
+		Keys: bson.D{
+			{Key: mstore.FieldTenantID, Value: 1},
+			{Key: dbFieldName, Value: 1},
+		},
+		Options: mopts.Index().
+			SetName(mstore.FieldTenantID + "_" + dbFieldName).
+			SetUnique(true),
+	},
+}
+
+var DbTokensCollectionIndices = []mongo.IndexModel{
+	{
+		Keys: bson.D{
+			{Key: mstore.FieldTenantID, Value: 1},
+			{Key: dbFieldID, Value: 1},
+		},
+		Options: mopts.Index().
+			SetName(mstore.FieldTenantID + "_" + dbFieldID),
+	},
+	{
+		Keys: bson.D{
+			{Key: mstore.FieldTenantID, Value: 1},
+			{Key: dbFieldExpTime, Value: 1},
+		},
+		Options: mopts.Index().
+			SetName(mstore.FieldTenantID + "_" + dbFieldExpTime),
+	},
+}
+
 // Up creates an index on status and id in the devices collection
 func (m *migration_2_0_0) Up(from migrate.Version) error {
 	ctx := context.Background()
@@ -47,116 +155,16 @@ func (m *migration_2_0_0) Up(from migrate.Version) error {
 		Indexes []mongo.IndexModel
 	}{
 		DbAuthSetColl: {
-			Indexes: []mongo.IndexModel{
-				{
-					Keys: bson.D{
-						{Key: mstore.FieldTenantID, Value: 1},
-						{Key: dbFieldID, Value: 1},
-					},
-					Options: mopts.Index().
-						SetName(mstore.FieldTenantID + "_" + dbFieldID).
-						SetUnique(true),
-				},
-				{
-					Keys: bson.D{
-						{Key: mstore.FieldTenantID, Value: 1},
-						{Key: dbFieldDeviceID, Value: 1},
-						{Key: dbFieldIDDataSha, Value: 1},
-						{Key: dbFieldPubKey, Value: 1},
-					},
-					Options: mopts.Index().
-						SetName(strings.Join([]string{
-							mstore.FieldTenantID,
-							dbFieldDeviceID,
-							dbFieldIDDataSha,
-							dbFieldPubKey,
-						}, "_")).
-						SetUnique(true),
-				},
-				{
-					Keys: bson.D{
-						{Key: mstore.FieldTenantID, Value: 1},
-						{Key: dbFieldIDDataSha, Value: 1},
-						{Key: dbFieldPubKey, Value: 1},
-					},
-					Options: mopts.Index().
-						SetName(strings.Join([]string{
-							mstore.FieldTenantID,
-							dbFieldIDDataSha,
-							dbFieldPubKey,
-						}, "_")).
-						SetUnique(true),
-				},
-			},
+			Indexes: DbAuthSetsCollectionIndices,
 		},
 		DbDevicesColl: {
-			Indexes: []mongo.IndexModel{
-				{
-					Keys: bson.D{
-						{Key: mstore.FieldTenantID, Value: 1},
-						{Key: dbFieldID, Value: 1},
-					},
-					Options: mopts.Index().
-						SetName(mstore.FieldTenantID + "_" + dbFieldID),
-				},
-				{
-					Keys: bson.D{
-						{Key: mstore.FieldTenantID, Value: 1},
-						{Key: dbFieldIDDataSha, Value: 1},
-					},
-					Options: mopts.Index().
-						SetName(mstore.FieldTenantID + "_" + dbFieldIDDataSha),
-				},
-				{
-					Keys: bson.D{
-						{Key: mstore.FieldTenantID, Value: 1},
-						{Key: dbFieldStatus, Value: 1},
-					},
-					Options: mopts.Index().
-						SetName(mstore.FieldTenantID + "_" + dbFieldStatus),
-				},
-			},
+			Indexes: DbDevicesCollectionIndices,
 		},
 		DbLimitsColl: {
-			Indexes: []mongo.IndexModel{
-				{
-					Keys: bson.D{
-						{Key: mstore.FieldTenantID, Value: 1},
-						{Key: dbFieldID, Value: 1},
-					},
-					Options: mopts.Index().
-						SetName(mstore.FieldTenantID + "_" + dbFieldID),
-				},
-				{
-					Keys: bson.D{
-						{Key: mstore.FieldTenantID, Value: 1},
-						{Key: dbFieldName, Value: 1},
-					},
-					Options: mopts.Index().
-						SetName(mstore.FieldTenantID + "_" + dbFieldName).
-						SetUnique(true),
-				},
-			},
+			Indexes: DbLimitsCollectionIndices,
 		},
 		DbTokensColl: {
-			Indexes: []mongo.IndexModel{
-				{
-					Keys: bson.D{
-						{Key: mstore.FieldTenantID, Value: 1},
-						{Key: dbFieldID, Value: 1},
-					},
-					Options: mopts.Index().
-						SetName(mstore.FieldTenantID + "_" + dbFieldID),
-				},
-				{
-					Keys: bson.D{
-						{Key: mstore.FieldTenantID, Value: 1},
-						{Key: dbFieldExpTime, Value: 1},
-					},
-					Options: mopts.Index().
-						SetName(mstore.FieldTenantID + "_" + dbFieldExpTime),
-				},
-			},
+			Indexes: DbTokensCollectionIndices,
 		},
 	}
 
@@ -174,6 +182,9 @@ func (m *migration_2_0_0) Up(from migrate.Version) error {
 			SetSort(bson.D{{Key: dbFieldID, Value: 1}})
 		collOut := client.Database(DbName).Collection(collection)
 		if databaseName == DbName {
+			indices := collOut.Indexes()
+			indices.DropAll(ctx)
+
 			if len(idxes.Indexes) > 0 {
 				_, err := collOut.Indexes().CreateMany(ctx, collections[collection].Indexes)
 				if err != nil {

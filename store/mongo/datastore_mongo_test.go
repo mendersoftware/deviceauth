@@ -30,7 +30,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/mendersoftware/deviceauth/jwt"
 	"github.com/mendersoftware/deviceauth/model"
@@ -739,7 +738,7 @@ func TestStoreDeleteTokens(t *testing.T) {
 
 			c := d.client.Database(DbName).Collection(DbTokensColl)
 
-			cursor, err := c.Find(ctx, bson.M{})
+			cursor, err := c.Find(ctx, bson.M{dbFieldTenantID: tc.tenant})
 			assert.NoError(t, err)
 			err = cursor.All(ctx, &out)
 			assert.NoError(t, err)
@@ -864,9 +863,24 @@ func verifyIndexes(t *testing.T, coll *mongo.Collection, expected []mongo.IndexM
 			if idx["name"] == *expectedIdx.Options.Name {
 				t.Logf("found same index, comparing")
 				found = true
-				assert.Equal(t, *expectedIdx.Options.Background, idx["background"])
-				if idx["unique"] != nil {
-					assert.Equal(t, *expectedIdx.Options.Unique, idx["unique"])
+				var fieldPresent bool
+				_, fieldPresent = idx["background"]
+				if expectedIdx.Options.Background == nil {
+					if fieldPresent {
+						t.Logf("this will fail")
+					}
+					assert.False(t, fieldPresent)
+				} else {
+					assert.Equal(t, *expectedIdx.Options.Background, fieldPresent)
+				}
+				_, fieldPresent = idx["unique"]
+				if expectedIdx.Options.Unique == nil {
+					if fieldPresent {
+						t.Logf("this will fail")
+					}
+					assert.False(t, fieldPresent)
+				} else {
+					assert.Equal(t, *expectedIdx.Options.Unique, fieldPresent)
 				}
 				break
 			}
@@ -900,17 +914,17 @@ func TestStoreMigrate(t *testing.T) {
 				"needs version " + DbVersion,
 		},
 		DbVersion + " multitenant": {
-			automigrate: true,
 			tenantDbs:   []string{"deviceauth-tenant1id", "deviceauth-tenant2id"},
+			automigrate: true,
 			version:     DbVersion,
 			err:         "",
 		},
 		DbVersion + " multitenant, no automigrate": {
-			automigrate: false,
 			tenantDbs:   []string{"deviceauth-tenant1id", "deviceauth-tenant2id"},
+			automigrate: false,
 			version:     DbVersion,
 			err: "failed to apply migrations: db needs " +
-				"migration: deviceauth-tenant1id has version " +
+				"migration: deviceauth has version " +
 				"0.0.0, needs version " + DbVersion,
 		},
 		"0.1 error": {
@@ -919,8 +933,6 @@ func TestStoreMigrate(t *testing.T) {
 			err:         "failed to parse service version: failed to parse Version: unexpected EOF",
 		},
 	}
-	_false := false
-	_true := true
 
 	for name, tc := range testCases {
 		t.Run(fmt.Sprintf("tc: %s", name), func(t *testing.T) {
@@ -931,7 +943,6 @@ func TestStoreMigrate(t *testing.T) {
 			if tc.automigrate {
 				db = db.WithAutomigrate().(*DataStoreMongo)
 			}
-
 			// set up multitenancy/tenant dbs
 			if len(tc.tenantDbs) != 0 {
 				db = db.WithMultitenant()
@@ -969,58 +980,24 @@ func TestStoreMigrate(t *testing.T) {
 						v, _ := migrate.NewVersion(tc.version)
 						assert.Equal(t, *v, out[len(out)-1].Version)
 
-						// verify that all indexes are created
-						verifyIndexes(t, db.client.Database(d).Collection(DbDevicesColl),
-							[]mongo.IndexModel{
-								{
-									Keys: bson.D{
-										{Key: model.DevKeyIdDataSha256, Value: 1},
-									},
-									Options: &options.IndexOptions{
-										Background: &_false,
-										Name:       &indexDevices_IdentityDataSha256,
-										Unique:     &_true,
-									},
-								},
-								{
-									Keys: bson.D{
-										{Key: model.DevKeyStatus, Value: 1},
-										{Key: model.DevKeyId, Value: 1},
-									},
-									Options: &options.IndexOptions{
-										Background: &_false,
-										Name:       &indexDevices_Status,
-									},
-								},
-							},
-						)
-						verifyIndexes(t, db.client.Database(d).Collection(DbAuthSetColl),
-							[]mongo.IndexModel{
-								{
-									Keys: bson.D{
-										{Key: model.AuthSetKeyDeviceId, Value: 1},
-										{Key: model.AuthSetKeyIdDataSha256, Value: 1},
-										{Key: model.AuthSetKeyPubKey, Value: 1},
-									},
-									Options: &options.IndexOptions{
-										Background: &_false,
-										Name:       &indexAuthSet_DeviceId_IdentityDataSha256_PubKey,
-										Unique:     &_true,
-									},
-								},
-								{
-									Keys: bson.D{
-										{Key: model.AuthSetKeyIdDataSha256, Value: 1},
-										{Key: model.AuthSetKeyPubKey, Value: 1},
-									},
-									Options: &options.IndexOptions{
-										Background: &_false,
-										Name:       &indexAuthSet_IdentityDataSha256_PubKey,
-										Unique:     &_true,
-									},
-								},
-							},
-						)
+						// verify that all indexes are created, but only for final single db
+						if d == DbName {
+							verifyIndexes(t, db.client.Database(d).Collection(DbDevicesColl),
+								DbDevicesCollectionIndices,
+							)
+							verifyIndexes(t, db.client.Database(d).Collection(DbAuthSetColl),
+								DbAuthSetsCollectionIndices,
+							)
+							verifyIndexes(t, db.client.Database(d).Collection(DbLimitsColl),
+								DbLimitsCollectionIndices,
+							)
+							verifyIndexes(t, db.client.Database(d).Collection(DbLimitsColl),
+								DbLimitsCollectionIndices,
+							)
+							verifyIndexes(t, db.client.Database(d).Collection(DbTokensColl),
+								DbTokensCollectionIndices,
+							)
+						}
 					}
 				}
 
