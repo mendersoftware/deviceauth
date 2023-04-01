@@ -2126,9 +2126,10 @@ func getDevsWithStatuses(accepted, preauthorized, pending, rejected, noauth int)
 func getDevWithStatus(id int, status string) (*model.Device, []model.AuthSet) {
 	iddata := fmt.Sprintf("foo-%04d", id)
 	dev := model.Device{
-		Id:     fmt.Sprintf("%d", id),
-		IdData: iddata,
-		Status: status,
+		Id:           fmt.Sprintf("%d", id),
+		IdData:       iddata,
+		IdDataSha256: getIdDataHash(iddata),
+		Status:       status,
 	}
 
 	var asets []model.AuthSet
