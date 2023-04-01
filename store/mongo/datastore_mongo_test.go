@@ -27,7 +27,6 @@ import (
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	"github.com/mendersoftware/go-lib-micro/mongo/oid"
-	ctxstore "github.com/mendersoftware/go-lib-micro/store"
 	ctxstore2 "github.com/mendersoftware/go-lib-micro/store/v2"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
@@ -1389,8 +1388,11 @@ func TestUpdateAuthSetMultiple(t *testing.T) {
 	asets, err := db.GetAuthSetsForDevice(ctx, "1")
 	assert.NoError(t, err)
 	assert.Len(t, asets, 6)
-	for idx, aset := range asets {
-		if idx < 5 {
+	for _, aset := range asets {
+		key := strings.TrimPrefix(aset.PubKey, "pubkey-")
+		value, e := strconv.Atoi(key)
+		assert.NoError(t, e)
+		if value < 5 {
 			assert.Equal(t, model.DevStatusRejected, aset.Status)
 		} else {
 			// last one is pending
@@ -2177,12 +2179,14 @@ func TestStoreDeleteAuthSetForDevice(t *testing.T) {
 			DeviceId: "001",
 			IdData:   "001",
 			PubKey:   "001",
+			TenantID: tenant,
 		},
 		model.AuthSet{
 			Id:       "002",
 			DeviceId: "001",
 			IdData:   "001",
 			PubKey:   "002",
+			TenantID: tenant,
 		},
 	}
 
@@ -2191,7 +2195,7 @@ func TestStoreDeleteAuthSetForDevice(t *testing.T) {
 	})
 	db := getDb(dbCtx)
 
-	coll := db.client.Database(ctxstore.DbFromContext(dbCtx, DbName)).Collection(DbAuthSetColl)
+	coll := db.client.Database(DbName).Collection(DbAuthSetColl)
 	_, err := coll.InsertMany(dbCtx, authSets)
 	assert.NoError(t, err)
 
