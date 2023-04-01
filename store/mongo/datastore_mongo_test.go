@@ -1865,14 +1865,17 @@ func TestGetLimit(t *testing.T) {
 	lim1 := model.Limit{
 		Name:  "foo",
 		Value: 123,
+		TenantID: tenant,
 	}
 	lim2 := model.Limit{
 		Name:  "bar",
 		Value: 456,
+		TenantID: tenant,
 	}
 	lim3OtherTenant := model.Limit{
 		Name:  "bar",
 		Value: 920,
+		TenantID: tenant,
 	}
 
 	dbCtx := identity.WithContext(context.Background(), &identity.Identity{
@@ -1880,7 +1883,7 @@ func TestGetLimit(t *testing.T) {
 	})
 	db := getDb(dbCtx)
 
-	coll := db.client.Database(ctxstore.DbFromContext(dbCtx, DbName)).Collection(DbLimitsColl)
+	coll := db.client.Database(DbName).Collection(DbLimitsColl)
 	_, err := coll.InsertMany(dbCtx, bson.A{lim1, lim2})
 	assert.NoError(t, err)
 
@@ -1888,7 +1891,7 @@ func TestGetLimit(t *testing.T) {
 		Tenant: "other-" + tenant,
 	})
 
-	collOtherTenant := db.client.Database(ctxstore.DbFromContext(dbCtxOtherTenant, DbName)).Collection(DbLimitsColl)
+	collOtherTenant := db.client.Database(DbName).Collection(DbLimitsColl)
 	_, err = collOtherTenant.InsertMany(dbCtx, bson.A{lim3OtherTenant})
 	assert.NoError(t, err)
 
