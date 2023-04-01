@@ -2630,6 +2630,13 @@ func TestStoreUpdateuthSetById(t *testing.T) {
 	}
 }
 
+type InDescr struct {
+	id           string
+	idData       string
+	idDataSha256 []byte
+	limits       ratelimits.ApiLimits
+}
+
 func TestStoreGetDeviceById(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping TestStoreGetDeviceById in short mode.")
@@ -2639,12 +2646,7 @@ func TestStoreGetDeviceById(t *testing.T) {
 	// (always get UTC instead of e.g. CEST)
 	time.Local = time.UTC
 
-	indescr := []struct {
-		id           string
-		idData       string
-		idDataSha256 []byte
-		limits       ratelimits.ApiLimits
-	}{
+	indescr := []InDescr{
 		{
 			id:           "dev1",
 			idData:       "idData1",
@@ -2735,7 +2737,18 @@ func TestStoreGetDeviceById(t *testing.T) {
 
 			d := getDb(ctx)
 
-			c := d.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
+			c := d.client.Database(DbName).Collection(DbDevicesColl)
+			id := identity.FromContext(ctx)
+			tenantId := ""
+			if id != nil {
+				tenantId = id.Tenant
+			}
+			for j, _ := range indevs {
+				var dev *model.Device
+				dev = indevs[j].(*model.Device)
+				dev.TenantID = tenantId
+				indevs[j] = dev
+			}
 			_, err := c.InsertMany(ctx, indevs)
 			assert.NoError(t, err)
 
