@@ -47,7 +47,7 @@ func (m *migration_1_4_0) Up(from migrate.Version) error {
 			continue
 		}
 
-		status, err := m.ms.GetDeviceStatus(m.ctx, dev.Id)
+		status, err := getDeviceStatusDB(m.ms, ctxstore.DbFromContext(m.ctx, DbName), m.ctx, dev.Id)
 
 		if err != nil {
 			if err == store.ErrAuthSetNotFound {

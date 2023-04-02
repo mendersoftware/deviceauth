@@ -1,4 +1,4 @@
-// Copyright 2023 Northern.tech AS
+// Copyright 2022 Northern.tech AS
 //
 //	Licensed under the Apache License, Version 2.0 (the "License");
 //	you may not use this file except in compliance with the License.
@@ -47,6 +47,8 @@ UwIDAQAB
 	})
 	db.Wipe()
 	db := NewDataStoreMongoWithClient(db.Client())
+	devsColl := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
+	authSetsColl := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
 
 	// prep base version
 	mig110 := migration_1_1_0{
@@ -68,8 +70,8 @@ UwIDAQAB
 	err = mig130.Up(migrate.MakeVersion(1, 3, 0))
 	assert.NoError(t, err)
 
-	devs := []model.Device{
-		{
+	devs := []interface{}{
+		model.Device{
 			Id:              "1",
 			IdData:          "{\"sn\":\"0001\",\"mac\":\"00:00:00:01\"}",
 			Status:          "pending",
@@ -77,7 +79,7 @@ UwIDAQAB
 			CreatedTs:       ts,
 			UpdatedTs:       ts,
 		},
-		{
+		model.Device{
 			Id:              "2",
 			IdData:          "{\"sn\":\"0002\",\"attr\":\"foo1\",\"mac\":\"00:00:00:02\"}",
 			Status:          "rejected",
@@ -85,7 +87,7 @@ UwIDAQAB
 			CreatedTs:       ts,
 			UpdatedTs:       ts,
 		},
-		{
+		model.Device{
 			Id:              "3",
 			IdData:          "{\"sn\":\"0003\",\"attr\":\"foo3\",\"mac\":\"00:00:00:03\"}",
 			Status:          "rejected",
@@ -93,7 +95,7 @@ UwIDAQAB
 			CreatedTs:       ts,
 			UpdatedTs:       ts,
 		},
-		{
+		model.Device{
 			Id:              "4",
 			IdData:          "{\"sn\":\"0004\",\"attr\":\"foo4\",\"mac\":\"00:00:00:04\"}",
 			Status:          "accepted",
@@ -103,8 +105,8 @@ UwIDAQAB
 		},
 	}
 
-	asets := []model.AuthSet{
-		{
+	asets := []interface{}{
+		model.AuthSet{
 			Id:        "1",
 			DeviceId:  "1",
 			IdData:    "{\"sn\":\"0001\",\"mac\":\"00:00:00:01\"}",
@@ -112,7 +114,7 @@ UwIDAQAB
 			PubKey:    pubKey,
 			Timestamp: &ts,
 		},
-		{
+		model.AuthSet{
 			Id:        "2",
 			DeviceId:  "2",
 			IdData:    "{\"sn\":\"0002\",\"attr\":\"foo\",\"mac\":\"00:00:00:02\"}",
@@ -120,7 +122,7 @@ UwIDAQAB
 			PubKey:    pubKey,
 			Timestamp: &ts,
 		},
-		{
+		model.AuthSet{
 			Id:        "3",
 			DeviceId:  "2",
 			IdData:    "{\"sn\":\"0002\",\"attr\":\"foo1\",\"mac\":\"00:00:00:02\"}",
@@ -128,7 +130,7 @@ UwIDAQAB
 			PubKey:    pubKey,
 			Timestamp: &ts,
 		},
-		{
+		model.AuthSet{
 			Id:        "4",
 			DeviceId:  "3",
 			IdData:    "{\"sn\":\"0003\",\"attr\":\"foo3\",\"mac\":\"00:00:00:03\"}",
@@ -138,15 +140,11 @@ UwIDAQAB
 		},
 	}
 
-	for _, d := range devs {
-		err = db.AddDevice(ctx, d)
-		assert.NoError(t, err)
-	}
+	_, err = devsColl.InsertMany(ctx, devs)
+	assert.NoError(t, err)
 
-	for _, a := range asets {
-		err = db.AddAuthSet(ctx, a)
-		assert.NoError(t, err)
-	}
+	_, err = authSetsColl.InsertMany(ctx, asets)
+	assert.NoError(t, err)
 
 	// test new version
 	mig140 := migration_1_4_0{
@@ -159,14 +157,12 @@ UwIDAQAB
 	var dev model.Device
 	var status string
 	var noAuthSets bool
-	dColl := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
-	asColl := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
-	for _, d := range devs {
-		err := dColl.FindOne(ctx, bson.M{"_id": d.Id}).Decode(&dev)
-		assert.NoError(t, err)
+
+	for _, ds := range devs {
+		d := ds.(model.Device)
 
 		res := []model.AuthSet{}
-		cursor, err := asColl.Find(ctx, model.AuthSet{DeviceId: dev.Id})
+		cursor, err := authSetsColl.Find(ctx, model.AuthSet{DeviceId: d.Id})
 		assert.NoError(t, err)
 		err = cursor.All(ctx, &res)
 		if (err != nil && err == mongo.ErrNoDocuments) || len(res) == 0 {
@@ -179,9 +175,13 @@ UwIDAQAB
 		if noAuthSets {
 			status = model.DevStatusRejected
 		} else {
-			status, err = db.GetDeviceStatus(ctx, dev.Id)
+			status, err = getDeviceStatusDB(db, ctxstore.DbFromContext(ctx, DbName), ctx, d.Id)
 			assert.NoError(t, err)
 		}
+
+		err = devsColl.FindOne(ctx, bson.M{"_id": d.Id}).Decode(&dev)
+		assert.NoError(t, err)
+
 		assert.Equal(t, status, dev.Status)
 
 		d.Status = status
