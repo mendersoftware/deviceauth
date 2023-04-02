@@ -856,65 +856,7 @@ func (db *DataStoreMongo) GetDevCountByStatus(ctx context.Context, status string
 }
 
 func (db *DataStoreMongo) GetDeviceStatus(ctx context.Context, devId string) (string, error) {
-	var statuses = map[string]int{}
-
-	c := db.client.Database(DbName).Collection(DbAuthSetColl)
-
-	// get device auth sets; group by status
-
-	id := identity.FromContext(ctx)
-	tenantId := ""
-	if id != nil {
-		tenantId = id.Tenant
-	}
-	filter := model.AuthSet{
-		DeviceId: devId,
-		TenantID: tenantId,
-	}
-
-	match := bson.D{
-		{Key: "$match", Value: filter},
-	}
-	group := bson.D{
-		{Key: "$group", Value: bson.D{
-			{Key: "_id", Value: "$status"},
-			{Key: "count", Value: bson.M{"$sum": 1}}},
-		},
-	}
-
-	pipeline := []bson.D{
-		match,
-		group,
-	}
-	var result []struct {
-		Status string `bson:"_id"`
-		Value  int    `bson:"count"`
-	}
-	cursor, err := c.Aggregate(ctx, pipeline)
-	if err != nil {
-		return "", err
-	}
-	if err := cursor.All(ctx, &result); err != nil {
-		if err == mongo.ErrNoDocuments {
-			return "", store.ErrAuthSetNotFound
-		}
-		return "", err
-	}
-
-	if len(result) == 0 {
-		return "", store.ErrAuthSetNotFound
-	}
-
-	for _, res := range result {
-		statuses[res.Status] = res.Value
-	}
-
-	status, err := getDeviceStatus(statuses)
-	if err != nil {
-		return "", err
-	}
-
-	return status, nil
+	return getDeviceStatusDB(db, DbName, ctx, devId)
 }
 
 func getDeviceStatus(statuses map[string]int) (string, error) {
