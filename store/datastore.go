@@ -50,14 +50,14 @@ type AuthSetFilter struct {
 }
 
 // MapFunc is the prototype for the function applied to each database in
-// ForEachDatabase. dbCtx contains a reference to the current database
+// ForEachTenant. dbCtx contains a reference to the current database
 // MapFunc is applied to.
 type MapFunc func(dbCtx context.Context) error
 
 //go:generate ../utils/mockgen.sh
 type DataStore interface {
-	// ForEachDatabase loops over all databases and applies opFunc with
-	// for all existing databases. If opFunc returns an error for one of
+	// ForEachTenant loops over all tenants and applies opFunc with
+	// for the existing database. If opFunc returns an error for one of
 	// the elements, this function aborts with the same error.
 	ForEachTenant(parentCtx context.Context, opFunc MapFunc) error
 

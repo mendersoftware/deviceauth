@@ -785,14 +785,14 @@ func TestCheckDeviceLimits(t *testing.T) {
 					}
 				}
 			}
-			ds.On("ForEachDatabase",
+			ds.On("ForEachTenant",
 				ctxMatcher,
 				mock.MatchedBy(func(f store.MapFunc) bool {
 					return true
 				}),
 			).Run(func(args mock.Arguments) {
 				// A simplified version of what
-				// mongo.ForEachDatabase does
+				// mongo.ForEachTenant does
 				for _, tenant := range tc.Tenants {
 					ctx := identity.WithContext(
 						args.Get(0).(context.Context),
