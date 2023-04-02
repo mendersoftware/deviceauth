@@ -21,14 +21,12 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
 
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	ctxstore "github.com/mendersoftware/go-lib-micro/store"
 
 	"github.com/mendersoftware/deviceauth/model"
-	"github.com/mendersoftware/deviceauth/store"
 )
 
 func TestMigration_1_5_0(t *testing.T) {
