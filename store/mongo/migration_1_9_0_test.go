@@ -139,7 +139,7 @@ func TestMigration_1_9_0(t *testing.T) {
 		IdDataSha256: getIdDataHash(idData),
 	}
 	_, err = devsColl.InsertOne(ctx, dev)
-	assert.EqualError(t, err, "object exists")
+	assert.Contains(t, err.Error(), "duplicate key error collection")
 
 	// can't add authset with duplicated dev id + id data sha + pubkey
 	aset := model.AuthSet{
@@ -149,7 +149,7 @@ func TestMigration_1_9_0(t *testing.T) {
 		PubKey:       "key3",
 	}
 	_, err = authSetsColl.InsertOne(ctx, aset)
-	assert.EqualError(t, err, "object exists")
+	assert.Contains(t, err.Error(), "duplicate key error collection")
 
 	// can't add authset with duplicated id data sha + pubkey
 	aset = model.AuthSet{
@@ -158,7 +158,7 @@ func TestMigration_1_9_0(t *testing.T) {
 		PubKey:       "key3",
 	}
 	_, err = authSetsColl.InsertOne(ctx, aset)
-	assert.EqualError(t, err, "object exists")
+	assert.Contains(t, err.Error(), "duplicate key error collection")
 }
 
 func TestMigration_1_9_0_NoFailDelete(t *testing.T) {
