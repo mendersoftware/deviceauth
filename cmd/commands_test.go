@@ -409,26 +409,26 @@ func TestPropagateReporting(t *testing.T) {
 
 		err error
 	}{
-		//"ok": {
-		//	tenantIds: []string{
-		//		oid.NewUUIDv4().String(),
-		//		oid.NewUUIDv4().String(),
-		//		oid.NewUUIDv4().String(),
-		//	},
-		//	devices: []model.Device{
-		//		{
-		//			Id:              oid.NewUUIDv4().String(),
-		//			IdData:          "somedata",
-		//			IdDataStruct:    map[string]interface{}{"key0": "value0", "key1": "value0"},
-		//			IdDataSha256:    []byte("some"),
-		//			Status:          "accepted",
-		//			Decommissioning: false,
-		//			CreatedTs:       time.Now(),
-		//			UpdatedTs:       time.Now(),
-		//			TenantID:        "",
-		//		},
-		//	},
-		//},
+		"ok": {
+			tenantIds: []string{
+				oid.NewUUIDv4().String(),
+				oid.NewUUIDv4().String(),
+				oid.NewUUIDv4().String(),
+			},
+			devices: []model.Device{
+				{
+					Id:              oid.NewUUIDv4().String(),
+					IdData:          "somedata",
+					IdDataStruct:    map[string]interface{}{"key0": "value0", "key1": "value0"},
+					IdDataSha256:    []byte("some"),
+					Status:          "accepted",
+					Decommissioning: false,
+					CreatedTs:       time.Now(),
+					UpdatedTs:       time.Now(),
+					TenantID:        "",
+				},
+			},
+		},
 		"error: workflow": {
 			tenantIds: []string{
 				oid.NewUUIDv4().String(),
@@ -561,17 +561,19 @@ func TestPropagateReporting(t *testing.T) {
 							break
 						}
 					}
+					var noError error
+					errChannel<-noError
 				}()
 			}).Return(getError(t, errChannel, tc.tenantIds)).Once()
 
 			var err error
-			go func() {
-				time.Sleep(15 * time.Second)
-				t.Logf("dbg.%s: here0010: about to read from channel", time.Now().Format(time.RFC3339Nano))
-				err = <-errChannel
-				t.Logf("dbg.%s: here0010: read from channel: %+v", time.Now().Format(time.RFC3339Nano), err)
-			}()
-			
+			//go func() {
+			//	time.Sleep(15 * time.Second)
+			//	t.Logf("dbg.%s: here0010: about to read from channel", time.Now().Format(time.RFC3339Nano))
+			//	err = <-errChannel
+			//	t.Logf("dbg.%s: here0010: read from channel: %+v", time.Now().Format(time.RFC3339Nano), err)
+			//}()
+
 			//t.Logf("%s: here0020: read from channel: %+v", time.Now().Format(time.RFC3339Nano), err)
 			//m := mock.MatchedBy(func(c context.Context) bool {
 			//	id := identity.FromContext(c)
@@ -604,16 +606,26 @@ func TestPropagateReporting(t *testing.T) {
 				).Return(tc.workflowError)
 			}
 
+			doneChannel:=make(chan bool,1)
 			go func() {
 				err = PropagateReporting(db, wflows, tc.cmdTenant, tc.cmdDryRun)
+				t.Logf("dbg.%s: here0010: about to read from channel", time.Now().Format(time.RFC3339Nano))
+				err = <-errChannel
+				t.Logf("dbg.%s: here0010: read from channel: %+v", time.Now().Format(time.RFC3339Nano), err)
 				if tc.err != nil {
 					assert.EqualError(t, err, tc.err.Error())
 				} else {
 					assert.NoError(t, err)
 				}
+				doneChannel<-true
 			}()
-			t.Logf("dbg.%s final sleep", time.Now().Format(time.RFC3339Nano))
-			time.Sleep(32 * time.Second)
+			t.Logf("dbg.%s final wait", time.Now().Format(time.RFC3339Nano))
+			ctxTimeout, cancel := context.WithTimeout(context.Background(), time.Second*3)
+			defer cancel()
+			select {
+			case <-ctxTimeout.Done():
+			case <-doneChannel:
+			}
 			t.Logf("dbg.%s exiting", time.Now().Format(time.RFC3339Nano))
 		})
 	}
