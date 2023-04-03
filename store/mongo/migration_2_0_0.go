@@ -51,31 +51,10 @@ var DbDevicesCollectionIndices = []mongo.IndexModel{
 	{
 		Keys: bson.D{
 			{Key: mstore.FieldTenantID, Value: 1},
-			{Key: dbFieldIDDataSha, Value: 1},
-		},
-		Options: mopts.Index().
-			SetName(mstore.FieldTenantID + "_" + dbFieldIDDataSha).
-			SetUnique(true),
-	},
-	{
-		Keys: bson.D{
-			{Key: mstore.FieldTenantID, Value: 1},
 			{Key: dbFieldStatus, Value: 1},
 		},
 		Options: mopts.Index().
 			SetName(mstore.FieldTenantID + "_" + dbFieldStatus),
-	},
-}
-
-var DbAuthSetsCollectionIndices = []mongo.IndexModel{
-	{
-		Keys: bson.D{
-			{Key: mstore.FieldTenantID, Value: 1},
-			{Key: dbFieldID, Value: 1},
-		},
-		Options: mopts.Index().
-			SetName(mstore.FieldTenantID + "_" + dbFieldID).
-			SetUnique(true),
 	},
 	{
 		Keys: bson.D{
@@ -93,7 +72,8 @@ var DbAuthSetsCollectionIndices = []mongo.IndexModel{
 	{
 		Keys: bson.D{
 			{Key: mstore.FieldTenantID, Value: 1},
-			{Key: dbFieldIDDataSha, Value: 1},
+			{Key: dbFieldStatus, Value: 1},
+			{Key: dbFieldID, Value: 1},
 		},
 		Options: mopts.Index().
 			SetName(strings.Join([]string{
@@ -102,6 +82,18 @@ var DbAuthSetsCollectionIndices = []mongo.IndexModel{
 				dbFieldID,
 			}, "_")).
 			SetBackground(false),
+	},
+}
+
+var DbAuthSetsCollectionIndices = []mongo.IndexModel{
+	{
+		Keys: bson.D{
+			{Key: mstore.FieldTenantID, Value: 1},
+			{Key: dbFieldID, Value: 1},
+		},
+		Options: mopts.Index().
+			SetName(mstore.FieldTenantID + "_" + dbFieldID).
+			SetUnique(true),
 	},
 	{
 		Keys: bson.D{
