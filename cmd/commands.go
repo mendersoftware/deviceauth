@@ -226,23 +226,34 @@ func PropagateReporting(db store.DataStore, wflows orchestrator.ClientRunner, te
 	dryRun bool) error {
 	l := log.NewEmpty()
 
-	dbs, err := selectDbs(db, tenant)
-	if err != nil {
-		return errors.Wrap(err, "aborting")
-	}
-
-	var errReturned error
-	for _, d := range dbs {
-		err := tryPropagateReportingForDb(db, wflows, d, dryRun)
-		if err != nil {
-			errReturned = err
-			l.Errorf("giving up on DB %s due to fatal error: %s", d, err.Error())
-			continue
+	mapFunc := func(ctx context.Context) error {
+		id := identity.FromContext(ctx)
+		if id == nil || id.Tenant == "" {
+			// Not a tenant db - skip!
+			return nil
 		}
+		tenantId := id.Tenant
+		return tryPropagateReportingForTenant(db, wflows, tenantId, dryRun)
 	}
-
-	l.Info("all DBs processed, exiting.")
-	return errReturned
+	if tenant != "" {
+		ctx := identity.WithContext(context.Background(),
+			&identity.Identity{
+				Tenant: tenant,
+			},
+		)
+		err := mapFunc(ctx)
+		if err != nil {
+			return errors.Wrap(err, "failed to propagate for given tenant")
+		}
+		l.Infof("tenant processed, exiting.")
+	} else {
+		err := db.ForEachTenant(context.Background(), mapFunc)
+		if err != nil {
+			return errors.Wrap(err, "failed to propagate for all tenant")
+		}
+		l.Info("all tenants processed, exiting.")
+	}
+	return nil
 }
 
 func selectDbs(db store.DataStore, tenant string) ([]string, error) {
@@ -439,30 +450,30 @@ func tryPropagateIdDataInventoryForDb(
 	return err
 }
 
-func tryPropagateReportingForDb(
+func tryPropagateReportingForTenant(
 	db store.DataStore,
 	wflows orchestrator.ClientRunner,
-	dbname string,
+	tenant string,
 	dryRun bool,
 ) error {
 	l := log.NewEmpty()
 
-	l.Infof("propagating device data to reporting from DB: %s", dbname)
-
-	tenant := mstore.TenantFromDbName(dbname, mongo.DbName)
+	l.Infof("propagating device data to reporting for tenant %s", tenant)
 
 	ctx := context.Background()
 	if tenant != "" {
 		ctx = identity.WithContext(ctx, &identity.Identity{
 			Tenant: tenant,
 		})
+	} else {
+		return errors.New("you must provide a tenant id")
 	}
 
 	err := reindexDevicesReporting(ctx, db, wflows, tenant, dryRun)
 	if err != nil {
-		l.Infof("Done with DB %s, but there were errors: %s.", dbname, err.Error())
+		l.Infof("Done with tenant %s, but there were errors: %s.", tenant, err.Error())
 	} else {
-		l.Infof("Done with DB %s", dbname)
+		l.Infof("Done with tenant %s", tenant)
 	}
 
 	return err
