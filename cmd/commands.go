@@ -469,7 +469,7 @@ func tryPropagateReportingForTenant(
 		return errors.New("you must provide a tenant id")
 	}
 
-	err := reindexDevicesReporting(ctx, db, wflows, tenant, dryRun)
+	err := reindexDevicesReporting(ctx, db, wflows, dryRun)
 	if err != nil {
 		l.Infof("Done with tenant %s, but there were errors: %s.", tenant, err.Error())
 	} else {
@@ -483,7 +483,6 @@ func reindexDevicesReporting(
 	ctx context.Context,
 	db store.DataStore,
 	wflows orchestrator.ClientRunner,
-	tenant string,
 	dryRun bool,
 ) error {
 	var skip uint

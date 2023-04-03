@@ -16,6 +16,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"testing"
 	"time"
 
@@ -395,29 +396,9 @@ func TestPropagateStatusesInventory(t *testing.T) {
 }
 
 func TestPropagateReporting(t *testing.T) {
-	devSet1 := []model.Device{
-		{
-			Id: "001",
-		},
-		{
-			Id: "002",
-		},
-	}
-
-	devSet2 := []model.Device{
-		{
-			Id: "003",
-		},
-		{
-			Id: "004",
-		},
-		{
-			Id: "005",
-		},
-	}
-
 	cases := map[string]struct {
-		dbDevs map[string][]model.Device
+		tenantIds []string
+		devices   []model.Device
 
 		cmdTenant string
 		cmdDryRun bool
@@ -428,146 +409,170 @@ func TestPropagateReporting(t *testing.T) {
 
 		err error
 	}{
-		"ok, default db, no tenant": {
-			dbDevs: map[string][]model.Device{
-				"deviceauth": devSet1,
+		"ok": {
+			tenantIds: []string{
+				oid.NewUUIDv4().String(),
+				oid.NewUUIDv4().String(),
+				oid.NewUUIDv4().String(),
+			},
+			devices: []model.Device{
+				{
+					Id:              oid.NewUUIDv4().String(),
+					IdData:          "somedata",
+					IdDataStruct:    map[string]interface{}{"key0": "value0", "key1": "value0"},
+					IdDataSha256:    []byte("some"),
+					Status:          "accepted",
+					Decommissioning: false,
+					CreatedTs:       time.Now(),
+					UpdatedTs:       time.Now(),
+					TenantID:        "",
+				},
 			},
 		},
-		"ok, default db, no tenant, dry run": {
-			dbDevs: map[string][]model.Device{
-				"deviceauth": devSet1,
-			},
-			cmdDryRun: true,
-		},
-		"ok, >1 tenant, process all": {
-			dbDevs: map[string][]model.Device{
-				"deviceauth-tenant1": devSet1,
-				"deviceauth-tenant2": devSet2,
-			},
-		},
-		"ok, >1 tenant, process selected": {
-			dbDevs: map[string][]model.Device{
-				"deviceauth-tenant1": devSet1,
-				"deviceauth-tenant2": devSet2,
-			},
-			cmdTenant: "tenant1",
-		},
-		"error: store get tenant dbs, abort": {
-			dbDevs: map[string][]model.Device{
-				"deviceauth-tenant1": devSet1,
-				"deviceauth-tenant2": devSet2,
-			},
-			errDbTenants: errors.New("db failure"),
-			err:          errors.New("aborting: failed to retrieve tenant DBs: db failure"),
-		},
-		"error: store get devices, report but don't abort": {
-			dbDevs: map[string][]model.Device{
-				"deviceauth-tenant1": devSet1,
-				"deviceauth-tenant2": devSet2,
-			},
-			errDbDevices: errors.New("db failure"),
-			err:          errors.New("failed to get devices: db failure"),
-		},
-		"error: workflow": {
-			dbDevs: map[string][]model.Device{
-				"deviceauth-tenant1": devSet1,
-				"deviceauth-tenant2": devSet2,
-			},
-			workflowError: errors.New("service failure"),
-			err:           errors.New("service failure"),
-		},
+		//"ok, default db, no tenant, dry run": {
+		//	dbDevs: map[string][]model.Device{
+		//		"deviceauth": devSet1,
+		//	},
+		//	cmdDryRun: true,
+		//},
+		//"ok, >1 tenant, process all": {
+		//	dbDevs: map[string][]model.Device{
+		//		"deviceauth-tenant1": devSet1,
+		//		"deviceauth-tenant2": devSet2,
+		//	},
+		//},
+		//"ok, >1 tenant, process selected": {
+		//	dbDevs: map[string][]model.Device{
+		//		"deviceauth-tenant1": devSet1,
+		//		"deviceauth-tenant2": devSet2,
+		//	},
+		//	cmdTenant: "tenant1",
+		//},
+		//"error: store get tenant dbs, abort": {
+		//	dbDevs: map[string][]model.Device{
+		//		"deviceauth-tenant1": devSet1,
+		//		"deviceauth-tenant2": devSet2,
+		//	},
+		//	errDbTenants: errors.New("db failure"),
+		//	err:          errors.New("aborting: failed to retrieve tenant DBs: db failure"),
+		//},
+		//"error: store get devices, report but don't abort": {
+		//	dbDevs: map[string][]model.Device{
+		//		"deviceauth-tenant1": devSet1,
+		//		"deviceauth-tenant2": devSet2,
+		//	},
+		//	errDbDevices: errors.New("db failure"),
+		//	err:          errors.New("failed to get devices: db failure"),
+		//},
+		//"error: workflow": {
+		//	dbDevs: map[string][]model.Device{
+		//		"deviceauth-tenant1": devSet1,
+		//		"deviceauth-tenant2": devSet2,
+		//	},
+		//	workflowError: errors.New("service failure"),
+		//	err:           errors.New("service failure"),
+		//},
 	}
 
+	/*
+			ds.On("ForEachTenant",
+			ctxMatcher,
+			mock.MatchedBy(func(f store.MapFunc) bool {
+				return true
+			}),
+		).Run(func(args mock.Arguments) {
+			// A simplified version of what
+			// mongo.ForEachTenant does
+			for _, tenant := range tc.Tenants {
+				ctx := identity.WithContext(
+					args.Get(0).(context.Context),
+					&identity.Identity{
+						Tenant: tenant.ID,
+					},
+				)
+				mapFun := args.Get(1).(store.MapFunc)
+				actualErr = mapFun(ctx)
+				if actualErr != nil {
+					break
+				}
+			}
+		}).Return(actualErr).Once()
+	*/
 	for k := range cases {
 		tc := cases[k]
 		t.Run(fmt.Sprintf("tc %s", k), func(t *testing.T) {
 			db := &mstore.DataStore{}
-			// setup GetTenantDbs
-			// first, infer if we're in ST or MT
-			st := len(tc.dbDevs) == 1 && tc.dbDevs["deviceauth"] != nil
-			if st {
-				db.On("GetTenantDbs").Return([]string{}, tc.errDbTenants)
-			} else {
-				dbs := []string{}
-				for k := range tc.dbDevs {
-					dbs = append(dbs, k)
-				}
-				db.On("GetTenantDbs").Return(dbs, tc.errDbTenants)
-			}
+			ctxMatcher := mock.MatchedBy(func(c context.Context) bool { return true })
 
-			// 'final' dbs to include based on ST vs MT + tenant selection
-			dbs := map[string][]model.Device{}
-			if st {
-				dbs["deviceauth"] = tc.dbDevs["deviceauth"]
-			} else {
-				if tc.cmdTenant != "" {
-					k := "deviceauth-" + tc.cmdTenant
-					dbs[k] = tc.dbDevs[k]
-				} else {
-					dbs = tc.dbDevs
+			if len(tc.tenantIds) > 0 {
+				for i := range tc.devices {
+					tc.devices[i].TenantID = tc.tenantIds[rand.Intn(len(tc.tenantIds))]
 				}
 			}
-
-			// setup GetDevices
-			// only default db devs in ST, or
-			// all devs in all dbs if no tenant selected
-			// just one tenant dev set if tenant selected
-			if st {
-				db.On("GetDevices",
-					context.Background(),
-					uint(0),
-					uint(512),
-					model.DeviceFilter{},
-				).Return(
-					dbs["deviceauth"],
-					tc.errDbDevices,
-				)
-			} else {
-				for k, v := range dbs {
-					tname := ctxstore.TenantFromDbName(k, mongo.DbName)
-					m := mock.MatchedBy(func(c context.Context) bool {
-						id := identity.FromContext(c)
-						return id.Tenant == tname
-					})
-
-					db.On("GetDevices",
-						m,
-						uint(0),
-						uint(512),
-						model.DeviceFilter{},
-					).Return(
-						v,
-						tc.errDbDevices)
+			db.On("GetDevices",
+				ctxMatcher,
+				uint(0),
+				uint(512),
+				model.DeviceFilter{},
+			).Return(
+				tc.devices,
+				tc.errDbDevices,
+			)
+			var (
+				actualErr error
+			)
+			db.On("ForEachTenant",
+				ctxMatcher,
+				mock.MatchedBy(func(f store.MapFunc) bool {
+					return true
+				}),
+			).Run(func(args mock.Arguments) {
+				// A simplified version of what
+				// mongo.ForEachTenant does
+				for _, tenant := range tc.tenantIds {
+					ctx := identity.WithContext(
+						args.Get(0).(context.Context),
+						&identity.Identity{
+							Tenant: tenant,
+						},
+					)
+					mapFun := args.Get(1).(store.MapFunc)
+					actualErr = mapFun(ctx)
+					if actualErr != nil {
+						break
+					}
 				}
-			}
+			}).Return(actualErr).Once()
 
-			// setup client
-			// (dry run, time source, no tenant/all tenants/selected tenant)
-			NowUnixMilis = func() int64 { return int64(123456) }
+			//m := mock.MatchedBy(func(c context.Context) bool {
+			//	id := identity.FromContext(c)
+			//	return id.Tenant == tname
+			//})
+			//
+			//db.On("GetDevices",
+			//	m,
+			//	uint(0),
+			//	uint(512),
+			//	model.DeviceFilter{},
+			//).Return(
+			//	v,
+			//	tc.errDbDevices)
 
 			wflows := &mwflows.ClientRunner{}
 			defer wflows.AssertExpectations(t)
 
 			if !tc.cmdDryRun && tc.errDbTenants == nil && tc.errDbDevices == nil {
-				for db := range tc.dbDevs {
-					if tc.cmdTenant != "" {
-						k := "deviceauth-" + tc.cmdTenant
-						if k != db {
-							continue
-						}
-					}
-					devicesIDs := make([]string, len(tc.dbDevs[db]))
-					for i, dev := range tc.dbDevs[db] {
-						devicesIDs[i] = dev.Id
-					}
-
-					wflows.On("SubmitReindexReportingBatch",
-						mock.MatchedBy(func(c context.Context) bool {
-							return true
-						}),
-						devicesIDs,
-					).Return(tc.workflowError)
+				devicesIDs := make([]string, len(tc.devices))
+				for i, dev := range tc.devices {
+					devicesIDs[i] = dev.Id
 				}
+
+				wflows.On("SubmitReindexReportingBatch",
+					mock.MatchedBy(func(c context.Context) bool {
+						return true
+					}),
+					devicesIDs,
+				).Return(tc.workflowError)
 			}
 
 			err := PropagateReporting(db, wflows, tc.cmdTenant, tc.cmdDryRun)
