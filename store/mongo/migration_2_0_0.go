@@ -203,7 +203,10 @@ func (m *migration_2_0_0) Up(from migrate.Version) error {
 		collOut := client.Database(DbName).Collection(collection)
 		if databaseName == DbName {
 			indices := collOut.Indexes()
-			indices.DropAll(ctx)
+			_, err := indices.DropAll(ctx)
+			if err != nil {
+				return err
+			}
 
 			if len(idxes.Indexes) > 0 {
 				_, err := collOut.Indexes().CreateMany(ctx, collections[collection].Indexes)
