@@ -856,7 +856,12 @@ func (db *DataStoreMongo) GetDevCountByStatus(ctx context.Context, status string
 }
 
 func (db *DataStoreMongo) GetDeviceStatus(ctx context.Context, devId string) (string, error) {
-	return getDeviceStatusDB(db, DbName, ctx, devId)
+	id := identity.FromContext(ctx)
+	tenantId := ""
+	if id != nil {
+		tenantId = id.Tenant
+	}
+	return getDeviceStatusDB(db, DbName, tenantId, ctx, devId)
 }
 
 func getDeviceStatus(statuses map[string]int) (string, error) {
@@ -883,20 +888,22 @@ func getDeviceStatus(statuses map[string]int) (string, error) {
 	return "", store.ErrDevStatusBroken
 }
 
-func getDeviceStatusDB(db *DataStoreMongo, dbName string, ctx context.Context, devId string) (string, error) {
+func getDeviceStatusDB(
+	db *DataStoreMongo,
+	dbName string,
+	tenantId string,
+	ctx context.Context,
+	devId string,
+) (string, error) {
 	var statuses = map[string]int{}
 
 	c := db.client.Database(dbName).Collection(DbAuthSetColl)
 
-	// get device auth sets; group by status
-	id := identity.FromContext(ctx)
-	tenantId := ""
-	if id != nil {
-		tenantId = id.Tenant
-	}
 	filter := model.AuthSet{
 		DeviceId: devId,
-		TenantID: tenantId,
+	}
+	if tenantId != "" {
+		filter.TenantID = tenantId
 	}
 
 	match := bson.D{

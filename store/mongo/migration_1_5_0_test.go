@@ -160,7 +160,13 @@ UwIDAQAB
 
 		assert.NoError(t, err)
 
-		status, err := getDeviceStatusDB(db, ctxstore.DbFromContext(ctx, DbName), ctx, dev.Id)
+		status, err := getDeviceStatusDB(
+			db,
+			ctxstore.DbFromContext(ctx, DbName),
+			"",
+			ctx,
+			dev.Id,
+		)
 
 		assert.NoError(t, err)
 		assert.Equal(t, status, dev.Status)

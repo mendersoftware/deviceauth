@@ -175,7 +175,13 @@ UwIDAQAB
 		if noAuthSets {
 			status = model.DevStatusRejected
 		} else {
-			status, err = getDeviceStatusDB(db, ctxstore.DbFromContext(ctx, DbName), ctx, d.Id)
+			status, err = getDeviceStatusDB(
+				db,
+				ctxstore.DbFromContext(ctx, DbName),
+				"",
+				ctx,
+				d.Id,
+			)
 			assert.NoError(t, err)
 		}
 
