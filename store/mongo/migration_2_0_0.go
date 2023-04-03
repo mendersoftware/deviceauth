@@ -61,7 +61,7 @@ var DbDevicesCollectionIndices = []mongo.IndexModel{
 			{Key: mstore.FieldTenantID, Value: 1},
 			{Key: dbFieldIDDataSha, Value: 1},
 		},
-		//nolint
+		//nolint:staticcheck // SA1019
 		Options: mopts.Index().
 			SetName(strings.Join([]string{
 				mstore.FieldTenantID,
@@ -76,7 +76,7 @@ var DbDevicesCollectionIndices = []mongo.IndexModel{
 			{Key: dbFieldStatus, Value: 1},
 			{Key: dbFieldID, Value: 1},
 		},
-		//nolint
+		//nolint:staticcheck // SA1019
 		Options: mopts.Index().
 			SetName(strings.Join([]string{
 				mstore.FieldTenantID,
