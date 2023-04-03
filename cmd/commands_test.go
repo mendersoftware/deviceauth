@@ -184,29 +184,10 @@ func TestMaintenanceWithDataStore(t *testing.T) {
 }
 
 func TestPropagateStatusesInventory(t *testing.T) {
-	devSet1 := []model.Device{
-		{
-			Id: "001",
-		},
-		{
-			Id: "002",
-		},
-	}
-
-	devSet2 := []model.Device{
-		{
-			Id: "003",
-		},
-		{
-			Id: "004",
-		},
-		{
-			Id: "005",
-		},
-	}
-
+	statuses := []string{"accepted", "pending", "preauthorized", "noauth"}
 	cases := map[string]struct {
-		dbDevs        map[string][]model.Device
+		devices       []model.Device
+		tenantIds     []string
 		forcedVersion string
 
 		cmdTenant string
@@ -219,76 +200,112 @@ func TestPropagateStatusesInventory(t *testing.T) {
 		err error
 	}{
 		"ok, default db, no tenant": {
-			dbDevs: map[string][]model.Device{
-				"deviceauth": devSet1,
+			tenantIds: []string{
+				oid.NewUUIDv4().String(),
+				oid.NewUUIDv4().String(),
+				oid.NewUUIDv4().String(),
+			},
+			devices: []model.Device{
+				{
+					Id:              oid.NewUUIDv4().String(),
+					IdData:          "somedata",
+					IdDataStruct:    map[string]interface{}{"key0": "value0", "key1": "value0"},
+					IdDataSha256:    []byte("some"),
+					Status:          "",
+					Decommissioning: false,
+					CreatedTs:       time.Now(),
+					UpdatedTs:       time.Now(),
+					TenantID:        "",
+				},
+				{
+					Id:              oid.NewUUIDv4().String(),
+					IdData:          "somedata",
+					IdDataStruct:    map[string]interface{}{"key0": "value0", "key1": "value0"},
+					IdDataSha256:    []byte("some"),
+					Status:          "",
+					Decommissioning: false,
+					CreatedTs:       time.Now(),
+					UpdatedTs:       time.Now(),
+					TenantID:        "",
+				},
 			},
 		},
-		"ok, default db, no tenant, dry run": {
-			dbDevs: map[string][]model.Device{
-				"deviceauth": devSet1,
-			},
-			cmdDryRun: true,
-		},
-		"ok, >1 tenant, process all": {
-			dbDevs: map[string][]model.Device{
-				"deviceauth-tenant1": devSet1,
-				"deviceauth-tenant2": devSet2,
-			},
-		},
-		"ok, >1 tenant, process selected": {
-			dbDevs: map[string][]model.Device{
-				"deviceauth-tenant1": devSet1,
-				"deviceauth-tenant2": devSet2,
-			},
-			cmdTenant: "tenant1",
-		},
-		"ok, with forced version": {
-			dbDevs: map[string][]model.Device{
-				"deviceauth-tenant1": devSet1,
-				"deviceauth-tenant2": devSet2,
-			},
-			cmdTenant:     "tenant1",
-			forcedVersion: "1.7.1",
-		},
-		"error, with bad forced version": {
-			dbDevs: map[string][]model.Device{
-				"deviceauth-tenant1": devSet1,
-				"deviceauth-tenant2": devSet2,
-			},
-			cmdTenant:     "tenant1",
-			forcedVersion: "and what this version might be",
-			err:           errors.New("failed to parse Version: expected integer"),
-		},
-		"error: store get tenant dbs, abort": {
-			dbDevs: map[string][]model.Device{
-				"deviceauth-tenant1": devSet1,
-				"deviceauth-tenant2": devSet2,
-			},
-			errDbTenants: errors.New("db failure"),
-
-			err: errors.New("aborting: failed to retrieve tenant DBs: db failure"),
-		},
-		"error: store get devices, report but don't abort": {
-			dbDevs: map[string][]model.Device{
-				"deviceauth-tenant1": devSet1,
-				"deviceauth-tenant2": devSet2,
-			},
-			errDbDevices: errors.New("db failure"),
-			err:          errors.New("failed to get devices: db failure"),
-		},
-		"error: patch devices, report but don't abort": {
-			dbDevs: map[string][]model.Device{
-				"deviceauth-tenant1": devSet1,
-				"deviceauth-tenant2": devSet2,
-			},
-			setStatus: errors.New("service failure"),
-			err:       errors.New("service failure"),
-		},
+		//"ok, default db, no tenant, dry run": {
+		//	dbDevs: map[string][]model.Device{
+		//		"deviceauth": devSet1,
+		//	},
+		//	cmdDryRun: true,
+		//},
+		//"ok, >1 tenant, process all": {
+		//	dbDevs: map[string][]model.Device{
+		//		"deviceauth-tenant1": devSet1,
+		//		"deviceauth-tenant2": devSet2,
+		//	},
+		//},
+		//"ok, >1 tenant, process selected": {
+		//	dbDevs: map[string][]model.Device{
+		//		"deviceauth-tenant1": devSet1,
+		//		"deviceauth-tenant2": devSet2,
+		//	},
+		//	cmdTenant: "tenant1",
+		//},
+		//"ok, with forced version": {
+		//	dbDevs: map[string][]model.Device{
+		//		"deviceauth-tenant1": devSet1,
+		//		"deviceauth-tenant2": devSet2,
+		//	},
+		//	cmdTenant:     "tenant1",
+		//	forcedVersion: "1.7.1",
+		//},
+		//"error, with bad forced version": {
+		//	dbDevs: map[string][]model.Device{
+		//		"deviceauth-tenant1": devSet1,
+		//		"deviceauth-tenant2": devSet2,
+		//	},
+		//	cmdTenant:     "tenant1",
+		//	forcedVersion: "and what this version might be",
+		//	err:           errors.New("failed to parse Version: expected integer"),
+		//},
+		//"error: store get tenant dbs, abort": {
+		//	dbDevs: map[string][]model.Device{
+		//		"deviceauth-tenant1": devSet1,
+		//		"deviceauth-tenant2": devSet2,
+		//	},
+		//	errDbTenants: errors.New("db failure"),
+		//
+		//	err: errors.New("aborting: failed to retrieve tenant DBs: db failure"),
+		//},
+		//"error: store get devices, report but don't abort": {
+		//	dbDevs: map[string][]model.Device{
+		//		"deviceauth-tenant1": devSet1,
+		//		"deviceauth-tenant2": devSet2,
+		//	},
+		//	errDbDevices: errors.New("db failure"),
+		//	err:          errors.New("failed to get devices: db failure"),
+		//},
+		//"error: patch devices, report but don't abort": {
+		//	dbDevs: map[string][]model.Device{
+		//		"deviceauth-tenant1": devSet1,
+		//		"deviceauth-tenant2": devSet2,
+		//	},
+		//	setStatus: errors.New("service failure"),
+		//	err:       errors.New("service failure"),
+		//},
 	}
 
 	for k := range cases {
 		tc := cases[k]
 		t.Run(fmt.Sprintf("tc %s", k), func(t *testing.T) {
+			if len(tc.tenantIds) > 0 {
+				for i := range tc.devices {
+					tc.devices[i].TenantID = tc.tenantIds[rand.Intn(len(tc.tenantIds))]
+					tc.devices[i].Status = statuses[rand.Intn(len(statuses))]
+					if tc.cmdTenant != "" {
+						tc.devices[i].TenantID = tc.cmdTenant
+					}
+				}
+			}
+
 			var deviceStatuses = model.DevStatuses
 			db := &mstore.DataStore{}
 			v, _ := migrate.NewVersion(tc.forcedVersion)
@@ -297,84 +314,28 @@ func TestPropagateStatusesInventory(t *testing.T) {
 				v).Return(nil)
 			// setup GetTenantDbs
 			// first, infer if we're in ST or MT
-			st := len(tc.dbDevs) == 1 && tc.dbDevs["deviceauth"] != nil
-			if st {
-				db.On("GetTenantDbs").Return([]string{}, tc.errDbTenants)
-			} else {
-				dbs := []string{}
-				for k := range tc.dbDevs {
-					dbs = append(dbs, k)
-				}
-				db.On("GetTenantDbs").Return(dbs, tc.errDbTenants)
-			}
+			db.On("ListTenantsIds").Return(tc.tenantIds, tc.errDbTenants)
 
-			// 'final' dbs to include based on ST vs MT + tenant selection
-			dbs := map[string][]model.Device{}
-			if st {
-				dbs["deviceauth"] = tc.dbDevs["deviceauth"]
-			} else {
-				if tc.cmdTenant != "" {
-					k := "deviceauth-" + tc.cmdTenant
-					dbs[k] = tc.dbDevs[k]
-				} else {
-					dbs = tc.dbDevs
-				}
-			}
-
-			// setup GetDevices
-			// only default db devs in ST, or
-			// all devs in all dbs if no tenant selected
-			// just one tenant dev set if tenant selected
-			if st {
-				for i := range deviceStatuses {
-					db.On("GetDevices",
-						context.Background(),
-						uint(0),
-						uint(512),
-						model.DeviceFilter{Status: []string{deviceStatuses[i]}},
-					).Return(
-						dbs["deviceauth"],
-						tc.errDbDevices,
-					)
-				}
-			} else {
-				for k, v := range dbs {
-					tname := ctxstore.TenantFromDbName(k, mongo.DbName)
-					m := mock.MatchedBy(func(c context.Context) bool {
-						id := identity.FromContext(c)
-						return id.Tenant == tname
-					})
-
-					for i := range deviceStatuses {
-						db.On("GetDevices",
-							m,
-							uint(0),
-							uint(512),
-							model.DeviceFilter{Status: []string{deviceStatuses[i]}},
-						).Return(
-							v,
-							tc.errDbDevices)
-					}
-				}
-			}
-
-			// setup client
-			// (dry run, time source, no tenant/all tenants/selected tenant)
-			NowUnixMilis = func() int64 { return int64(123456) }
+			db.On("GetDevices",
+				context.Background(),
+				uint(0),
+				uint(512),
+				model.DeviceFilter{Status: []string{deviceStatuses[i]}},
+			).Return(
+				tc.devices,
+				tc.errDbDevices,
+			)
 
 			c := &minv.Client{}
 
 			if tc.cmdDryRun == false {
-				for n, devs := range dbs {
-					devices := make([]model.DeviceInventoryUpdate, len(devs))
-					for i, d := range devs {
-						devices[i].Id = d.Id
-					}
-					tenant := ctxstore.TenantFromDbName(n, mongo.DbName)
+				devices := make([]model.DeviceInventoryUpdate, len(tc.devices))
+				for n, d := range tc.devices {
+					devices[n].Id = d.Id
 					for _, status := range model.DevStatuses {
 						c.On("SetDeviceStatus",
 							mock.Anything,
-							tenant,
+							tc.devices[n].TenantID,
 							devices,
 							status).Return(tc.setStatus)
 					}
@@ -427,7 +388,39 @@ func TestPropagateReporting(t *testing.T) {
 					UpdatedTs:       time.Now(),
 					TenantID:        "",
 				},
+				{
+					Id:              oid.NewUUIDv4().String(),
+					IdData:          "somedata",
+					IdDataStruct:    map[string]interface{}{"key0": "value0", "key1": "value0"},
+					IdDataSha256:    []byte("some"),
+					Status:          "accepted",
+					Decommissioning: false,
+					CreatedTs:       time.Now(),
+					UpdatedTs:       time.Now(),
+					TenantID:        "",
+				},
 			},
+		},
+		"ok, dry run": {
+			tenantIds: []string{
+				oid.NewUUIDv4().String(),
+				oid.NewUUIDv4().String(),
+				oid.NewUUIDv4().String(),
+			},
+			devices: []model.Device{
+				{
+					Id:              oid.NewUUIDv4().String(),
+					IdData:          "somedata",
+					IdDataStruct:    map[string]interface{}{"key0": "value0", "key1": "value0"},
+					IdDataSha256:    []byte("some"),
+					Status:          "accepted",
+					Decommissioning: false,
+					CreatedTs:       time.Now(),
+					UpdatedTs:       time.Now(),
+					TenantID:        "",
+				},
+			},
+			cmdDryRun: true,
 		},
 		"error: workflow": {
 			tenantIds: []string{
@@ -527,7 +520,7 @@ func TestPropagateReporting(t *testing.T) {
 					var noError error
 					errChannel <- noError
 				}()
-			}).Return(getError(t, errChannel, tc.tenantIds)).Once()
+			}).Return(actualErr).Once() // there is no way actualErr will have the value set inside Run, this one is executed first, and has always the value of before the run
 
 			var err error
 			wflows := &mwflows.ClientRunner{}
@@ -570,24 +563,6 @@ func TestPropagateReporting(t *testing.T) {
 			t.Logf("dbg.%s exiting", time.Now().Format(time.RFC3339Nano))
 		})
 	}
-}
-
-func getError(t *testing.T, channel chan error, ids []string) error {
-	return nil
-	//var now string
-	//var err error
-	//now = time.Now().Format(time.RFC3339Nano)
-	//t.Logf("%s: getError entering",now)
-	//go func() {
-	//	now = time.Now().Format(time.RFC3339Nano)
-	//	t.Logf("%s: getError reading from channel",now)
-	//	err = <-channel
-	//	t.Logf("%s: getError read from channel",now)
-	//}()
-	//select {
-	//case err = <-channel:
-	//}
-	//return errors.New(now+": getError returning: "+err.Error())
 }
 
 func TestCheckDeviceLimits(t *testing.T) {

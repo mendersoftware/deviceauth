@@ -179,24 +179,28 @@ func PropagateStatusesInventory(
 	migrationVersion string,
 	dryRun bool,
 ) error {
-	l := log.NewEmpty()
+	var err error
 
-	dbs, err := selectDbs(db, tenant)
-	if err != nil {
-		return errors.Wrap(err, "aborting")
+	l := log.NewEmpty()
+	tenants := []string{tenant}
+	if tenant == "" {
+		tenants, err = db.ListTenantsIds(context.Background())
+		if err != nil {
+			return errors.Wrap(err, "cant list tenants")
+		}
 	}
 
 	var errReturned error
-	for _, d := range dbs {
-		err := tryPropagateStatusesInventoryForDb(db, c, d, migrationVersion, dryRun)
+	for _, t := range tenants {
+		err = tryPropagateStatusesInventoryForTenant(db, c, t, migrationVersion, dryRun)
 		if err != nil {
 			errReturned = err
-			l.Errorf("giving up on DB %s due to fatal error: %s", d, err.Error())
+			l.Errorf("giving up on tenant %s due to fatal error: %s", t, err.Error())
 			continue
 		}
 	}
 
-	l.Info("all DBs processed, exiting.")
+	l.Info("all tenants processed, exiting.")
 	return errReturned
 }
 
@@ -359,18 +363,16 @@ func updateDevicesIdData(
 	return nil
 }
 
-func tryPropagateStatusesInventoryForDb(
+func tryPropagateStatusesInventoryForTenant(
 	db store.DataStore,
 	c cinv.Client,
-	dbname string,
+	tenant string,
 	migrationVersion string,
 	dryRun bool,
 ) error {
 	l := log.NewEmpty()
 
-	l.Infof("propagating device statuses to inventory from DB: %s", dbname)
-
-	tenant := mstore.TenantFromDbName(dbname, mongo.DbName)
+	l.Infof("propagating device statuses to inventory from tenant: %s", tenant)
 
 	ctx := context.Background()
 	if tenant != "" {
@@ -385,22 +387,22 @@ func tryPropagateStatusesInventoryForDb(
 		err = updateDevicesStatus(ctx, db, c, tenant, status, dryRun)
 		if err != nil {
 			l.Infof(
-				"Done with DB %s status=%s, but there were errors: %s.",
-				dbname,
+				"Done with tenant %s status=%s, but there were errors: %s.",
+				tenant,
 				status,
 				err.Error(),
 			)
 			errReturned = err
 		} else {
-			l.Infof("Done with DB %s status=%s", dbname, status)
+			l.Infof("Done with tenant %s status=%s", tenant, status)
 		}
 	}
 	if migrationVersion != "" && !dryRun {
 		if errReturned != nil {
 			l.Warnf(
-				"Will not store %s migration version in %s.migration_info due to errors.",
+				"Will not store %s migration version for tenant %s due to errors.",
 				migrationVersion,
-				dbname,
+				tenant,
 			)
 		} else {
 			version, err := migrate.NewVersion(migrationVersion)
@@ -409,7 +411,7 @@ func tryPropagateStatusesInventoryForDb(
 					"Will not store %s migration version in %s.migration_info due to bad version"+
 						" provided.",
 					migrationVersion,
-					dbname,
+					tenant,
 				)
 				errReturned = err
 			} else {
