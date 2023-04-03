@@ -409,25 +409,47 @@ func TestPropagateReporting(t *testing.T) {
 
 		err error
 	}{
-		"ok": {
-			tenantIds: []string{
-				oid.NewUUIDv4().String(),
-				oid.NewUUIDv4().String(),
-				oid.NewUUIDv4().String(),
-			},
-			devices: []model.Device{
-				{
-					Id:              oid.NewUUIDv4().String(),
-					IdData:          "somedata",
-					IdDataStruct:    map[string]interface{}{"key0": "value0", "key1": "value0"},
-					IdDataSha256:    []byte("some"),
-					Status:          "accepted",
-					Decommissioning: false,
-					CreatedTs:       time.Now(),
-					UpdatedTs:       time.Now(),
-					TenantID:        "",
+		//"ok": {
+		//	tenantIds: []string{
+		//		oid.NewUUIDv4().String(),
+		//		oid.NewUUIDv4().String(),
+		//		oid.NewUUIDv4().String(),
+		//	},
+		//	devices: []model.Device{
+		//		{
+		//			Id:              oid.NewUUIDv4().String(),
+		//			IdData:          "somedata",
+		//			IdDataStruct:    map[string]interface{}{"key0": "value0", "key1": "value0"},
+		//			IdDataSha256:    []byte("some"),
+		//			Status:          "accepted",
+		//			Decommissioning: false,
+		//			CreatedTs:       time.Now(),
+		//			UpdatedTs:       time.Now(),
+		//			TenantID:        "",
+		//		},
+		//	},
+		//},
+		"error: workflow": {
+				tenantIds: []string{
+					oid.NewUUIDv4().String(),
+					oid.NewUUIDv4().String(),
+					oid.NewUUIDv4().String(),
 				},
-			},
+				devices: []model.Device{
+					{
+						Id:              oid.NewUUIDv4().String(),
+						IdData:          "somedata",
+						IdDataStruct:    map[string]interface{}{"key0": "value0", "key1": "value0"},
+						IdDataSha256:    []byte("some"),
+						Status:          "accepted",
+						Decommissioning: false,
+						CreatedTs:       time.Now(),
+						UpdatedTs:       time.Now(),
+						TenantID:        "",
+					},
+				},
+			workflowError: errors.New("service failure"),
+			err:           errors.New("service failure"),
 		},
 		//"ok, default db, no tenant, dry run": {
 		//	dbDevs: map[string][]model.Device{
@@ -463,14 +485,6 @@ func TestPropagateReporting(t *testing.T) {
 		//	},
 		//	errDbDevices: errors.New("db failure"),
 		//	err:          errors.New("failed to get devices: db failure"),
-		//},
-		//"error: workflow": {
-		//	dbDevs: map[string][]model.Device{
-		//		"deviceauth-tenant1": devSet1,
-		//		"deviceauth-tenant2": devSet2,
-		//	},
-		//	workflowError: errors.New("service failure"),
-		//	err:           errors.New("service failure"),
 		//},
 	}
 
