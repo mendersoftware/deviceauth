@@ -203,10 +203,7 @@ func (m *migration_2_0_0) Up(from migrate.Version) error {
 		collOut := client.Database(DbName).Collection(collection)
 		if databaseName == DbName {
 			indices := collOut.Indexes()
-			_, err := indices.DropAll(ctx)
-			if err != nil {
-				return err
-			}
+			_, _ = indices.DropAll(ctx)
 
 			if len(idxes.Indexes) > 0 {
 				_, err := collOut.Indexes().CreateMany(ctx, collections[collection].Indexes)
@@ -214,7 +211,7 @@ func (m *migration_2_0_0) Up(from migrate.Version) error {
 					return err
 				}
 			}
-			_, err = collOut.UpdateMany(ctx, bson.D{
+			_, err := collOut.UpdateMany(ctx, bson.D{
 				{Key: mstore.FieldTenantID, Value: bson.D{
 					{Key: "$exists", Value: false},
 				}},
