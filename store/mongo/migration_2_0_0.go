@@ -214,7 +214,7 @@ func (m *migration_2_0_0) Up(from migrate.Version) error {
 					return err
 				}
 			}
-			_, err := collOut.UpdateMany(ctx, bson.D{
+			_, err = collOut.UpdateMany(ctx, bson.D{
 				{Key: mstore.FieldTenantID, Value: bson.D{
 					{Key: "$exists", Value: false},
 				}},
