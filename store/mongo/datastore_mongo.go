@@ -889,9 +889,14 @@ func getDeviceStatusDB(db *DataStoreMongo, dbName string, ctx context.Context, d
 	c := db.client.Database(dbName).Collection(DbAuthSetColl)
 
 	// get device auth sets; group by status
-
+	id := identity.FromContext(ctx)
+	tenantId := ""
+	if id != nil {
+		tenantId = id.Tenant
+	}
 	filter := model.AuthSet{
 		DeviceId: devId,
+		TenantID: tenantId,
 	}
 
 	match := bson.D{
