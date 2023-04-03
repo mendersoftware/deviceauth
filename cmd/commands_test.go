@@ -430,24 +430,24 @@ func TestPropagateReporting(t *testing.T) {
 		//	},
 		//},
 		"error: workflow": {
-				tenantIds: []string{
-					oid.NewUUIDv4().String(),
-					oid.NewUUIDv4().String(),
-					oid.NewUUIDv4().String(),
+			tenantIds: []string{
+				oid.NewUUIDv4().String(),
+				oid.NewUUIDv4().String(),
+				oid.NewUUIDv4().String(),
+			},
+			devices: []model.Device{
+				{
+					Id:              oid.NewUUIDv4().String(),
+					IdData:          "somedata",
+					IdDataStruct:    map[string]interface{}{"key0": "value0", "key1": "value0"},
+					IdDataSha256:    []byte("some"),
+					Status:          "accepted",
+					Decommissioning: false,
+					CreatedTs:       time.Now(),
+					UpdatedTs:       time.Now(),
+					TenantID:        "",
 				},
-				devices: []model.Device{
-					{
-						Id:              oid.NewUUIDv4().String(),
-						IdData:          "somedata",
-						IdDataStruct:    map[string]interface{}{"key0": "value0", "key1": "value0"},
-						IdDataSha256:    []byte("some"),
-						Status:          "accepted",
-						Decommissioning: false,
-						CreatedTs:       time.Now(),
-						UpdatedTs:       time.Now(),
-						TenantID:        "",
-					},
-				},
+			},
 			workflowError: errors.New("service failure"),
 			err:           errors.New("service failure"),
 		},
@@ -535,29 +535,44 @@ func TestPropagateReporting(t *testing.T) {
 			var (
 				actualErr error
 			)
+			errChannel := make(chan error, 1)
 			db.On("ForEachTenant",
 				ctxMatcher,
 				mock.MatchedBy(func(f store.MapFunc) bool {
 					return true
 				}),
 			).Run(func(args mock.Arguments) {
-				// A simplified version of what
-				// mongo.ForEachTenant does
-				for _, tenant := range tc.tenantIds {
-					ctx := identity.WithContext(
-						args.Get(0).(context.Context),
-						&identity.Identity{
-							Tenant: tenant,
-						},
-					)
-					mapFun := args.Get(1).(store.MapFunc)
-					actualErr = mapFun(ctx)
-					if actualErr != nil {
-						break
+				go func() {
+					// A simplified version of what
+					// mongo.ForEachTenant does
+					for _, tenant := range tc.tenantIds {
+						t.Logf("dbg.%s: here-100", time.Now().Format(time.RFC3339Nano))
+						ctx := identity.WithContext(
+							args.Get(0).(context.Context),
+							&identity.Identity{
+								Tenant: tenant,
+							},
+						)
+						mapFun := args.Get(1).(store.MapFunc)
+						actualErr = mapFun(ctx)
+						if actualErr != nil {
+							t.Logf("dbg.%s: here0: actual->channel: %+v", time.Now().Format(time.RFC3339Nano), actualErr)
+							errChannel<-actualErr
+							break
+						}
 					}
-				}
-			}).Return(actualErr).Once()
+				}()
+			}).Return(getError(t, errChannel, tc.tenantIds)).Once()
 
+			var err error
+			go func() {
+				time.Sleep(15 * time.Second)
+				t.Logf("dbg.%s: here0010: about to read from channel", time.Now().Format(time.RFC3339Nano))
+				err = <-errChannel
+				t.Logf("dbg.%s: here0010: read from channel: %+v", time.Now().Format(time.RFC3339Nano), err)
+			}()
+			
+			//t.Logf("%s: here0020: read from channel: %+v", time.Now().Format(time.RFC3339Nano), err)
 			//m := mock.MatchedBy(func(c context.Context) bool {
 			//	id := identity.FromContext(c)
 			//	return id.Tenant == tname
@@ -589,14 +604,37 @@ func TestPropagateReporting(t *testing.T) {
 				).Return(tc.workflowError)
 			}
 
-			err := PropagateReporting(db, wflows, tc.cmdTenant, tc.cmdDryRun)
-			if tc.err != nil {
-				assert.EqualError(t, err, tc.err.Error())
-			} else {
-				assert.NoError(t, err)
-			}
+			go func() {
+				err = PropagateReporting(db, wflows, tc.cmdTenant, tc.cmdDryRun)
+				if tc.err != nil {
+					assert.EqualError(t, err, tc.err.Error())
+				} else {
+					assert.NoError(t, err)
+				}
+			}()
+			t.Logf("dbg.%s final sleep", time.Now().Format(time.RFC3339Nano))
+			time.Sleep(32 * time.Second)
+			t.Logf("dbg.%s exiting", time.Now().Format(time.RFC3339Nano))
 		})
 	}
+}
+
+func getError(t *testing.T, channel chan error, ids []string) error {
+	return nil
+	//var now string
+	//var err error
+	//now = time.Now().Format(time.RFC3339Nano)
+	//t.Logf("%s: getError entering",now)
+	//go func() {
+	//	now = time.Now().Format(time.RFC3339Nano)
+	//	t.Logf("%s: getError reading from channel",now)
+	//	err = <-channel
+	//	t.Logf("%s: getError read from channel",now)
+	//}()
+	//select {
+	//case err = <-channel:
+	//}
+	//return errors.New(now+": getError returning: "+err.Error())
 }
 
 func TestCheckDeviceLimits(t *testing.T) {
