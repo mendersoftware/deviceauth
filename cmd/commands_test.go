@@ -451,67 +451,30 @@ func TestPropagateReporting(t *testing.T) {
 			workflowError: errors.New("service failure"),
 			err:           errors.New("service failure"),
 		},
-		//"ok, default db, no tenant, dry run": {
-		//	dbDevs: map[string][]model.Device{
-		//		"deviceauth": devSet1,
-		//	},
-		//	cmdDryRun: true,
-		//},
-		//"ok, >1 tenant, process all": {
-		//	dbDevs: map[string][]model.Device{
-		//		"deviceauth-tenant1": devSet1,
-		//		"deviceauth-tenant2": devSet2,
-		//	},
-		//},
-		//"ok, >1 tenant, process selected": {
-		//	dbDevs: map[string][]model.Device{
-		//		"deviceauth-tenant1": devSet1,
-		//		"deviceauth-tenant2": devSet2,
-		//	},
-		//	cmdTenant: "tenant1",
-		//},
-		//"error: store get tenant dbs, abort": {
-		//	dbDevs: map[string][]model.Device{
-		//		"deviceauth-tenant1": devSet1,
-		//		"deviceauth-tenant2": devSet2,
-		//	},
-		//	errDbTenants: errors.New("db failure"),
-		//	err:          errors.New("aborting: failed to retrieve tenant DBs: db failure"),
-		//},
-		//"error: store get devices, report but don't abort": {
-		//	dbDevs: map[string][]model.Device{
-		//		"deviceauth-tenant1": devSet1,
-		//		"deviceauth-tenant2": devSet2,
-		//	},
-		//	errDbDevices: errors.New("db failure"),
-		//	err:          errors.New("failed to get devices: db failure"),
-		//},
+		"error: db failure: devices": {
+			tenantIds: []string{
+				oid.NewUUIDv4().String(),
+				oid.NewUUIDv4().String(),
+				oid.NewUUIDv4().String(),
+			},
+			devices: []model.Device{
+				{
+					Id:              oid.NewUUIDv4().String(),
+					IdData:          "somedata",
+					IdDataStruct:    map[string]interface{}{"key0": "value0", "key1": "value0"},
+					IdDataSha256:    []byte("some"),
+					Status:          "accepted",
+					Decommissioning: false,
+					CreatedTs:       time.Now(),
+					UpdatedTs:       time.Now(),
+					TenantID:        "",
+				},
+			},
+			errDbDevices: errors.New("db failure"),
+			err:          errors.New("failed to get devices: db failure"),
+		},
 	}
 
-	/*
-			ds.On("ForEachTenant",
-			ctxMatcher,
-			mock.MatchedBy(func(f store.MapFunc) bool {
-				return true
-			}),
-		).Run(func(args mock.Arguments) {
-			// A simplified version of what
-			// mongo.ForEachTenant does
-			for _, tenant := range tc.Tenants {
-				ctx := identity.WithContext(
-					args.Get(0).(context.Context),
-					&identity.Identity{
-						Tenant: tenant.ID,
-					},
-				)
-				mapFun := args.Get(1).(store.MapFunc)
-				actualErr = mapFun(ctx)
-				if actualErr != nil {
-					break
-				}
-			}
-		}).Return(actualErr).Once()
-	*/
 	for k := range cases {
 		tc := cases[k]
 		t.Run(fmt.Sprintf("tc %s", k), func(t *testing.T) {
@@ -557,38 +520,16 @@ func TestPropagateReporting(t *testing.T) {
 						actualErr = mapFun(ctx)
 						if actualErr != nil {
 							t.Logf("dbg.%s: here0: actual->channel: %+v", time.Now().Format(time.RFC3339Nano), actualErr)
-							errChannel<-actualErr
+							errChannel <- actualErr
 							break
 						}
 					}
 					var noError error
-					errChannel<-noError
+					errChannel <- noError
 				}()
 			}).Return(getError(t, errChannel, tc.tenantIds)).Once()
 
 			var err error
-			//go func() {
-			//	time.Sleep(15 * time.Second)
-			//	t.Logf("dbg.%s: here0010: about to read from channel", time.Now().Format(time.RFC3339Nano))
-			//	err = <-errChannel
-			//	t.Logf("dbg.%s: here0010: read from channel: %+v", time.Now().Format(time.RFC3339Nano), err)
-			//}()
-
-			//t.Logf("%s: here0020: read from channel: %+v", time.Now().Format(time.RFC3339Nano), err)
-			//m := mock.MatchedBy(func(c context.Context) bool {
-			//	id := identity.FromContext(c)
-			//	return id.Tenant == tname
-			//})
-			//
-			//db.On("GetDevices",
-			//	m,
-			//	uint(0),
-			//	uint(512),
-			//	model.DeviceFilter{},
-			//).Return(
-			//	v,
-			//	tc.errDbDevices)
-
 			wflows := &mwflows.ClientRunner{}
 			defer wflows.AssertExpectations(t)
 
@@ -606,7 +547,7 @@ func TestPropagateReporting(t *testing.T) {
 				).Return(tc.workflowError)
 			}
 
-			doneChannel:=make(chan bool,1)
+			doneChannel := make(chan bool, 1)
 			go func() {
 				err = PropagateReporting(db, wflows, tc.cmdTenant, tc.cmdDryRun)
 				t.Logf("dbg.%s: here0010: about to read from channel", time.Now().Format(time.RFC3339Nano))
@@ -617,7 +558,7 @@ func TestPropagateReporting(t *testing.T) {
 				} else {
 					assert.NoError(t, err)
 				}
-				doneChannel<-true
+				doneChannel <- true
 			}()
 			t.Logf("dbg.%s final wait", time.Now().Format(time.RFC3339Nano))
 			ctxTimeout, cancel := context.WithTimeout(context.Background(), time.Second*3)
