@@ -1,4 +1,4 @@
-// Copyright 2021 Northern.tech AS
+// Copyright 2023 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -176,8 +176,8 @@ func (_m *DataStore) DeleteTokens(ctx context.Context) error {
 	return r0
 }
 
-// ForEachDatabase provides a mock function with given fields: parentCtx, opFunc
-func (_m *DataStore) ForEachDatabase(parentCtx context.Context, opFunc store.MapFunc) error {
+// ForEachTenant provides a mock function with given fields: parentCtx, opFunc
+func (_m *DataStore) ForEachTenant(parentCtx context.Context, opFunc store.MapFunc) error {
 	ret := _m.Called(parentCtx, opFunc)
 
 	var r0 error
@@ -393,29 +393,6 @@ func (_m *DataStore) GetLimit(ctx context.Context, name string) (*model.Limit, e
 	return r0, r1
 }
 
-// GetTenantDbs provides a mock function with given fields:
-func (_m *DataStore) GetTenantDbs() ([]string, error) {
-	ret := _m.Called()
-
-	var r0 []string
-	if rf, ok := ret.Get(0).(func() []string); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]string)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // GetToken provides a mock function with given fields: ctx, jti
 func (_m *DataStore) GetToken(ctx context.Context, jti oid.ObjectID) (*jwt.Token, error) {
 	ret := _m.Called(ctx, jti)
@@ -432,6 +409,29 @@ func (_m *DataStore) GetToken(ctx context.Context, jti oid.ObjectID) (*jwt.Token
 	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, oid.ObjectID) error); ok {
 		r1 = rf(ctx, jti)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ListTenantsIds provides a mock function with given fields: ctx
+func (_m *DataStore) ListTenantsIds(ctx context.Context) ([]string, error) {
+	ret := _m.Called(ctx)
+
+	var r0 []string
+	if rf, ok := ret.Get(0).(func(context.Context) []string); ok {
+		r0 = rf(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
 	} else {
 		r1 = ret.Error(1)
 	}
