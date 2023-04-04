@@ -38,7 +38,9 @@ from common import (
 
 DB_NAME = "deviceauth"
 DB_MIGRATION_COLLECTION = "migration_info"
+DB_DEVICES_COLLECTION = "devices"
 DB_VERSION = "1.10.0"
+TENANT_IDS = ["tid1","tid2","tid3"]
 
 
 MIGRATED_TENANT_DBS = {
@@ -55,6 +57,7 @@ def migrated_tenant_dbs(clean_db, mongo):
     """ Init a set of tenant dbs to predefined versions. """
     for tid, ver in MIGRATED_TENANT_DBS.items():
         mongo_set_version(mongo, make_tenant_db(tid), ver)
+    mongo_insert_tenant_data(mongo, DB_NAME)
 
 
 @pytest.fixture(scope="function")
@@ -80,6 +83,10 @@ def mongo_set_version(mongo, dbname, version):
 def make_tenant_db(tenant_id):
     return "{}-{}".format(DB_NAME, tenant_id)
 
+
+def mongo_insert_tenant_data(mongo, dbname):
+    for tid in TENANT_IDS:
+        mongo[dbname][DB_DEVICES_COLLECTION].insert_one({"tenant_id": tid})
 
 class TestMigration:
     @staticmethod
@@ -112,7 +119,7 @@ class TestMigration:
 
 class TestListTenants:
     def test_ok(self, cli, migrated_tenant_dbs):
-        dbs = list(MIGRATED_TENANT_DBS.keys())
+        dbs = TENANT_IDS
         dbs.sort()
         code, stdout, stderr = cli.list_tenants()
         assert code == 0

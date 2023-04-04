@@ -1,4 +1,4 @@
-// Copyright 2022 Northern.tech AS
+// Copyright 2023 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -2619,7 +2619,7 @@ func TestDevAuthSetTenantLimit(t *testing.T) {
 		{
 			tenantId:      "tenant1",
 			dbPutLimitErr: errors.New("PutLimit error"),
-			outErr:        "failed to save limit {foobar 1234} for tenant tenant1 to database: PutLimit error",
+			outErr:        "failed to save limit { foobar 1234 } for tenant tenant1 to database: PutLimit error",
 			limit: model.Limit{
 				Name:  "foobar",
 				Value: 1234,
