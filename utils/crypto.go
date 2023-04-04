@@ -1,4 +1,4 @@
-// Copyright 2020 Northern.tech AS
+// Copyright 2023 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -93,7 +93,7 @@ func VerifyAuthReqSign(signature string, pubkey crypto.PublicKey, content []byte
 	return nil
 }
 
-//ParsePubKey
+// ParsePubKey
 func ParsePubKey(pubkey string) (crypto.PublicKey, error) {
 	block, _ := pem.Decode([]byte(pubkey))
 	if block == nil || block.Type != PubKeyBlockType {
