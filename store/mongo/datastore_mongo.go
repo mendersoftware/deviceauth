@@ -897,27 +897,6 @@ func getDeviceStatusDB(
 		filter.TenantID = tenantId
 	}
 
-	//var filter bson.D
-	//if tenantId != "" {
-	//	filter = bson.D{
-	//		{
-	//			Key:   dbFieldTenantID,
-	//			Value: tenantId,
-	//		},
-	//		{
-	//			Key:   dbFieldDeviceID,
-	//			Value: devId,
-	//		},
-	//	}
-	//} else {
-	//	filter = bson.D{
-	//		{
-	//			Key:   dbFieldDeviceID,
-	//			Value: devId,
-	//		},
-	//	}
-	//}
-
 	match := bson.D{
 		{Key: "$match", Value: filter},
 	}

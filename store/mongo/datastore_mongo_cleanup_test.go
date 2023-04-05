@@ -37,33 +37,33 @@ func TestGetDevicesBeingDecommissioned(t *testing.T) {
 		outDevices []model.Device
 		tenant     string
 	}{
-		//{
-		//	inDevices: bson.A{
-		//		model.Device{
-		//			Id:              "001",
-		//			IdData:          "001",
-		//			Status:          model.DevStatusPending,
-		//			Decommissioning: false,
-		//			IdDataSha256:    getIdDataHash("001"),
-		//		},
-		//		model.Device{
-		//			Id:              "002",
-		//			IdData:          "002",
-		//			Status:          model.DevStatusPending,
-		//			Decommissioning: true,
-		//			IdDataSha256:    getIdDataHash("002"),
-		//		},
-		//	},
-		//	outDevices: []model.Device{
-		//		{
-		//			Id:              "002",
-		//			IdData:          "002",
-		//			Status:          model.DevStatusPending,
-		//			Decommissioning: true,
-		//			IdDataSha256:    getIdDataHash("002"),
-		//		},
-		//	},
-		//},
+		{
+			inDevices: bson.A{
+				model.Device{
+					Id:              "001",
+					IdData:          "001",
+					Status:          model.DevStatusPending,
+					Decommissioning: false,
+					IdDataSha256:    getIdDataHash("001"),
+				},
+				model.Device{
+					Id:              "002",
+					IdData:          "002",
+					Status:          model.DevStatusPending,
+					Decommissioning: true,
+					IdDataSha256:    getIdDataHash("002"),
+				},
+			},
+			outDevices: []model.Device{
+				{
+					Id:              "002",
+					IdData:          "002",
+					Status:          model.DevStatusPending,
+					Decommissioning: true,
+					IdDataSha256:    getIdDataHash("002"),
+				},
+			},
+		},
 		{
 			inDevices: bson.A{
 				model.Device{
@@ -241,14 +241,14 @@ func TestGetBrokenAuthSets(t *testing.T) {
 					DeviceId: "001",
 					IdData:   "001",
 					PubKey:   "001",
-					TenantID: tenant, // here
+					TenantID: tenant,
 				},
 				model.AuthSet{
 					Id:       "002",
 					DeviceId: "003",
 					IdData:   "001",
 					PubKey:   "002",
-					TenantID: tenant, // here
+					TenantID: tenant,
 				},
 			},
 			inDevices: bson.A{
@@ -258,7 +258,7 @@ func TestGetBrokenAuthSets(t *testing.T) {
 					Status:          model.DevStatusPending,
 					IdDataSha256:    []byte(fmt.Sprintf("sha-%04d", rand.Int())),
 					Decommissioning: false,
-					TenantID:        tenant, // here
+					TenantID:        tenant,
 				},
 				model.Device{
 					Id:              "002",
@@ -266,7 +266,7 @@ func TestGetBrokenAuthSets(t *testing.T) {
 					IdDataSha256:    []byte(fmt.Sprintf("sha-%04d", rand.Int())),
 					Status:          model.DevStatusPending,
 					Decommissioning: false,
-					TenantID:        tenant, // here
+					TenantID:        tenant,
 				},
 			},
 			tenant:         tenant,
@@ -280,14 +280,14 @@ func TestGetBrokenAuthSets(t *testing.T) {
 					DeviceId: "001",
 					IdData:   "001",
 					PubKey:   "001",
-					TenantID: tenant, // here
+					TenantID: tenant,
 				},
 				model.AuthSet{
 					Id:       "002",
 					DeviceId: "002",
 					IdData:   "001",
 					PubKey:   "002",
-					TenantID: tenant, // here
+					TenantID: tenant,
 				},
 			},
 			inDevices: bson.A{
@@ -297,7 +297,7 @@ func TestGetBrokenAuthSets(t *testing.T) {
 					IdDataSha256:    []byte(fmt.Sprintf("sha-%04d", rand.Int())),
 					Status:          model.DevStatusPending,
 					Decommissioning: false,
-					TenantID:        tenant, // here
+					TenantID:        tenant,
 				},
 				model.Device{
 					Id:              "002",
@@ -305,7 +305,7 @@ func TestGetBrokenAuthSets(t *testing.T) {
 					IdDataSha256:    []byte(fmt.Sprintf("sha-%04d", rand.Int())),
 					Status:          model.DevStatusPending,
 					Decommissioning: true,
-					TenantID:        tenant, // here
+					TenantID:        tenant,
 				},
 			},
 			tenant:         tenant,
@@ -395,14 +395,12 @@ func TestDeleteBrokenAuthSets(t *testing.T) {
 					DeviceId: "001",
 					IdData:   "001",
 					PubKey:   "001",
-					//TenantID: tenant, // here
 				},
 				model.AuthSet{
 					Id:       "002",
 					DeviceId: "003",
 					IdData:   "001",
 					PubKey:   "002",
-					//TenantID: tenant, // here
 				},
 			},
 			inDevices: bson.A{
@@ -430,14 +428,12 @@ func TestDeleteBrokenAuthSets(t *testing.T) {
 					DeviceId: "001",
 					IdData:   "001",
 					PubKey:   "001",
-					//TenantID: tenant, // here
 				},
 				model.AuthSet{
 					Id:       "002",
 					DeviceId: "002",
 					IdData:   "001",
 					PubKey:   "002",
-					//TenantID: tenant, // here
 				},
 			},
 			inDevices: bson.A{

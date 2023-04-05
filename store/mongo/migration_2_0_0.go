@@ -39,23 +39,6 @@ type migration_2_0_0 struct {
 }
 
 var DbDevicesCollectionIndices = []mongo.IndexModel{
-	//{
-	//	Keys: bson.D{
-	//		{Key: mstore.FieldTenantID, Value: 1},
-	//		{Key: dbFieldID, Value: 1},
-	//	},
-	//	Options: mopts.Index().
-	//		SetName(mstore.FieldTenantID + "_" + dbFieldID).
-	//		SetUnique(true),
-	//},
-	//{
-	//	Keys: bson.D{
-	//		{Key: mstore.FieldTenantID, Value: 1},
-	//		{Key: dbFieldStatus, Value: 1},
-	//	},
-	//	Options: mopts.Index().
-	//		SetName(mstore.FieldTenantID + "_" + dbFieldStatus),
-	//},
 	{
 		Keys: bson.D{
 			{Key: mstore.FieldTenantID, Value: 1},
@@ -88,31 +71,6 @@ var DbDevicesCollectionIndices = []mongo.IndexModel{
 }
 
 var DbAuthSetsCollectionIndices = []mongo.IndexModel{
-	//{
-	//	Keys: bson.D{
-	//		{Key: mstore.FieldTenantID, Value: 1},
-	//		{Key: dbFieldID, Value: 1},
-	//	},
-	//	Options: mopts.Index().
-	//		SetName(mstore.FieldTenantID + "_" + dbFieldID).
-	//		SetUnique(true),
-	//},
-	//{
-	//	Keys: bson.D{
-	//		{Key: mstore.FieldTenantID, Value: 1},
-	//		{Key: dbFieldDeviceID, Value: 1},
-	//		{Key: dbFieldIDDataSha, Value: 1},
-	//		{Key: dbFieldPubKey, Value: 1},
-	//	},
-	//	Options: mopts.Index().
-	//		SetName(strings.Join([]string{
-	//			mstore.FieldTenantID,
-	//			dbFieldDeviceID,
-	//			dbFieldIDDataSha,
-	//			dbFieldPubKey,
-	//		}, "_")).
-	//		SetUnique(true),
-	//},
 	{
 		Keys: bson.D{
 			{Key: mstore.FieldTenantID, Value: 1},

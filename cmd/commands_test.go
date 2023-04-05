@@ -391,7 +391,6 @@ func TestPropagateStatusesInventory(t *testing.T) {
 	for k := range cases {
 		tc := cases[k]
 		t.Run(fmt.Sprintf("tc %s", k), func(t *testing.T) {
-			//ctxMatcher := mock.MatchedBy(func(c context.Context) bool { return true })
 			ctxMatcher := mock.Anything
 			status := statuses[rand.Intn(len(statuses))]
 			if len(tc.tenantIds) > 0 {
