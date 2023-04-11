@@ -52,6 +52,7 @@ const (
 	dbFieldDeviceID     = "device_id"
 	dbFieldPubKey       = "pubkey"
 	dbFieldExpTime      = "exp.time"
+	dbFieldTenantClaim  = "mender.tenant"
 	dbFieldName         = "name"
 )
 
@@ -367,13 +368,7 @@ func (db *DataStoreMongo) AddToken(ctx context.Context, t *jwt.Token) error {
 	database := db.client.Database(DbName)
 	collTokens := database.Collection(DbTokensColl)
 
-	filter := ctxstore.WithTenantID(ctx, bson.M{"_id": t.Claims.ID})
-	id := identity.FromContext(ctx)
-	tenantId := ""
-	if id != nil {
-		tenantId = id.Tenant
-	}
-	t.TenantID = tenantId
+	filter := bson.M{"_id": t.Claims.ID}
 	update := bson.M{"$set": t}
 	updateOpts := mopts.Update()
 	updateOpts.SetUpsert(true)
@@ -427,7 +422,16 @@ func (db *DataStoreMongo) DeleteTokens(ctx context.Context) error {
 	c := db.client.Database(DbName).
 		Collection(DbTokensColl)
 
-	_, err := c.DeleteMany(ctx, ctxstore.WithTenantID(ctx, bson.D{}))
+	id := identity.FromContext(ctx)
+	filter := bson.M{}
+	// I have some doubts in here: we are dropping all the tokens if
+	// tenant claim in the JWT is empty
+	if id != nil {
+		if id.Tenant != "" {
+			filter = bson.M{dbFieldTenantClaim: id.Tenant}
+		}
+	}
+	_, err := c.DeleteMany(ctx, filter)
 
 	return err
 }
@@ -438,7 +442,34 @@ func (db *DataStoreMongo) DeleteTokenByDevId(
 ) error {
 	c := db.client.Database(DbName).
 		Collection(DbTokensColl)
-	ci, err := c.DeleteMany(ctx, ctxstore.WithTenantID(ctx, bson.M{"sub": devID}))
+	var filter interface{}
+	id := identity.FromContext(ctx)
+	if id != nil {
+		// in here if mender.tenant is not set we will not match,
+		// since there is no way to tell looking at id if we wanted empty Tenant
+		// or nil. we could have either change AddToken or remove omitempty.
+		if id.Tenant == "" {
+			filter = bson.M{
+				"$or": []bson.M{
+					{"sub": devID},
+					{
+						"$and": []bson.M{
+							{"sub": devID},
+							{dbFieldTenantClaim: ""},
+						},
+					},
+				},
+			}
+		} else {
+			filter = bson.D{
+				{Key: "sub", Value: devID},
+				{Key: dbFieldTenantClaim, Value: id.Tenant},
+			}
+		}
+	} else {
+		filter = bson.M{"sub": devID}
+	}
+	ci, err := c.DeleteMany(ctx, filter)
 
 	if err != nil {
 		return errors.Wrap(err, "failed to remove tokens")

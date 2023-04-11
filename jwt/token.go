@@ -25,8 +25,7 @@ type UnpackVerifyFunc func(s string) (*Token, error)
 
 // Token wrapper
 type Token struct {
-	Claims   `bson:"inline"`
-	TenantID string `json:"-" bson:"tenant_id"`
+	Claims `bson:"inline"`
 }
 
 // MarshalJWT marshals Token into JWT comaptible format. `sign` provides means

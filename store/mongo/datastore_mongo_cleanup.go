@@ -164,7 +164,7 @@ func (db *DataStoreMongo) DeleteBrokenAuthSets(tenantId string) error {
 			return errors.Wrapf(err, "tenant %s, failed to delete authentication sets", tenantId)
 		}
 		// Attempt to delete token (may have already expired).
-		_, _ = collTokens.DeleteOne(ctx, bson.M{"_id": as, dbFieldTenantID: tenantId})
+		_, _ = collTokens.DeleteOne(ctx, bson.M{"_id": as, dbFieldTenantClaim: tenantId})
 	}
 
 	return nil

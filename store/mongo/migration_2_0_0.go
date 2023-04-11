@@ -105,7 +105,13 @@ var DbLimitsCollectionIndices = []mongo.IndexModel{
 			{Key: dbFieldName, Value: 1},
 		},
 		Options: mopts.Index().
-			SetName(mstore.FieldTenantID + "_" + dbFieldName).
+			SetName(strings.Join([]string{
+				mstore.FieldTenantID,
+				dbFieldName,
+			},
+				"_",
+			),
+			).
 			SetUnique(true),
 	},
 }
@@ -113,23 +119,40 @@ var DbLimitsCollectionIndices = []mongo.IndexModel{
 var DbTokensCollectionIndices = []mongo.IndexModel{
 	{
 		Keys: bson.D{
-			{Key: mstore.FieldTenantID, Value: 1},
+			{Key: dbFieldTenantClaim, Value: 1},
 			{Key: dbFieldID, Value: 1},
 		},
 		Options: mopts.Index().
-			SetName(mstore.FieldTenantID + "_" + dbFieldID),
+			SetName(
+				strings.Join(
+					[]string{
+						strings.ReplaceAll(dbFieldTenantClaim, ".", "_"),
+						dbFieldID,
+					},
+					"_",
+				),
+			),
 	},
 	{
 		Keys: bson.D{
-			{Key: mstore.FieldTenantID, Value: 1},
+			{Key: dbFieldTenantClaim, Value: 1},
 			{Key: dbFieldExpTime, Value: 1},
 		},
 		Options: mopts.Index().
-			SetName(mstore.FieldTenantID + "_" + dbFieldExpTime),
+			SetName(
+				strings.Join(
+					[]string{
+						strings.ReplaceAll(dbFieldTenantClaim, ".", "_"),
+						strings.ReplaceAll(dbFieldExpTime, ".", "_"),
+					},
+					"_",
+				),
+			),
 	},
 }
 
 // Up creates an index on status and id in the devices collection
+// nolint: gocyclo
 func (m *migration_2_0_0) Up(from migrate.Version) error {
 	ctx := context.Background()
 	client := m.ds.client
@@ -174,6 +197,9 @@ func (m *migration_2_0_0) Up(from migrate.Version) error {
 					return err
 				}
 			}
+			if collection == DbTokensColl {
+				continue
+			}
 			_, err := collOut.UpdateMany(ctx, bson.D{
 				{Key: mstore.FieldTenantID, Value: bson.D{
 					{Key: "$exists", Value: false},
@@ -188,6 +214,9 @@ func (m *migration_2_0_0) Up(from migrate.Version) error {
 			continue
 		}
 
+		if collection == DbTokensColl {
+			continue
+		}
 		coll := client.Database(databaseName).Collection(collection)
 		// get all the documents in the collection
 		cur, err := coll.Find(ctx, bson.D{}, findOptions)

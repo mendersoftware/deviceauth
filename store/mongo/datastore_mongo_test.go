@@ -128,8 +128,8 @@ func setUpTokens(ctx context.Context, client *mongo.Client, tenantId string) err
 	}
 	c := client.Database(DbName).Collection(DbTokensColl)
 	_, err := c.InsertMany(ctx, inputTokens)
-	c.UpdateOne(ctx, bson.M{dbFieldID: token1.ID}, bson.M{"$set": bson.M{dbFieldTenantID: tenantId}})
-	c.UpdateOne(ctx, bson.M{dbFieldID: token2.ID}, bson.M{"$set": bson.M{dbFieldTenantID: tenantId}})
+	c.UpdateOne(ctx, bson.M{dbFieldID: token1.ID}, bson.M{"$set": bson.M{dbFieldTenantClaim: tenantId}})
+	c.UpdateOne(ctx, bson.M{dbFieldID: token2.ID}, bson.M{"$set": bson.M{dbFieldTenantClaim: tenantId}})
 	return err
 }
 
@@ -754,7 +754,7 @@ func TestStoreDeleteTokens(t *testing.T) {
 				if tc.tenant != "" {
 					for _, token := range tc.inTokens {
 						tokenId := token.(*jwt.Token).ID
-						_, err := c.UpdateOne(ctx, bson.M{dbFieldID: tokenId}, bson.M{"$set": bson.M{dbFieldTenantID: tc.tenant}})
+						_, err := c.UpdateOne(ctx, bson.M{dbFieldID: tokenId}, bson.M{"$set": bson.M{dbFieldTenantClaim: tc.tenant}})
 						assert.NoError(t, err)
 					}
 				}
@@ -766,7 +766,7 @@ func TestStoreDeleteTokens(t *testing.T) {
 
 			c := d.client.Database(DbName).Collection(DbTokensColl)
 
-			cursor, err := c.Find(ctx, bson.M{dbFieldTenantID: tc.tenant})
+			cursor, err := c.Find(ctx, bson.M{dbFieldTenantClaim: tc.tenant})
 			assert.NoError(t, err)
 			err = cursor.All(ctx, &out)
 			assert.NoError(t, err)
@@ -850,7 +850,7 @@ func TestStoreDeleteTokenByDevId(t *testing.T) {
 			assert.NoError(t, err)
 			for _, token := range inTokens {
 				tokenId := token.(*jwt.Token).ID
-				_, err := c.UpdateOne(ctx, bson.M{dbFieldID: tokenId}, bson.M{"$set": bson.M{dbFieldTenantID: tc.tenant}})
+				_, err := c.UpdateOne(ctx, bson.M{dbFieldID: tokenId}, bson.M{"$set": bson.M{dbFieldTenantClaim: tc.tenant}})
 				assert.NoError(t, err)
 			}
 
