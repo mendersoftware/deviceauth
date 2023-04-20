@@ -570,7 +570,7 @@ func TestPropagateReporting(t *testing.T) {
 				}
 			}
 
-			err := PropagateReporting(db, wflows, tc.cmdTenant, tc.cmdDryRun)
+			err := PropagateReporting(db, wflows, tc.cmdTenant, time.Microsecond, tc.cmdDryRun)
 			if tc.err != nil {
 				assert.EqualError(t, err, tc.err.Error())
 			} else {
