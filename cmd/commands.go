@@ -85,13 +85,13 @@ func Migrate(c config.Reader, tenant string, listTenantsFlag bool) error {
 }
 
 func listTenants(db *mongo.DataStoreMongo) error {
-	tdbs, err := db.GetTenantDbs()
+	tdbs, err := db.ListTenantsIds(context.Background())
 	if err != nil {
-		return errors.Wrap(err, "failed to retrieve tenant DBs")
+		return errors.Wrap(err, "failed to retrieve tenant ids")
 	}
 
 	for _, tenant := range tdbs {
-		fmt.Println(mstore.TenantFromDbName(tenant, mongo.DbName))
+		fmt.Println(tenant)
 	}
 
 	return nil
@@ -121,48 +121,16 @@ func maintenanceWithDataStore(
 }
 
 func decommissioningCleanup(db *mongo.DataStoreMongo, tenant string, dryRunFlag bool) error {
-	if tenant == "" {
-		tdbs, err := db.GetTenantDbs()
-		if err != nil {
-			return errors.Wrap(err, "failed to retrieve tenant DBs")
-		}
-		_ = decommissioningCleanupWithDbs(db, append(tdbs, mongo.DbName), dryRunFlag)
-	} else {
-		_ = decommissioningCleanupWithDbs(
-			db,
-			[]string{mstore.DbNameForTenant(tenant, mongo.DbName)},
-			dryRunFlag,
-		)
-	}
-
-	return nil
-}
-
-func decommissioningCleanupWithDbs(
-	db *mongo.DataStoreMongo,
-	tenantDbs []string,
-	dryRunFlag bool,
-) error {
-	for _, dbName := range tenantDbs {
-		println("database: ", dbName)
-		if err := decommissioningCleanupWithDb(db, dbName, dryRunFlag); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func decommissioningCleanupWithDb(db *mongo.DataStoreMongo, dbName string, dryRunFlag bool) error {
 	if dryRunFlag {
-		return decommissioningCleanupDryRun(db, dbName)
+		return decommissioningCleanupDryRun(db, tenant)
 	} else {
-		return decommissioningCleanupExecute(db, dbName)
+		return decommissioningCleanupExecute(db, tenant)
 	}
 }
 
-func decommissioningCleanupDryRun(db *mongo.DataStoreMongo, dbName string) error {
+func decommissioningCleanupDryRun(db *mongo.DataStoreMongo, tenantId string) error {
 	//devices
-	devices, err := db.GetDevicesBeingDecommissioned(dbName)
+	devices, err := db.GetDevicesBeingDecommissioned(tenantId)
 	if err != nil {
 		return err
 	}
@@ -174,7 +142,7 @@ func decommissioningCleanupDryRun(db *mongo.DataStoreMongo, dbName string) error
 	}
 
 	//auth sets
-	authSetIds, err := db.GetBrokenAuthSets(dbName)
+	authSetIds, err := db.GetBrokenAuthSets(tenantId)
 	if err != nil {
 		return err
 	}
@@ -188,16 +156,16 @@ func decommissioningCleanupDryRun(db *mongo.DataStoreMongo, dbName string) error
 	return nil
 }
 
-func decommissioningCleanupExecute(db *mongo.DataStoreMongo, dbName string) error {
-	if err := decommissioningCleanupDryRun(db, dbName); err != nil {
+func decommissioningCleanupExecute(db *mongo.DataStoreMongo, tenantId string) error {
+	if err := decommissioningCleanupDryRun(db, tenantId); err != nil {
 		return err
 	}
 
-	if err := db.DeleteDevicesBeingDecommissioned(dbName); err != nil {
+	if err := db.DeleteDevicesBeingDecommissioned(tenantId); err != nil {
 		return err
 	}
 
-	if err := db.DeleteBrokenAuthSets(dbName); err != nil {
+	if err := db.DeleteBrokenAuthSets(tenantId); err != nil {
 		return err
 	}
 
@@ -211,24 +179,28 @@ func PropagateStatusesInventory(
 	migrationVersion string,
 	dryRun bool,
 ) error {
-	l := log.NewEmpty()
+	var err error
 
-	dbs, err := selectDbs(db, tenant)
-	if err != nil {
-		return errors.Wrap(err, "aborting")
+	l := log.NewEmpty()
+	tenants := []string{tenant}
+	if tenant == "" {
+		tenants, err = db.ListTenantsIds(context.Background())
+		if err != nil {
+			return errors.Wrap(err, "cant list tenants")
+		}
 	}
 
 	var errReturned error
-	for _, d := range dbs {
-		err := tryPropagateStatusesInventoryForDb(db, c, d, migrationVersion, dryRun)
+	for _, t := range tenants {
+		err = tryPropagateStatusesInventoryForTenant(db, c, t, migrationVersion, dryRun)
 		if err != nil {
 			errReturned = err
-			l.Errorf("giving up on DB %s due to fatal error: %s", d, err.Error())
+			l.Errorf("giving up on tenant %s due to fatal error: %s", t, err.Error())
 			continue
 		}
 	}
 
-	l.Info("all DBs processed, exiting.")
+	l.Info("all tenants processed, exiting.")
 	return errReturned
 }
 
@@ -258,23 +230,34 @@ func PropagateReporting(db store.DataStore, wflows orchestrator.ClientRunner, te
 	dryRun bool) error {
 	l := log.NewEmpty()
 
-	dbs, err := selectDbs(db, tenant)
-	if err != nil {
-		return errors.Wrap(err, "aborting")
-	}
-
-	var errReturned error
-	for _, d := range dbs {
-		err := tryPropagateReportingForDb(db, wflows, d, dryRun)
-		if err != nil {
-			errReturned = err
-			l.Errorf("giving up on DB %s due to fatal error: %s", d, err.Error())
-			continue
+	mapFunc := func(ctx context.Context) error {
+		id := identity.FromContext(ctx)
+		if id == nil || id.Tenant == "" {
+			// Not a tenant db - skip!
+			return nil
 		}
+		tenantId := id.Tenant
+		return tryPropagateReportingForTenant(db, wflows, tenantId, dryRun)
 	}
-
-	l.Info("all DBs processed, exiting.")
-	return errReturned
+	if tenant != "" {
+		ctx := identity.WithContext(context.Background(),
+			&identity.Identity{
+				Tenant: tenant,
+			},
+		)
+		err := mapFunc(ctx)
+		if err != nil {
+			return errors.Wrap(err, "failed to propagate for given tenant")
+		}
+		l.Infof("tenant processed, exiting.")
+	} else {
+		err := db.ForEachTenant(context.Background(), mapFunc)
+		if err != nil {
+			return errors.Wrap(err, "failed to propagate for all tenant")
+		}
+		l.Info("all tenants processed, exiting.")
+	}
+	return nil
 }
 
 func selectDbs(db store.DataStore, tenant string) ([]string, error) {
@@ -286,21 +269,6 @@ func selectDbs(db store.DataStore, tenant string) ([]string, error) {
 		l.Infof("propagating inventory for user-specified tenant %s", tenant)
 		n := mstore.DbNameForTenant(tenant, mongo.DbName)
 		dbs = []string{n}
-	} else {
-		l.Infof("propagating inventory for all tenants")
-
-		// infer if we're in ST or MT
-		tdbs, err := db.GetTenantDbs()
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to retrieve tenant DBs")
-		}
-
-		if len(tdbs) == 0 {
-			l.Infof("no tenant DBs found - will try the default database %s", mongo.DbName)
-			dbs = []string{mongo.DbName}
-		} else {
-			dbs = tdbs
-		}
 	}
 
 	return dbs, nil
@@ -395,18 +363,16 @@ func updateDevicesIdData(
 	return nil
 }
 
-func tryPropagateStatusesInventoryForDb(
+func tryPropagateStatusesInventoryForTenant(
 	db store.DataStore,
 	c cinv.Client,
-	dbname string,
+	tenant string,
 	migrationVersion string,
 	dryRun bool,
 ) error {
 	l := log.NewEmpty()
 
-	l.Infof("propagating device statuses to inventory from DB: %s", dbname)
-
-	tenant := mstore.TenantFromDbName(dbname, mongo.DbName)
+	l.Infof("propagating device statuses to inventory from tenant: %s", tenant)
 
 	ctx := context.Background()
 	if tenant != "" {
@@ -421,22 +387,22 @@ func tryPropagateStatusesInventoryForDb(
 		err = updateDevicesStatus(ctx, db, c, tenant, status, dryRun)
 		if err != nil {
 			l.Infof(
-				"Done with DB %s status=%s, but there were errors: %s.",
-				dbname,
+				"Done with tenant %s status=%s, but there were errors: %s.",
+				tenant,
 				status,
 				err.Error(),
 			)
 			errReturned = err
 		} else {
-			l.Infof("Done with DB %s status=%s", dbname, status)
+			l.Infof("Done with tenant %s status=%s", tenant, status)
 		}
 	}
 	if migrationVersion != "" && !dryRun {
 		if errReturned != nil {
 			l.Warnf(
-				"Will not store %s migration version in %s.migration_info due to errors.",
+				"Will not store %s migration version for tenant %s due to errors.",
 				migrationVersion,
-				dbname,
+				tenant,
 			)
 		} else {
 			version, err := migrate.NewVersion(migrationVersion)
@@ -445,7 +411,7 @@ func tryPropagateStatusesInventoryForDb(
 					"Will not store %s migration version in %s.migration_info due to bad version"+
 						" provided.",
 					migrationVersion,
-					dbname,
+					tenant,
 				)
 				errReturned = err
 			} else {
@@ -486,30 +452,30 @@ func tryPropagateIdDataInventoryForDb(
 	return err
 }
 
-func tryPropagateReportingForDb(
+func tryPropagateReportingForTenant(
 	db store.DataStore,
 	wflows orchestrator.ClientRunner,
-	dbname string,
+	tenant string,
 	dryRun bool,
 ) error {
 	l := log.NewEmpty()
 
-	l.Infof("propagating device data to reporting from DB: %s", dbname)
-
-	tenant := mstore.TenantFromDbName(dbname, mongo.DbName)
+	l.Infof("propagating device data to reporting for tenant %s", tenant)
 
 	ctx := context.Background()
 	if tenant != "" {
 		ctx = identity.WithContext(ctx, &identity.Identity{
 			Tenant: tenant,
 		})
+	} else {
+		return errors.New("you must provide a tenant id")
 	}
 
-	err := reindexDevicesReporting(ctx, db, wflows, tenant, dryRun)
+	err := reindexDevicesReporting(ctx, db, wflows, dryRun)
 	if err != nil {
-		l.Infof("Done with DB %s, but there were errors: %s.", dbname, err.Error())
+		l.Infof("Done with tenant %s, but there were errors: %s.", tenant, err.Error())
 	} else {
-		l.Infof("Done with DB %s", dbname)
+		l.Infof("Done with tenant %s", tenant)
 	}
 
 	return err
@@ -519,7 +485,6 @@ func reindexDevicesReporting(
 	ctx context.Context,
 	db store.DataStore,
 	wflows orchestrator.ClientRunner,
-	tenant string,
 	dryRun bool,
 ) error {
 	var skip uint
@@ -640,7 +605,7 @@ func CheckDeviceLimits(
 		return nil
 	}
 	// Start looping through the databases.
-	return ds.ForEachDatabase(
+	return ds.ForEachTenant(
 		context.Background(),
 		mapFunc,
 	)
