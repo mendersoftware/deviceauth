@@ -16,6 +16,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/mendersoftware/go-lib-micro/config"
 	"github.com/mendersoftware/go-lib-micro/identity"
@@ -254,7 +255,11 @@ func PropagateIdDataInventory(db store.DataStore, c cinv.Client, tenant string, 
 	return errReturned
 }
 
-func PropagateReporting(db store.DataStore, wflows orchestrator.ClientRunner, tenant string,
+func PropagateReporting(
+	db store.DataStore,
+	wflows orchestrator.ClientRunner,
+	tenant string,
+	requestPeriod time.Duration,
 	dryRun bool) error {
 	l := log.NewEmpty()
 
@@ -265,7 +270,7 @@ func PropagateReporting(db store.DataStore, wflows orchestrator.ClientRunner, te
 
 	var errReturned error
 	for _, d := range dbs {
-		err := tryPropagateReportingForDb(db, wflows, d, dryRun)
+		err := tryPropagateReportingForDb(db, wflows, d, requestPeriod, dryRun)
 		if err != nil {
 			errReturned = err
 			l.Errorf("giving up on DB %s due to fatal error: %s", d, err.Error())
@@ -490,6 +495,7 @@ func tryPropagateReportingForDb(
 	db store.DataStore,
 	wflows orchestrator.ClientRunner,
 	dbname string,
+	requestPeriod time.Duration,
 	dryRun bool,
 ) error {
 	l := log.NewEmpty()
@@ -505,7 +511,7 @@ func tryPropagateReportingForDb(
 		})
 	}
 
-	err := reindexDevicesReporting(ctx, db, wflows, tenant, dryRun)
+	err := reindexDevicesReporting(ctx, requestPeriod, db, wflows, tenant, dryRun)
 	if err != nil {
 		l.Infof("Done with DB %s, but there were errors: %s.", dbname, err.Error())
 	} else {
@@ -517,6 +523,7 @@ func tryPropagateReportingForDb(
 
 func reindexDevicesReporting(
 	ctx context.Context,
+	requestPeriod time.Duration,
 	db store.DataStore,
 	wflows orchestrator.ClientRunner,
 	tenant string,
@@ -525,6 +532,9 @@ func reindexDevicesReporting(
 	var skip uint
 
 	skip = 0
+	done := ctx.Done()
+	rateLimit := time.NewTicker(requestPeriod)
+	defer rateLimit.Stop()
 	for {
 		devices, err := db.GetDevices(ctx, skip, devicesBatchSize, model.DeviceFilter{})
 		if err != nil {
@@ -549,6 +559,12 @@ func reindexDevicesReporting(
 		skip += devicesBatchSize
 		if len(devices) < devicesBatchSize {
 			break
+		}
+		select {
+		case <-rateLimit.C:
+
+		case <-done:
+			return ctx.Err()
 		}
 	}
 	return nil

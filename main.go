@@ -17,6 +17,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/mendersoftware/go-lib-micro/config"
 	"github.com/mendersoftware/go-lib-micro/log"
@@ -29,6 +30,10 @@ import (
 	"github.com/mendersoftware/deviceauth/cmd"
 	dconfig "github.com/mendersoftware/deviceauth/config"
 	"github.com/mendersoftware/deviceauth/store/mongo"
+)
+
+const (
+	cliDefaultRateLimit = 50
 )
 
 func main() {
@@ -134,6 +139,11 @@ func doMain(args []string) {
 				cli.StringFlag{
 					Name:  "tenant_id",
 					Usage: "Tenant ID (optional) - propagate for just a single tenant.",
+				},
+				cli.UintFlag{
+					Name:  "rate-limit",
+					Usage: "`N`umber of reindexing batch requests per second.",
+					Value: cliDefaultRateLimit,
 				},
 				cli.BoolFlag{
 					Name: "dry-run",
@@ -324,10 +334,16 @@ func cmdPropagateReporting(args *cli.Context) error {
 		),
 	})
 
+	var requestPeriod time.Duration
+	if rateLimit := args.Uint("rate-limit"); rateLimit > 0 {
+		requestPeriod = time.Second / time.Duration(rateLimit)
+	}
+
 	err = cmd.PropagateReporting(
 		db,
 		wflows,
 		args.String("tenant_id"),
+		requestPeriod,
 		args.Bool("dry-run"),
 	)
 	if err != nil {
