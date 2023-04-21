@@ -17,13 +17,14 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
-	"github.com/pkg/errors"
 	"math/rand"
 	"sort"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"

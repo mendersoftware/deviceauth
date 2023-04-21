@@ -71,6 +71,11 @@ func Migrate(c config.Reader, tenant string, listTenantsFlag bool) error {
 	if tenant == "" {
 		err = db.Migrate(ctx, mongo.DbVersion)
 	} else {
+		err = db.MigrateTenant(ctx, mongo.DbName, mongo.DbVersion)
+		if err != nil {
+			return errors.Wrap(err, "failed to migrate main db")
+		}
+
 		tenantCtx := identity.WithContext(ctx, &identity.Identity{
 			Tenant: tenant,
 		})
