@@ -1,4 +1,4 @@
-// Copyright 2020 Northern.tech AS
+// Copyright 2023 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -489,4 +489,36 @@ func testThrottle(c Cache, limits ratelimits.ApiLimits) (string, error) {
 func fastForward(r *miniredis.Miniredis, c utils.Clock, secs int64) {
 	r.FastForward(time.Duration(secs) * time.Second)
 	c.Forward(secs)
+}
+
+func TestRedisCacheGetSetCheckInTime(t *testing.T) {
+	r := miniredis.NewMiniRedis()
+	err := r.Start()
+	assert.NoError(t, err)
+	defer r.Close()
+
+	ctx := context.TODO()
+
+	limitsExpSec := 1800
+
+	rcache, err := NewRedisCache(r.Addr(), "", "", 0, 5, limitsExpSec)
+	assert.NoError(t, err)
+
+	res, err := rcache.GetCheckInTime(ctx, "tenant-foo", "device-bar")
+
+	assert.Nil(t, res)
+	assert.NoError(t, err)
+
+	checkInTime := time.Now()
+	err = rcache.CacheCheckInTime(ctx, &checkInTime, "tenant-foo", "device-bar")
+	assert.NoError(t, err)
+
+	res, err = rcache.GetCheckInTime(ctx, "tenant-foo", "device-bar")
+	assert.NoError(t, err)
+	assert.WithinDuration(t, checkInTime, *res, time.Second)
+
+	times, err := rcache.GetCheckInTimes(ctx, "tenant-foo", []string{"device-bar"})
+	assert.NoError(t, err)
+	assert.Len(t, times, 1)
+	assert.WithinDuration(t, checkInTime, *times[0], time.Second)
 }

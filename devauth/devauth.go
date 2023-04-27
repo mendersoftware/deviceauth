@@ -704,6 +704,32 @@ func (d *DevAuth) GetDevices(
 			return nil, errors.Wrap(err, "db get auth sets error")
 		}
 	}
+
+	// update check-in time
+	if d.cache != nil {
+		tenantID := ""
+		idData := identity.FromContext(ctx)
+		if idData != nil {
+			tenantID = idData.Tenant
+		}
+
+		ids := make([]string, len(devs))
+		for i := range devs {
+			ids[i] = devs[i].Id
+		}
+		checkInTimes, err := d.cache.GetCheckInTimes(ctx, tenantID, ids)
+		if err != nil {
+			l := log.FromContext(ctx)
+			l.Errorf("Failed to get check-in times for devices")
+		} else {
+			for i := range devs {
+				if checkInTimes[i] != nil {
+					devs[i].CheckInTime = checkInTimes[i]
+				}
+			}
+		}
+	}
+
 	return devs, err
 }
 
@@ -723,6 +749,23 @@ func (d *DevAuth) GetDevice(ctx context.Context, devId string) (*model.Device, e
 		}
 		return dev, nil
 	}
+
+	if d.cache != nil {
+		tenantID := ""
+		idData := identity.FromContext(ctx)
+		if idData != nil {
+			tenantID = idData.Tenant
+		}
+
+		checkInTime, err := d.cache.GetCheckInTime(ctx, tenantID, devId)
+		if err != nil {
+			l := log.FromContext(ctx)
+			l.Errorf("Failed to get check-in times for device")
+		} else if checkInTime != nil {
+			dev.CheckInTime = checkInTime
+		}
+	}
+
 	return dev, err
 }
 
@@ -1258,6 +1301,18 @@ func (d *DevAuth) VerifyToken(ctx context.Context, raw string) error {
 	}
 
 	if cachedToken != "" {
+		// update device check-in time
+		if err := d.updateCheckInTime(
+			ctx,
+			token.Claims.Subject.String(),
+			token.Claims.Tenant,
+			nil,
+		); err != nil {
+			l.Errorf(
+				"failed to update device check-in time for device %s: %s",
+				token.Claims.Subject.String(), err.Error(),
+			)
+		}
 		return nil
 	}
 
@@ -1299,6 +1354,19 @@ func (d *DevAuth) VerifyToken(ctx context.Context, raw string) error {
 	if dev.Decommissioning {
 		l.Errorf("Token %s rejected, device %s is being decommissioned", jti, auth.DeviceId)
 		return jwt.ErrTokenInvalid
+	}
+
+	// update device check-in time
+	if err := d.updateCheckInTime(
+		ctx,
+		token.Claims.Subject.String(),
+		token.Claims.Tenant,
+		dev.CheckInTime,
+	); err != nil {
+		l.Errorf(
+			"failed to update device check-in time for device %s: %s",
+			token.Claims.Subject.String(), err.Error(),
+		)
 	}
 
 	// after successful token verification - cache it (best effort)
@@ -1629,4 +1697,59 @@ func (d *DevAuth) GetTenantDeviceStatus(
 		return nil, errors.Wrapf(err, "get device %s failed", deviceId)
 
 	}
+}
+
+func (d *DevAuth) updateCheckInTime(
+	ctx context.Context,
+	deviceId string,
+	tenantId string,
+	previous *time.Time,
+) error {
+	var err error
+	checkInTime := uto.TimePtr(time.Now().UTC())
+	// in case cache is disabled, use mongo
+	if d.cache == nil {
+		if err = d.db.UpdateDevice(ctx,
+			deviceId,
+			model.DeviceUpdate{
+				CheckInTime: checkInTime,
+			}); err != nil {
+			return err
+		}
+	} else {
+		// get check-in time from cache
+		previous, err = d.cache.GetCheckInTime(ctx, tenantId, deviceId)
+		if err != nil {
+			return err
+		}
+		// update check-in time in cache
+		err = d.cache.CacheCheckInTime(ctx, checkInTime, tenantId, deviceId)
+		if err != nil {
+			return err
+		}
+	}
+	// compare data without a time of current and previous check-in time
+	// and if it's different trigger reindexing (if enabled)
+	// and save check-in time in the database
+	if previous == nil ||
+		(previous != nil &&
+			!previous.Truncate(24*time.Hour).Equal(checkInTime.Truncate(24*time.Hour))) {
+		// trigger reindexing
+		if d.config.EnableReporting {
+			if err = d.cOrch.SubmitReindexReporting(ctx, deviceId); err != nil {
+				return errors.Wrap(err, "reindex reporting job error")
+			}
+		}
+		// dump cached value to database
+		if d.cache != nil {
+			if err = d.db.UpdateDevice(ctx,
+				deviceId,
+				model.DeviceUpdate{
+					CheckInTime: checkInTime,
+				}); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }

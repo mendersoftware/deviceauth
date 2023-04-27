@@ -1,4 +1,4 @@
-// Copyright 2022 Northern.tech AS
+// Copyright 2023 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -1829,7 +1829,10 @@ func TestDevAuthVerifyToken(t *testing.T) {
 		dev          *model.Device
 		getDeviceErr error
 
-		tenantVerify bool
+		updateDeviceErr error
+
+		tenantVerify     bool
+		willUpdateDevice bool
 	}{
 		{
 			tokenString:      "expired",
@@ -1878,6 +1881,7 @@ func TestDevAuthVerifyToken(t *testing.T) {
 				Id:              oid.NewUUIDv5("bar").String(),
 				Decommissioning: false,
 			},
+			willUpdateDevice: true,
 		},
 		{
 			tokenString:      "good-rejected",
@@ -1984,6 +1988,15 @@ func TestDevAuthVerifyToken(t *testing.T) {
 				}
 			}
 
+			if tc.willUpdateDevice {
+				db.On("UpdateDevice", context.Background(),
+					tc.jwToken.Claims.Subject.String(),
+					mock.AnythingOfType("model.DeviceUpdate"),
+				).Return(tc.updateDeviceErr)
+			} else {
+				db.AssertNotCalled(t, "UpdateDevice")
+			}
+
 			err := devauth.VerifyToken(context.Background(), tc.tokenString)
 			if tc.tokenValidateErr != nil {
 				assert.EqualError(t, err, tc.tokenValidateErr.Error())
@@ -2037,10 +2050,20 @@ func TestDevAuthVerifyTokenWithCache(t *testing.T) {
 		cacheTokenErr  error
 		cacheLimitsErr error
 
-		willCallThrottle bool
-		willVerifyDb     bool
-		willCacheToken   bool
-		willFetchLimits  bool
+		checkInTime       *time.Time
+		getCheckInTimeErr error
+
+		cacheCheckInTimeErr error
+
+		updateDeviceErr error
+
+		willCallThrottle     bool
+		willVerifyDb         bool
+		willCacheToken       bool
+		willFetchLimits      bool
+		willGetCheckInTime   bool
+		willCacheCheckInTime bool
+		willUpdateDevice     bool
 
 		outErr error
 	}{
@@ -2051,7 +2074,10 @@ func TestDevAuthVerifyTokenWithCache(t *testing.T) {
 			cacheGetLimits:    &ratelimits.ApiLimits{},
 			cacheGetLimitsErr: nil,
 
-			willCallThrottle: true,
+			willCallThrottle:     true,
+			willGetCheckInTime:   true,
+			willCacheCheckInTime: true,
+			willUpdateDevice:     true,
 		},
 		"token cached, but limits exceeded - early return": {
 			tokenString: "valid",
@@ -2086,9 +2112,12 @@ func TestDevAuthVerifyTokenWithCache(t *testing.T) {
 				Decommissioning: false,
 			},
 
-			willCallThrottle: true,
-			willVerifyDb:     true,
-			willCacheToken:   true,
+			willCallThrottle:     true,
+			willVerifyDb:         true,
+			willCacheToken:       true,
+			willGetCheckInTime:   true,
+			willCacheCheckInTime: true,
+			willUpdateDevice:     true,
 		},
 		"throttle transient error - swallow error, proceed with standard db verification flow: success, cache token: error (don't fail)": {
 			tokenString: "valid",
@@ -2108,9 +2137,12 @@ func TestDevAuthVerifyTokenWithCache(t *testing.T) {
 				Decommissioning: false,
 			},
 
-			willCallThrottle: true,
-			willVerifyDb:     true,
-			willCacheToken:   true,
+			willCallThrottle:     true,
+			willVerifyDb:         true,
+			willCacheToken:       true,
+			willGetCheckInTime:   true,
+			willCacheCheckInTime: true,
+			willUpdateDevice:     true,
 		},
 		"token not cached - verify against db, failed": {
 			tokenString: "valid",
@@ -2146,10 +2178,13 @@ func TestDevAuthVerifyTokenWithCache(t *testing.T) {
 				},
 			},
 
-			willCallThrottle: true,
-			willVerifyDb:     false,
-			willCacheToken:   false,
-			willFetchLimits:  true,
+			willCallThrottle:     true,
+			willVerifyDb:         false,
+			willCacheToken:       false,
+			willFetchLimits:      true,
+			willGetCheckInTime:   true,
+			willCacheCheckInTime: true,
+			willUpdateDevice:     true,
 		},
 		"limits mgmt errors won't stop processing - 'get cached limits' failed": {
 			tokenString: "valid",
@@ -2176,10 +2211,13 @@ func TestDevAuthVerifyTokenWithCache(t *testing.T) {
 				},
 			},
 
-			willCallThrottle: false,
-			willVerifyDb:     true,
-			willCacheToken:   true,
-			willFetchLimits:  false,
+			willCallThrottle:     false,
+			willVerifyDb:         true,
+			willCacheToken:       true,
+			willFetchLimits:      false,
+			willGetCheckInTime:   true,
+			willCacheCheckInTime: true,
+			willUpdateDevice:     true,
 		},
 		"limits mgmt errors won't stop processing - 'get tenant' failed": {
 			tokenString: "valid",
@@ -2200,10 +2238,13 @@ func TestDevAuthVerifyTokenWithCache(t *testing.T) {
 
 			getTenantErr: errors.New("internal error"),
 
-			willCallThrottle: false,
-			willVerifyDb:     true,
-			willCacheToken:   true,
-			willFetchLimits:  true,
+			willCallThrottle:     false,
+			willVerifyDb:         true,
+			willCacheToken:       true,
+			willFetchLimits:      true,
+			willGetCheckInTime:   true,
+			willCacheCheckInTime: true,
+			willUpdateDevice:     true,
 		},
 		"limits mgmt errors won't stop processing - tenant not found": {
 			tokenString: "valid",
@@ -2224,10 +2265,16 @@ func TestDevAuthVerifyTokenWithCache(t *testing.T) {
 
 			getTenantErr: errors.New("internal error"),
 
-			willCallThrottle: false,
-			willVerifyDb:     true,
-			willCacheToken:   true,
-			willFetchLimits:  true,
+			checkInTime:       nil,
+			getCheckInTimeErr: nil,
+
+			willCallThrottle:     false,
+			willVerifyDb:         true,
+			willCacheToken:       true,
+			willFetchLimits:      true,
+			willGetCheckInTime:   true,
+			willCacheCheckInTime: true,
+			willUpdateDevice:     true,
 		},
 		"limits mgmt errors won't stop processing - 'cache limits' failed": {
 			tokenString: "valid",
@@ -2256,10 +2303,13 @@ func TestDevAuthVerifyTokenWithCache(t *testing.T) {
 
 			cacheLimitsErr: errors.New("redis error"),
 
-			willCallThrottle: false,
-			willVerifyDb:     true,
-			willCacheToken:   true,
-			willFetchLimits:  true,
+			willCallThrottle:     false,
+			willVerifyDb:         true,
+			willCacheToken:       true,
+			willFetchLimits:      true,
+			willGetCheckInTime:   true,
+			willCacheCheckInTime: true,
+			willUpdateDevice:     true,
 		},
 	}
 
@@ -2292,6 +2342,27 @@ func TestDevAuthVerifyTokenWithCache(t *testing.T) {
 				token.Claims.Tenant,
 				token.Claims.Subject.String(),
 				cache.IdTypeDevice).Return(tc.cacheGetLimits, tc.cacheGetLimitsErr)
+
+			if tc.willGetCheckInTime {
+				c.On("GetCheckInTime",
+					ctx,
+					token.Claims.Tenant,
+					token.Claims.Subject.String(),
+				).Return(tc.checkInTime, tc.getCheckInTimeErr)
+			} else {
+				db.AssertNotCalled(t, "GetCheckInTime")
+			}
+
+			if tc.willCacheCheckInTime {
+				c.On("CacheCheckInTime",
+					ctx,
+					mock.AnythingOfType("*time.Time"),
+					token.Claims.Tenant,
+					token.Claims.Subject.String(),
+				).Return(tc.cacheCheckInTimeErr)
+			} else {
+				db.AssertNotCalled(t, "CacheCheckInTime")
+			}
 
 			if tc.willCallThrottle {
 				c.On("Throttle",
@@ -2358,6 +2429,14 @@ func TestDevAuthVerifyTokenWithCache(t *testing.T) {
 				db.AssertNotCalled(t, "GetDeviceById")
 				tclient.AssertNotCalled(t, "GetTenant")
 				c.AssertNotCalled(t, "CacheLimits")
+			}
+			if tc.willUpdateDevice {
+				db.On("UpdateDevice", ctx,
+					token.Claims.Subject.String(),
+					mock.AnythingOfType("model.DeviceUpdate"),
+				).Return(tc.updateDeviceErr)
+			} else {
+				db.AssertNotCalled(t, "UpdateDevice")
 			}
 
 			err := devauth.VerifyToken(context.Background(), tc.tokenString)
@@ -3625,4 +3704,206 @@ func TestPurgeUriArgs(t *testing.T) {
 
 	out = purgeUriArgs("/api/devices/v1/deployments/device/deployments/next")
 	assert.Equal(t, "/api/devices/v1/deployments/device/deployments/next", out)
+}
+
+func TestDevAuthGetDeviceWithCache(t *testing.T) {
+	t.Parallel()
+
+	devId := oid.NewUUIDv5("devId1").String()
+	checkInTime := time.Now()
+
+	testCases := []struct {
+		devId  string
+		tenant string
+
+		dbGetDeviceById        *model.Device
+		dbGetAuthSetsForDevice []model.AuthSet
+
+		cacheGetCheckInTimeErr error
+		cacheGetCheckInTime    *time.Time
+	}{
+		{
+			devId:  devId,
+			tenant: "foo",
+			dbGetDeviceById: &model.Device{
+				Id: devId,
+			},
+			dbGetAuthSetsForDevice: []model.AuthSet{
+				{
+					Id: "foo",
+				},
+			},
+			cacheGetCheckInTimeErr: nil,
+			cacheGetCheckInTime:    &checkInTime,
+		},
+		{
+			devId:  devId,
+			tenant: "foo",
+			dbGetDeviceById: &model.Device{
+				Id: devId,
+			},
+			dbGetAuthSetsForDevice: []model.AuthSet{
+				{
+					Id: "foo",
+				},
+			},
+			cacheGetCheckInTimeErr: errors.New("foo"),
+			cacheGetCheckInTime:    nil,
+		},
+	}
+
+	for i := range testCases {
+		tc := testCases[i]
+		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			t.Parallel()
+
+			ctx := context.Background()
+
+			if tc.tenant != "" {
+				id := &identity.Identity{
+					Tenant: tc.tenant,
+				}
+				ctx = identity.WithContext(ctx, id)
+			}
+
+			db := mstore.DataStore{}
+			db.On("GetDeviceById",
+				ctx,
+				tc.devId,
+			).Return(tc.dbGetDeviceById, nil)
+			db.On("GetAuthSetsForDevice",
+				ctx,
+				tc.devId,
+			).Return(tc.dbGetAuthSetsForDevice, nil)
+			defer db.AssertExpectations(t)
+
+			devauth := NewDevAuth(&db, nil, nil, Config{})
+
+			c := &mcache.Cache{}
+			devauth = devauth.WithCache(c)
+			c.On("GetCheckInTime",
+				ctx,
+				tc.tenant,
+				tc.devId,
+			).Return(tc.cacheGetCheckInTime, tc.cacheGetCheckInTimeErr)
+			defer c.AssertExpectations(t)
+
+			dev, err := devauth.GetDevice(ctx, tc.devId)
+			assert.NoError(t, err)
+			if tc.cacheGetCheckInTimeErr == nil {
+				assert.WithinDuration(t, checkInTime, *(dev.CheckInTime), time.Nanosecond)
+			} else {
+				assert.Nil(t, dev.CheckInTime)
+			}
+
+		})
+	}
+}
+
+func TestDevAuthGetDevicesWithCache(t *testing.T) {
+	t.Parallel()
+
+	devId := oid.NewUUIDv5("devId1").String()
+	checkInTime := time.Now()
+
+	testCases := []struct {
+		devId  string
+		tenant string
+
+		dbGetDevices           []model.Device
+		dbGetAuthSetsForDevice []model.AuthSet
+
+		cacheGetCheckInTimesErr error
+		cacheGetCheckInTimes    []*time.Time
+	}{
+		{
+			devId:  devId,
+			tenant: "foo",
+			dbGetDevices: []model.Device{
+				{
+					Id: devId,
+				},
+			},
+			dbGetAuthSetsForDevice: []model.AuthSet{
+				{
+					Id: "foo",
+				},
+			},
+			cacheGetCheckInTimesErr: nil,
+			cacheGetCheckInTimes:    []*time.Time{&checkInTime},
+		},
+		{
+			devId:  devId,
+			tenant: "foo",
+			dbGetDevices: []model.Device{
+				{
+					Id: devId,
+				},
+			},
+			dbGetAuthSetsForDevice: []model.AuthSet{
+				{
+					Id: "foo",
+				},
+			},
+			cacheGetCheckInTimesErr: errors.New("foo"),
+			cacheGetCheckInTimes:    nil,
+		},
+	}
+
+	for i := range testCases {
+		tc := testCases[i]
+		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			t.Parallel()
+
+			ctx := context.Background()
+
+			if tc.tenant != "" {
+				id := &identity.Identity{
+					Tenant: tc.tenant,
+				}
+				ctx = identity.WithContext(ctx, id)
+			}
+
+			db := mstore.DataStore{}
+			db.On("GetDevices",
+				ctx,
+				uint(0),
+				uint(10),
+				model.DeviceFilter{
+					IDs: []string{tc.devId},
+				},
+			).Return(tc.dbGetDevices, nil)
+			db.On("GetAuthSetsForDevice",
+				ctx,
+				tc.devId,
+			).Return(tc.dbGetAuthSetsForDevice, nil)
+			defer db.AssertExpectations(t)
+
+			devauth := NewDevAuth(&db, nil, nil, Config{})
+
+			c := &mcache.Cache{}
+			devauth = devauth.WithCache(c)
+			c.On("GetCheckInTimes",
+				ctx,
+				tc.tenant,
+				[]string{tc.devId},
+			).Return(tc.cacheGetCheckInTimes, tc.cacheGetCheckInTimesErr)
+			defer c.AssertExpectations(t)
+
+			devs, err := devauth.GetDevices(
+				ctx,
+				uint(0),
+				uint(10),
+				model.DeviceFilter{IDs: []string{tc.devId}},
+			)
+			assert.NoError(t, err)
+			assert.Len(t, devs, 1)
+			if tc.cacheGetCheckInTimesErr == nil {
+				assert.WithinDuration(t, checkInTime, *(devs[0].CheckInTime), time.Nanosecond)
+			} else {
+				assert.Nil(t, devs[0].CheckInTime)
+			}
+
+		})
+	}
 }

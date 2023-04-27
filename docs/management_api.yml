@@ -498,6 +498,11 @@ definitions:
         type: string
         format: date-time
         description: Updated timestamp
+      check_in_time:
+        type: string
+        format: date-time
+        description: |
+            Time when accepted device contacted server for the last time.
       auth_sets:
         type: array
         items:
