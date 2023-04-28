@@ -1261,16 +1261,7 @@ func (d *DevAuth) VerifyToken(ctx context.Context, raw string) error {
 	if err != nil {
 		if err == jwt.ErrTokenExpired && jti.String() != "" {
 			l.Errorf("Token %s expired: %v", jti, err)
-
-			err := d.db.DeleteToken(ctx, jti)
-			if err == store.ErrTokenNotFound {
-				l.Errorf("Token %s not found", jti)
-				return err
-			}
-			if err != nil {
-				return errors.Wrapf(err, "Cannot delete token with jti: %s : %s", jti, err)
-			}
-			return jwt.ErrTokenExpired
+			return d.handleExpiredToken(ctx, jti)
 		}
 		l.Errorf("Token %s invalid: %v", jti, err)
 		return jwt.ErrTokenInvalid
@@ -1373,6 +1364,19 @@ func (d *DevAuth) VerifyToken(ctx context.Context, raw string) error {
 	_ = d.cacheSetToken(ctx, token, raw)
 
 	return nil
+}
+
+func (d *DevAuth) handleExpiredToken(ctx context.Context, jti oid.ObjectID) error {
+	err := d.db.DeleteToken(ctx, jti)
+	if err == store.ErrTokenNotFound {
+		l := log.FromContext(ctx)
+		l.Errorf("Token %s not found", jti)
+		return err
+	}
+	if err != nil {
+		return errors.Wrapf(err, "Cannot delete token with jti: %s : %s", jti, err)
+	}
+	return jwt.ErrTokenExpired
 }
 
 // purgeUriArgs removes query string args from an uri string
