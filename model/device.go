@@ -1,4 +1,4 @@
-// Copyright 2022 Northern.tech AS
+// Copyright 2023 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -58,6 +58,7 @@ type Device struct {
 	CreatedTs       time.Time              `json:"created_ts" bson:"created_ts,omitempty"`
 	UpdatedTs       time.Time              `json:"updated_ts" bson:"updated_ts,omitempty"`
 	AuthSets        []AuthSet              `json:"auth_sets" bson:"-"`
+	CheckInTime     *time.Time             `json:"check_in_time,omitempty" bson:"check_in_time,omitempty"` // nolint:lll
 	//ApiLimits override tenant-wide quota/burst config
 	ApiLimits ratelimits.ApiLimits `json:"-" bson:"api_limits"`
 
@@ -73,6 +74,7 @@ type DeviceUpdate struct {
 	Status          string                 `json:"-" bson:",omitempty"`
 	Decommissioning *bool                  `json:"-" bson:",omitempty"`
 	UpdatedTs       *time.Time             `json:"updated_ts" bson:"updated_ts,omitempty"`
+	CheckInTime     *time.Time             `json:"-" bson:"check_in_time,omitempty"`
 }
 
 func NewDevice(id, id_data, pubkey string) *Device {

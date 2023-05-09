@@ -56,6 +56,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/go-redis/redis/v8"
+	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/mendersoftware/go-lib-micro/ratelimits"
 
 	"github.com/mendersoftware/deviceauth/utils"
@@ -64,6 +65,8 @@ import (
 const (
 	IdTypeDevice = "device"
 	IdTypeUser   = "user"
+	// expiration of the device check in time - one week
+	CheckInTimeExpiration = time.Duration(time.Hour * 24 * 7)
 )
 
 var (
@@ -107,6 +110,16 @@ type Cache interface {
 	// FlushDB clears the whole db asynchronously (FLUSHDB ASYNC)
 	// TODO: replace with more fine grained key removal (per tenant)
 	FlushDB(ctx context.Context) error
+
+	// CacheCheckInTime caches the last device check in time
+	CacheCheckInTime(ctx context.Context, t *time.Time, tid, id string) error
+
+	// GetCheckInTime gets the last device check in time from cache
+	GetCheckInTime(ctx context.Context, tid, id string) (*time.Time, error)
+
+	// GetCheckInTimes gets the last device check in time from cache
+	// for each device with id from the list of ids
+	GetCheckInTimes(ctx context.Context, tid string, ids []string) ([]*time.Time, error)
 }
 
 type RedisCache struct {
@@ -417,6 +430,10 @@ func KeyLimits(tid, id, idtype string) string {
 	return fmt.Sprintf("tenant:%s:%s:%s:limits", tid, idtype, id)
 }
 
+func KeyCheckInTime(tid, id, idtype string) string {
+	return fmt.Sprintf("tenant:%s:%s:%s:checkInTime", tid, idtype, id)
+}
+
 // isErrRedisNil checks for a very common non-error, "redis: nil",
 // which just means the key was not found, and is normal
 // it's routinely returned e.g. from GET, or pipelines containing it
@@ -429,4 +446,83 @@ func LimitsEmpty(l *ratelimits.ApiLimits) bool {
 	return l.ApiQuota.MaxCalls == 0 &&
 		l.ApiQuota.IntervalSec == 0 &&
 		len(l.ApiBursts) == 0
+}
+
+func (rl *RedisCache) CacheCheckInTime(
+	ctx context.Context,
+	t *time.Time,
+	tid,
+	id string,
+) error {
+	tj, err := json.Marshal(t)
+	if err != nil {
+		return err
+	}
+
+	res := rl.c.Set(
+		ctx,
+		KeyCheckInTime(tid, id, IdTypeDevice),
+		tj,
+		CheckInTimeExpiration,
+	)
+
+	return res.Err()
+}
+
+func (rl *RedisCache) GetCheckInTime(
+	ctx context.Context,
+	tid,
+	id string,
+) (*time.Time, error) {
+	res := rl.c.Get(ctx, KeyCheckInTime(tid, id, IdTypeDevice))
+
+	if res.Err() != nil {
+		if isErrRedisNil(res.Err()) {
+			return nil, nil
+		}
+		return nil, res.Err()
+	}
+
+	var checkInTime time.Time
+
+	err := json.Unmarshal([]byte(res.Val()), &checkInTime)
+	if err != nil {
+		return nil, err
+	}
+
+	return &checkInTime, nil
+}
+
+func (rl *RedisCache) GetCheckInTimes(
+	ctx context.Context,
+	tid string,
+	ids []string,
+) ([]*time.Time, error) {
+	keys := make([]string, len(ids))
+	for i, id := range ids {
+		keys[i] = KeyCheckInTime(tid, id, IdTypeDevice)
+	}
+
+	res := rl.c.MGet(ctx, keys...)
+
+	checkInTimes := make([]*time.Time, len(ids))
+
+	for i, v := range res.Val() {
+		if v != nil {
+			b, ok := v.(string)
+			if !ok {
+				continue
+			}
+			var checkInTime time.Time
+			err := json.Unmarshal([]byte(b), &checkInTime)
+			if err != nil {
+				l := log.FromContext(ctx)
+				l.Errorf("failed to unmarshal check-in time: %s", err.Error())
+				continue
+			}
+			checkInTimes[i] = &checkInTime
+		}
+	}
+
+	return checkInTimes, nil
 }
