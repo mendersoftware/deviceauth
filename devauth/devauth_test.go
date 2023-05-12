@@ -904,7 +904,7 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 				dummyDevId,
 				mock.MatchedBy(
 					func(u model.DeviceUpdate) bool {
-						return u.Status == model.DevStatusAccepted
+						return u.Status == model.DevStatusAccepted || !u.CheckInTime.IsZero()
 					}),
 			).Return(nil)
 
