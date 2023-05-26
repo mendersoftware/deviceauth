@@ -1261,10 +1261,10 @@ func (d *DevAuth) VerifyToken(ctx context.Context, raw string) error {
 	jti := token.Claims.ID
 	if err != nil {
 		if err == jwt.ErrTokenExpired && jti.String() != "" {
-			l.Errorf("Token %s expired: %v", jti, err)
+			l.Errorf("Token %s expired: %v", jti.String(), err)
 			return d.handleExpiredToken(ctx, jti)
 		}
-		l.Errorf("Token %s invalid: %v", jti, err)
+		l.Errorf("Token %s invalid: %v", jti.String(), err)
 		return jwt.ErrTokenInvalid
 	}
 
@@ -1318,7 +1318,7 @@ func (d *DevAuth) VerifyToken(ctx context.Context, raw string) error {
 	_, err = d.db.GetToken(ctx, jti)
 	if err != nil {
 		if err == store.ErrTokenNotFound {
-			l.Errorf("Token %s not found", jti)
+			l.Errorf("Token %s not found", jti.String())
 			return err
 		}
 		return errors.Wrapf(err, "Cannot get token with id: %s from database: %s", jti, err)
@@ -1327,7 +1327,7 @@ func (d *DevAuth) VerifyToken(ctx context.Context, raw string) error {
 	auth, err := d.db.GetAuthSetById(ctx, jti.String())
 	if err != nil {
 		if err == store.ErrAuthSetNotFound {
-			l.Errorf("Auth set %s not found", jti)
+			l.Errorf("Auth set %s not found", jti.String())
 			return err
 		}
 		return err
@@ -1344,7 +1344,11 @@ func (d *DevAuth) VerifyToken(ctx context.Context, raw string) error {
 		return err
 	}
 	if dev.Decommissioning {
-		l.Errorf("Token %s rejected, device %s is being decommissioned", jti, auth.DeviceId)
+		l.Errorf(
+			"Token %s rejected, device %s is being decommissioned",
+			jti.String(),
+			auth.DeviceId,
+		)
 		return jwt.ErrTokenInvalid
 	}
 
@@ -1371,7 +1375,7 @@ func (d *DevAuth) handleExpiredToken(ctx context.Context, jti oid.ObjectID) erro
 	err := d.db.DeleteToken(ctx, jti)
 	if err == store.ErrTokenNotFound {
 		l := log.FromContext(ctx)
-		l.Errorf("Token %s not found", jti)
+		l.Errorf("Token %s not found", jti.String())
 		return err
 	}
 	if err != nil {
