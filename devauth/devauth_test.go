@@ -553,9 +553,7 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 				// use in outgoing requests (via
 				// go-lib-micro/context/httpheader packaage)
 				ctxMatcher = mock.MatchedBy(func(c context.Context) bool {
-					return assert.NotNil(t, identity.FromContext(c)) &&
-						assert.NotEmpty(t,
-							ctxhttpheader.FromContext(c, "Authorization"))
+					return assert.NotNil(t, identity.FromContext(c))
 				})
 			}
 

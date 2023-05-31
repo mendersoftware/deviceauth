@@ -17,13 +17,10 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
-	"fmt"
-	"net/http"
 	"strings"
 	"time"
 
 	"github.com/mendersoftware/go-lib-micro/addons"
-	"github.com/mendersoftware/go-lib-micro/apiclient"
 	ctxhttpheader "github.com/mendersoftware/go-lib-micro/context/httpheader"
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/log"
@@ -81,13 +78,6 @@ func MakeErrDevAuthBadRequest(e error) error {
 	return errors.Wrap(e, MsgErrDevAuthBadRequest)
 }
 
-// helper for obtaining API clients
-type ApiClientGetter func() apiclient.HttpRunner
-
-func simpleApiClientGetter() apiclient.HttpRunner {
-	return &apiclient.HttpApi{}
-}
-
 // this device auth service interface
 //
 //go:generate ../utils/mockgen.sh
@@ -133,7 +123,6 @@ type DevAuth struct {
 	cOrch        orchestrator.ClientRunner
 	cTenant      tenant.ClientRunner
 	jwt          jwt.Handler
-	clientGetter ApiClientGetter
 	verifyTenant bool
 	config       Config
 	cache        cache.Cache
@@ -168,7 +157,6 @@ func NewDevAuth(d store.DataStore, co orchestrator.ClientRunner,
 		invClient:    inventory.NewClient(config.InventoryAddr, false),
 		cOrch:        co,
 		jwt:          jwt,
-		clientGetter: simpleApiClientGetter,
 		verifyTenant: false,
 		config:       config,
 		clock:        utils.NewClock(),
@@ -306,14 +294,6 @@ func tenantWithContext(ctx context.Context, tenantToken string) (context.Context
 
 	// update context to store the identity of the caller
 	ctx = identity.WithContext(ctx, &ident)
-
-	// setup authorization header so that outgoing requests are done for
-	// *this* tenant
-	ctx = ctxhttpheader.WithContext(ctx,
-		http.Header{
-			"Authorization": []string{fmt.Sprintf("Bearer %s", tenantToken)},
-		},
-		"Authorization")
 
 	return ctx, nil
 }
