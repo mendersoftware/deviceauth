@@ -285,19 +285,6 @@ func (d *DevAuth) signToken(ctx context.Context) jwt.SignFunc {
 	}
 }
 
-// tenantWithContext will update `ctx` with tenant related data
-func tenantWithContext(ctx context.Context, tenantToken string) (context.Context, error) {
-	ident, err := identity.ExtractIdentity(tenantToken)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to extract identity from tenant token")
-	}
-
-	// update context to store the identity of the caller
-	ctx = identity.WithContext(ctx, &ident)
-
-	return ctx, nil
-}
-
 func (d *DevAuth) doVerifyTenant(ctx context.Context, token string) (*tenant.Tenant, error) {
 	t, err := d.cTenant.VerifyToken(ctx, token)
 
@@ -323,7 +310,6 @@ func (d *DevAuth) getTenantWithDefault(
 		return nil, nil, MakeErrDevAuthUnauthorized(errors.New("tenant token missing"))
 	}
 
-	var chosenToken string
 	var t *tenant.Tenant
 	var err error
 
@@ -332,9 +318,7 @@ func (d *DevAuth) getTenantWithDefault(
 	if tenantToken != "" {
 		t, err = d.doVerifyTenant(ctx, tenantToken)
 
-		if err == nil {
-			chosenToken = tenantToken
-		} else {
+		if err != nil {
 			l.Errorf("Failed to verify supplied tenant token: %s", err.Error())
 		}
 	}
@@ -343,10 +327,6 @@ func (d *DevAuth) getTenantWithDefault(
 	// try the default one
 	if t == nil && defaultToken != "" {
 		t, err = d.doVerifyTenant(ctx, defaultToken)
-
-		if err == nil {
-			chosenToken = defaultToken
-		}
 		if err != nil {
 			l.Errorf("Failed to verify default tenant token: %s", err.Error())
 		}
@@ -360,12 +340,10 @@ func (d *DevAuth) getTenantWithDefault(
 		return ctx, nil, err
 	}
 
-	// we do have a working token/valid tenant
-	tCtx, err := tenantWithContext(ctx, chosenToken)
-	if err != nil {
-		l.Errorf("failed to setup tenant context: %v", err)
-		return nil, nil, ErrDevAuthUnauthorized
-	}
+	tCtx := identity.WithContext(ctx, &identity.Identity{
+		Subject: "internal",
+		Tenant:  t.ID,
+	})
 
 	return tCtx, t, nil
 }
