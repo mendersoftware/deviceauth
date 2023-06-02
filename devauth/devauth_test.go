@@ -748,6 +748,26 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 			res: dummyToken,
 		},
 		{
+			desc: "ok: device during decommissioning",
+			dbGetAuthSetByDataKeyRes: &model.AuthSet{
+				Id:           dummyAuthID,
+				IdDataSha256: idDataSha256,
+				DeviceId:     dummyDevId,
+				PubKey:       inReq.PubKey,
+				Status:       model.DevStatusPreauth,
+			},
+			dbGetLimitRes: &model.Limit{
+				Value: 5,
+			},
+			dbGetDevCountByStatusRes: 0,
+			dev: &model.Device{
+				Id:              dummyDevId,
+				Status:          model.DevStatusPending,
+				Decommissioning: true,
+			},
+			err: ErrDevAuthUnauthorized,
+		},
+		{
 			desc:                     "error: can't get an existing authset",
 			dbGetAuthSetByDataKeyErr: errors.New("db error"),
 			dev: &model.Device{
