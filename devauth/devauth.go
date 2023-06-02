@@ -510,6 +510,13 @@ func (d *DevAuth) processPreAuthRequest(
 		return nil, err
 	}
 
+	// check if the device is in the decommissioning state
+	if dev.Decommissioning {
+		l := log.FromContext(ctx)
+		l.Warnf("Device %s in the decommissioning state.", dev.Id)
+		return nil, ErrDevAuthUnauthorized
+	}
+
 	currentStatus := dev.Status
 	if dev.Status == model.DevStatusAccepted {
 		deviceAlreadyAccepted = true
