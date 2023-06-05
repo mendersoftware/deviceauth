@@ -54,7 +54,7 @@ MIGRATED_TENANT_DBS = {
 
 @pytest.fixture(scope="function")
 def migrated_tenant_dbs(clean_db, mongo):
-    """ Init a set of tenant dbs to predefined versions. """
+    """Init a set of tenant dbs to predefined versions."""
     for tid, ver in MIGRATED_TENANT_DBS.items():
         mongo_set_version(mongo, make_tenant_db(tid), ver)
 
@@ -197,9 +197,10 @@ class TestCliMigrateEnterprise:
 class TestCheckDeviceLimitsEnterprise:
     @contextmanager
     def init_service_mocks(
-        self, wflows_rsp_q: asyncio.Queue = None, tadm_rsp_q: asyncio.Queue = None,
+        self,
+        wflows_rsp_q: asyncio.Queue = None,
+        tadm_rsp_q: asyncio.Queue = None,
     ) -> mockserver.MockServer:
-
         # Very simple tornado request handler for tenantadm and workflows that
         # generates responses from items pushed onto an asyncio.Queue object,
         # the object can either be a callable or a 3-tuple with (code, header,
@@ -226,11 +227,25 @@ class TestCheckDeviceLimitsEnterprise:
 
         with mockserver.run_fake(get_fake_tenantadm_addr()) as tadm:
             tadm.app.add_handlers(
-                r".*", [(r".*", RequestHandler, {"rsp_q": tadm_rsp_q},)],
+                r".*",
+                [
+                    (
+                        r".*",
+                        RequestHandler,
+                        {"rsp_q": tadm_rsp_q},
+                    )
+                ],
             )
             with mockserver.run_fake(get_fake_workflows_addr()) as wflows:
                 wflows.app.add_handlers(
-                    r".*", [(r".*", RequestHandler, {"rsp_q": wflows_rsp_q},)],
+                    r".*",
+                    [
+                        (
+                            r".*",
+                            RequestHandler,
+                            {"rsp_q": wflows_rsp_q},
+                        )
+                    ],
                 )
                 yield tadm, wflows
 
@@ -280,7 +295,6 @@ class TestCheckDeviceLimitsEnterprise:
     def test_check_device_limits(
         self, clean_db, cli, device_api, management_api, internal_api, test_case
     ):
-
         rsp_q_tadm = asyncio.Queue(maxsize=100)
         rsp_q_wflows = asyncio.Queue(maxsize=100)
         with self.init_service_mocks(wflows_rsp_q=rsp_q_wflows, tadm_rsp_q=rsp_q_tadm):
@@ -293,7 +307,11 @@ class TestCheckDeviceLimitsEnterprise:
             for _ in range(test_case["device_count"]):
                 # POST /api/internal/v1/tenantadm/verify
                 rsp_q_tadm.put_nowait(
-                    (200, {}, '{"id": "%s", "sub": "user"}' % test_case["tenant"])
+                    (
+                        200,
+                        {},
+                        '{"id": "%s", "sub": "user"}' % test_case["tenant"].get("id"),
+                    )
                 )
                 # POST /api/v1/workflows/update_device_inventory
                 rsp_q_wflows.put_nowait((201, {}, ""))
