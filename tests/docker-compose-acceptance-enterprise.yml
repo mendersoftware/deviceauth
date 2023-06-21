@@ -31,3 +31,4 @@ services:
             DEVICEAUTH_DEVADM_ADDR: "http://acceptance:9997/"
             DEVICEAUTH_HAVE_ADDONS: "1"
             TESTING_LOGS: "1"
+            DEVICEAUTH_ENABLE_REPORTING: "0"
