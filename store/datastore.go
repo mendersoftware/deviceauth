@@ -1,4 +1,4 @@
-// Copyright 2021 Northern.tech AS
+// Copyright 2023 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -50,16 +50,16 @@ type AuthSetFilter struct {
 }
 
 // MapFunc is the prototype for the function applied to each database in
-// ForEachDatabase. dbCtx contains a reference to the current database
+// ForEachTenant. dbCtx contains a reference to the current database
 // MapFunc is applied to.
 type MapFunc func(dbCtx context.Context) error
 
 //go:generate ../utils/mockgen.sh
 type DataStore interface {
-	// ForEachDatabase loops over all databases and applies opFunc with
-	// for all existing databases. If opFunc returns an error for one of
+	// ForEachTenant loops over all tenants and applies opFunc with
+	// for the existing database. If opFunc returns an error for one of
 	// the elements, this function aborts with the same error.
-	ForEachDatabase(parentCtx context.Context, opFunc MapFunc) error
+	ForEachTenant(parentCtx context.Context, opFunc MapFunc) error
 
 	Ping(ctx context.Context) error
 	// retrieve device by Mender-assigned device ID
@@ -141,11 +141,12 @@ type DataStore interface {
 	// gets device status
 	GetDeviceStatus(ctx context.Context, dev_id string) (string, error)
 
-	GetTenantDbs() ([]string, error)
-
 	MigrateTenant(ctx context.Context, version string, tenant string) error
 	WithAutomigrate() DataStore
 	//call this one if you really know what you are doing. This is supposed to be called only
 	//from cmdPropagateStatusesInventory
 	StoreMigrationVersion(ctx context.Context, version *migrate.Version) error
+	ListTenantsIds(
+		ctx context.Context,
+	) ([]string, error)
 }
