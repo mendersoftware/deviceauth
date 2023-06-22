@@ -1,4 +1,4 @@
-// Copyright 2022 Northern.tech AS
+// Copyright 2023 Northern.tech AS
 //
 //	Licensed under the Apache License, Version 2.0 (the "License");
 //	you may not use this file except in compliance with the License.
@@ -19,18 +19,20 @@ import (
 	"fmt"
 	"math/rand"
 	"sort"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	"github.com/mendersoftware/go-lib-micro/mongo/oid"
-	ctxstore "github.com/mendersoftware/go-lib-micro/store"
-	"github.com/pkg/errors"
+	ctxstore2 "github.com/mendersoftware/go-lib-micro/store/v2"
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/mendersoftware/deviceauth/jwt"
 	"github.com/mendersoftware/deviceauth/model"
@@ -99,26 +101,36 @@ func assertEqualTokens(t *testing.T, expected, actual []jwt.Token) bool {
 }
 
 // setup devices
-func setUpDevices(ctx context.Context, client *mongo.Client) error {
+func setUpDevices(ctx context.Context, client *mongo.Client, tenantId string) error {
 	dev1.IdDataSha256 = getIdDataHash(dev1.IdData)
 	dev2.IdDataSha256 = getIdDataHash(dev2.IdData)
+	dev1.TenantID = tenantId
+	dev2.TenantID = tenantId
 	inputDevices := bson.A{
 		dev1,
 		dev2,
 	}
-	c := client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
-	_, err := c.InsertMany(ctx, inputDevices)
-	return err
+	c := client.Database(DbName).Collection(DbDevicesColl)
+	var returnedErr error
+	for _, d := range inputDevices {
+		_, err := c.InsertOne(ctx, d)
+		if err != nil {
+			returnedErr = err
+		}
+	}
+	return returnedErr
 }
 
 // setup tokens
-func setUpTokens(ctx context.Context, client *mongo.Client) error {
+func setUpTokens(ctx context.Context, client *mongo.Client, tenantId string) error {
 	inputTokens := bson.A{
 		token1,
 		token2,
 	}
-	c := client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbTokensColl)
+	c := client.Database(DbName).Collection(DbTokensColl)
 	_, err := c.InsertMany(ctx, inputTokens)
+	c.UpdateOne(ctx, bson.M{dbFieldID: token1.ID}, bson.M{"$set": bson.M{dbFieldTenantClaim: tenantId}})
+	c.UpdateOne(ctx, bson.M{dbFieldID: token2.ID}, bson.M{"$set": bson.M{dbFieldTenantClaim: tenantId}})
 	return err
 }
 
@@ -154,7 +166,7 @@ func compareTime(expected time.Time, actual time.Time, t *testing.T) {
 	assert.Equal(t, expected.Unix(), actual.Unix())
 }
 
-func TestForEachDatabase(t *testing.T) {
+func TestForEachTenant(t *testing.T) {
 	testCases := []struct {
 		Name string
 
@@ -164,82 +176,101 @@ func TestForEachDatabase(t *testing.T) {
 		MapFunc store.MapFunc
 
 		Error error
-	}{{
-		Name: "ok, noop",
+	}{
+		{
+			Name: "ok, noop",
 
-		CTX: context.Background(),
+			CTX: context.Background(),
 
-		TenantIDs: []string{"tenant1", "tenant2", ""},
-		MapFunc: func(ctx context.Context) error {
-			return nil
+			TenantIDs: []string{"tenant1", "tenant2", ""},
+			MapFunc: func(ctx context.Context) error {
+				return nil
+			},
 		},
-	}, {
-		Name: "error, map func errored",
+		{
+			Name: "error, map func errored",
 
-		CTX:       context.Background(),
-		TenantIDs: []string{"tenant"},
-		MapFunc: func(ctx context.Context) error {
-			return errors.New("internal error")
+			CTX:       context.Background(),
+			TenantIDs: []string{"tenant"},
+			MapFunc: func(ctx context.Context) error {
+				return errors.New("internal error")
+			},
+
+			Error: errors.New(
+				"store: failed to apply mapFunc to tenant \"tenant\": internal error",
+			),
 		},
+		{
+			Name: "error, context already canceled",
 
-		Error: errors.New(
-			`store: failed to apply mapFunc to database ` +
-				`"deviceauth-tenant": internal error`,
-		),
-	}, {
-		Name: "error, context already canceled",
-
-		CTX: func() context.Context {
-			ctx, cancel := context.WithCancel(context.TODO())
-			cancel()
-			return ctx
-		}(),
-		TenantIDs: []string{"tenant"},
-		MapFunc: func(ctx context.Context) error {
-			return nil
-		},
-
-		Error: errors.Wrap(context.Canceled,
-			`store: failed to retrieve databases`,
-		),
-	}, {
-		Name: "error, context timeout",
-
-		CTX: func() context.Context {
-			ctx, cancel := context.WithTimeout(context.TODO(), time.Second*3)
-			go func() {
-				// the things we do for go vet...
-				<-time.After(time.Minute)
+			CTX: func() context.Context {
+				ctx, cancel := context.WithCancel(context.TODO())
 				cancel()
-			}()
-			return ctx
-		}(),
-		TenantIDs: []string{"tenant1", "tenant2"},
-		MapFunc: func(ctx context.Context) error {
-			time.Sleep(time.Second * 3)
-			return nil
+				return ctx
+			}(),
+			TenantIDs: []string{"tenant"},
+			MapFunc: func(ctx context.Context) error {
+				return nil
+			},
+
+			Error: errors.Wrap(context.Canceled,
+				`store: database operations stopped prematurely`,
+			),
 		},
-		Error: errors.Wrap(context.DeadlineExceeded,
-			"store: database operations stopped prematurely",
-		),
-	}}
+		{
+			Name: "error, context timeout",
+
+			CTX: func() context.Context {
+				ctx, cancel := context.WithTimeout(context.TODO(), time.Second*3)
+				go func() {
+					// the things we do for go vet...
+					<-time.After(time.Minute)
+					cancel()
+				}()
+				return ctx
+			}(),
+			TenantIDs: []string{"tenant1", "tenant2"},
+			MapFunc: func(ctx context.Context) error {
+				time.Sleep(time.Second * 3)
+				return nil
+			},
+			Error: errors.Wrap(context.DeadlineExceeded,
+				"store: database operations stopped prematurely",
+			),
+		},
+	}
 
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
 			var (
 				numCalled int
 				client    = db.Client()
-				setupCtx  = context.Background()
 			)
 			db.Wipe()
 			// Initialize databases in our test setup
-			for _, tenantID := range tc.TenantIDs {
-				dbName := ctxstore.DbNameForTenant(tenantID, DbName)
-				err := client.Database(dbName).
-					CreateCollection(setupCtx, "test")
-				if !assert.NoError(t, err) {
-					panic(err)
-				}
+			for _, tenantId := range tc.TenantIDs {
+				c := client.Database(DbName).Collection(DbDevicesColl)
+				ctx := identity.WithContext(context.Background(), &identity.Identity{
+					Tenant: tenantId,
+				})
+				_, err := c.InsertOne(ctx, ctxstore2.WithTenantID(
+					ctx,
+					model.Device{
+						Id:              oid.NewUUIDv4().String(),
+						IdData:          oid.NewUUIDv4().String(),
+						IdDataStruct:    map[string]interface{}{"k0": "v0"},
+						IdDataSha256:    []byte(oid.NewUUIDv4().String()),
+						Status:          "accepted",
+						Decommissioning: false,
+						CreatedTs:       time.Now(),
+						UpdatedTs:       time.Now(),
+						AuthSets:        nil,
+						ApiLimits:       ratelimits.ApiLimits{},
+						Revision:        0,
+						TenantID:        tenantId,
+					},
+				))
+				assert.NoError(t, err)
 			}
 			ds := NewDataStoreMongoWithClient(client)
 
@@ -247,20 +278,22 @@ func TestForEachDatabase(t *testing.T) {
 			// database legitimacy.
 			mapFunc := func(ctx context.Context) error {
 				numCalled++
-				dbName := ctxstore.DbFromContext(ctx, DbName)
-				tenantID := ctxstore.TenantFromDbName(dbName, DbName)
-				assert.Contains(t, tc.TenantIDs, tenantID)
+				id := identity.FromContext(ctx)
+				if id != nil {
+					tenantID := id.Tenant
+					assert.Contains(t, tc.TenantIDs, tenantID)
+				}
 				return tc.MapFunc(ctx)
 			}
 			// Run test:
-			err := ds.ForEachDatabase(tc.CTX, mapFunc)
+			err := ds.ForEachTenant(tc.CTX, mapFunc)
 			if tc.Error != nil {
 				if assert.Error(t, err) {
 					assert.Regexp(t, tc.Error.Error(), err.Error())
 				}
 			} else {
 				assert.NoError(t, err)
-				assert.Equal(t, numCalled, len(tc.TenantIDs))
+				assert.Equal(t, len(tc.TenantIDs), numCalled)
 			}
 		})
 	}
@@ -292,7 +325,7 @@ func TestStoreGetDeviceByIdentityDataHash(t *testing.T) {
 
 	d := getDb(dbCtx)
 
-	err := setUpDevices(dbCtx, d.client)
+	err := setUpDevices(dbCtx, d.client, tenant)
 	assert.NoError(t, err, "failed to setup input data")
 
 	testCases := []struct {
@@ -372,7 +405,7 @@ func TestStoreAddDevice(t *testing.T) {
 		Tenant: "foo",
 	})
 	d := getDb(ctx)
-	d.MigrateTenant(ctx, ctxstore.DbFromContext(ctx, DbName), DbVersion)
+	d.MigrateTenant(ctx, DbName, DbVersion)
 
 	err := d.AddDevice(ctx, *dev)
 	assert.NoError(t, err, "failed to add device")
@@ -399,7 +432,6 @@ func TestStoreAddDevice(t *testing.T) {
 	ctx = identity.WithContext(context.Background(), &identity.Identity{
 		Tenant: "bar",
 	})
-	d.MigrateTenant(ctx, ctxstore.DbFromContext(ctx, DbName), DbVersion)
 
 	err = d.AddDevice(ctx, model.Device{
 		Id:     "foobar",
@@ -426,7 +458,7 @@ func TestStoreUpdateDevice(t *testing.T) {
 	})
 	d := getDb(dbCtx)
 
-	err := setUpDevices(dbCtx, d.client)
+	err := setUpDevices(dbCtx, d.client, tenant)
 	assert.NoError(t, err, "failed to setup input data")
 
 	now := time.Now().UTC()
@@ -449,11 +481,12 @@ func TestStoreUpdateDevice(t *testing.T) {
 
 	//test status updates
 	testCases := []struct {
-		id     string
-		old    *model.Device
-		update model.DeviceUpdate
-		tenant string
-		outErr string
+		id                   string
+		old                  *model.Device
+		update               model.DeviceUpdate
+		tenant               string
+		forceDifferentTenant string
+		outErr               string
 	}{
 		{
 			id:     dev1.Id,
@@ -463,7 +496,7 @@ func TestStoreUpdateDevice(t *testing.T) {
 			tenant: tenant,
 		},
 		{
-			// other tenant's DB
+			//other tenant's DB
 			id:     dev1.Id,
 			update: model.DeviceUpdate{Decommissioning: uto.BoolPtr(true)},
 			outErr: store.ErrDevNotFound.Error(),
@@ -474,6 +507,13 @@ func TestStoreUpdateDevice(t *testing.T) {
 			update: model.DeviceUpdate{Status: model.DevStatusRejected},
 			outErr: store.ErrDevNotFound.Error(),
 			tenant: tenant,
+		},
+		{
+			id:                   "id3",
+			update:               model.DeviceUpdate{Status: model.DevStatusRejected},
+			outErr:               store.ErrDevNotFound.Error(),
+			tenant:               tenant,
+			forceDifferentTenant: oid.NewUUIDv4().String(),
 		},
 	}
 
@@ -497,9 +537,14 @@ func TestStoreUpdateDevice(t *testing.T) {
 
 				var found model.Device
 
-				c := d.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
+				c := d.client.Database(DbName).Collection(DbDevicesColl)
 
-				err := c.FindOne(ctx, bson.M{"_id": tc.id}).Decode(&found)
+				if tc.forceDifferentTenant != "" {
+					ctx = identity.WithContext(context.Background(), &identity.Identity{
+						Tenant: tc.forceDifferentTenant,
+					})
+				}
+				err := c.FindOne(ctx, ctxstore2.WithTenantID(ctx, bson.M{"_id": tc.id})).Decode(&found)
 				assert.NoError(t, err, "failed to find device")
 
 				compareUpdateDev(t, *tc.old, found, tc.update)
@@ -528,7 +573,7 @@ func TestStoreAddToken(t *testing.T) {
 	//verify
 	var found jwt.Token
 
-	c := d.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbTokensColl)
+	c := d.client.Database(DbName).Collection(DbTokensColl)
 	err = c.FindOne(ctx, bson.M{"_id": token1.ID}).Decode(&found)
 	assert.NoError(t, err, "failed to find token")
 	assertEqualTokens(t, []jwt.Token{*token1}, []jwt.Token{found})
@@ -544,7 +589,7 @@ func TestStoreGetToken(t *testing.T) {
 	})
 	d := getDb(dbCtx)
 
-	err := setUpTokens(dbCtx, d.client)
+	err := setUpTokens(dbCtx, d.client, tenant)
 	assert.NoError(t, err, "failed to setup input data")
 
 	testCases := []struct {
@@ -558,7 +603,7 @@ func TestStoreGetToken(t *testing.T) {
 			expectedToken: token1,
 		},
 		{
-			tokenID: token1.ID,
+			tokenID: oid.NewUUIDv4(),
 		},
 		{
 			tokenID:       token2.ID,
@@ -611,7 +656,7 @@ func TestStoreDeleteToken(t *testing.T) {
 	})
 	d := getDb(dbCtx)
 
-	err := setUpTokens(dbCtx, d.client)
+	err := setUpTokens(dbCtx, d.client, tenant)
 	assert.NoError(t, err, "failed to setup input data")
 
 	testCases := []struct {
@@ -704,18 +749,25 @@ func TestStoreDeleteTokens(t *testing.T) {
 			d := getDb(ctx)
 
 			if tc.inTokens != nil {
-				c := d.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbTokensColl)
+				c := d.client.Database(DbName).Collection(DbTokensColl)
 				_, err := c.InsertMany(ctx, tc.inTokens)
 				assert.NoError(t, err)
+				if tc.tenant != "" {
+					for _, token := range tc.inTokens {
+						tokenId := token.(*jwt.Token).ID
+						_, err := c.UpdateOne(ctx, bson.M{dbFieldID: tokenId}, bson.M{"$set": bson.M{dbFieldTenantClaim: tc.tenant}})
+						assert.NoError(t, err)
+					}
+				}
 			}
 
 			err := d.DeleteTokens(ctx)
 			assert.NoError(t, err)
 			var out []jwt.Token
 
-			c := d.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbTokensColl)
+			c := d.client.Database(DbName).Collection(DbTokensColl)
 
-			cursor, err := c.Find(ctx, bson.M{})
+			cursor, err := c.Find(ctx, bson.M{dbFieldTenantClaim: tc.tenant})
 			assert.NoError(t, err)
 			err = cursor.All(ctx, &out)
 			assert.NoError(t, err)
@@ -794,9 +846,14 @@ func TestStoreDeleteTokenByDevId(t *testing.T) {
 
 			d := getDb(ctx)
 
-			c := d.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbTokensColl)
+			c := d.client.Database(DbName).Collection(DbTokensColl)
 			_, err := c.InsertMany(ctx, inTokens)
 			assert.NoError(t, err)
+			for _, token := range inTokens {
+				tokenId := token.(*jwt.Token).ID
+				_, err := c.UpdateOne(ctx, bson.M{dbFieldID: tokenId}, bson.M{"$set": bson.M{dbFieldTenantClaim: tc.tenant}})
+				assert.NoError(t, err)
+			}
 
 			err = d.DeleteTokenByDevId(ctx, tc.devID)
 			if tc.err != nil {
@@ -835,8 +892,17 @@ func verifyIndexes(t *testing.T, coll *mongo.Collection, expected []mongo.IndexM
 			if idx["name"] == *expectedIdx.Options.Name {
 				t.Logf("found same index, comparing")
 				found = true
-				assert.Equal(t, *expectedIdx.Options.Background, idx["background"])
-				if idx["unique"] != nil {
+				var fieldPresent bool
+				_, fieldPresent = idx["background"]
+				if expectedIdx.Options.Background == nil {
+					assert.False(t, fieldPresent)
+				} else {
+					assert.Equal(t, *expectedIdx.Options.Background, idx["background"])
+				}
+				_, fieldPresent = idx["unique"]
+				if expectedIdx.Options.Unique == nil {
+					assert.False(t, fieldPresent)
+				} else {
 					assert.Equal(t, *expectedIdx.Options.Unique, idx["unique"])
 				}
 				break
@@ -871,17 +937,17 @@ func TestStoreMigrate(t *testing.T) {
 				"needs version " + DbVersion,
 		},
 		DbVersion + " multitenant": {
-			automigrate: true,
 			tenantDbs:   []string{"deviceauth-tenant1id", "deviceauth-tenant2id"},
+			automigrate: true,
 			version:     DbVersion,
 			err:         "",
 		},
 		DbVersion + " multitenant, no automigrate": {
-			automigrate: false,
 			tenantDbs:   []string{"deviceauth-tenant1id", "deviceauth-tenant2id"},
+			automigrate: false,
 			version:     DbVersion,
 			err: "failed to apply migrations: db needs " +
-				"migration: deviceauth-tenant1id has version " +
+				"migration: deviceauth has version " +
 				"0.0.0, needs version " + DbVersion,
 		},
 		"0.1 error": {
@@ -890,8 +956,6 @@ func TestStoreMigrate(t *testing.T) {
 			err:         "failed to parse service version: failed to parse Version: unexpected EOF",
 		},
 	}
-	_false := false
-	_true := true
 
 	for name, tc := range testCases {
 		t.Run(fmt.Sprintf("tc: %s", name), func(t *testing.T) {
@@ -902,7 +966,6 @@ func TestStoreMigrate(t *testing.T) {
 			if tc.automigrate {
 				db = db.WithAutomigrate().(*DataStoreMongo)
 			}
-
 			// set up multitenancy/tenant dbs
 			if len(tc.tenantDbs) != 0 {
 				db = db.WithMultitenant()
@@ -940,58 +1003,24 @@ func TestStoreMigrate(t *testing.T) {
 						v, _ := migrate.NewVersion(tc.version)
 						assert.Equal(t, *v, out[len(out)-1].Version)
 
-						// verify that all indexes are created
-						verifyIndexes(t, db.client.Database(d).Collection(DbDevicesColl),
-							[]mongo.IndexModel{
-								{
-									Keys: bson.D{
-										{Key: model.DevKeyIdDataSha256, Value: 1},
-									},
-									Options: &options.IndexOptions{
-										Background: &_false,
-										Name:       &indexDevices_IdentityDataSha256,
-										Unique:     &_true,
-									},
-								},
-								{
-									Keys: bson.D{
-										{Key: model.DevKeyStatus, Value: 1},
-										{Key: model.DevKeyId, Value: 1},
-									},
-									Options: &options.IndexOptions{
-										Background: &_false,
-										Name:       &indexDevices_Status,
-									},
-								},
-							},
-						)
-						verifyIndexes(t, db.client.Database(d).Collection(DbAuthSetColl),
-							[]mongo.IndexModel{
-								{
-									Keys: bson.D{
-										{Key: model.AuthSetKeyDeviceId, Value: 1},
-										{Key: model.AuthSetKeyIdDataSha256, Value: 1},
-										{Key: model.AuthSetKeyPubKey, Value: 1},
-									},
-									Options: &options.IndexOptions{
-										Background: &_false,
-										Name:       &indexAuthSet_DeviceId_IdentityDataSha256_PubKey,
-										Unique:     &_true,
-									},
-								},
-								{
-									Keys: bson.D{
-										{Key: model.AuthSetKeyIdDataSha256, Value: 1},
-										{Key: model.AuthSetKeyPubKey, Value: 1},
-									},
-									Options: &options.IndexOptions{
-										Background: &_false,
-										Name:       &indexAuthSet_IdentityDataSha256_PubKey,
-										Unique:     &_true,
-									},
-								},
-							},
-						)
+						// verify that all indexes are created, but only for final single db
+						if d == DbName {
+							verifyIndexes(t, db.client.Database(d).Collection(DbDevicesColl),
+								DbDevicesCollectionIndices,
+							)
+							verifyIndexes(t, db.client.Database(d).Collection(DbAuthSetColl),
+								DbAuthSetsCollectionIndices,
+							)
+							verifyIndexes(t, db.client.Database(d).Collection(DbLimitsColl),
+								DbLimitsCollectionIndices,
+							)
+							verifyIndexes(t, db.client.Database(d).Collection(DbLimitsColl),
+								DbLimitsCollectionIndices,
+							)
+							verifyIndexes(t, db.client.Database(d).Collection(DbTokensColl),
+								DbTokensCollectionIndices,
+							)
+						}
 					}
 				}
 
@@ -1078,9 +1107,11 @@ func TestStoreGetDevices(t *testing.T) {
 	// populate DB with a set of devices
 	for i := 0; i < devCount; i++ {
 		dev := model.Device{
-			Id:     fmt.Sprintf("%04d", i),
-			IdData: fmt.Sprintf("foo-%04d", i),
-			Status: randDevStatus(),
+			Id:           fmt.Sprintf("%04d", i),
+			IdData:       fmt.Sprintf("foo-%04d", i),
+			IdDataSha256: []byte(fmt.Sprintf("foo-%04d", i)),
+			Status:       randDevStatus(),
+			TenantID:     "foo",
 		}
 
 		devsList = append(devsList, dev)
@@ -1251,6 +1282,7 @@ func TestStoreAuthSet(t *testing.T) {
 		PubKey:       "pubkey-1",
 		DeviceId:     "1",
 		Timestamp:    uto.TimePtr(time.Now()),
+		TenantID:     tenant,
 	}
 	err := db.AddAuthSet(ctx, asin)
 	assert.NoError(t, err)
@@ -1329,7 +1361,7 @@ func TestUpdateAuthSetMultiple(t *testing.T) {
 	}
 
 	ctx := identity.WithContext(context.Background(), &identity.Identity{
-		Tenant: "foo",
+		Tenant: tenant,
 	})
 	db := getDb(ctx)
 
@@ -1345,6 +1377,7 @@ func TestUpdateAuthSetMultiple(t *testing.T) {
 		IdData:   "foobar",
 		DeviceId: "1",
 		Status:   model.DevStatusAccepted,
+		TenantID: tenant,
 	}
 	// add 5 auth sets, all with status 'accepted'
 	for i := 0; i < 5; i++ {
@@ -1360,6 +1393,7 @@ func TestUpdateAuthSetMultiple(t *testing.T) {
 		DeviceId:  "1",
 		Status:    model.DevStatusPending,
 		Timestamp: uto.TimePtr(time.Now()),
+		TenantID:  tenant,
 	})
 	assert.NoError(t, err)
 
@@ -1367,6 +1401,7 @@ func TestUpdateAuthSetMultiple(t *testing.T) {
 	err = db.UpdateAuthSet(ctx, model.AuthSet{
 		DeviceId: "1",
 		Status:   model.DevStatusAccepted,
+		TenantID: tenant,
 	}, model.AuthSetUpdate{
 		Status: model.DevStatusRejected,
 	})
@@ -1375,8 +1410,11 @@ func TestUpdateAuthSetMultiple(t *testing.T) {
 	asets, err := db.GetAuthSetsForDevice(ctx, "1")
 	assert.NoError(t, err)
 	assert.Len(t, asets, 6)
-	for idx, aset := range asets {
-		if idx < 5 {
+	for _, aset := range asets {
+		key := strings.TrimPrefix(aset.PubKey, "pubkey-")
+		value, e := strconv.Atoi(key)
+		assert.NoError(t, e)
+		if value < 5 {
 			assert.Equal(t, model.DevStatusRejected, aset.Status)
 		} else {
 			// last one is pending
@@ -1396,10 +1434,13 @@ func TestUpdateAuthSetMultiple(t *testing.T) {
 	asets, err = db.GetAuthSetsForDevice(ctx, "1")
 	assert.NoError(t, err)
 	assert.Len(t, asets, 6)
-	for idx, aset := range asets {
+	for _, aset := range asets {
+		key := strings.TrimPrefix(aset.PubKey, "pubkey-")
+		value, e := strconv.Atoi(key)
+		assert.NoError(t, e)
 		if aset.Id == but_last.Id {
 			assert.Equal(t, model.DevStatusAccepted, aset.Status)
-		} else if idx < 5 {
+		} else if value < 5 {
 			assert.Equal(t, model.DevStatusRejected, aset.Status)
 		} else {
 			assert.Equal(t, model.DevStatusPending, aset.Status)
@@ -1469,8 +1510,11 @@ func TestUpdateAuthSetBson(t *testing.T) {
 	asets, err := db.GetAuthSetsForDevice(ctx, "1")
 	assert.NoError(t, err)
 	assert.Len(t, asets, 7)
-	for idx, aset := range asets {
-		if idx < 5 {
+	for _, aset := range asets {
+		key := strings.TrimPrefix(aset.PubKey, "pubkey-")
+		value, e := strconv.Atoi(key)
+		assert.NoError(t, e)
+		if value < 5 {
 			assert.Equal(t, model.DevStatusPending, aset.Status)
 		} else {
 			// last 2 are rejected
@@ -1494,16 +1538,17 @@ func TestStoreDeleteDevice(t *testing.T) {
 		dev1,
 		dev2,
 	}
-	c := db.client.Database(ctxstore.DbFromContext(dbCtx, DbName)).Collection(DbDevicesColl)
-	_, err := c.InsertMany(dbCtx, inputDevices)
-	assert.NoError(t, err, "failed to setup input data")
+	dev1.IdDataSha256 = getIdDataHash(dev1.IdData)
+	dev2.IdDataSha256 = getIdDataHash(dev2.IdData)
+	c := db.client.Database(DbName).Collection(DbDevicesColl)
 
 	coll := db.client.Database(DbName).Collection(DbDevicesColl)
 
 	testCases := []struct {
-		devId  string
-		tenant string
-		err    string
+		devId                string
+		tenant               string
+		forceDifferentTenant string
+		err                  string
 	}{
 		{
 			devId:  dev1.Id,
@@ -1512,7 +1557,10 @@ func TestStoreDeleteDevice(t *testing.T) {
 		},
 		{
 			devId: dev1.Id,
-			err:   store.ErrDevNotFound.Error(),
+			//we have to set a different tenant in the ctx before deleting a device,
+			//otherwise in db version 2.0.0 it will exist with the empty tenant_id and be removed
+			forceDifferentTenant: oid.NewUUIDv4().String(),
+			err:                  store.ErrDevNotFound.Error(),
 		},
 		{
 			devId:  "100",
@@ -1535,14 +1583,30 @@ func TestStoreDeleteDevice(t *testing.T) {
 					Tenant: tc.tenant,
 				})
 			}
+			c.DeleteMany(dbCtx, bson.M{})
+			for _, d := range inputDevices {
+				_, err := c.InsertOne(dbCtx, ctxstore2.WithTenantID(ctx, d))
+				assert.NoError(t, err, "failed to setup input data")
+			}
 
+			if tc.forceDifferentTenant != "" {
+				ctx = identity.WithContext(context.Background(), &identity.Identity{
+					Tenant: tc.forceDifferentTenant,
+				})
+			}
 			err := db.DeleteDevice(ctx, tc.devId)
 			if tc.err != "" {
 				assert.Equal(t, tc.err, err.Error())
 			} else {
 				assert.NoError(t, err)
 				var found model.Device
-				err := coll.FindOne(ctx, bson.M{"_id": tc.devId}).Decode(&found)
+				err := coll.FindOne(
+					ctx,
+					ctxstore2.WithTenantID(
+						ctx,
+						bson.M{dbFieldID: tc.devId},
+					),
+				).Decode(&found)
 				if assert.Error(t, err) {
 					assert.Equal(t, err.Error(), mongo.ErrNoDocuments.Error())
 				}
@@ -1690,7 +1754,14 @@ func TestStoreDeleteAuthSetsForDevice(t *testing.T) {
 
 			db := getDb(ctx)
 
-			c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
+			c := db.client.Database(DbName).Collection(DbAuthSetColl)
+			id := identity.FromContext(ctx)
+			for j, _ := range authSets {
+				var as model.AuthSet
+				as = authSets[j].(model.AuthSet)
+				as.TenantID = id.Tenant
+				authSets[j] = as
+			}
 			_, err := c.InsertMany(ctx, authSets)
 			assert.NoError(t, err)
 
@@ -1704,6 +1775,10 @@ func TestStoreDeleteAuthSetsForDevice(t *testing.T) {
 				assert.NoError(t, err)
 				err = cursor.All(ctx, &out)
 				assert.NoError(t, err)
+				id := identity.FromContext(ctx)
+				for j, _ := range tc.outAuthSets {
+					tc.outAuthSets[j].TenantID = id.Tenant
+				}
 				assert.Equal(t, tc.outAuthSets, out)
 			}
 		})
@@ -1729,20 +1804,26 @@ func TestPutLimit(t *testing.T) {
 	})
 	db := getDb(dbCtx)
 
-	coll := db.client.Database(ctxstore.DbFromContext(dbCtx, DbName)).Collection(DbLimitsColl)
+	coll := db.client.Database(DbName).Collection(DbLimitsColl)
+	id := identity.FromContext(dbCtx)
+	lim1.TenantID = id.Tenant
+	lim2.TenantID = id.Tenant
 	_, err := coll.InsertMany(dbCtx, bson.A{lim1, lim2})
 	assert.NoError(t, err)
 
 	dbCtxOtherTenant := identity.WithContext(context.Background(), &identity.Identity{
 		Tenant: "other-" + tenant,
 	})
-	collOtherTenant := db.client.Database(ctxstore.DbFromContext(dbCtxOtherTenant, DbName)).Collection(DbLimitsColl)
+	id = identity.FromContext(dbCtxOtherTenant)
+	lim1.TenantID = id.Tenant
+	lim2.TenantID = id.Tenant
+	collOtherTenant := db.client.Database(DbName).Collection(DbLimitsColl)
 	_, err = collOtherTenant.InsertMany(dbCtx, bson.A{lim1, lim2})
 	assert.NoError(t, err)
 
 	var lim model.Limit
 
-	assert.NoError(t, coll.FindOne(dbCtx, bson.M{"_id": "foo"}).Decode(&lim))
+	assert.NoError(t, coll.FindOne(dbCtx, bson.M{dbFieldName: "foo"}).Decode(&lim))
 
 	// empty limit name
 	err = db.PutLimit(dbCtx, model.Limit{Name: "", Value: 123})
@@ -1751,30 +1832,46 @@ func TestPutLimit(t *testing.T) {
 	// update
 	err = db.PutLimit(dbCtx, model.Limit{Name: "foo", Value: 999})
 	assert.NoError(t, err)
-	assert.NoError(t, coll.FindOne(dbCtx, bson.M{"_id": "foo"}).Decode(&lim))
-	assert.EqualValues(t, model.Limit{Name: "foo", Value: 999}, lim)
+	assert.NoError(t, coll.FindOne(dbCtx, bson.M{dbFieldName: "foo"}).Decode(&lim))
+	lim.Id = ""
+	id = identity.FromContext(dbCtx)
+	tenantId := id.Tenant
+	assert.EqualValues(t, model.Limit{Name: "foo", Value: 999, TenantID: tenantId}, lim)
 
 	// insert
 	err = db.PutLimit(dbCtx, model.Limit{Name: "baz", Value: 9809899990})
 	assert.NoError(t, err)
-	assert.NoError(t, coll.FindOne(dbCtx, bson.M{"_id": "baz"}).Decode(&lim))
-	assert.EqualValues(t, model.Limit{Name: "baz", Value: 9809899990}, lim)
+	assert.NoError(t, coll.FindOne(dbCtx, bson.M{dbFieldName: "baz"}).Decode(&lim))
+	id = identity.FromContext(dbCtx)
+	tenantId = id.Tenant
+	lim.Id = ""
+	assert.EqualValues(t, model.Limit{Name: "baz", Value: 9809899990, TenantID: tenantId}, lim)
 
 	// switch tenants
 
 	// the other-tenant limit 'foo' was not modified
-	assert.NoError(t, collOtherTenant.FindOne(dbCtx, bson.M{"_id": "foo"}).Decode(&lim))
+	id = identity.FromContext(dbCtxOtherTenant)
+	tenantId = id.Tenant
+	assert.NoError(t, collOtherTenant.FindOne(dbCtx, bson.M{dbFieldName: "foo", dbFieldTenantID: tenantId}).Decode(&lim))
+	lim.Id = ""
 	assert.EqualValues(t, lim1, lim)
 
 	// update
 	err = db.PutLimit(dbCtxOtherTenant, model.Limit{Name: "bar", Value: 1234})
 	assert.NoError(t, err)
-	assert.NoError(t, collOtherTenant.FindOne(dbCtx, bson.M{"_id": "bar"}).Decode(&lim))
-	assert.EqualValues(t, model.Limit{Name: "bar", Value: 1234}, lim)
+	id = identity.FromContext(dbCtxOtherTenant)
+	tenantId = id.Tenant
+	assert.NoError(t, collOtherTenant.FindOne(dbCtx, bson.M{dbFieldName: "bar", dbFieldTenantID: tenantId}).Decode(&lim))
+	lim.Id = ""
+	assert.EqualValues(t, model.Limit{Name: "bar", Value: 1234, TenantID: tenantId}, lim)
 	// original tenant is unmodified
-	assert.NoError(t, coll.FindOne(dbCtx, bson.M{"_id": "bar"}).Decode(&lim))
+	id = identity.FromContext(dbCtx)
+	tenantId = id.Tenant
+	lim2.TenantID = id.Tenant // we are reusing those, we originally inserted with this tenant
+	lim2.Id = ""              // let's not compare the ids, since we have not supplied them
+	assert.NoError(t, coll.FindOne(dbCtx, bson.M{dbFieldName: "bar", dbFieldTenantID: tenantId}).Decode(&lim))
+	lim.Id = ""
 	assert.EqualValues(t, lim2, lim)
-
 }
 
 func TestDeleteLimit(t *testing.T) {
@@ -1796,29 +1893,37 @@ func TestDeleteLimit(t *testing.T) {
 	})
 	db := getDb(dbCtx)
 
-	coll := db.client.Database(ctxstore.DbFromContext(dbCtx, DbName)).Collection(DbLimitsColl)
+	coll := db.client.Database(DbName).Collection(DbLimitsColl)
+	id := identity.FromContext(dbCtx)
+	lim1.TenantID = id.Tenant
+	lim2.TenantID = id.Tenant
 	_, err := coll.InsertMany(dbCtx, bson.A{lim1, lim2})
 	assert.NoError(t, err)
 
 	dbCtxOtherTenant := identity.WithContext(context.Background(), &identity.Identity{
 		Tenant: "other-" + tenant,
 	})
-	collOtherTenant := db.client.Database(ctxstore.DbFromContext(dbCtxOtherTenant, DbName)).Collection(DbLimitsColl)
-	_, err = collOtherTenant.InsertMany(dbCtx, bson.A{lim1, lim2})
+	collOtherTenant := db.client.Database(DbName).Collection(DbLimitsColl)
+	id = identity.FromContext(dbCtxOtherTenant)
+	lim1.TenantID = id.Tenant
+	lim2.TenantID = id.Tenant
+	// there was an error here, dbCtxOtherTenant was unused
+	_, err = collOtherTenant.InsertMany(dbCtxOtherTenant, bson.A{lim1, lim2})
 	assert.NoError(t, err)
 
 	var lim model.Limit
-	assert.NoError(t, coll.FindOne(dbCtx, bson.M{"_id": lim1.Name}).Decode(&lim))
+	assert.NoError(t, coll.FindOne(dbCtx, ctxstore2.WithTenantID(dbCtxOtherTenant, bson.M{dbFieldName: lim1.Name})).Decode(&lim))
 
 	// delete the limit
 	err = db.DeleteLimit(dbCtx, lim.Name)
 	assert.NoError(t, err)
 
 	// limit not found
-	assert.Error(t, coll.FindOne(dbCtx, bson.M{"_id": lim1.Name}).Decode(&lim))
+	assert.Error(t, coll.FindOne(dbCtx, ctxstore2.WithTenantID(dbCtx, bson.M{dbFieldName: lim1.Name})).Decode(&lim))
 
 	// the other-tenant limit 'foo' was not modified
-	assert.NoError(t, collOtherTenant.FindOne(dbCtx, bson.M{"_id": lim1.Name}).Decode(&lim))
+	assert.NoError(t, collOtherTenant.FindOne(dbCtx, ctxstore2.WithTenantID(dbCtxOtherTenant, bson.M{dbFieldName: lim1.Name})).Decode(&lim))
+	lim.Id = ""
 	assert.EqualValues(t, lim1, lim)
 }
 
@@ -1828,16 +1933,22 @@ func TestGetLimit(t *testing.T) {
 	}
 
 	lim1 := model.Limit{
-		Name:  "foo",
-		Value: 123,
+		Id:       oid.NewUUIDv4().String(),
+		Name:     "foo",
+		Value:    123,
+		TenantID: tenant,
 	}
 	lim2 := model.Limit{
-		Name:  "bar",
-		Value: 456,
+		Id:       oid.NewUUIDv4().String(),
+		Name:     "bar",
+		Value:    456,
+		TenantID: tenant,
 	}
 	lim3OtherTenant := model.Limit{
-		Name:  "bar",
-		Value: 920,
+		Id:       oid.NewUUIDv4().String(),
+		Name:     "bar",
+		Value:    920,
+		TenantID: tenant,
 	}
 
 	dbCtx := identity.WithContext(context.Background(), &identity.Identity{
@@ -1845,7 +1956,7 @@ func TestGetLimit(t *testing.T) {
 	})
 	db := getDb(dbCtx)
 
-	coll := db.client.Database(ctxstore.DbFromContext(dbCtx, DbName)).Collection(DbLimitsColl)
+	coll := db.client.Database(DbName).Collection(DbLimitsColl)
 	_, err := coll.InsertMany(dbCtx, bson.A{lim1, lim2})
 	assert.NoError(t, err)
 
@@ -1853,7 +1964,9 @@ func TestGetLimit(t *testing.T) {
 		Tenant: "other-" + tenant,
 	})
 
-	collOtherTenant := db.client.Database(ctxstore.DbFromContext(dbCtxOtherTenant, DbName)).Collection(DbLimitsColl)
+	collOtherTenant := db.client.Database(DbName).Collection(DbLimitsColl)
+	id := identity.FromContext(dbCtxOtherTenant)
+	lim3OtherTenant.TenantID = id.Tenant
 	_, err = collOtherTenant.InsertMany(dbCtx, bson.A{lim3OtherTenant})
 	assert.NoError(t, err)
 
@@ -2055,9 +2168,10 @@ func getDevsWithStatuses(accepted, preauthorized, pending, rejected, noauth int)
 func getDevWithStatus(id int, status string) (*model.Device, []model.AuthSet) {
 	iddata := fmt.Sprintf("foo-%04d", id)
 	dev := model.Device{
-		Id:     fmt.Sprintf("%d", id),
-		IdData: iddata,
-		Status: status,
+		Id:           fmt.Sprintf("%d", id),
+		IdData:       iddata,
+		IdDataSha256: getIdDataHash(iddata),
+		Status:       status,
 	}
 
 	var asets []model.AuthSet
@@ -2105,12 +2219,14 @@ func TestStoreDeleteAuthSetForDevice(t *testing.T) {
 			DeviceId: "001",
 			IdData:   "001",
 			PubKey:   "001",
+			TenantID: tenant,
 		},
 		model.AuthSet{
 			Id:       "002",
 			DeviceId: "001",
 			IdData:   "001",
 			PubKey:   "002",
+			TenantID: tenant,
 		},
 	}
 
@@ -2119,9 +2235,7 @@ func TestStoreDeleteAuthSetForDevice(t *testing.T) {
 	})
 	db := getDb(dbCtx)
 
-	coll := db.client.Database(ctxstore.DbFromContext(dbCtx, DbName)).Collection(DbAuthSetColl)
-	_, err := coll.InsertMany(dbCtx, authSets)
-	assert.NoError(t, err)
+	coll := db.client.Database(DbName).Collection(DbAuthSetColl)
 
 	testCases := []struct {
 		devId  string
@@ -2156,6 +2270,11 @@ func TestStoreDeleteAuthSetForDevice(t *testing.T) {
 				ctx = identity.WithContext(ctx, &identity.Identity{
 					Tenant: tc.tenant,
 				})
+			}
+			coll.DeleteMany(ctx, bson.M{})
+			for _, a := range authSets {
+				_, err := coll.InsertOne(dbCtx, ctxstore2.WithTenantID(ctx, a))
+				assert.NoError(t, err)
 			}
 
 			err := db.DeleteAuthSetForDevice(ctx, tc.devId, tc.authId)
@@ -2376,8 +2495,18 @@ func TestStoreGetDeviceStatus(t *testing.T) {
 
 			db := getDb(ctx)
 
+			var err error
 			if len(tc.inAuthSets) > 0 {
-				coll := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
+				coll := db.client.Database(DbName).Collection(DbAuthSetColl)
+				id := identity.FromContext(ctx)
+				for i, _ := range tc.inAuthSets {
+					var a model.AuthSet
+					a = tc.inAuthSets[i].(model.AuthSet)
+					a.TenantID = id.Tenant
+					a.IdData = oid.NewUUIDv4().String()
+					a.IdDataSha256 = getIdDataHash(a.IdData)
+					tc.inAuthSets[i] = a
+				}
 				_, err := coll.InsertMany(ctx, tc.inAuthSets)
 				assert.NoError(t, err)
 			}
@@ -2520,10 +2649,20 @@ func TestStoreUpdateuthSetById(t *testing.T) {
 			}
 			db := getDb(ctx)
 
-			coll := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
+			coll := db.client.Database(DbName).Collection(DbAuthSetColl)
+			id := identity.FromContext(ctx)
+			tenantId := ""
+			if id != nil {
+				tenantId = id.Tenant
+			}
+			for j, _ := range input {
+				var a model.AuthSet
+				a = input[j].(model.AuthSet)
+				a.TenantID = tenantId
+				input[j] = a
+			}
 			_, err := coll.InsertMany(ctx, input)
 			assert.NoError(t, err, "failed to setup input data")
-
 			err = db.UpdateAuthSetById(ctx, tc.aid, tc.update)
 
 			if tc.err != nil {
@@ -2532,14 +2671,21 @@ func TestStoreUpdateuthSetById(t *testing.T) {
 				assert.NoError(t, err)
 
 				var found model.AuthSet
-				coll := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
-				err := coll.FindOne(ctx, bson.M{"_id": tc.aid}).Decode(&found)
+				coll := db.client.Database(DbName).Collection(DbAuthSetColl)
+				err := coll.FindOne(ctx, ctxstore2.WithTenantID(ctx, bson.M{"_id": tc.aid})).Decode(&found)
 				assert.NoError(t, err)
 
 				compareAuthSet(tc.out, &found, t)
 			}
 		})
 	}
+}
+
+type InDescr struct {
+	id           string
+	idData       string
+	idDataSha256 []byte
+	limits       ratelimits.ApiLimits
 }
 
 func TestStoreGetDeviceById(t *testing.T) {
@@ -2551,12 +2697,7 @@ func TestStoreGetDeviceById(t *testing.T) {
 	// (always get UTC instead of e.g. CEST)
 	time.Local = time.UTC
 
-	indescr := []struct {
-		id           string
-		idData       string
-		idDataSha256 []byte
-		limits       ratelimits.ApiLimits
-	}{
+	indescr := []InDescr{
 		{
 			id:           "dev1",
 			idData:       "idData1",
@@ -2647,7 +2788,18 @@ func TestStoreGetDeviceById(t *testing.T) {
 
 			d := getDb(ctx)
 
-			c := d.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
+			c := d.client.Database(DbName).Collection(DbDevicesColl)
+			id := identity.FromContext(ctx)
+			tenantId := ""
+			if id != nil {
+				tenantId = id.Tenant
+			}
+			for j, _ := range indevs {
+				var dev *model.Device
+				dev = indevs[j].(*model.Device)
+				dev.TenantID = tenantId
+				indevs[j] = dev
+			}
 			_, err := c.InsertMany(ctx, indevs)
 			assert.NoError(t, err)
 

@@ -2718,7 +2718,7 @@ func TestDevAuthSetTenantLimit(t *testing.T) {
 		{
 			tenantId:      "tenant1",
 			dbPutLimitErr: errors.New("PutLimit error"),
-			outErr:        "failed to save limit {foobar 1234} for tenant tenant1 to database: PutLimit error",
+			outErr:        "failed to save limit { foobar 1234 } for tenant tenant1 to database: PutLimit error",
 			limit: model.Limit{
 				Name:  "foobar",
 				Value: 1234,
