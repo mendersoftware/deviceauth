@@ -24,3 +24,4 @@ services:
                 DEVICEAUTH_ORCHESTRATOR_ADDR: "http://acceptance:9998/"
                 DEVICEAUTH_DEVADM_ADDR: "http://acceptance:9997/"
                 TESTING_LOGS: "1"
+                DEVICEAUTH_ENABLE_REPORTING: "0"
