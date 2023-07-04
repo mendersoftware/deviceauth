@@ -1,4 +1,4 @@
-// Copyright 2022 Northern.tech AS
+// Copyright 2023 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -746,6 +746,26 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 				Status: model.DevStatusPending,
 			},
 			res: dummyToken,
+		},
+		{
+			desc: "ok: device during decommissioning",
+			dbGetAuthSetByDataKeyRes: &model.AuthSet{
+				Id:           dummyAuthID,
+				IdDataSha256: idDataSha256,
+				DeviceId:     dummyDevId,
+				PubKey:       inReq.PubKey,
+				Status:       model.DevStatusPreauth,
+			},
+			dbGetLimitRes: &model.Limit{
+				Value: 5,
+			},
+			dbGetDevCountByStatusRes: 0,
+			dev: &model.Device{
+				Id:              dummyDevId,
+				Status:          model.DevStatusPending,
+				Decommissioning: true,
+			},
+			err: ErrDevAuthUnauthorized,
 		},
 		{
 			desc:                     "error: can't get an existing authset",

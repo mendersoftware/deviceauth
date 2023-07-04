@@ -1,6 +1,6 @@
 #
 # Apache-2.0
-1033348db7606a7e61b6484f293847cf8d7a35766efebb97e304d4bd5d7f3f6b  LICENSE
+52b2497ce07650b825015e80ca7a5d40c360c04c530234ca6d950b0f98bca23a  LICENSE
 0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594  vendor/github.com/gomodule/redigo/LICENSE
 a4e99d13c6cd0e4faf3867ae5c9815ff88cab3cefdefe0dc1ec9ac28b1152944  vendor/github.com/mendersoftware/go-lib-micro/LICENSE
 c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4  vendor/github.com/modern-go/concurrent/LICENSE
