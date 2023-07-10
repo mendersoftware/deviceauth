@@ -700,23 +700,8 @@ func (d *DevAuthApiHandlers) GetAuthSetStatusHandler(w rest.ResponseWriter, r *r
 }
 
 func (d *DevAuthApiHandlers) ProvisionTenantHandler(w rest.ResponseWriter, r *rest.Request) {
-	ctx := r.Context()
-	l := log.FromContext(ctx)
-
-	defer r.Body.Close()
-
-	tenant, err := model.ParseNewTenant(r.Body)
-	if err != nil {
-		rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
-		return
-	}
-
-	err = d.devAuth.ProvisionTenant(ctx, tenant.TenantId)
-	if err != nil {
-		rest_utils.RestErrWithLogInternal(w, r, l, err)
-		return
-	}
-
+	// NOTE: This handler was used to initialize database collections. This is no longer
+	//       needed after migration 2.0.0.
 	w.WriteHeader(http.StatusCreated)
 }
 

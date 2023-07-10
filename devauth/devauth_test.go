@@ -41,7 +41,6 @@ import (
 	"github.com/mendersoftware/deviceauth/model"
 	"github.com/mendersoftware/deviceauth/store"
 	mstore "github.com/mendersoftware/deviceauth/store/mocks"
-	"github.com/mendersoftware/deviceauth/store/mongo"
 	"github.com/mendersoftware/deviceauth/utils"
 	mtesting "github.com/mendersoftware/deviceauth/utils/testing"
 	uto "github.com/mendersoftware/deviceauth/utils/to"
@@ -3033,48 +3032,6 @@ func TestDevAuthGetDevCountByStatus(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 				assert.Equal(t, tc.cnt, cnt)
-			}
-		})
-	}
-}
-
-func TestDevAuthProvisionTenant(t *testing.T) {
-	t.Parallel()
-
-	testCases := map[string]struct {
-		datastoreError error
-		outError       error
-	}{
-		"ok": {
-			datastoreError: nil,
-			outError:       nil,
-		},
-		"generic error": {
-			datastoreError: errors.New("failed to provision tenant"),
-			outError:       errors.New("failed to provision tenant"),
-		},
-	}
-
-	for name, tc := range testCases {
-		t.Run(fmt.Sprintf("test case: %s", name), func(t *testing.T) {
-			ctx := context.Background()
-			ctxMatcher := mtesting.ContextMatcher()
-			db := mstore.DataStore{}
-			db.On("MigrateTenant", ctxMatcher,
-				mock.AnythingOfType("string"),
-				mongo.DbVersion,
-			).Return(tc.datastoreError)
-			db.On("WithAutomigrate").Return(&db)
-			devauth := NewDevAuth(&db, nil, nil, Config{})
-
-			err := devauth.ProvisionTenant(ctx, "foo")
-
-			if tc.outError != nil {
-				if assert.Error(t, err) {
-					assert.EqualError(t, err, tc.outError.Error())
-				}
-			} else {
-				assert.NoError(t, err)
 			}
 		})
 	}

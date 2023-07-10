@@ -1750,30 +1750,6 @@ func TestApiDevAuthPostTenants(t *testing.T) {
 			respCode: 201,
 			respBody: "",
 		},
-		"error: empty request": {
-			req: test.MakeSimpleRequest("POST",
-				"http://1.2.3.4/api/internal/v1/devauth/tenants",
-				nil),
-			respCode: 400,
-			respBody: RestError("EOF"),
-		},
-		"error: no tenant_id": {
-			req: test.MakeSimpleRequest("POST",
-				"http://1.2.3.4/api/internal/v1/devauth/tenants",
-				model.NewTenant{TenantId: ""},
-			),
-			respCode: 400,
-			respBody: RestError("tenant_id must be provided"),
-		},
-		"error: generic": {
-			req: test.MakeSimpleRequest("POST",
-				"http://1.2.3.4/api/internal/v1/devauth/tenants",
-				model.NewTenant{TenantId: "foo"},
-			),
-			devAuthErr: errors.New("can't provision tenant"),
-			respCode:   500,
-			respBody:   RestError("internal error"),
-		},
 	}
 
 	for name, tc := range testCases {
