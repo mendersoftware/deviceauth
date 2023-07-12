@@ -211,24 +211,28 @@ func PropagateStatusesInventory(
 }
 
 func PropagateIdDataInventory(db store.DataStore, c cinv.Client, tenant string, dryRun bool) error {
-	l := log.NewEmpty()
+	var err error
 
-	dbs, err := selectDbs(db, tenant)
-	if err != nil {
-		return errors.Wrap(err, "aborting")
+	l := log.NewEmpty()
+	tenants := []string{tenant}
+	if tenant == "" {
+		tenants, err = db.ListTenantsIds(context.Background())
+		if err != nil {
+			return errors.Wrap(err, "cant list tenants")
+		}
 	}
 
 	var errReturned error
-	for _, d := range dbs {
-		err := tryPropagateIdDataInventoryForDb(db, c, d, dryRun)
+	for _, d := range tenants {
+		err := tryPropagateIdDataInventoryForTenant(db, c, d, dryRun)
 		if err != nil {
 			errReturned = err
-			l.Errorf("giving up on DB %s due to fatal error: %s", d, err.Error())
+			l.Errorf("giving up on tenant %s due to fatal error: %s", d, err.Error())
 			continue
 		}
 	}
 
-	l.Info("all DBs processed, exiting.")
+	l.Info("all tenants processed, exiting.")
 	return errReturned
 }
 
@@ -268,20 +272,6 @@ func PropagateReporting(
 		l.Info("all tenants processed, exiting.")
 	}
 	return nil
-}
-
-func selectDbs(db store.DataStore, tenant string) ([]string, error) {
-	l := log.NewEmpty()
-
-	var dbs []string
-
-	if tenant != "" {
-		l.Infof("propagating inventory for user-specified tenant %s", tenant)
-		n := mstore.DbNameForTenant(tenant, mongo.DbName)
-		dbs = []string{n}
-	}
-
-	return dbs, nil
 }
 
 const (
@@ -433,17 +423,15 @@ func tryPropagateStatusesInventoryForTenant(
 	return errReturned
 }
 
-func tryPropagateIdDataInventoryForDb(
+func tryPropagateIdDataInventoryForTenant(
 	db store.DataStore,
 	c cinv.Client,
-	dbname string,
+	tenant string,
 	dryRun bool,
 ) error {
 	l := log.NewEmpty()
 
-	l.Infof("propagating device id_data to inventory from DB: %s", dbname)
-
-	tenant := mstore.TenantFromDbName(dbname, mongo.DbName)
+	l.Infof("propagating device id_data to inventory from tenant: %s", tenant)
 
 	ctx := context.Background()
 	if tenant != "" {
@@ -454,9 +442,9 @@ func tryPropagateIdDataInventoryForDb(
 
 	err := updateDevicesIdData(ctx, db, c, tenant, dryRun)
 	if err != nil {
-		l.Infof("Done with DB %s, but there were errors: %s.", dbname, err.Error())
+		l.Infof("Done with tenant %s, but there were errors: %s.", tenant, err.Error())
 	} else {
-		l.Infof("Done with DB %s", dbname)
+		l.Infof("Done with tenant %s", tenant)
 	}
 
 	return err
