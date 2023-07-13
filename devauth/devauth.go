@@ -31,7 +31,6 @@ import (
 	"github.com/mendersoftware/go-lib-micro/plan"
 	"github.com/mendersoftware/go-lib-micro/ratelimits"
 	"github.com/mendersoftware/go-lib-micro/requestid"
-	mstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/pkg/errors"
 	"go.mongodb.org/mongo-driver/bson"
 
@@ -43,7 +42,6 @@ import (
 	"github.com/mendersoftware/deviceauth/jwt"
 	"github.com/mendersoftware/deviceauth/model"
 	"github.com/mendersoftware/deviceauth/store"
-	"github.com/mendersoftware/deviceauth/store/mongo"
 	"github.com/mendersoftware/deviceauth/utils"
 	uto "github.com/mendersoftware/deviceauth/utils/to"
 )
@@ -121,8 +119,6 @@ type App interface {
 	GetTenantLimit(ctx context.Context, name, tenant_id string) (*model.Limit, error)
 
 	GetDevCountByStatus(ctx context.Context, status string) (int, error)
-
-	ProvisionTenant(ctx context.Context, tenant_id string) error
 
 	GetTenantDeviceStatus(ctx context.Context, tenantId, deviceId string) (*model.Status, error)
 }
@@ -1681,16 +1677,6 @@ func (d *DevAuth) cacheFlush(ctx context.Context) error {
 	}
 
 	return d.cache.FlushDB(ctx)
-}
-
-func (d *DevAuth) ProvisionTenant(ctx context.Context, tenant_id string) error {
-	tenantCtx := identity.WithContext(ctx, &identity.Identity{
-		Tenant: tenant_id,
-	})
-
-	dbname := mstore.DbFromContext(tenantCtx, mongo.DbName)
-
-	return d.db.WithAutomigrate().MigrateTenant(tenantCtx, dbname, mongo.DbVersion)
 }
 
 func (d *DevAuth) GetTenantDeviceStatus(
