@@ -191,8 +191,9 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 
 		devAdmErr error
 
-		tenantVerify          bool
-		tenantVerificationErr error
+		tenantVerify                 bool
+		tenantVerificationErr        error
+		tenantVerificationDefaultErr error
 
 		config Config
 
@@ -336,8 +337,12 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 			addDeviceErr:  store.ErrObjectExists,
 			addAuthSetErr: store.ErrObjectExists,
 
-			tenantVerify: true,
-			err:          ErrDevAuthUnauthorized,
+			tenantVerify:          true,
+			tenantVerificationErr: errors.New("tenant not found"),
+
+			updateDeviceStatus: true,
+
+			err: ErrDevAuthUnauthorized,
 		},
 		{
 			//new device - both given and default tenant token verification fail
@@ -351,27 +356,9 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 
 			err: errors.New("dev auth: unauthorized: tenant token verification failed: account suspended"),
 
-			tenantVerify:          true,
-			tenantVerificationErr: errors.New("tenant token verification failed: account suspended"),
-		},
-		{
-			//new device - both given and default tenant token verification fail
-			desc: "new device, no given tenant token and default tenant token verification fail",
-
-			inReq: model.AuthReq{
-				IdData:      idData,
-				TenantToken: "",
-				PubKey:      pubKey,
-			},
-
-			config: Config{
-				DefaultTenantToken: "bogustoken",
-			},
-
-			err: errors.New("dev auth: unauthorized: tenant token verification failed: account suspended"),
-
-			tenantVerify:          true,
-			tenantVerificationErr: errors.New("tenant token verification failed: account suspended"),
+			tenantVerify:                 true,
+			tenantVerificationErr:        errors.New("tenant token verification failed: account suspended"),
+			tenantVerificationDefaultErr: errors.New("tenant token verification failed: account suspended"),
 		},
 		{
 			//new device - tenant token verification failed because of other reasons
@@ -398,20 +385,6 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 
 			tenantVerify:          true,
 			tenantVerificationErr: errors.New("should not be called"),
-		},
-		{
-			//new device - tenant token is malformed, but was somehow verified ok
-			desc: "new device, malformed tenant token",
-
-			inReq: model.AuthReq{
-				IdData:      idData,
-				TenantToken: "tenant-foo",
-				PubKey:      pubKey,
-			},
-
-			err: ErrDevAuthUnauthorized,
-
-			tenantVerify: true,
 		},
 		{
 			// a known device with a correct tenant token
@@ -552,9 +525,7 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 				// use in outgoing requests (via
 				// go-lib-micro/context/httpheader packaage)
 				ctxMatcher = mock.MatchedBy(func(c context.Context) bool {
-					return assert.NotNil(t, identity.FromContext(c)) &&
-						assert.NotEmpty(t,
-							ctxhttpheader.FromContext(c, "Authorization"))
+					return assert.NotNil(t, identity.FromContext(c))
 				})
 			}
 
@@ -672,7 +643,7 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 						tc.config.DefaultTenantToken).
 						Return(
 							&tenant.Tenant{},
-							tc.tenantVerificationErr)
+							tc.tenantVerificationDefaultErr)
 				}
 				devauth = devauth.WithTenantVerification(&ct)
 			}

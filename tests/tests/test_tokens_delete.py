@@ -1,4 +1,4 @@
-# Copyright 2022 Northern.tech AS
+# Copyright 2023 Northern.tech AS
 #
 #    Licensed under the Apache License, Version 2.0 (the "License");
 #    you may not use this file except in compliance with the License.
@@ -14,6 +14,7 @@
 import bravado
 import pytest
 import requests
+import time
 import json
 import base64
 
@@ -109,8 +110,7 @@ def accepted_tenants_devices(
     tenants_devices = dict()
     url = device_api.auth_requests_url
 
-    for (tenant, dev_count, auth_count) in requested:
-
+    for tenant, dev_count, auth_count in requested:
         tenant_devices = []
         cli.migrate(tenant=tenant)
         tenant_token = make_fake_tenant_token(tenant)
@@ -129,7 +129,7 @@ def accepted_tenants_devices(
                             200,
                             {},
                             {
-                                "id": "507f191e810c19729de860ea",
+                                "id": tenant,
                                 "name": "Acme",
                             },
                         ),
@@ -148,9 +148,9 @@ def accepted_tenants_devices(
 
                 # try to find our devices in all devices listing
                 dev = management_api.find_device_by_identity(
-                    d.identity, Authorization="Bearer " + tenant_token
+                    d.identity,
+                    Authorization="Bearer " + tenant_token,
                 )
-
                 devid = dev.id
                 for a in dev.auth_sets:
                     if compare_keys(a.pubkey, d.public_key):

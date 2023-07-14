@@ -147,7 +147,6 @@ github.com/mattn/go-isatty
 ## explicit; go 1.18
 github.com/mendersoftware/go-lib-micro/accesslog
 github.com/mendersoftware/go-lib-micro/addons
-github.com/mendersoftware/go-lib-micro/apiclient
 github.com/mendersoftware/go-lib-micro/config
 github.com/mendersoftware/go-lib-micro/context
 github.com/mendersoftware/go-lib-micro/context/httpheader

@@ -17,13 +17,10 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
-	"fmt"
-	"net/http"
 	"strings"
 	"time"
 
 	"github.com/mendersoftware/go-lib-micro/addons"
-	"github.com/mendersoftware/go-lib-micro/apiclient"
 	ctxhttpheader "github.com/mendersoftware/go-lib-micro/context/httpheader"
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/log"
@@ -79,13 +76,6 @@ func MakeErrDevAuthBadRequest(e error) error {
 	return errors.Wrap(e, MsgErrDevAuthBadRequest)
 }
 
-// helper for obtaining API clients
-type ApiClientGetter func() apiclient.HttpRunner
-
-func simpleApiClientGetter() apiclient.HttpRunner {
-	return &apiclient.HttpApi{}
-}
-
 // this device auth service interface
 //
 //go:generate ../utils/mockgen.sh
@@ -129,7 +119,6 @@ type DevAuth struct {
 	cOrch        orchestrator.ClientRunner
 	cTenant      tenant.ClientRunner
 	jwt          jwt.Handler
-	clientGetter ApiClientGetter
 	verifyTenant bool
 	config       Config
 	cache        cache.Cache
@@ -164,7 +153,6 @@ func NewDevAuth(d store.DataStore, co orchestrator.ClientRunner,
 		invClient:    inventory.NewClient(config.InventoryAddr, false),
 		cOrch:        co,
 		jwt:          jwt,
-		clientGetter: simpleApiClientGetter,
 		verifyTenant: false,
 		config:       config,
 		clock:        utils.NewClock(),
@@ -293,27 +281,6 @@ func (d *DevAuth) signToken(ctx context.Context) jwt.SignFunc {
 	}
 }
 
-// tenantWithContext will update `ctx` with tenant related data
-func tenantWithContext(ctx context.Context, tenantToken string) (context.Context, error) {
-	ident, err := identity.ExtractIdentity(tenantToken)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to extract identity from tenant token")
-	}
-
-	// update context to store the identity of the caller
-	ctx = identity.WithContext(ctx, &ident)
-
-	// setup authorization header so that outgoing requests are done for
-	// *this* tenant
-	ctx = ctxhttpheader.WithContext(ctx,
-		http.Header{
-			"Authorization": []string{fmt.Sprintf("Bearer %s", tenantToken)},
-		},
-		"Authorization")
-
-	return ctx, nil
-}
-
 func (d *DevAuth) doVerifyTenant(ctx context.Context, token string) (*tenant.Tenant, error) {
 	t, err := d.cTenant.VerifyToken(ctx, token)
 
@@ -339,7 +306,6 @@ func (d *DevAuth) getTenantWithDefault(
 		return nil, nil, MakeErrDevAuthUnauthorized(errors.New("tenant token missing"))
 	}
 
-	var chosenToken string
 	var t *tenant.Tenant
 	var err error
 
@@ -348,9 +314,7 @@ func (d *DevAuth) getTenantWithDefault(
 	if tenantToken != "" {
 		t, err = d.doVerifyTenant(ctx, tenantToken)
 
-		if err == nil {
-			chosenToken = tenantToken
-		} else {
+		if err != nil {
 			l.Errorf("Failed to verify supplied tenant token: %s", err.Error())
 		}
 	}
@@ -359,10 +323,6 @@ func (d *DevAuth) getTenantWithDefault(
 	// try the default one
 	if t == nil && defaultToken != "" {
 		t, err = d.doVerifyTenant(ctx, defaultToken)
-
-		if err == nil {
-			chosenToken = defaultToken
-		}
 		if err != nil {
 			l.Errorf("Failed to verify default tenant token: %s", err.Error())
 		}
@@ -376,12 +336,10 @@ func (d *DevAuth) getTenantWithDefault(
 		return ctx, nil, err
 	}
 
-	// we do have a working token/valid tenant
-	tCtx, err := tenantWithContext(ctx, chosenToken)
-	if err != nil {
-		l.Errorf("failed to setup tenant context: %v", err)
-		return nil, nil, ErrDevAuthUnauthorized
-	}
+	tCtx := identity.WithContext(ctx, &identity.Identity{
+		Subject: "internal",
+		Tenant:  t.ID,
+	})
 
 	return tCtx, t, nil
 }
