@@ -54,6 +54,7 @@ const (
 	dbFieldExpTime      = "exp.time"
 	dbFieldTenantClaim  = "mender.tenant"
 	dbFieldName         = "name"
+	dbFieldSubject      = "sub"
 )
 
 var (
