@@ -120,14 +120,14 @@ var DbTokensCollectionIndices = []mongo.IndexModel{
 	{
 		Keys: bson.D{
 			{Key: dbFieldTenantClaim, Value: 1},
-			{Key: dbFieldID, Value: 1},
+			{Key: dbFieldSubject, Value: 1},
 		},
 		Options: mopts.Index().
 			SetName(
 				strings.Join(
 					[]string{
 						strings.ReplaceAll(dbFieldTenantClaim, ".", "_"),
-						dbFieldID,
+						dbFieldSubject,
 					},
 					"_",
 				),
@@ -135,19 +135,18 @@ var DbTokensCollectionIndices = []mongo.IndexModel{
 	},
 	{
 		Keys: bson.D{
-			{Key: dbFieldTenantClaim, Value: 1},
 			{Key: dbFieldExpTime, Value: 1},
 		},
 		Options: mopts.Index().
 			SetName(
 				strings.Join(
 					[]string{
-						strings.ReplaceAll(dbFieldTenantClaim, ".", "_"),
 						strings.ReplaceAll(dbFieldExpTime, ".", "_"),
 					},
 					"_",
 				),
-			),
+			).
+			SetExpireAfterSeconds(0),
 	},
 }
 
