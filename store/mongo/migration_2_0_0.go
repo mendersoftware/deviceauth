@@ -15,15 +15,15 @@ package mongo
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
-	"github.com/pkg/errors"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	mopts "go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
-	"github.com/mendersoftware/go-lib-micro/mongo/oid"
 	mstorev1 "github.com/mendersoftware/go-lib-micro/store"
 	mstore "github.com/mendersoftware/go-lib-micro/store/v2"
 	"go.mongodb.org/mongo-driver/bson"
@@ -227,28 +227,27 @@ func (m *migration_2_0_0) Up(from migrate.Version) error {
 		// migrate the documents
 		if collection == DbLimitsColl {
 			for cur.Next(ctx) {
-				id := cur.Current.Lookup(dbFieldID)
-				var currentId string
-				err = id.Unmarshal(&currentId)
-				if err != nil {
-					return errors.Wrap(err, "the id found is un-parsable")
+				id, ok := cur.Current.Lookup(dbFieldID).StringValueOK()
+				if !ok {
+					return fmt.Errorf(
+						"found suspicious limits document: %s",
+						cur.Current.String())
 				}
-				var item bson.D
+				var item bson.M
 				if err = cur.Decode(&item); err != nil {
 					return err
 				}
-				item = append(item, bson.E{
-					Key:   dbFieldName,
-					Value: currentId,
-				})
-				item = item[1:]
-				item = findAndReplace(item, dbFieldID, oid.NewUUIDv4().String())
-
+				item[dbFieldName] = id
+				item[dbFieldTenantID] = tenantID
+				item[dbFieldID] = primitive.NewObjectID()
 				writes = append(writes, mongo.
 					NewReplaceOneModel().
-					SetFilter(bson.D{{Key: dbFieldName, Value: id}}).
+					SetFilter(bson.D{
+						{Key: dbFieldTenantID, Value: tenantID},
+						{Key: dbFieldName, Value: id},
+					}).
 					SetUpsert(true).
-					SetReplacement(mstore.WithTenantID(ctx, item)))
+					SetReplacement(item))
 				if len(writes) == findBatchSize {
 					_, err = collOut.BulkWrite(ctx, writes)
 					if err != nil {
@@ -287,15 +286,6 @@ func (m *migration_2_0_0) Up(from migrate.Version) error {
 	}
 
 	return nil
-}
-
-func findAndReplace(item bson.D, key string, value string) bson.D {
-	for i, d := range item {
-		if d.Key == key {
-			item[i].Value = value
-		}
-	}
-	return item
 }
 
 func (m *migration_2_0_0) Version() migrate.Version {
