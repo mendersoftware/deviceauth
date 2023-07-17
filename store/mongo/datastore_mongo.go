@@ -769,10 +769,8 @@ func (db *DataStoreMongo) WithMultitenant() *DataStoreMongo {
 }
 
 func (db *DataStoreMongo) WithAutomigrate() store.DataStore {
-	return &DataStoreMongo{
-		client:      db.client,
-		automigrate: true,
-	}
+	db.automigrate = true
+	return db
 }
 
 func (db *DataStoreMongo) PutLimit(ctx context.Context, lim model.Limit) error {

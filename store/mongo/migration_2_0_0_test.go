@@ -41,7 +41,7 @@ func TestMigration_2_0_0(t *testing.T) {
 
 	db.Wipe()
 	client := db.Client()
-	db := NewDataStoreMongoWithClient(client)
+	ds := NewDataStoreMongoWithClient(client)
 
 	tenantIds = make([]string, rand.Intn(maxTenants)+minTenants)
 	ctxs = make([]context.Context, len(tenantIds))
@@ -51,7 +51,7 @@ func TestMigration_2_0_0(t *testing.T) {
 			Tenant: tenantIds[i],
 		})
 		ctxs[i] = ctx
-		prep_2_0_0(t, ctx, db)
+		prep_2_0_0(t, ctx, ds)
 	}
 
 	tenantDeviceCount := make([]int64, len(tenantIds))
@@ -59,7 +59,7 @@ func TestMigration_2_0_0(t *testing.T) {
 		ctx := ctxs[i]
 		for j := 0; j < rand.Intn(maxDevicesPerTenant)+minDevicesPerTenant; j++ {
 			dbName := ctxstore.DbFromContext(ctx, DbName)
-			devicesCollection := db.client.Database(dbName).Collection(DbDevicesColl)
+			devicesCollection := ds.client.Database(dbName).Collection(DbDevicesColl)
 			_, err := devicesCollection.InsertOne(ctx, model.Device{
 				Id:     oid.NewUUIDv4().String(),
 				IdData: oid.NewUUIDv4().String(),
@@ -83,14 +83,14 @@ func TestMigration_2_0_0(t *testing.T) {
 	for i := 0; i < len(tenantIds); i++ {
 		ctx := ctxs[i]
 		mig200 := migration_2_0_0{
-			ds:  db,
+			ds:  ds,
 			ctx: ctx,
 		}
 		err := mig200.Up(migrate.MakeVersion(2, 0, 0))
 		assert.NoError(t, err)
 	}
 
-	devicesCollection := db.client.Database(DbName).Collection(DbDevicesColl)
+	devicesCollection := ds.client.Database(DbName).Collection(DbDevicesColl)
 	for i := 0; i < len(tenantIds); i++ {
 		count, err := devicesCollection.CountDocuments(
 			ctxs[i],
@@ -104,6 +104,60 @@ func TestMigration_2_0_0(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, tenantDeviceCount[i], count)
 	}
+
+	t.Run("limits", func(t *testing.T) {
+		db.Wipe()
+
+		ctx := context.Background()
+		client.Database("deviceauth-000000000000000000000000").
+			Collection(DbLimitsColl).
+			InsertOne(ctx, bson.M{
+				"_id":   "max_devices",
+				"value": 10,
+			})
+		client.Database("deviceauth-000000000000000000000001").
+			Collection(DbLimitsColl).
+			InsertOne(ctx, bson.M{
+				"_id":   "max_devices",
+				"value": 43,
+			})
+
+		ds := NewDataStoreMongoWithClient(client).WithAutomigrate().(*DataStoreMongo)
+		err := ds.Migrate(ctx, "2.0.0")
+		if assert.NoError(t, err) {
+			expected := map[string]model.Limit{
+				"000000000000000000000000": model.Limit{
+					Name:  "max_devices",
+					Value: 10,
+				},
+				"000000000000000000000001": model.Limit{
+					Name:  "max_devices",
+					Value: 43,
+				},
+			}
+			cur, err := client.Database(DbName).
+				Collection(DbLimitsColl).
+				Find(ctx, bson.D{})
+			if err != nil {
+				t.Errorf("failed to retrieve limits documents: %s",
+					err.Error())
+				t.FailNow()
+			}
+			defer cur.Close(ctx)
+			for cur.Next(ctx) {
+				tenantID := cur.Current.
+					Lookup(dbFieldTenantID).
+					StringValue()
+				if expect, ok := expected[tenantID]; assert.Truef(t, ok,
+					"Could not find document with tenantID %q",
+					tenantID) {
+					assert.Equal(t, expect.Name,
+						cur.Current.Lookup(dbFieldName))
+					assert.Equal(t, expect.Value, cur.Current.Lookup("value"))
+				}
+			}
+		}
+	})
 }
 
 func prep_2_0_0(t *testing.T, ctx context.Context, db *DataStoreMongo) {
