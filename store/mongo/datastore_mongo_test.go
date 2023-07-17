@@ -1107,7 +1107,7 @@ func TestStoreGetDevices(t *testing.T) {
 	// populate DB with a set of devices
 	for i := 0; i < devCount; i++ {
 		dev := model.Device{
-			Id:           fmt.Sprintf("%04d", i),
+			Id:           oid.NewUUIDv4().String(),
 			IdData:       fmt.Sprintf("foo-%04d", i),
 			IdDataSha256: []byte(fmt.Sprintf("foo-%04d", i)),
 			Status:       randDevStatus(),
@@ -1119,6 +1119,13 @@ func TestStoreGetDevices(t *testing.T) {
 		assert.NoError(t, err)
 		devsCountByStatus[dev.Status]++
 	}
+
+	sort.Slice(devsList, func(i, j int) bool {
+		return devsList[i].Id < devsList[j].Id
+	})
+	sort.SliceStable(devsList, func(i, j int) bool {
+		return devsList[i].Status < devsList[j].Status
+	})
 
 	testCases := map[string]struct {
 		skip            uint
@@ -1254,12 +1261,19 @@ func TestStoreGetDevices(t *testing.T) {
 				}
 			}
 			if tc.filter.IDs != nil {
-				if assert.Len(t, dbdevs, len(tc.filter.IDs)) {
-					for i := range dbdevs {
-						assert.Equal(t,
-							dbdevs[i].Id,
-							tc.filter.IDs[i])
-					}
+				deviceIDs := make(map[string]struct{}, len(tc.filter.IDs))
+				for _, id := range tc.filter.IDs {
+					deviceIDs[id] = struct{}{}
+				}
+				var lastStatus string
+				for i := range dbdevs {
+					assert.True(t, dbdevs[i].Status >= lastStatus,
+						"devices are not ordered by status")
+					assert.Containsf(t, deviceIDs, dbdevs[i].Id,
+						"GetDevices returned device with ID "+
+							"not in the filter: %v", dbdevs[i])
+					delete(deviceIDs, dbdevs[i].Id)
+					lastStatus = dbdevs[i].Status
 				}
 			}
 		})
