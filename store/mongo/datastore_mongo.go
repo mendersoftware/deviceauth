@@ -225,7 +225,10 @@ func (db *DataStoreMongo) GetDevices(
 		Collection(DbDevicesColl)
 
 	findOpts := mopts.Find().
-		SetSort(bson.D{{Key: "_id", Value: 1}}).
+		SetSort(bson.D{
+			{Key: dbFieldStatus, Value: 1},
+			{Key: dbFieldID, Value: 1},
+		}).
 		SetSkip(int64(skip) & MaxInt64)
 
 	if limit > 0 {
