@@ -77,6 +77,7 @@ c8a84b926246b4ac76e3810722858b0f83bdea8378de49911dccbefd70b0692e  vendor/github.
 d18f6323b71b0b768bb5e9616e36da390fbd39369a81807cca352de4e4e6aa0b  vendor/gopkg.in/yaml.v3/LICENSE
 a707cd425201945d57500566c47c74dc9fb8cd02ef91b9a761abddeb2401e6a7  vendor/github.com/goccy/go-json/LICENSE
 5d966570d7a442d4e969892860a914e542c97f262c873baee8f0aa48e1f40212  vendor/github.com/klauspost/cpuid/v2/LICENSE
+4335e2ceb33d8d7e75125192466ae8604617b0a67492b919604fe52dc56018d9  vendor/github.com/gabriel-vasile/mimetype/LICENSE
 #
 # MIT + Apache-2.0
 #
