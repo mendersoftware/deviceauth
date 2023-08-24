@@ -1,4 +1,5 @@
-FROM golang:1.20.4-alpine3.16 as builder
+FROM --platform=$BUILDPLATFORM golang:1.20.4-alpine3.16 as builder
+ARG TARGETARCH
 WORKDIR /go/src/github.com/mendersoftware/deviceauth
 RUN mkdir -p /etc_extra
 RUN echo "nobody:x:65534:" > /etc_extra/group
@@ -8,7 +9,7 @@ RUN mkdir -p /tmp_extra && chown nobody:nobody /tmp_extra
 RUN chown -R nobody:nobody /etc_extra
 RUN apk add --no-cache ca-certificates
 COPY ./ .
-RUN CGO_ENABLED=0 GOARCH=amd64 go build -o deviceauth .
+RUN CGO_ENABLED=0 GOARCH=$TARGETARCH go build -o deviceauth .
 
 FROM scratch
 EXPOSE 8080
