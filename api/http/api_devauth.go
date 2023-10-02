@@ -195,21 +195,7 @@ func (d *DevAuthApiHandlers) SubmitAuthRequestHandler(w rest.ResponseWriter, r *
 		return
 	}
 
-	err = utils.VerifyAuthReqSign(signature, authreq.PubKeyStruct, body)
-	if err != nil {
-		rest_utils.RestErrWithLogMsg(
-			w,
-			r,
-			l,
-			err,
-			http.StatusUnauthorized,
-			"signature verification failed",
-		)
-		return
-	}
-
 	token, err := d.devAuth.SubmitAuthRequest(ctx, &authreq)
-
 	if err != nil {
 		if devauth.IsErrDevAuthUnauthorized(err) {
 			rest_utils.RestErrWithWarningMsg(w, r, l, err,
@@ -223,15 +209,27 @@ func (d *DevAuthApiHandlers) SubmitAuthRequestHandler(w rest.ResponseWriter, r *
 	}
 
 	switch err {
+	case nil:
+		err = utils.VerifyAuthReqSign(signature, authreq.PubKeyStruct, body)
+		if err != nil {
+			rest_utils.RestErrWithLogMsg(
+				w,
+				r,
+				l,
+				err,
+				http.StatusUnauthorized,
+				"signature verification failed",
+			)
+			return
+		}
+		_, _ = w.(http.ResponseWriter).Write([]byte(token))
+		w.Header().Set("Content-Type", "application/jwt")
+		return
 	case devauth.ErrDevIdAuthIdMismatch, devauth.ErrMaxDeviceCountReached:
 		// error is always set to unauthorized, client does not need to
 		// know why
 		rest_utils.RestErrWithWarningMsg(w, r, l, devauth.ErrDevAuthUnauthorized,
 			http.StatusUnauthorized, "unauthorized")
-		return
-	case nil:
-		_, _ = w.(http.ResponseWriter).Write([]byte(token))
-		w.Header().Set("Content-Type", "application/jwt")
 		return
 	default:
 		rest_utils.RestErrWithLogInternal(w, r, l, err)
