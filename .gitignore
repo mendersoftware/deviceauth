@@ -30,4 +30,5 @@ gover.coverprofile
 profile.coverprofile
 
 .idea
+vendor
 venv
