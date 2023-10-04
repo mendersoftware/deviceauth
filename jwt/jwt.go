@@ -30,11 +30,15 @@ var (
 //go:generate ../utils/mockgen.sh
 type Handler interface {
 	ToJWT(t *Token) (string, error)
-	// FromJWT parses the token and does basic validity checks (Claims.Valid().
+	// FromJWT parses the token
+	// returns:
+	// ErrTokenInvalid when the token is invalid (malformed, missing required claims, etc.)
+	FromJWT(string) (*Token, error)
+	// Validate does basic validity checks (Claims.Valid()).
 	// returns:
 	// ErrTokenExpired when the token is valid but expired
 	// ErrTokenInvalid when the token is invalid (malformed, missing required claims, etc.)
-	FromJWT(string) (*Token, error)
+	Validate(string) error
 }
 
 // JWTHandlerRS256 is an RS256-specific JWTHandler
@@ -60,6 +64,20 @@ func (j *JWTHandlerRS256) ToJWT(token *Token) (string, error) {
 }
 
 func (j *JWTHandlerRS256) FromJWT(tokstr string) (*Token, error) {
+	parser := jwtgo.NewParser(jwtgo.WithoutClaimsValidation())
+	jwttoken, _, err := parser.ParseUnverified(tokstr, &Claims{})
+	if err == nil {
+		token := Token{}
+		if claims, ok := jwttoken.Claims.(*Claims); ok {
+			token.Claims = *claims
+			return &token, nil
+		}
+	}
+
+	return nil, ErrTokenInvalid
+}
+
+func (j *JWTHandlerRS256) Validate(tokstr string) error {
 	var err error
 	var jwttoken *jwtgo.Token
 	for _, privKey := range []*rsa.PrivateKey{
@@ -83,21 +101,16 @@ func (j *JWTHandlerRS256) FromJWT(tokstr string) (*Token, error) {
 
 	// our Claims return Mender-specific validation errors
 	// go-jwt will wrap them in a generic ValidationError - unwrap and return directly
-	if err != nil {
+	if jwttoken != nil && !jwttoken.Valid {
+		return ErrTokenInvalid
+	} else if err != nil {
 		err, ok := err.(*jwtgo.ValidationError)
 		if ok && err.Inner != nil {
-			return nil, err.Inner
+			return err.Inner
 		} else {
-			return nil, err
+			return err
 		}
 	}
 
-	token := Token{}
-
-	if claims, ok := jwttoken.Claims.(*Claims); ok && jwttoken.Valid {
-		token.Claims = *claims
-		return &token, nil
-	} else {
-		return nil, ErrTokenInvalid
-	}
+	return nil
 }

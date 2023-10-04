@@ -78,12 +78,48 @@ func TestTokenUnmarshal(t *testing.T) {
 	assert.Error(t, err)
 
 	unTok = &Token{}
-	// make sure that the token is updated if UnpackVerifyFunc returns both
+	// make sure that the token is updated if UnpackFunc returns both
 	// a token & an error
 	err = unTok.UnmarshalJWT(tokin, func(toUnpack string) (*Token, error) {
 		assert.Equal(t, string(tokin), toUnpack)
 		return tok, errors.New("failed")
 	})
 	assert.Equal(t, unTok, tok)
+	assert.Error(t, err)
+}
+
+func TestTokenVerify(t *testing.T) {
+	tokin := []byte("some-fake-jwt")
+	tok := &Token{
+		Claims: Claims{
+			ID:      oid.NewUUIDv5("foo"),
+			Subject: oid.NewUUIDv5("valid-subject"),
+			ExpiresAt: Time{
+				Time: time.Now().Add(time.Hour),
+			},
+		},
+	}
+
+	unTok := &Token{}
+
+	err := unTok.UnmarshalJWT(tokin, func(toUnpack string) (*Token, error) {
+		assert.Equal(t, string(tokin), toUnpack)
+		return tok, nil
+	})
+	assert.Equal(t, unTok, tok)
+	assert.NoError(t, err)
+
+	unTok = &Token{}
+
+	err = unTok.Verify(tokin, func(toUnpack string) error {
+		assert.Equal(t, string(tokin), toUnpack)
+		return errors.New("failed")
+	})
+	assert.Error(t, err)
+
+	err = unTok.Verify(tokin, func(toUnpack string) error {
+		assert.Equal(t, string(tokin), toUnpack)
+		return errors.New("failed")
+	})
 	assert.Error(t, err)
 }

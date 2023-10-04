@@ -20,8 +20,11 @@ import (
 // SignFunc will sign and encode token.
 type SignFunc func(token *Token) (string, error)
 
-// UnpackVerifyFunc will decode and verify token
-type UnpackVerifyFunc func(s string) (*Token, error)
+// UnpackFunc will decode token
+type UnpackFunc func(s string) (*Token, error)
+
+// VerifyFunc will verify token
+type VerifyFunc func(s string) error
 
 // Token wrapper
 type Token struct {
@@ -42,18 +45,21 @@ func (t *Token) MarshalJWT(sign SignFunc) ([]byte, error) {
 	return []byte(signed), nil
 }
 
-// UnmarshalJWT unmarshals raw JWT data into Token. UnpackVerifyFunc does the
+// UnmarshalJWT unmarshals raw JWT data into Token. UnpackFunc does the
 // actual heavy-lifting of parsing and deserializing base64'ed JWT. Returns an
-// error if `uv` failed, however if `uv` returns a token `t` will be updated as
-// well (may happen if token is valid wrt. to structure & signature, but
-// expired).
-func (t *Token) UnmarshalJWT(raw []byte, uv UnpackVerifyFunc) error {
-	tok, err := uv(string(raw))
+// error if `unpack` failed, however if `unpack` returns a token `t` will be
+// updated as well (may happen if token is valid wrt. to structure & signature,
+// but expired).
+func (t *Token) UnmarshalJWT(raw []byte, unpack UnpackFunc) error {
+	tok, err := unpack(string(raw))
 	if tok != nil {
 		*t = *tok
 	}
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
+}
+
+// Verify verifies the Token. VerifyFunc does the actual heavy-lifting of validating
+// the JWT token. Returns an error if `verify` failed.
+func (t *Token) Verify(raw []byte, verify VerifyFunc) error {
+	return verify(string(raw))
 }
