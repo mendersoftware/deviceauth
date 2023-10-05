@@ -1805,7 +1805,9 @@ func TestDevAuthVerifyToken(t *testing.T) {
 
 	testCases := []struct {
 		tokenString      string
+		tokenParseErr    error
 		tokenValidateErr error
+		tokenOtherError  error
 
 		jwToken     *jwt.Token
 		validateErr error
@@ -1842,8 +1844,8 @@ func TestDevAuthVerifyToken(t *testing.T) {
 			validateErr: jwt.ErrTokenExpired,
 		},
 		{
-			tokenString:      "bad",
-			tokenValidateErr: jwt.ErrTokenInvalid,
+			tokenString:   "bad",
+			tokenParseErr: jwt.ErrTokenInvalid,
 
 			jwToken:     nil,
 			validateErr: jwt.ErrTokenInvalid,
@@ -1923,13 +1925,27 @@ func TestDevAuthVerifyToken(t *testing.T) {
 			},
 		},
 		{
-			tokenString:      "missing-tenant-claim",
-			tokenValidateErr: jwt.ErrTokenInvalid,
+			tokenString:     "not-a-device-token",
+			tokenOtherError: jwt.ErrTokenInvalid,
 
 			jwToken: &jwt.Token{
 				Claims: jwt.Claims{
 					ID:      oid.NewUUIDv5("missing-tenant"),
 					Subject: oid.NewUUIDv5("foo"),
+				},
+			},
+
+			tenantVerify: true,
+		},
+		{
+			tokenString:     "missing-tenant-claim",
+			tokenOtherError: jwt.ErrTokenInvalid,
+
+			jwToken: &jwt.Token{
+				Claims: jwt.Claims{
+					ID:      oid.NewUUIDv5("missing-tenant"),
+					Subject: oid.NewUUIDv5("foo"),
+					Device:  true,
 				},
 			},
 
@@ -1955,7 +1971,12 @@ func TestDevAuthVerifyToken(t *testing.T) {
 				func(s string) *jwt.Token {
 					t.Logf("string: %v return %+v", s, tc.jwToken)
 					return tc.jwToken
-				}, tc.validateErr)
+				}, tc.tokenParseErr)
+
+			if tc.tokenParseErr == nil && tc.jwToken != nil &&
+				tc.tokenOtherError == nil && tc.tokenString != "missing-tenant-claim" {
+				ja.On("Validate", tc.tokenString).Return(tc.validateErr)
+			}
 
 			if tc.validateErr == jwt.ErrTokenExpired {
 				db.On("DeleteToken",
@@ -1988,8 +2009,12 @@ func TestDevAuthVerifyToken(t *testing.T) {
 			}
 
 			err := devauth.VerifyToken(context.Background(), tc.tokenString)
-			if tc.tokenValidateErr != nil {
+			if tc.tokenParseErr != nil {
+				assert.EqualError(t, err, tc.tokenParseErr.Error())
+			} else if tc.tokenValidateErr != nil {
 				assert.EqualError(t, err, tc.tokenValidateErr.Error())
+			} else if tc.tokenOtherError != nil {
+				assert.EqualError(t, err, tc.tokenOtherError.Error())
 			} else {
 				assert.NoError(t, err)
 			}
@@ -2326,6 +2351,8 @@ func TestDevAuthVerifyTokenWithCache(t *testing.T) {
 					t.Logf("string: %v return %+v", s, token)
 					return token
 				}, nil)
+
+			ja.On("Validate", tc.tokenString).Return(nil)
 
 			c.On("GetLimits",
 				ctx,

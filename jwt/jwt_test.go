@@ -256,7 +256,7 @@ func TestJWTHandlerRS256FromJWT(t *testing.T) {
 			inToken: "1234123412341234",
 
 			outToken: Token{},
-			outErr:   errors.New("token contains an invalid number of segments"),
+			outErr:   ErrTokenInvalid,
 		},
 	}
 
@@ -269,6 +269,160 @@ func TestJWTHandlerRS256FromJWT(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, tc.outToken, *token)
 		} else {
+			assert.EqualError(t, tc.outErr, err.Error())
+		}
+	}
+}
+
+func TestJWTHandlerRS256Validate(t *testing.T) {
+
+	key := loadPrivKey("./testdata/private.pem", t)
+	keyAlternative := loadPrivKey("./testdata/private_alternative.pem", t)
+
+	testCases := map[string]struct {
+		privKey         *rsa.PrivateKey
+		fallbackPrivKey *rsa.PrivateKey
+
+		inToken string
+
+		outErr error
+	}{
+		"ok (all claims)": {
+			privKey: key,
+
+			inToken: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdW" +
+				"QiOiJNZW5kZXIiLCJleHAiOjQxNDc0ODM2NDcsImp0aS" +
+				"I6ImI5NDc1MzM2LWRkZTYtNTQ5Ny04MDQ0LTUxYWE5ZG" +
+				"RjMDJmOCIsImlhdCI6MTIzNDU2NywiaXNzIjoiTWVuZG" +
+				"VyIiwibmJmIjoxMjM0NTY3OCwic3ViIjoiYmNhOTVhZG" +
+				"ItYjVmMS01NjRmLTk2YTctNjM1NWM1MmQxZmE3Iiwic2" +
+				"NwIjoibWVuZGVyLioifQ.bEvw5q8Ohf_3DOw77EDeOTq" +
+				"99_JKUDz1YhCpJ5NaKPtMGmTksZIDoc6vk_lFyrPWzXm" +
+				"lmbiCB8bEYI2-QGe2XwTnCkWm8YPxTFJw3UriZLt-5Pw" +
+				"cEBDPG8FqTMtFaRjcbH-E7W7m_KT_Tm6fm93Vvqv_z6a" +
+				"JiCOL7e16sLC0DQCJ2nZ4OleztNDkP4rCOgtBuSbhOaR" +
+				"E_zhSsLf2Dj4Dlt5DVqDd8kqUBmA9-Sn9m5BeCUs023_" +
+				"W4FWOH4NJpqyxjO0jXGoncvZu0AYPqHSbJ9J6Oucvc4y" +
+				"lpbrCHN4diQ39s2egWzRbrSORsr-IL3hb1PZTINzLlQE" +
+				"6Wol2S-I8ag",
+		},
+		"ok (some claims)": {
+			privKey: key,
+
+			inToken: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJleH" +
+				"AiOjQxNDc0ODM2NDcsImp0aSI6ImI5NDc1MzM2LWRkZT" +
+				"YtNTQ5Ny04MDQ0LTUxYWE5ZGRjMDJmOCIsImlhdCI6MT" +
+				"IzNDU2NywiaXNzIjoiTWVuZGVyIiwic3ViIjoiYmNhOT" +
+				"VhZGItYjVmMS01NjRmLTk2YTctNjM1NWM1MmQxZmE3Ii" +
+				"wic2NwIjoibWVuZGVyLnVzZXJzLmluaXRpYWwuY3JlYX" +
+				"RlIn0.qzW1QfnvfB384DfOyX6LC4jsTSVEWwsyb-vSeA" +
+				"ebfHdJquX2BfQ6_1ZGtqyCC7mOhMrXeJv1gmprpkOxKw" +
+				"hPBexS-U1gOc_aO7Oi7uPl1HQRhMw9SM2QamOOVGmLi5" +
+				"1uVg9ZEQhvnN7s-w4girnmGyhnPWV58CorJtW4t1Dgyr" +
+				"6fG_v8wtrGt-rMb7uMLmEQMjIqcUBa6mlU1sVBEPTeGb" +
+				"KvR6kSJ727UW91y7krTcQUdNN4rv2CfG7ETlPsrUgMvr" +
+				"GUPqoq_ygbLX3kDZveVzTE2CQdI7PpAO14UZQxRBfff5" +
+				"ewyW4P0ulYRj0mPF5NmsHwbADoAjILoA5uSWW9Dg",
+		},
+		"ok (fallback not used)": {
+			privKey:         key,
+			fallbackPrivKey: keyAlternative,
+
+			inToken: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdW" +
+				"QiOiJNZW5kZXIiLCJleHAiOjQxNDc0ODM2NDcsImp0aS" +
+				"I6ImI5NDc1MzM2LWRkZTYtNTQ5Ny04MDQ0LTUxYWE5ZG" +
+				"RjMDJmOCIsImlhdCI6MTIzNDU2NywiaXNzIjoiTWVuZG" +
+				"VyIiwibmJmIjoxMjM0NTY3OCwic3ViIjoiYmNhOTVhZG" +
+				"ItYjVmMS01NjRmLTk2YTctNjM1NWM1MmQxZmE3Iiwic2" +
+				"NwIjoibWVuZGVyLioifQ.bEvw5q8Ohf_3DOw77EDeOTq" +
+				"99_JKUDz1YhCpJ5NaKPtMGmTksZIDoc6vk_lFyrPWzXm" +
+				"lmbiCB8bEYI2-QGe2XwTnCkWm8YPxTFJw3UriZLt-5Pw" +
+				"cEBDPG8FqTMtFaRjcbH-E7W7m_KT_Tm6fm93Vvqv_z6a" +
+				"JiCOL7e16sLC0DQCJ2nZ4OleztNDkP4rCOgtBuSbhOaR" +
+				"E_zhSsLf2Dj4Dlt5DVqDd8kqUBmA9-Sn9m5BeCUs023_" +
+				"W4FWOH4NJpqyxjO0jXGoncvZu0AYPqHSbJ9J6Oucvc4y" +
+				"lpbrCHN4diQ39s2egWzRbrSORsr-IL3hb1PZTINzLlQE" +
+				"6Wol2S-I8ag",
+		},
+		"ok (fallback used)": {
+			privKey:         keyAlternative,
+			fallbackPrivKey: key,
+
+			inToken: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdW" +
+				"QiOiJNZW5kZXIiLCJleHAiOjQxNDc0ODM2NDcsImp0aS" +
+				"I6ImI5NDc1MzM2LWRkZTYtNTQ5Ny04MDQ0LTUxYWE5ZG" +
+				"RjMDJmOCIsImlhdCI6MTIzNDU2NywiaXNzIjoiTWVuZG" +
+				"VyIiwibmJmIjoxMjM0NTY3OCwic3ViIjoiYmNhOTVhZG" +
+				"ItYjVmMS01NjRmLTk2YTctNjM1NWM1MmQxZmE3Iiwic2" +
+				"NwIjoibWVuZGVyLioifQ.bEvw5q8Ohf_3DOw77EDeOTq" +
+				"99_JKUDz1YhCpJ5NaKPtMGmTksZIDoc6vk_lFyrPWzXm" +
+				"lmbiCB8bEYI2-QGe2XwTnCkWm8YPxTFJw3UriZLt-5Pw" +
+				"cEBDPG8FqTMtFaRjcbH-E7W7m_KT_Tm6fm93Vvqv_z6a" +
+				"JiCOL7e16sLC0DQCJ2nZ4OleztNDkP4rCOgtBuSbhOaR" +
+				"E_zhSsLf2Dj4Dlt5DVqDd8kqUBmA9-Sn9m5BeCUs023_" +
+				"W4FWOH4NJpqyxjO0jXGoncvZu0AYPqHSbJ9J6Oucvc4y" +
+				"lpbrCHN4diQ39s2egWzRbrSORsr-IL3hb1PZTINzLlQE" +
+				"6Wol2S-I8ag",
+		},
+		"error - bad claims": {
+			privKey:         keyAlternative,
+			fallbackPrivKey: key,
+
+			inToken: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGk" +
+				"iOm51bGwsInN1YiI6ImJjYTk1YWRiLWI1ZjEtNTY0Zi0" +
+				"5NmE3LTYzNTVjNTJkMWZhNyIsImV4cCI6MTY5NjQxNjU" +
+				"2NCwiaWF0IjotNjIxMzU1OTY4MDAsIm5iZiI6LTYyMTM" +
+				"1NTk2ODAwLCJtZW5kZXIudHJpYWwiOmZhbHNlfQ.LNRO" +
+				"1CzYVkOqU_-ikNva-MvFyvZTVLbR8irmecbPKPij-6cv" +
+				"h_DymOdbtupRCpABq2XFfLGAz68AOqGhc0Utp_AL-EY7" +
+				"kSH-QbPVdlFvnZO_T-gPHxOY2wNoZqnyusr-cpiRR413" +
+				"lySS5t5ZPsghFtlCSFHITdZ11sin79C1JJxd3cUnhjXj" +
+				"P-wL7YJmsfFR9KfSL4AEPtpDsQ98gPhcnqPRCBuLSFcU" +
+				"d3_w-pbc7PkbM0A_nO2jrwCJCaHvjMMvL9FHIZ2-xfUW" +
+				"qDB13KkPo0BrVwHLvhykLlCuhshNaNugzH0Tb4djrM__" +
+				"NCKofdozu3DowLLjesXp7oIYWRAKUQ",
+
+			outErr: errors.New("jwt: token invalid"),
+		},
+		"error - bad signature": {
+			privKey:         keyAlternative,
+			fallbackPrivKey: key,
+
+			inToken: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdW" +
+				"QiOiJNZW5kZXIiLCJleHAiOjQxNDc0ODM2NDcsImp0aS" +
+				"I6ImI5NDc1MzM2LWRkZTYtNTQ5Ny04MDQ0LTUxYWE5ZG" +
+				"RjMDJmOCIsImlhdCI6MTIzNDU2NywiaXNzIjoiTWVuZG" +
+				"VyIiwibmJmIjoxMjM0NTY3OCwic3ViIjoiYmNhOTVhZG" +
+				"ItYjVmMS01NjRmLTk2YTctNjM1NWM1MmQxZmE3Iiwic2" +
+				"NwIjoibWVuZGVyLioifQ.bEvw5q8Ohf_3DOw77EDeOTq" +
+				"99_JKUDz1YhCpJ5NaKPtMGmTksZIDoc6vk_lFyrPWzXm" +
+				"lmbiCB8bEYI2-QGe2XwTnCkWm8YPxTFJw3UriZLt-5Pw" +
+				"cEBDPG8FqTMtFaRjcbH-E7W7m_KT_Tm6fm93Vvqv_z6a" +
+				"JiCOL7e16sLC0DQCJ2nZ4OleztNDkP4rCOgtBuSbhOaR" +
+				"E_zhSsLf2Dj4Dlt5DVqDd8kqUBmA9-Sn9m5BeCUs023_" +
+				"W4FWOH4NJpqyxjO0jXGoncvZu0AYPqHSbJ9J6Oucvc4y" +
+				"lpbrCHN4diQ39s2egWzRbrSORsr-IL3hb1PZTINzLlQE" +
+				"6Wol2S-I8XX",
+			outErr: ErrTokenInvalid,
+		},
+		"error - token invalid": {
+			privKey: key,
+
+			inToken: "1234123412341234",
+
+			outErr: errors.New("token contains an invalid number of segments"),
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Logf("test case: %s", name)
+		jwtHandler := NewJWTHandlerRS256(tc.privKey, tc.fallbackPrivKey)
+
+		err := jwtHandler.Validate(tc.inToken)
+		if tc.outErr == nil {
+			assert.NoError(t, err)
+		} else {
+			assert.Error(t, err)
 			assert.EqualError(t, tc.outErr, err.Error())
 		}
 	}

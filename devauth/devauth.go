@@ -422,7 +422,7 @@ func (d *DevAuth) SubmitAuthRequest(ctx context.Context, r *model.AuthReq) (stri
 
 		l.Infof("Token %s assigned to device %s",
 			token.Claims.ID, token.Claims.Subject)
-		_ = d.updateCheckInTime(ctx, authSet.DeviceId, token.Claims.Tenant, nil)
+		d.updateCheckInTime(ctx, authSet.DeviceId, token.Claims.Tenant, nil)
 		return string(raw), nil
 	}
 
@@ -1213,31 +1213,24 @@ func verifyTenantClaim(ctx context.Context, verifyTenant bool, tenant string) er
 }
 
 func (d *DevAuth) VerifyToken(ctx context.Context, raw string) error {
-
 	l := log.FromContext(ctx)
 
 	token := &jwt.Token{}
-
 	err := token.UnmarshalJWT([]byte(raw), d.jwt.FromJWT)
 	jti := token.Claims.ID
 	if err != nil {
-		if err == jwt.ErrTokenExpired && jti.String() != "" {
-			l.Errorf("Token %s expired: %v", jti.String(), err)
-			return d.handleExpiredToken(ctx, jti)
-		}
 		l.Errorf("Token %s invalid: %v", jti.String(), err)
 		return jwt.ErrTokenInvalid
-	}
-
-	if !token.Claims.Device {
+	} else if !token.Claims.Device {
 		l.Errorf("not a device token")
 		return jwt.ErrTokenInvalid
 	}
 
-	if err := verifyTenantClaim(ctx, d.verifyTenant, token.Claims.Tenant); err != nil {
-		return err
+	err = verifyTenantClaim(ctx, d.verifyTenant, token.Claims.Tenant)
+	if err == nil {
+		err = d.checker.ValidateWithContext(ctx)
 	}
-	if err = d.checker.ValidateWithContext(ctx); err != nil {
+	if err != nil {
 		return err
 	}
 
@@ -1253,25 +1246,30 @@ func (d *DevAuth) VerifyToken(ctx context.Context, raw string) error {
 		return err
 	}
 
-	if cachedToken != "" {
+	if cachedToken != "" && raw == cachedToken {
 		// update device check-in time
-		if err := d.updateCheckInTime(
+		d.updateCheckInTime(
 			ctx,
 			token.Claims.Subject.String(),
 			token.Claims.Tenant,
 			nil,
-		); err != nil {
-			l.Errorf(
-				"failed to update device check-in time for device %s: %s",
-				token.Claims.Subject.String(), err.Error(),
-			)
-		}
+		)
 		return nil
 	}
 
 	// caching is best effort, don't fail
 	if err != nil {
 		l.Errorf("Failed to throttle for token %v: %s, continue.", token, err.Error())
+	}
+
+	// perform JWT signature and claims validation
+	if err := d.jwt.Validate(raw); err != nil {
+		if err == jwt.ErrTokenExpired && jti.String() != "" {
+			l.Errorf("Token %s expired: %v", jti.String(), err)
+			return d.handleExpiredToken(ctx, jti)
+		}
+		l.Errorf("Token %s invalid: %v", jti.String(), err)
+		return jwt.ErrTokenInvalid
 	}
 
 	// cache check was a MISS, hit the db for verification
@@ -1314,17 +1312,12 @@ func (d *DevAuth) VerifyToken(ctx context.Context, raw string) error {
 	}
 
 	// update device check-in time
-	if err := d.updateCheckInTime(
+	d.updateCheckInTime(
 		ctx,
 		token.Claims.Subject.String(),
 		token.Claims.Tenant,
 		dev.CheckInTime,
-	); err != nil {
-		l.Errorf(
-			"failed to update device check-in time for device %s: %s",
-			token.Claims.Subject.String(), err.Error(),
-		)
-	}
+	)
 
 	// after successful token verification - cache it (best effort)
 	_ = d.cacheSetToken(ctx, token, raw)
@@ -1664,8 +1657,16 @@ func (d *DevAuth) updateCheckInTime(
 	deviceId string,
 	tenantId string,
 	previous *time.Time,
-) error {
+) {
 	var err error
+	defer func() {
+		if err != nil {
+			log.FromContext(ctx).Errorf(
+				"failed to update device check-in time for device %s: %s",
+				deviceId, err.Error(),
+			)
+		}
+	}()
 	checkInTime := uto.TimePtr(time.Now().UTC())
 	// in case cache is disabled, use mongo
 	if d.cache == nil {
@@ -1674,18 +1675,18 @@ func (d *DevAuth) updateCheckInTime(
 			model.DeviceUpdate{
 				CheckInTime: checkInTime,
 			}); err != nil {
-			return err
+			return
 		}
 	} else {
 		// get check-in time from cache
 		previous, err = d.cache.GetCheckInTime(ctx, tenantId, deviceId)
 		if err != nil {
-			return err
+			return
 		}
 		// update check-in time in cache
 		err = d.cache.CacheCheckInTime(ctx, checkInTime, tenantId, deviceId)
 		if err != nil {
-			return err
+			return
 		}
 	}
 	// compare data without a time of current and previous check-in time
@@ -1697,7 +1698,8 @@ func (d *DevAuth) updateCheckInTime(
 		// trigger reindexing
 		if d.config.EnableReporting {
 			if err = d.cOrch.SubmitReindexReporting(ctx, deviceId); err != nil {
-				return errors.Wrap(err, "reindex reporting job error")
+				err = errors.Wrap(err, "reindex reporting job error")
+				return
 			}
 		}
 		// dump cached value to database
@@ -1707,9 +1709,8 @@ func (d *DevAuth) updateCheckInTime(
 				model.DeviceUpdate{
 					CheckInTime: checkInTime,
 				}); err != nil {
-				return err
+				return
 			}
 		}
 	}
-	return nil
 }
