@@ -155,6 +155,39 @@ func doMain(args []string) {
 			Action: cmdPropagateReporting,
 		},
 		{
+			Name:  "diag",
+			Usage: "Run basic tests and exit",
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:  "tenant",
+					Usage: "Tenant ID (optional).",
+				},
+				cli.BoolFlag{
+					Name:  "list-all",
+					Usage: "list all devices in all tenants.",
+				},
+				cli.StringFlag{
+					Name:  "dev-id",
+					Usage: "Device ID (optional).",
+				},
+				cli.BoolFlag{
+					Name:  "insert",
+					Usage: "insert a device.",
+				},
+				cli.StringFlag{
+					Name:  "delete",
+					Usage: "delete the given device.",
+				},
+				cli.BoolFlag{
+					Name: "dry-run",
+					Usage: "Do not perform any modifications and serves" +
+						" only as a way to inspect changes and detect if any are necessary",
+				},
+			},
+
+			Action: cmdDiag,
+		},
+		{
 			Name:  "maintenance",
 			Usage: "Run maintenance operations and exit",
 			Flags: []cli.Flag{
@@ -174,7 +207,8 @@ func doMain(args []string) {
 			},
 
 			Action: cmdMaintenance,
-		}, {
+		},
+		{
 			Name:  "check-device-limits",
 			Usage: "Warn users if user is approaching device limit",
 			Description: "Loops through all tenant databases and " +
@@ -271,6 +305,21 @@ func cmdMaintenance(args *cli.Context) error {
 	err := cmd.Maintenance(
 		args.Bool("decommissioning-cleanup"),
 		args.String("tenant"),
+		args.Bool("dry-run"),
+	)
+	if err != nil {
+		return cli.NewExitError(err, 6)
+	}
+	return nil
+}
+
+func cmdDiag(args *cli.Context) error {
+	err := cmd.Diag(
+		args.String("tenant"),
+		args.Bool("list-all"),
+		args.String("dev-id"),
+		args.Bool("insert"),
+		args.String("delete"),
 		args.Bool("dry-run"),
 	)
 	if err != nil {
