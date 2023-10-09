@@ -119,6 +119,7 @@ type DevAuth struct {
 	cOrch        orchestrator.ClientRunner
 	cTenant      tenant.ClientRunner
 	jwt          jwt.Handler
+	jwtFallback  jwt.Handler
 	verifyTenant bool
 	config       Config
 	cache        cache.Cache
@@ -1212,6 +1213,21 @@ func verifyTenantClaim(ctx context.Context, verifyTenant bool, tenant string) er
 	return nil
 }
 
+func (d *DevAuth) validateJWTToken(ctx context.Context, jti oid.ObjectID, raw string) error {
+	err := d.jwt.Validate(raw)
+	if err != nil && d.jwtFallback != nil {
+		err = d.jwtFallback.Validate(raw)
+	}
+	if err == jwt.ErrTokenExpired && jti.String() != "" {
+		log.FromContext(ctx).Errorf("Token %s expired: %v", jti.String(), err)
+		return d.handleExpiredToken(ctx, jti)
+	} else if err != nil {
+		log.FromContext(ctx).Errorf("Token %s invalid: %v", jti.String(), err)
+		return jwt.ErrTokenInvalid
+	}
+	return nil
+}
+
 func (d *DevAuth) VerifyToken(ctx context.Context, raw string) error {
 	l := log.FromContext(ctx)
 
@@ -1263,13 +1279,9 @@ func (d *DevAuth) VerifyToken(ctx context.Context, raw string) error {
 	}
 
 	// perform JWT signature and claims validation
-	if err := d.jwt.Validate(raw); err != nil {
-		if err == jwt.ErrTokenExpired && jti.String() != "" {
-			l.Errorf("Token %s expired: %v", jti.String(), err)
-			return d.handleExpiredToken(ctx, jti)
-		}
-		l.Errorf("Token %s invalid: %v", jti.String(), err)
-		return jwt.ErrTokenInvalid
+	err = d.validateJWTToken(ctx, jti, raw)
+	if err != nil {
+		return err
 	}
 
 	// cache check was a MISS, hit the db for verification
@@ -1498,6 +1510,11 @@ func (d *DevAuth) GetTenantLimit(
 	})
 
 	return d.GetLimit(ctx, name)
+}
+
+func (d *DevAuth) WithJWTFallbackHandler(handler jwt.Handler) *DevAuth {
+	d.jwtFallback = handler
+	return d
 }
 
 // WithTenantVerification will force verification of tenant token with tenant

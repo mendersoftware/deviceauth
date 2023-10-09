@@ -1809,8 +1809,9 @@ func TestDevAuthVerifyToken(t *testing.T) {
 		tokenValidateErr error
 		tokenOtherError  error
 
-		jwToken     *jwt.Token
-		validateErr error
+		jwToken             *jwt.Token
+		validateErr         error
+		fallbackValidateErr error
 
 		getToken    bool
 		getTokenErr error
@@ -1823,8 +1824,9 @@ func TestDevAuthVerifyToken(t *testing.T) {
 
 		updateDeviceErr error
 
-		tenantVerify     bool
-		willUpdateDevice bool
+		tenantVerify       bool
+		willUpdateDevice   bool
+		jwtHandlerFallback bool
 	}{
 		{
 			tokenString:      "expired",
@@ -1951,6 +1953,51 @@ func TestDevAuthVerifyToken(t *testing.T) {
 
 			tenantVerify: true,
 		},
+		{
+			tokenString: "with fallback",
+			jwToken: &jwt.Token{
+				Claims: jwt.Claims{
+					ID:      oid.NewUUIDv5("good"),
+					Subject: oid.NewUUIDv5("bar"),
+					ExpiresAt: jwt.Time{
+						Time: time.Now().Add(time.Hour),
+					},
+					Issuer: "Tester",
+					Device: true,
+				},
+			},
+			validateErr: jwt.ErrTokenInvalid,
+			getToken:    true,
+			auth: &model.AuthSet{
+				Id:       oid.NewUUIDv5("good").String(),
+				Status:   model.DevStatusAccepted,
+				DeviceId: oid.NewUUIDv5("bar").String(),
+			},
+			dev: &model.Device{
+				Id:              oid.NewUUIDv5("bar").String(),
+				Decommissioning: false,
+			},
+			willUpdateDevice:   true,
+			jwtHandlerFallback: true,
+		},
+		{
+			tokenString:      "failed-validation-with-fallback",
+			tokenValidateErr: jwt.ErrTokenInvalid,
+			jwToken: &jwt.Token{
+				Claims: jwt.Claims{
+					ID:      oid.NewUUIDv5("good"),
+					Subject: oid.NewUUIDv5("bar"),
+					ExpiresAt: jwt.Time{
+						Time: time.Now().Add(time.Hour),
+					},
+					Issuer: "Tester",
+					Device: true,
+				},
+			},
+			validateErr:         jwt.ErrTokenInvalid,
+			fallbackValidateErr: jwt.ErrTokenInvalid,
+			jwtHandlerFallback:  true,
+		},
 	}
 
 	for i := range testCases {
@@ -1962,6 +2009,12 @@ func TestDevAuthVerifyToken(t *testing.T) {
 			ja := &mjwt.Handler{}
 
 			devauth := NewDevAuth(db, nil, ja, Config{})
+			if tc.jwtHandlerFallback {
+				jaFallback := &mjwt.Handler{}
+				jaFallback.On("Validate", tc.tokenString).Return(tc.fallbackValidateErr)
+
+				devauth = devauth.WithJWTFallbackHandler(jaFallback)
+			}
 			if tc.tenantVerify {
 				// ok to pass nil tenantadm client here
 				devauth = devauth.WithTenantVerification(nil)
@@ -1973,8 +2026,8 @@ func TestDevAuthVerifyToken(t *testing.T) {
 					return tc.jwToken
 				}, tc.tokenParseErr)
 
-			if tc.tokenParseErr == nil && tc.jwToken != nil &&
-				tc.tokenOtherError == nil && tc.tokenString != "missing-tenant-claim" {
+			if tc.tokenParseErr == nil && tc.jwToken != nil && tc.tokenOtherError == nil &&
+				tc.tokenString != "missing-tenant-claim" {
 				ja.On("Validate", tc.tokenString).Return(tc.validateErr)
 			}
 

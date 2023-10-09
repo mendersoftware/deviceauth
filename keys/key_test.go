@@ -39,21 +39,21 @@ func TestLoadRsaPrivateKey(t *testing.T) {
 		},
 		{
 			PrivateKey: PrivateKeyECDSAP521,
-			Error:      "key type not supported",
+			Error:      "key is not a valid RSA private key",
 		},
 		{
 			PrivateKey: "randomGarbage",
-			Error:      ErrMsgPrivKeyNotPEMEncoded,
+			Error:      "Key must be a PEM encoded PKCS1 or PKCS8 key",
 		},
 		{
 			PrivateKey: `-----BEGIN PRIVATE KEY-----
 randomPKCS8Garba
 -----END PRIVATE KEY-----`,
-			Error: "LoadRSAPrivate",
+			Error: "asn1: structure error: length too large",
 		},
 		{
 			PrivateKey: PublicKeyECDSAP521,
-			Error:      "invalid PEM block header: PUBLIC KEY",
+			Error:      "asn1: structure error: tags don't match",
 		},
 	}
 
@@ -85,6 +85,70 @@ randomPKCS8Garba
 	t.Run("error/file not exist", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "not-exist.pem")
 		_, err := LoadRSAPrivate(path)
+		var expected *os.PathError
+		assert.ErrorAs(t, err, &expected)
+	})
+}
+
+func TestLoadEd25519Private(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		PrivateKey string
+		Error      string
+	}{
+		{
+			PrivateKey: PrivateKeyEd25519,
+			Error:      "",
+		},
+		{
+			PrivateKey: PrivateKeyEdDSA,
+			Error:      "x509: failed to parse private key (use ParseECPrivateKey instead for this key format)",
+		},
+		{
+			PrivateKey: "randomGarbage",
+			Error:      "Key must be a PEM encoded PKCS1 or PKCS8 key",
+		},
+		{
+			PrivateKey: `-----BEGIN PRIVATE KEY-----
+randomPKCS8Garba
+-----END PRIVATE KEY-----`,
+			Error: "asn1: structure error: length too large",
+		},
+		{
+			PrivateKey: PublicKeyECDSAP521,
+			Error:      "asn1: structure error: tags don't match",
+		},
+	}
+
+	for i := range testCases {
+		tc := testCases[i]
+		t.Run(fmt.Sprintf("tc %d", i), func(t *testing.T) {
+			t.Parallel()
+
+			fd, err := os.CreateTemp(t.TempDir(), "private*.pem")
+			if err != nil {
+				panic(err)
+			}
+			_, err = fd.Write([]byte(tc.PrivateKey))
+			fd.Close()
+			if err != nil {
+				panic(err)
+			}
+
+			key, err := LoadEd25519Private(fd.Name())
+			if tc.Error != "" {
+				assert.ErrorContains(t, err, tc.Error)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, key)
+			}
+		})
+	}
+
+	t.Run("error/file not exist", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "not-exist.pem")
+		_, err := LoadEd25519Private(path)
 		var expected *os.PathError
 		assert.ErrorAs(t, err, &expected)
 	})
@@ -160,4 +224,12 @@ oz6JAoGAUaG6yncXpdmZmDfGhxwQtfZ5saJoj/KooKrnwerxoItDsUYLeIGmwDgV
 yLMn8dwhm2xg8cjYsdR2uxEiBhGtA0VH6PnAnOU5Bnw4haOWiZ6D4zh7PAGh5jAW
 j/ZC1+dPF08FixsQbPxEtTYZe9/9cvhbB0iVg5ir6X2Y7EfW+LY=
 -----END RSA PRIVATE KEY-----`
+	PrivateKeyEdDSA = `-----BEGIN EC PRIVATE KEY-----
+MHcCAQEEIObQL4Tfegl+9PQUDCHceXk5kgLfpnwWKrcHcbUZnmwioAoGCCqGSM49
+AwEHoUQDQgAEfPeNXqdQ6L2VnVRrOjtsLj9LWJId1dLEERv7j+3U9dGasF1UWrg/
+fZKOwSHuqhAjvdPMFAKmUgePNjU14bjy5A==
+-----END EC PRIVATE KEY-----`
+	PrivateKeyEd25519 = `-----BEGIN PRIVATE KEY-----
+MC4CAQAwBQYDK2VwBCIEIG1ZSPHHBCWnpD1hZAsEMxMemPK26E6EbxxXgsA5M/9H
+-----END PRIVATE KEY-----`
 )

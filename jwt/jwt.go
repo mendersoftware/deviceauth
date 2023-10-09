@@ -14,9 +14,6 @@
 package jwt
 
 import (
-	"crypto/rsa"
-
-	jwtgo "github.com/golang-jwt/jwt/v4"
 	"github.com/pkg/errors"
 )
 
@@ -39,78 +36,4 @@ type Handler interface {
 	// ErrTokenExpired when the token is valid but expired
 	// ErrTokenInvalid when the token is invalid (malformed, missing required claims, etc.)
 	Validate(string) error
-}
-
-// JWTHandlerRS256 is an RS256-specific JWTHandler
-type JWTHandlerRS256 struct {
-	privKey         *rsa.PrivateKey
-	fallbackPrivKey *rsa.PrivateKey
-}
-
-func NewJWTHandlerRS256(privKey *rsa.PrivateKey, fallbackPrivKey *rsa.PrivateKey) *JWTHandlerRS256 {
-	return &JWTHandlerRS256{
-		privKey:         privKey,
-		fallbackPrivKey: fallbackPrivKey,
-	}
-}
-
-func (j *JWTHandlerRS256) ToJWT(token *Token) (string, error) {
-	//generate
-	jt := jwtgo.NewWithClaims(jwtgo.SigningMethodRS256, &token.Claims)
-
-	//sign
-	data, err := jt.SignedString(j.privKey)
-	return data, err
-}
-
-func (j *JWTHandlerRS256) FromJWT(tokstr string) (*Token, error) {
-	parser := jwtgo.NewParser(jwtgo.WithoutClaimsValidation())
-	jwttoken, _, err := parser.ParseUnverified(tokstr, &Claims{})
-	if err == nil {
-		token := Token{}
-		if claims, ok := jwttoken.Claims.(*Claims); ok {
-			token.Claims = *claims
-			return &token, nil
-		}
-	}
-
-	return nil, ErrTokenInvalid
-}
-
-func (j *JWTHandlerRS256) Validate(tokstr string) error {
-	var err error
-	var jwttoken *jwtgo.Token
-	for _, privKey := range []*rsa.PrivateKey{
-		j.privKey,
-		j.fallbackPrivKey,
-	} {
-		if privKey != nil {
-			jwttoken, err = jwtgo.ParseWithClaims(tokstr, &Claims{},
-				func(token *jwtgo.Token) (interface{}, error) {
-					if _, ok := token.Method.(*jwtgo.SigningMethodRSA); !ok {
-						return nil, errors.New("unexpected signing method: " + token.Method.Alg())
-					}
-					return &privKey.PublicKey, nil
-				},
-			)
-			if jwttoken != nil && err == nil {
-				break
-			}
-		}
-	}
-
-	// our Claims return Mender-specific validation errors
-	// go-jwt will wrap them in a generic ValidationError - unwrap and return directly
-	if jwttoken != nil && !jwttoken.Valid {
-		return ErrTokenInvalid
-	} else if err != nil {
-		err, ok := err.(*jwtgo.ValidationError)
-		if ok && err.Inner != nil {
-			return err.Inner
-		} else {
-			return err
-		}
-	}
-
-	return nil
 }

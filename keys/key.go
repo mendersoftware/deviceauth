@@ -14,65 +14,36 @@
 package keys
 
 import (
+	"crypto/ed25519"
 	"crypto/rsa"
-	"crypto/x509"
-	"encoding/pem"
-	"io/ioutil"
 	"os"
 
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/pkg/errors"
 )
 
 const (
-	ErrMsgPrivKeyReadFailed    = "failed to read server private key file"
-	ErrMsgPrivKeyNotPEMEncoded = "server private key not PEM-encoded"
-
-	blockTypePKCS1 = "RSA PRIVATE KEY"
-	blockTypePKCS8 = "PRIVATE KEY"
+	ErrMsgPrivKeyReadFailed = "failed to read server private key file"
 )
 
 func LoadRSAPrivate(privKeyPath string) (*rsa.PrivateKey, error) {
-	var (
-		err     error
-		pemData []byte
-		rsaKey  *rsa.PrivateKey
-	)
-	// read key from file
-	pemData, err = ioutil.ReadFile(privKeyPath)
+	pemData, err := os.ReadFile(privKeyPath)
 	if err != nil {
 		return nil, errors.Wrap(err, ErrMsgPrivKeyReadFailed)
 	}
-	// decode pem key
-	block, _ := pem.Decode(pemData)
-	if block == nil {
-		return nil, &os.PathError{
-			Err:  errors.New(ErrMsgPrivKeyNotPEMEncoded),
-			Op:   "PEMDecode",
-			Path: privKeyPath,
-		}
-	}
+	return jwt.ParseRSAPrivateKeyFromPEM(pemData)
+}
 
-	switch block.Type {
-	case blockTypePKCS1:
-		rsaKey, err = x509.ParsePKCS1PrivateKey(block.Bytes)
-	case blockTypePKCS8:
-		var (
-			key interface{}
-			ok  bool
-		)
-		key, err = x509.ParsePKCS8PrivateKey(block.Bytes)
-		if rsaKey, ok = key.(*rsa.PrivateKey); !ok || rsaKey == nil {
-			err = errors.New("key type not supported")
-		}
-	default:
-		err = errors.Errorf("invalid PEM block header: %s", block.Type)
-	}
+func LoadEd25519Private(privKeyPath string) (*ed25519.PrivateKey, error) {
+	pemData, err := os.ReadFile(privKeyPath)
 	if err != nil {
-		err = &os.PathError{
-			Err:  err,
-			Op:   "LoadRSAPrivate",
-			Path: privKeyPath,
-		}
+		return nil, errors.Wrap(err, ErrMsgPrivKeyReadFailed)
 	}
-	return rsaKey, err
+	private, err := jwt.ParseEdPrivateKeyFromPEM(pemData)
+	if err != nil {
+		return nil, err
+	}
+	// safe, already asserted by `jwt.ParseEdPrivateKeyFromPEM`
+	key := private.(ed25519.PrivateKey)
+	return &key, nil
 }

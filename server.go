@@ -1,4 +1,4 @@
-// Copyright 2021 Northern.tech AS
+// Copyright 2023 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -15,7 +15,6 @@
 package main
 
 import (
-	"crypto/rsa"
 	"net/http"
 	"time"
 
@@ -50,24 +49,27 @@ func SetupAPI(stacktype string) (*rest.Api, error) {
 	return api, nil
 }
 
+func getJWTHandler(privateKeyType, privateKeyPath string) (jwt.Handler, error) {
+	if privateKeyType == dconfig.SettingServerPrivKeyTypeRSA {
+		privKey, err := keys.LoadRSAPrivate(privateKeyPath)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to read rsa private key")
+		}
+		return jwt.NewJWTHandlerRS256(privKey), nil
+	} else if privateKeyType == dconfig.SettingServerPrivKeyTypeEd25519 {
+		privKey, err := keys.LoadEd25519Private(privateKeyPath)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to read ed25519 private key")
+		}
+		return jwt.NewJWTHandlerEd25519(privKey), nil
+	}
+	return nil, errors.Errorf("unsupported server private key type %v", privateKeyType)
+}
+
 func RunServer(c config.Reader) error {
 	var tenantadmAddr = c.GetString(dconfig.SettingTenantAdmAddr)
 
 	l := log.New(log.Ctx{})
-
-	privKey, err := keys.LoadRSAPrivate(c.GetString(dconfig.SettingServerPrivKeyPath))
-	if err != nil {
-		return errors.Wrap(err, "failed to read rsa private key")
-	}
-
-	fallbackPrivKeyPath := c.GetString(dconfig.SettingServerFallbackPrivKeyPath)
-	var fallbackPrivKey *rsa.PrivateKey
-	if fallbackPrivKeyPath != "" {
-		fallbackPrivKey, err = keys.LoadRSAPrivate(fallbackPrivKeyPath)
-		if err != nil {
-			return errors.Wrap(err, "failed to read fallback rsa private key")
-		}
-	}
 
 	db, err := mongo.NewDataStoreMongo(
 		mongo.DataStoreMongoConfig{
@@ -83,7 +85,21 @@ func RunServer(c config.Reader) error {
 		return errors.Wrap(err, "database connection failed")
 	}
 
-	jwtHandler := jwt.NewJWTHandlerRS256(privKey, fallbackPrivKey)
+	jwtHandler, err := getJWTHandler(
+		c.GetString(dconfig.SettingServerPrivKeyType),
+		c.GetString(dconfig.SettingServerPrivKeyPath),
+	)
+	var jwtFallbackHandler jwt.Handler
+	fallback := c.GetString(dconfig.SettingServerFallbackPrivKeyPath)
+	if err == nil && fallback != "" {
+		jwtFallbackHandler, err = getJWTHandler(
+			c.GetString(dconfig.SettingServerFallbackPrivKeyType),
+			fallback,
+		)
+	}
+	if err != nil {
+		return err
+	}
 
 	orchClientConf := orchestrator.Config{
 		OrchestratorAddr: c.GetString(dconfig.SettingOrchestratorAddr),
@@ -103,6 +119,10 @@ func RunServer(c config.Reader) error {
 			HaveAddons: config.Config.GetBool(dconfig.SettingHaveAddons) &&
 				tenantadmAddr != "",
 		})
+
+	if jwtFallbackHandler != nil {
+		devauth = devauth.WithJWTFallbackHandler(jwtFallbackHandler)
+	}
 
 	if tenantadmAddr != "" {
 		tc := tenant.NewClient(tenant.Config{
