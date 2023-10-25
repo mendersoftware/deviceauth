@@ -72,25 +72,11 @@
 
 # default_tenant_token:  <VALID_TENANT_TOKEN>
 
-# Private key type - used for JWT signing
-# Defaults to: rsa
-# Supported values: rsa, ed25519
-# Overwrite with environment variable: DEVICEAUTH_SERVER_PRIV_KEY_TYPE
-
-# server_priv_key_type: rsa
-
 # Private key path - used for JWT signing
 # Defaults to: /etc/deviceauth/rsa/private.pem
 # Overwrite with environment variable: DEVICEAUTH_SERVER_PRIV_KEY_PATH
 
 # server_priv_key_path: /etc/deviceauth/rsa/private.pem
-
-# Private key type - used for JWT signing
-# Defaults to: rsa
-# Supported values: rsa, ed25519
-# Overwrite with environment variable: DEVICEAUTH_SERVER_FALLBACK_PRIV_KEY_TYPE
-
-# server_fallback_priv_key_type: rsa
 
 # Fallback private key path - used for JWT verification
 # Defaults to: none

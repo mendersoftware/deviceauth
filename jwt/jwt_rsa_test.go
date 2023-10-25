@@ -15,6 +15,9 @@ package jwt
 
 import (
 	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
+	"os"
 	"testing"
 	"time"
 
@@ -22,8 +25,6 @@ import (
 	"github.com/mendersoftware/go-lib-micro/mongo/oid"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
-
-	"github.com/mendersoftware/deviceauth/keys"
 )
 
 func TestNewJWTHandlerRS256(t *testing.T) {
@@ -306,10 +307,16 @@ func TestJWTHandlerRS256Validate(t *testing.T) {
 }
 
 func loadRSAPrivKey(path string, t *testing.T) *rsa.PrivateKey {
-	key, err := keys.LoadRSAPrivate(path)
+	pemData, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("failed to load key: %v", err)
 	}
+
+	block, _ := pem.Decode(pemData)
+	assert.Equal(t, block.Type, pemHeaderPKCS1)
+
+	key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	assert.NoError(t, err)
 
 	return key
 }

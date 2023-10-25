@@ -14,12 +14,23 @@
 package jwt
 
 import (
+	"crypto/ed25519"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
+	"os"
+
 	"github.com/pkg/errors"
 )
 
 var (
 	ErrTokenExpired = errors.New("jwt: token expired")
 	ErrTokenInvalid = errors.New("jwt: token invalid")
+)
+
+const (
+	pemHeaderPKCS1 = "RSA PRIVATE KEY"
+	pemHeaderPKCS8 = "PRIVATE KEY"
 )
 
 // Handler jwt generator/verifier
@@ -36,4 +47,32 @@ type Handler interface {
 	// ErrTokenExpired when the token is valid but expired
 	// ErrTokenInvalid when the token is invalid (malformed, missing required claims, etc.)
 	Validate(string) error
+}
+
+func NewJWTHandler(privateKeyPath string) (Handler, error) {
+	priv, err := os.ReadFile(privateKeyPath)
+	block, _ := pem.Decode(priv)
+	if block == nil {
+		return nil, errors.Wrap(err, "failed to read private key")
+	}
+	switch block.Type {
+	case pemHeaderPKCS1:
+		privKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to read rsa private key")
+		}
+		return NewJWTHandlerRS256(privKey), nil
+	case pemHeaderPKCS8:
+		key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to read private key")
+		}
+		switch v := key.(type) {
+		case *rsa.PrivateKey:
+			return NewJWTHandlerRS256(v), nil
+		case ed25519.PrivateKey:
+			return NewJWTHandlerEd25519(&v), nil
+		}
+	}
+	return nil, errors.Errorf("unsupported server private key type")
 }

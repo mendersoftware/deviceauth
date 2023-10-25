@@ -52,16 +52,8 @@ const (
 	SettingDefaultTenantToken        = "default_tenant_token"
 	SettingDefaultTenantTokenDefault = ""
 
-	SettingServerPrivKeyType        = "server_priv_key_type"
-	SettingServerPrivKeyTypeRSA     = "rsa"
-	SettingServerPrivKeyTypeEd25519 = "ed25519"
-	SettingServerPrivKeyTypeDefault = SettingServerPrivKeyTypeRSA
-
 	SettingServerPrivKeyPath        = "server_priv_key_path"
 	SettingServerPrivKeyPathDefault = "/etc/deviceauth/rsa/private.pem"
-
-	SettingServerFallbackPrivKeyType        = "server_fallback_priv_key_type"
-	SettingServerFallbackPrivKeyTypeDefault = SettingServerPrivKeyTypeRSA
 
 	SettingServerFallbackPrivKeyPath        = "server_fallback_priv_key_path"
 	SettingServerFallbackPrivKeyPathDefault = ""
@@ -107,9 +99,7 @@ var (
 		{Key: SettingEnableReporting, Value: SettingEnableReportingDefault},
 		{Key: SettingTenantAdmAddr, Value: SettingTenantAdmAddrDefault},
 		{Key: SettingDefaultTenantToken, Value: SettingDefaultTenantTokenDefault},
-		{Key: SettingServerPrivKeyType, Value: SettingServerPrivKeyTypeDefault},
 		{Key: SettingServerPrivKeyPath, Value: SettingServerPrivKeyPathDefault},
-		{Key: SettingServerFallbackPrivKeyType, Value: SettingServerFallbackPrivKeyTypeDefault},
 		{Key: SettingServerFallbackPrivKeyPath, Value: SettingServerFallbackPrivKeyPathDefault},
 		{Key: SettingJWTIssuer, Value: SettingJWTIssuerDefault},
 		{Key: SettingJWTExpirationTimeout, Value: SettingJWTExpirationTimeoutDefault},

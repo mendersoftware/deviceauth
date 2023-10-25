@@ -15,6 +15,9 @@ package jwt
 
 import (
 	"crypto/ed25519"
+	"crypto/x509"
+	"encoding/pem"
+	"os"
 	"testing"
 	"time"
 
@@ -22,8 +25,6 @@ import (
 	"github.com/mendersoftware/go-lib-micro/mongo/oid"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
-
-	"github.com/mendersoftware/deviceauth/keys"
 )
 
 func TestNewJWTHandlerEd25519(t *testing.T) {
@@ -281,12 +282,19 @@ func TestJWTHandlerEd25519Validate(t *testing.T) {
 }
 
 func loadEd25519PrivKey(path string, t *testing.T) *ed25519.PrivateKey {
-	key, err := keys.LoadEd25519Private(path)
+	pemData, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("failed to load key: %v", err)
 	}
 
-	return key
+	block, _ := pem.Decode(pemData)
+	assert.Equal(t, block.Type, pemHeaderPKCS8)
+
+	key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	assert.NoError(t, err)
+
+	retKey := key.(ed25519.PrivateKey)
+	return &retKey
 }
 
 func parseGeneratedTokenEd25519(t *testing.T, token string, key *ed25519.PrivateKey) *jwtgo.Token {

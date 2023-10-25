@@ -30,7 +30,6 @@ import (
 	dconfig "github.com/mendersoftware/deviceauth/config"
 	"github.com/mendersoftware/deviceauth/devauth"
 	"github.com/mendersoftware/deviceauth/jwt"
-	"github.com/mendersoftware/deviceauth/keys"
 	"github.com/mendersoftware/deviceauth/store/mongo"
 )
 
@@ -47,23 +46,6 @@ func SetupAPI(stacktype string) (*rest.Api, error) {
 	rest.ErrorFieldName = "error"
 
 	return api, nil
-}
-
-func getJWTHandler(privateKeyType, privateKeyPath string) (jwt.Handler, error) {
-	if privateKeyType == dconfig.SettingServerPrivKeyTypeRSA {
-		privKey, err := keys.LoadRSAPrivate(privateKeyPath)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to read rsa private key")
-		}
-		return jwt.NewJWTHandlerRS256(privKey), nil
-	} else if privateKeyType == dconfig.SettingServerPrivKeyTypeEd25519 {
-		privKey, err := keys.LoadEd25519Private(privateKeyPath)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to read ed25519 private key")
-		}
-		return jwt.NewJWTHandlerEd25519(privKey), nil
-	}
-	return nil, errors.Errorf("unsupported server private key type %v", privateKeyType)
 }
 
 func RunServer(c config.Reader) error {
@@ -85,15 +67,13 @@ func RunServer(c config.Reader) error {
 		return errors.Wrap(err, "database connection failed")
 	}
 
-	jwtHandler, err := getJWTHandler(
-		c.GetString(dconfig.SettingServerPrivKeyType),
+	jwtHandler, err := jwt.NewJWTHandler(
 		c.GetString(dconfig.SettingServerPrivKeyPath),
 	)
 	var jwtFallbackHandler jwt.Handler
 	fallback := c.GetString(dconfig.SettingServerFallbackPrivKeyPath)
 	if err == nil && fallback != "" {
-		jwtFallbackHandler, err = getJWTHandler(
-			c.GetString(dconfig.SettingServerFallbackPrivKeyType),
+		jwtFallbackHandler, err = jwt.NewJWTHandler(
 			fallback,
 		)
 	}
