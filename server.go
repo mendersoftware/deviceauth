@@ -1,4 +1,4 @@
-// Copyright 2021 Northern.tech AS
+// Copyright 2023 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -15,7 +15,6 @@
 package main
 
 import (
-	"crypto/rsa"
 	"net/http"
 	"time"
 
@@ -31,7 +30,6 @@ import (
 	dconfig "github.com/mendersoftware/deviceauth/config"
 	"github.com/mendersoftware/deviceauth/devauth"
 	"github.com/mendersoftware/deviceauth/jwt"
-	"github.com/mendersoftware/deviceauth/keys"
 	"github.com/mendersoftware/deviceauth/store/mongo"
 )
 
@@ -55,20 +53,6 @@ func RunServer(c config.Reader) error {
 
 	l := log.New(log.Ctx{})
 
-	privKey, err := keys.LoadRSAPrivate(c.GetString(dconfig.SettingServerPrivKeyPath))
-	if err != nil {
-		return errors.Wrap(err, "failed to read rsa private key")
-	}
-
-	fallbackPrivKeyPath := c.GetString(dconfig.SettingServerFallbackPrivKeyPath)
-	var fallbackPrivKey *rsa.PrivateKey
-	if fallbackPrivKeyPath != "" {
-		fallbackPrivKey, err = keys.LoadRSAPrivate(fallbackPrivKeyPath)
-		if err != nil {
-			return errors.Wrap(err, "failed to read fallback rsa private key")
-		}
-	}
-
 	db, err := mongo.NewDataStoreMongo(
 		mongo.DataStoreMongoConfig{
 			ConnectionString: c.GetString(dconfig.SettingDb),
@@ -83,7 +67,19 @@ func RunServer(c config.Reader) error {
 		return errors.Wrap(err, "database connection failed")
 	}
 
-	jwtHandler := jwt.NewJWTHandlerRS256(privKey, fallbackPrivKey)
+	jwtHandler, err := jwt.NewJWTHandler(
+		c.GetString(dconfig.SettingServerPrivKeyPath),
+	)
+	var jwtFallbackHandler jwt.Handler
+	fallback := c.GetString(dconfig.SettingServerFallbackPrivKeyPath)
+	if err == nil && fallback != "" {
+		jwtFallbackHandler, err = jwt.NewJWTHandler(
+			fallback,
+		)
+	}
+	if err != nil {
+		return err
+	}
 
 	orchClientConf := orchestrator.Config{
 		OrchestratorAddr: c.GetString(dconfig.SettingOrchestratorAddr),
@@ -103,6 +99,10 @@ func RunServer(c config.Reader) error {
 			HaveAddons: config.Config.GetBool(dconfig.SettingHaveAddons) &&
 				tenantadmAddr != "",
 		})
+
+	if jwtFallbackHandler != nil {
+		devauth = devauth.WithJWTFallbackHandler(jwtFallbackHandler)
+	}
 
 	if tenantadmAddr != "" {
 		tc := tenant.NewClient(tenant.Config{

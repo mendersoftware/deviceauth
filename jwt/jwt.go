@@ -14,15 +14,23 @@
 package jwt
 
 import (
+	"crypto/ed25519"
 	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
+	"os"
 
-	jwtgo "github.com/golang-jwt/jwt/v4"
 	"github.com/pkg/errors"
 )
 
 var (
 	ErrTokenExpired = errors.New("jwt: token expired")
 	ErrTokenInvalid = errors.New("jwt: token invalid")
+)
+
+const (
+	pemHeaderPKCS1 = "RSA PRIVATE KEY"
+	pemHeaderPKCS8 = "PRIVATE KEY"
 )
 
 // Handler jwt generator/verifier
@@ -41,76 +49,30 @@ type Handler interface {
 	Validate(string) error
 }
 
-// JWTHandlerRS256 is an RS256-specific JWTHandler
-type JWTHandlerRS256 struct {
-	privKey         *rsa.PrivateKey
-	fallbackPrivKey *rsa.PrivateKey
-}
-
-func NewJWTHandlerRS256(privKey *rsa.PrivateKey, fallbackPrivKey *rsa.PrivateKey) *JWTHandlerRS256 {
-	return &JWTHandlerRS256{
-		privKey:         privKey,
-		fallbackPrivKey: fallbackPrivKey,
+func NewJWTHandler(privateKeyPath string) (Handler, error) {
+	priv, err := os.ReadFile(privateKeyPath)
+	block, _ := pem.Decode(priv)
+	if block == nil {
+		return nil, errors.Wrap(err, "failed to read private key")
 	}
-}
-
-func (j *JWTHandlerRS256) ToJWT(token *Token) (string, error) {
-	//generate
-	jt := jwtgo.NewWithClaims(jwtgo.SigningMethodRS256, &token.Claims)
-
-	//sign
-	data, err := jt.SignedString(j.privKey)
-	return data, err
-}
-
-func (j *JWTHandlerRS256) FromJWT(tokstr string) (*Token, error) {
-	parser := jwtgo.NewParser(jwtgo.WithoutClaimsValidation())
-	jwttoken, _, err := parser.ParseUnverified(tokstr, &Claims{})
-	if err == nil {
-		token := Token{}
-		if claims, ok := jwttoken.Claims.(*Claims); ok {
-			token.Claims = *claims
-			return &token, nil
+	switch block.Type {
+	case pemHeaderPKCS1:
+		privKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to read rsa private key")
+		}
+		return NewJWTHandlerRS256(privKey), nil
+	case pemHeaderPKCS8:
+		key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to read private key")
+		}
+		switch v := key.(type) {
+		case *rsa.PrivateKey:
+			return NewJWTHandlerRS256(v), nil
+		case ed25519.PrivateKey:
+			return NewJWTHandlerEd25519(&v), nil
 		}
 	}
-
-	return nil, ErrTokenInvalid
-}
-
-func (j *JWTHandlerRS256) Validate(tokstr string) error {
-	var err error
-	var jwttoken *jwtgo.Token
-	for _, privKey := range []*rsa.PrivateKey{
-		j.privKey,
-		j.fallbackPrivKey,
-	} {
-		if privKey != nil {
-			jwttoken, err = jwtgo.ParseWithClaims(tokstr, &Claims{},
-				func(token *jwtgo.Token) (interface{}, error) {
-					if _, ok := token.Method.(*jwtgo.SigningMethodRSA); !ok {
-						return nil, errors.New("unexpected signing method: " + token.Method.Alg())
-					}
-					return &privKey.PublicKey, nil
-				},
-			)
-			if jwttoken != nil && err == nil {
-				break
-			}
-		}
-	}
-
-	// our Claims return Mender-specific validation errors
-	// go-jwt will wrap them in a generic ValidationError - unwrap and return directly
-	if jwttoken != nil && !jwttoken.Valid {
-		return ErrTokenInvalid
-	} else if err != nil {
-		err, ok := err.(*jwtgo.ValidationError)
-		if ok && err.Inner != nil {
-			return err.Inner
-		} else {
-			return err
-		}
-	}
-
-	return nil
+	return nil, errors.Errorf("unsupported server private key type")
 }
