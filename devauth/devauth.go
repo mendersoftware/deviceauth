@@ -746,7 +746,7 @@ func (d *DevAuth) DecommissionDevice(ctx context.Context, devID string) error {
 
 	// set decommissioning flag on the device
 	updev := model.DeviceUpdate{
-		Decommissioning: uto.BoolPtr(true),
+		Decommissioning: uto.BoolPtr(true), // here
 	}
 	if err := d.db.UpdateDevice(
 		ctx, devID, updev,
@@ -777,7 +777,7 @@ func (d *DevAuth) DecommissionDevice(ctx context.Context, devID string) error {
 }
 
 // Delete a device and its tokens from deviceauth db
-func (d *DevAuth) DeleteDevice(ctx context.Context, devID string) error {
+func (d *DevAuth) DeleteDevice(ctx context.Context, devID string) error { // here
 	// delete device authorization sets
 	if err := d.db.DeleteAuthSetsForDevice(ctx, devID); err != nil &&
 		err != store.ErrAuthSetNotFound {

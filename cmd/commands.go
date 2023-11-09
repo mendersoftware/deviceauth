@@ -15,7 +15,10 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"github.com/mendersoftware/go-lib-micro/mongo/oid"
+	"github.com/mendersoftware/go-lib-micro/ratelimits"
 	"time"
 
 	"github.com/mendersoftware/go-lib-micro/config"
@@ -100,6 +103,146 @@ func listTenants(db *mongo.DataStoreMongo) error {
 		fmt.Println(tenant)
 	}
 
+	return nil
+}
+
+func Diag(
+	tenant string,
+	listAll bool,
+	deviceId string,
+	insert bool,
+	delete string,
+	dryRunFlag bool,
+) error {
+	fmt.Println("deviceauth diagnostics.")
+	fmt.Println("connecting to db")
+	db, err := mongo.NewDataStoreMongo(makeDataStoreConfig())
+	if err != nil {
+		fmt.Printf("failed to connect to mongourl: %s\n", config.Config.GetString(dconfig.SettingDb))
+		return errors.Wrap(err, "failed to connect to db")
+	}
+	fmt.Printf("connected to mongourl: %s\n", config.Config.GetString(dconfig.SettingDb))
+	ctx, cancel := context.WithTimeout(context.Background(), 32*time.Second)
+	defer cancel()
+	if listAll {
+		var tenants []string
+		if len(tenant)>0 {
+			tenants=[]string{tenant}
+		} else {
+		tenants, err = db.ListTenantsIds(context.Background())
+		if err != nil {
+			fmt.Printf("error looking for all tenants: %s\n", err.Error())
+		}
+		}
+		fmt.Printf("looking for all devices for all %d tenants\n", len(tenants))
+
+		for _, t := range tenants {
+			ctx = context.Background()
+			ctx = identity.WithContext(ctx, &identity.Identity{
+				Tenant: t,
+			})
+			devices, err := db.GetDevices(ctx, 0, 8388480, model.DeviceFilter{})
+			if err != nil {
+				fmt.Printf("error looking for devices: %s\n", err.Error())
+			}
+			fmt.Printf("listing all %d devices for tenant %s\n", len(devices), t)
+			for _, d := range devices {
+				fmt.Printf("%s\n", d.Id)
+			}
+		}
+		return nil
+	}
+	if len(deviceId) < 1 {
+
+	} else {
+		fmt.Printf("checking device of id: %s\n", deviceId)
+		ctx = identity.WithContext(ctx, &identity.Identity{
+			Tenant: tenant,
+		})
+		device, err := db.GetDeviceById(ctx, deviceId)
+		if err != nil {
+			fmt.Printf("error looking for device of id: %s; %s\n", deviceId, err.Error())
+		}
+		if device == nil {
+			fmt.Printf("cant find device of id: %s\n", deviceId)
+			tenants, err := db.ListTenantsIds(context.Background())
+			if err != nil {
+				fmt.Printf("error looking for all tenants: %s\n", err.Error())
+			}
+			fmt.Printf("looking for all devices for all %d tenants\n", len(tenants))
+
+			for _, t := range tenants {
+				ctx = context.Background()
+				ctx = identity.WithContext(ctx, &identity.Identity{
+					Tenant: t,
+				})
+				devices, err := db.GetDevices(ctx, 0, 8388480, model.DeviceFilter{})
+				if err != nil {
+					fmt.Printf("error looking for devices: %s\n", err.Error())
+				}
+				fmt.Printf("listing all %d devices for tenant %s\n", len(devices), t)
+				for _, d := range devices {
+					fmt.Printf("%s\n", d.Id)
+				}
+			}
+			// now delete a device, insert a dummy device
+		}
+		if device != nil {
+			jsonDevice, _ := json.MarshalIndent(*device, "", " ")
+			fmt.Printf("found device: +%v\n%s\n", *device, string(jsonDevice))
+		}
+	}
+	if insert {
+		ctx = identity.WithContext(ctx, &identity.Identity{
+			Tenant: tenant,
+		})
+		newId := oid.NewUUIDv4().String()
+		fmt.Printf("adding a device: %s\n", newId)
+		err = db.AddDevice(ctx, model.Device{
+			Id:              newId,
+			IdData:          "some-id" + newId,
+			IdDataStruct:    map[string]interface{}{"some-id-k0": "some-id-v0"},
+			IdDataSha256:    []byte("some-hash" + newId),
+			Status:          "preauthorized",
+			Decommissioning: false,
+			CreatedTs:       time.Now(),
+			UpdatedTs:       time.Now(),
+			AuthSets:        nil,
+			CheckInTime:     nil,
+			ApiLimits:       ratelimits.ApiLimits{},
+			Revision:        0,
+			TenantID:        tenant,
+		})
+		if err != nil {
+			fmt.Printf("failed to add a device: %s\n", err.Error())
+		} else {
+			device, err := db.GetDeviceById(ctx, newId)
+			if err != nil {
+				fmt.Printf("failed to get the just added device: %s\n", err.Error())
+			} else {
+				if device == nil {
+					fmt.Printf("cant find the just added device\n")
+				} else {
+					jsonDevice, _ := json.MarshalIndent(*device, "", " ")
+					fmt.Printf("found just added device: +%v\n%s\n", *device, jsonDevice)
+					if len(delete) > 0 {
+						if delete != "%inserted" {
+							newId = delete
+						}
+						fmt.Printf("removing inserted device %s\n", newId)
+						err = db.DeleteDevice(ctx, newId)
+						fmt.Printf("removing inserted device rc:%+v\n", err)
+						device, err = db.GetDeviceById(ctx, newId)
+						fmt.Printf("getting inserted-removed device rc:%+v\n", err)
+						if device != nil {
+							jsonDevice, _ = json.MarshalIndent(*device, "", " ")
+							fmt.Printf("(!) found just removed device: +%v\n%s\n", *device, jsonDevice)
+						}
+					}
+				}
+			}
+		}
+	}
 	return nil
 }
 

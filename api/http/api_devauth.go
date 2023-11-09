@@ -106,7 +106,7 @@ func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
 		rest.Get(uriTenantDeviceStatus, d.GetTenantDeviceStatus),
 		rest.Get(uriTenantDevices, d.GetTenantDevicesHandler),
 		rest.Get(uriTenantDevicesCount, d.GetTenantDevicesCountHandler),
-		rest.Delete(uriTenantDevice, d.DeleteDeviceHandler),
+		rest.Delete(uriTenantDevice, d.DeleteDeviceHandler), // here
 
 		// API v2
 		rest.Get(v2uriDevicesCount, d.GetDevicesCountHandler),
