@@ -45,6 +45,24 @@ func parsePreAuthReq(source io.Reader) (*preAuthReq, error) {
 	return &req, nil
 }
 
+func parsePreAuthReqs(source io.Reader) ([]preAuthReq, error) {
+	jd := json.NewDecoder(source)
+
+	var req []preAuthReq
+
+	if err := jd.Decode(&req); err != nil {
+		return nil, err
+	}
+
+	for _, r := range req {
+		if err := r.validate(); err != nil {
+			return nil, err
+		}
+	}
+
+	return req, nil
+}
+
 func (r *preAuthReq) validate() error {
 	err := validation.ValidateStruct(r,
 		validation.Field(&r.IdData, validation.Required),

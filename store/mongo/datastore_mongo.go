@@ -330,6 +330,27 @@ func (db *DataStoreMongo) AddDevice(ctx context.Context, d model.Device) error {
 	return nil
 }
 
+func (db *DataStoreMongo) AddDevices(ctx context.Context, d []*model.Device) error {
+	devices := make(bson.A, len(d))
+	for i := range d {
+		if d[i].Id == "" {
+			uid := oid.NewUUIDv4()
+			d[i].Id = uid.String()
+		}
+		devices[i] = d[i]
+	}
+
+	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
+
+	if _, err := c.InsertMany(ctx, devices); err != nil {
+		if strings.Contains(err.Error(), "duplicate key error") {
+			return store.ErrObjectExists
+		}
+		return errors.Wrap(err, "failed to store device")
+	}
+	return nil
+}
+
 func (db *DataStoreMongo) UpdateDevice(ctx context.Context,
 	deviceID string, updev model.DeviceUpdate) error {
 
@@ -594,6 +615,28 @@ func (db *DataStoreMongo) AddAuthSet(ctx context.Context, set model.AuthSet) err
 	set.TenantID = tenantId
 
 	if _, err := c.InsertOne(ctx, set); err != nil {
+		if strings.Contains(err.Error(), "duplicate key error") {
+			return store.ErrObjectExists
+		}
+		return errors.Wrap(err, "failed to store device")
+	}
+
+	return nil
+}
+
+func (db *DataStoreMongo) AddAuthSets(ctx context.Context, set []model.AuthSet) error {
+	c := db.client.Database(ctxstore.DbFromContext(ctx, DbName)).Collection(DbAuthSetColl)
+
+	sets := make(bson.A, len(set))
+	for i := range set {
+		if set[i].Id == "" {
+			uid := oid.NewUUIDv4()
+			set[i].Id = uid.String()
+		}
+		sets[i] = set[i]
+	}
+
+	if _, err := c.InsertMany(ctx, sets); err != nil {
 		if strings.Contains(err.Error(), "duplicate key error") {
 			return store.ErrObjectExists
 		}

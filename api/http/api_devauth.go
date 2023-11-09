@@ -52,6 +52,7 @@ const (
 	uriTenantDevicesCount = "/api/internal/v1/devauth/tenants/#tid/devices/count"
 
 	// management API v2
+	v2uriBulkDevices         = "/api/management/v2/devauth/bulk/devices"
 	v2uriDevices             = "/api/management/v2/devauth/devices"
 	v2uriDevicesCount        = "/api/management/v2/devauth/devices/count"
 	v2uriDevicesSearch       = "/api/management/v2/devauth/devices/search"
@@ -76,16 +77,22 @@ var (
 type DevAuthApiHandlers struct {
 	devAuth devauth.App
 	db      store.DataStore
+	limits  Limits
 }
 
 type DevAuthApiStatus struct {
 	Status string `json:"status"`
 }
 
-func NewDevAuthApiHandlers(devAuth devauth.App, db store.DataStore) ApiHandler {
+type Limits struct {
+	MaxPreAuthElements int
+}
+
+func NewDevAuthApiHandlers(devAuth devauth.App, db store.DataStore, limits Limits) ApiHandler {
 	return &DevAuthApiHandlers{
 		devAuth: devAuth,
 		db:      db,
+		limits:  limits,
 	}
 }
 
@@ -113,6 +120,7 @@ func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
 		rest.Get(v2uriDevices, d.GetDevicesV2Handler),
 		rest.Post(v2uriDevicesSearch, d.SearchDevicesV2Handler),
 		rest.Post(v2uriDevices, d.PostDevicesV2Handler),
+		rest.Post(v2uriBulkDevices, d.PostBulkDevicesV2Handler),
 		rest.Get(v2uriDevice, d.GetDeviceV2Handler),
 		rest.Delete(v2uriDevice, d.DecommissionDeviceHandler),
 		rest.Delete(v2uriDeviceAuthSet, d.DeleteDeviceAuthSetHandler),
@@ -235,6 +243,47 @@ func (d *DevAuthApiHandlers) SubmitAuthRequestHandler(w rest.ResponseWriter, r *
 		rest_utils.RestErrWithLogInternal(w, r, l, err)
 		return
 	}
+}
+
+func (d *DevAuthApiHandlers) PostBulkDevicesV2Handler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+
+	l := log.FromContext(ctx)
+
+	reqs, err := parsePreAuthReqs(r.Body)
+	if err != nil {
+		err = errors.Wrap(err, "failed to decode preauth request")
+		rest_utils.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		return
+	}
+
+	count := 0
+	for _, req := range reqs {
+		if count > d.limits.MaxPreAuthElements {
+			break
+		}
+		reqDbModel, err := req.getDbModel()
+		if err != nil {
+			rest_utils.RestErrWithLogInternal(w, r, l, err)
+			return
+		}
+
+		device, err := d.devAuth.PreauthorizeDevice(ctx, reqDbModel)
+		switch err {
+		case nil:
+			w.Header().Set("Location", "devices/"+reqDbModel.DeviceId)
+		case devauth.ErrDeviceExists:
+			l.Error(err)
+			w.WriteHeader(http.StatusConflict)
+			_ = w.WriteJson(device)
+			return
+		default:
+			rest_utils.RestErrWithLogInternal(w, r, l, err)
+			return
+		}
+		count++
+	}
+	w.WriteHeader(http.StatusCreated)
 }
 
 func (d *DevAuthApiHandlers) PostDevicesV2Handler(w rest.ResponseWriter, r *rest.Request) {

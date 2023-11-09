@@ -97,6 +97,7 @@ type App interface {
 	RejectDeviceAuth(ctx context.Context, dev_id string, auth_id string) error
 	ResetDeviceAuth(ctx context.Context, dev_id string, auth_id string) error
 	PreauthorizeDevice(ctx context.Context, req *model.PreAuthReq) (*model.Device, error)
+	PreauthorizeDevices(ctx context.Context, req []model.PreAuthReq) error
 
 	RevokeToken(ctx context.Context, tokenID string) error
 	VerifyToken(ctx context.Context, token string) error
@@ -219,6 +220,49 @@ func (d *DevAuth) setDeviceIdentity(ctx context.Context, dev *model.Device, tena
 	if d.config.EnableReporting {
 		if err := d.cOrch.SubmitReindexReporting(ctx, string(dev.Id)); err != nil {
 			return errors.Wrap(err, "reindex reporting job error")
+		}
+	}
+	return nil
+}
+
+func (d *DevAuth) setDeviceIdentities(ctx context.Context, devices []*model.Device, tenantId string) error {
+	for _, dev := range devices {
+		attributes := make([]model.DeviceAttribute, len(dev.IdDataStruct))
+		i := 0
+		for name, value := range dev.IdDataStruct {
+			if name == "status" {
+				//we have to forbid the client to override attribute status in identity scope
+				//since it stands for status of a device (as in: accepted, rejected, preauthorized)
+				continue
+			}
+			attribute := model.DeviceAttribute{
+				Name:        name,
+				Description: nil,
+				Value:       value,
+				Scope:       "identity",
+			}
+			attributes[i] = attribute
+			i++
+		}
+		attrJson, err := json.Marshal(attributes)
+		if err != nil {
+			return errors.New("internal error: cannot marshal attributes into json")
+		}
+		if err := d.cOrch.SubmitUpdateDeviceInventoryJob(
+			ctx,
+			orchestrator.UpdateDeviceInventoryReq{
+				RequestId:  requestid.FromContext(ctx),
+				TenantId:   tenantId,
+				DeviceId:   dev.Id,
+				Scope:      "identity",
+				Attributes: string(attrJson),
+			}); err != nil {
+			return errors.Wrap(err, "failed to start device inventory update job")
+		}
+		if d.config.EnableReporting {
+			if err := d.cOrch.SubmitReindexReporting(ctx, string(dev.Id)); err != nil {
+				return errors.Wrap(err, "reindex reporting job error")
+			}
 		}
 	}
 	return nil
@@ -1169,6 +1213,92 @@ func (d *DevAuth) PreauthorizeDevice(
 		return dev, ErrDeviceExists
 	default:
 		return nil, errors.Wrap(err, "failed to add auth set")
+	}
+}
+
+func (d *DevAuth) PreauthorizeDevices(
+	ctx context.Context,
+	req []model.PreAuthReq,
+) error {
+	// try add device, if a device with the given id_data exists -
+	// the unique index on id_data will prevent it (conflict)
+	// this is the only safeguard against id data conflict - we won't try to handle it
+	// additionally on inserting the auth set (can't add an id data index on auth set - would
+	// prevent key rotation)
+
+	// FIXME: tenant_token is "" on purpose, will be removed
+
+	dev := make([]*model.Device, len(req))
+	authset := make([]model.AuthSet, len(req))
+	inventoryDevices := make([]model.DeviceInventoryUpdate, len(req))
+	for i, r := range req {
+		device := model.NewDevice(r.DeviceId, r.IdData, r.PubKey)
+		device.Status = model.DevStatusPreauth
+
+		idDataStruct, idDataSha256, err := parseIdData(r.IdData)
+		if err != nil {
+			return MakeErrDevAuthBadRequest(err)
+		}
+
+		device.IdDataStruct = idDataStruct
+		device.IdDataSha256 = idDataSha256
+		device.Status = model.DevStatusPreauth
+		dev[i] = device
+
+		// record authentication request
+		authset[i] = model.AuthSet{
+			Id:           r.AuthSetId,
+			IdData:       r.IdData,
+			IdDataStruct: idDataStruct,
+			IdDataSha256: idDataSha256,
+			PubKey:       r.PubKey,
+			DeviceId:     r.DeviceId,
+			Status:       model.DevStatusPreauth,
+			Timestamp:    uto.TimePtr(time.Now()),
+		}
+		inventoryDevices[i] = model.DeviceInventoryUpdate{
+			Id:       device.Id,
+			Revision: device.Revision,
+		}
+	}
+
+	err := d.db.AddDevices(ctx, dev)
+	switch err {
+	case nil:
+		break
+	case store.ErrObjectExists:
+		return ErrDeviceExists
+	default:
+		return errors.Wrap(err, "failed to add device")
+	}
+
+	tenantId := ""
+	idData := identity.FromContext(ctx)
+	if idData != nil {
+		tenantId = idData.Tenant
+	}
+
+	wfReq := orchestrator.UpdateDeviceStatusReq{
+		RequestId: requestid.FromContext(ctx),
+		Devices:   inventoryDevices,
+		TenantId:  tenantId,
+		Status:    model.DevStatusPreauth,
+	}
+	if err = d.cOrch.SubmitUpdateDeviceStatusJob(ctx, wfReq); err != nil {
+		return errors.Wrap(err, "update device status job error")
+	}
+
+	err = d.db.AddAuthSets(ctx, authset)
+	switch err {
+	case nil:
+		if err := d.setDeviceIdentities(ctx, dev, tenantId); err != nil {
+			return err
+		}
+		return nil
+	case store.ErrObjectExists:
+		return ErrDeviceExists
+	default:
+		return errors.Wrap(err, "failed to add auth set")
 	}
 }
 
