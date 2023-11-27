@@ -316,13 +316,13 @@ class TestCheckDeviceLimitsEnterprise:
                 # POST /api/v1/workflows/update_device_inventory
                 rsp_q_wflows.put_nowait((201, {}, ""))
                 # POST /api/v1/workflows/reindex_reporting
-                rsp_q_wflows.put_nowait((201, {}, ""))
+                # rsp_q_wflows.put_nowait((201, {}, ""))
                 # POST /api/v1/workflows/update_device_status
                 rsp_q_wflows.put_nowait((201, {}, ""))
                 # POST /api/v1/workflows/reindex_reporting
-                rsp_q_wflows.put_nowait((201, {}, ""))
+                # rsp_q_wflows.put_nowait((201, {}, ""))
                 # POST /api/v1/workflows/provision_device
-                rsp_q_wflows.put_nowait((201, {}, ""))
+                # rsp_q_wflows.put_nowait((201, {}, ""))
                 dev = Device()
                 da = DevAuthorizer(tenant_token=tenant_token)
                 rsp = device_auth_req(device_api.auth_requests_url, da, dev)
