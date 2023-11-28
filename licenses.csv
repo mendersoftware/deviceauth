@@ -11,7 +11,6 @@ github.com/go-ozzo/ozzo-validation/v4,MIT
 github.com/go-playground/locales,MIT
 github.com/go-playground/universal-translator,MIT
 github.com/go-playground/validator/v10,MIT
-github.com/go-redis/redis/v8,BSD-2-Clause
 github.com/golang-jwt/jwt/v4,MIT
 github.com/golang/snappy,BSD-3-Clause
 github.com/google/uuid,BSD-3-Clause
@@ -26,6 +25,7 @@ github.com/mitchellh/mapstructure,MIT
 github.com/montanaflynn/stats,MIT
 github.com/pelletier/go-toml/v2,MIT
 github.com/pkg/errors,BSD-2-Clause
+github.com/redis/go-redis/v9,BSD-2-Clause
 github.com/russross/blackfriday/v2,BSD-2-Clause
 github.com/sagikazarmark/slog-shim,BSD-3-Clause
 github.com/sirupsen/logrus,MIT

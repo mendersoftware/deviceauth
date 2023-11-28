@@ -15,6 +15,7 @@
 package main
 
 import (
+	"context"
 	"net/http"
 	"time"
 
@@ -111,14 +112,18 @@ func RunServer(c config.Reader) error {
 		devauth = devauth.WithTenantVerification(tc)
 	}
 
-	if cacheAddr := c.GetString(dconfig.SettingRedisAddr); cacheAddr != "" {
+	cacheConnStr := c.GetString(dconfig.SettingRedisConnectionString)
+	if cacheConnStr == "" {
+		// for backward compatibility check old redis_addr setting
+		cacheConnStr = c.GetString(dconfig.SettingRedisAddr)
+	}
+	if cacheConnStr != "" {
 		l.Infof("setting up redis cache")
 
-		cache, err := cache.NewRedisCache(cacheAddr,
-			c.GetString(dconfig.SettingRedisUsername),
-			c.GetString(dconfig.SettingRedisPassword),
-			c.GetInt(dconfig.SettingRedisDb),
-			c.GetInt(dconfig.SettingRedisTimeoutSec),
+		cache, err := cache.NewRedisCache(
+			context.TODO(),
+			cacheConnStr,
+			c.GetString(dconfig.SettingRedisKeyPrefix),
 			c.GetInt(dconfig.SettingRedisLimitsExpSec),
 		)
 

@@ -16,7 +16,6 @@ package cache
 
 import (
 	"context"
-	"net"
 	"testing"
 	"time"
 
@@ -27,46 +26,10 @@ import (
 	"github.com/mendersoftware/deviceauth/utils"
 )
 
-func TestNewRedisCache(t *testing.T) {
-	t.Parallel()
-
-	t.Run("ok", func(t *testing.T) {
-		_, err := NewRedisCache(
-			"localhost:6379", "admin", "password",
-			123, 123, 123,
-		)
-		assert.NoError(t, err)
-	})
-	t.Run("error/invalid address", func(t *testing.T) {
-		_, err := NewRedisCache(
-			"foo bar", "admin", "password",
-			123, 123, 123,
-		)
-		var addrErr *net.AddrError
-		assert.ErrorAs(t, err, &addrErr)
-	})
-	t.Run("error/database negative", func(t *testing.T) {
-		_, err := NewRedisCache(
-			"localhost:6379", "admin", "password",
-			-123, 123, 123,
-		)
-		assert.ErrorIs(t, err, ErrNegativeInteger)
-	})
-	t.Run("error/invalid timeout", func(t *testing.T) {
-		_, err := NewRedisCache(
-			"localhost:6379", "admin", "password",
-			123, 0, 123,
-		)
-		assert.ErrorIs(t, err, ErrNoPositiveInteger)
-	})
-	t.Run("error/invalid limit", func(t *testing.T) {
-		_, err := NewRedisCache(
-			"localhost:6379", "admin", "password",
-			123, 123, 0,
-		)
-		assert.ErrorIs(t, err, ErrNoPositiveInteger)
-	})
-}
+const (
+	limitsExpSec = 1800
+	cachePrefix  = "deviceauth:v1"
+)
 
 func TestRedisCacheThrottleToken(t *testing.T) {
 	r := miniredis.NewMiniRedis()
@@ -75,7 +38,7 @@ func TestRedisCacheThrottleToken(t *testing.T) {
 	defer r.Close()
 
 	ctx := context.TODO()
-	rcache, err := NewRedisCache(r.Addr(), "", "", 0, 5, 1800)
+	rcache, err := NewRedisCache(ctx, "redis://"+r.Addr(), cachePrefix, limitsExpSec)
 	assert.NoError(t, err)
 
 	// token not found
@@ -92,8 +55,8 @@ func TestRedisCacheThrottleToken(t *testing.T) {
 	assert.Equal(t, "", tok)
 
 	//insert token
-	r.Set(KeyToken("tenant-foo", "device-bar", IdTypeDevice), "tokenstring")
-	r.SetTTL(KeyToken("tenant-foo", "device-bar", IdTypeDevice), time.Duration(10*time.Second))
+	r.Set(rcache.KeyToken("tenant-foo", "device-bar", IdTypeDevice), "tokenstring")
+	r.SetTTL(rcache.KeyToken("tenant-foo", "device-bar", IdTypeDevice), time.Duration(10*time.Second))
 
 	tok, err = rcache.Throttle(ctx,
 		"tokenstring",
@@ -137,7 +100,7 @@ func TestRedisCacheThrottleToken(t *testing.T) {
 
 	// for some reason, the cache finds a valid token with different contents
 	// and defensively rejects it
-	r.Set(KeyToken("tenant-foo", "device-bar", IdTypeDevice), "unknown")
+	r.Set(rcache.KeyToken("tenant-foo", "device-bar", IdTypeDevice), "unknown")
 	tok, err = rcache.Throttle(ctx,
 		"tokenstring",
 		ratelimits.ApiLimits{},
@@ -170,7 +133,7 @@ func TestRedisCacheThrottleToken(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "tokenstr", tok)
 
-	r.SetTTL(KeyToken("tenant-foo", "device-bar", IdTypeDevice), time.Duration(10*time.Second))
+	r.SetTTL(rcache.KeyToken("tenant-foo", "device-bar", IdTypeDevice), time.Duration(10*time.Second))
 	r.FastForward(time.Duration(11 * time.Second))
 
 	tok, err = rcache.Throttle(ctx,
@@ -194,7 +157,7 @@ func TestRedisCacheTokenDelete(t *testing.T) {
 	assert.NoError(t, err)
 	defer r.Close()
 
-	rcache, err := NewRedisCache(r.Addr(), "", "", 0, 5, 1800)
+	rcache, err := NewRedisCache(ctx, "redis://"+r.Addr(), cachePrefix, limitsExpSec)
 
 	// cache 2 tokens, remove first one, other one should still be available
 	rcache.CacheToken(ctx,
@@ -250,7 +213,7 @@ func TestRedisCacheFlushDB(t *testing.T) {
 	assert.NoError(t, err)
 	defer r.Close()
 
-	rcache, err := NewRedisCache(r.Addr(), "", "", 0, 5, 1800)
+	rcache, err := NewRedisCache(ctx, "redis://"+r.Addr(), cachePrefix, limitsExpSec)
 
 	// cache 2 tokens and immediately flush
 	rcache.CacheToken(ctx,
@@ -305,7 +268,7 @@ func TestRedisCacheLimitsQuota(t *testing.T) {
 	assert.NoError(t, err)
 	defer r.Close()
 
-	rcache, err := NewRedisCache(r.Addr(), "", "", 0, 5, 1800)
+	rcache, err := NewRedisCache(context.TODO(), "redis://"+r.Addr(), cachePrefix, limitsExpSec)
 	assert.NoError(t, err)
 
 	// apply quota
@@ -347,7 +310,7 @@ func TestRedisCacheLimitsBurst(t *testing.T) {
 	assert.NoError(t, err)
 	defer r.Close()
 
-	rcache, err := NewRedisCache(r.Addr(), "", "", 0, 5, 1800)
+	rcache, err := NewRedisCache(context.TODO(), "redis://"+r.Addr(), cachePrefix, limitsExpSec)
 	assert.NoError(t, err)
 
 	clock := utils.NewMockClock(1590105600)
@@ -391,7 +354,7 @@ func TestRedisCacheLimitsQuotaBurst(t *testing.T) {
 	assert.NoError(t, err)
 	defer r.Close()
 
-	rcache, err := NewRedisCache(r.Addr(), "", "", 0, 5, 1800)
+	rcache, err := NewRedisCache(context.TODO(), "redis://"+r.Addr(), cachePrefix, limitsExpSec)
 	assert.NoError(t, err)
 
 	clock := utils.NewMockClock(1590105600)
@@ -473,9 +436,7 @@ func TestRedisCacheGetSetLimits(t *testing.T) {
 
 	ctx := context.TODO()
 
-	limitsExpSec := 1800
-
-	rcache, err := NewRedisCache(r.Addr(), "", "", 0, 5, limitsExpSec)
+	rcache, err := NewRedisCache(ctx, "redis://"+r.Addr(), cachePrefix, limitsExpSec)
 	assert.NoError(t, err)
 
 	res, err := rcache.GetLimits(ctx, "tenant-foo", "device-bar", IdTypeDevice)
@@ -537,9 +498,7 @@ func TestRedisCacheGetSetCheckInTime(t *testing.T) {
 
 	ctx := context.TODO()
 
-	limitsExpSec := 1800
-
-	rcache, err := NewRedisCache(r.Addr(), "", "", 0, 5, limitsExpSec)
+	rcache, err := NewRedisCache(ctx, "redis://"+r.Addr(), cachePrefix, limitsExpSec)
 	assert.NoError(t, err)
 
 	res, err := rcache.GetCheckInTime(ctx, "tenant-foo", "device-bar")
