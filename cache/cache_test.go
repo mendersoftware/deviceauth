@@ -55,8 +55,8 @@ func TestRedisCacheThrottleToken(t *testing.T) {
 	assert.Equal(t, "", tok)
 
 	//insert token
-	r.Set(rcache.KeyToken("tenant-foo", "device-bar", IdTypeDevice), "tokenstring")
-	r.SetTTL(rcache.KeyToken("tenant-foo", "device-bar", IdTypeDevice), time.Duration(10*time.Second))
+	r.Set(rcache.KeyToken("tenant-foo", "device-bar", IdTypeDevice, 0), "tokenstring")
+	r.SetTTL(rcache.KeyToken("tenant-foo", "device-bar", IdTypeDevice, 0), time.Duration(10*time.Second))
 
 	tok, err = rcache.Throttle(ctx,
 		"tokenstring",
@@ -100,7 +100,7 @@ func TestRedisCacheThrottleToken(t *testing.T) {
 
 	// for some reason, the cache finds a valid token with different contents
 	// and defensively rejects it
-	r.Set(rcache.KeyToken("tenant-foo", "device-bar", IdTypeDevice), "unknown")
+	r.Set(rcache.KeyToken("tenant-foo", "device-bar", IdTypeDevice, 0), "unknown")
 	tok, err = rcache.Throttle(ctx,
 		"tokenstring",
 		ratelimits.ApiLimits{},
@@ -133,7 +133,7 @@ func TestRedisCacheThrottleToken(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "tokenstr", tok)
 
-	r.SetTTL(rcache.KeyToken("tenant-foo", "device-bar", IdTypeDevice), time.Duration(10*time.Second))
+	r.SetTTL(rcache.KeyToken("tenant-foo", "device-bar", IdTypeDevice, 0), time.Duration(10*time.Second))
 	r.FastForward(time.Duration(11 * time.Second))
 
 	tok, err = rcache.Throttle(ctx,

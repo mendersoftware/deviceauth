@@ -1616,7 +1616,7 @@ func (d *DevAuth) DeleteTokens(
 		}
 		err = d.db.DeleteTokenByDevId(ctx, deviceOID)
 	} else {
-		if err := d.cacheFlush(ctx); err != nil {
+		if err := d.cacheFlush(ctx, tenantID); err != nil {
 			return errors.Wrapf(
 				err,
 				"failed to flush cache when cleaning tokens for tenant %v",
@@ -1639,12 +1639,12 @@ func (d *DevAuth) DeleteTokens(
 	return nil
 }
 
-func (d *DevAuth) cacheFlush(ctx context.Context) error {
+func (d *DevAuth) cacheFlush(ctx context.Context, tenantID string) error {
 	if d.cache == nil {
 		return nil
 	}
 
-	return d.cache.FlushDB(ctx)
+	return d.cache.SuspendTenant(ctx, tenantID)
 }
 
 func (d *DevAuth) GetTenantDeviceStatus(

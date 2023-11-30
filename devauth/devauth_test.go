@@ -3356,7 +3356,7 @@ func TestDeleteTokens(t *testing.T) {
 		tenantId string
 		deviceId string
 
-		cacheFlushErr error
+		cacheErr error
 
 		dbErrDeleteTokenById error
 		dbErrDeleteTokens    error
@@ -3389,9 +3389,9 @@ func TestDeleteTokens(t *testing.T) {
 			outErr:            errors.New("failed to delete tokens for tenant: foo, device id: : db error"),
 		},
 		"error(cache), all tenant's devs": {
-			tenantId:      "foo",
-			cacheFlushErr: errors.New("redis error"),
-			outErr:        errors.New("failed to flush cache when cleaning tokens for tenant foo: redis error"),
+			tenantId: "foo",
+			cacheErr: errors.New("redis error"),
+			outErr:   errors.New("failed to flush cache when cleaning tokens for tenant foo: redis error"),
 		},
 	}
 
@@ -3412,8 +3412,8 @@ func TestDeleteTokens(t *testing.T) {
 
 			c := &mcache.Cache{}
 			if tc.deviceId == "" {
-				c.On("FlushDB", ctxMatcher).
-					Return(tc.cacheFlushErr)
+				c.On("SuspendTenant", ctxMatcher, tc.tenantId).
+					Return(tc.cacheErr)
 			} else {
 				c.AssertNotCalled(t, "FlushDB")
 			}

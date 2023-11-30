@@ -86,20 +86,6 @@ func (_m *Cache) DeleteToken(ctx context.Context, tid string, id string, idtype 
 	return r0
 }
 
-// FlushDB provides a mock function with given fields: ctx
-func (_m *Cache) FlushDB(ctx context.Context) error {
-	ret := _m.Called(ctx)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context) error); ok {
-		r0 = rf(ctx)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // GetCheckInTime provides a mock function with given fields: ctx, tid, id
 func (_m *Cache) GetCheckInTime(ctx context.Context, tid string, id string) (*time.Time, error) {
 	ret := _m.Called(ctx, tid, id)
@@ -167,6 +153,20 @@ func (_m *Cache) GetLimits(ctx context.Context, tid string, id string, idtype st
 	}
 
 	return r0, r1
+}
+
+// SuspendTenant provides a mock function with given fields: ctx, tid
+func (_m *Cache) SuspendTenant(ctx context.Context, tid string) error {
+	ret := _m.Called(ctx, tid)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = rf(ctx, tid)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // Throttle provides a mock function with given fields: ctx, rawToken, l, tid, id, idtype, url, action
