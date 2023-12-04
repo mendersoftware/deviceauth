@@ -177,7 +177,7 @@ func (rl *RedisCache) Throttle(
 	var burstGet *redis.StringCmd
 	var burstSet *redis.StatusCmd
 
-	pipe := rl.c.TxPipeline()
+	pipe := rl.c.Pipeline()
 
 	version, err := rl.getTenantKeyVersion(ctx, tid)
 	if err != nil {
