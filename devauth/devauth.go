@@ -477,16 +477,16 @@ func (d *DevAuth) processPreAuthRequest(
 	currentStatus := dev.Status
 	if dev.Status == model.DevStatusAccepted {
 		deviceAlreadyAccepted = true
-	}
+	} else {
+		// auth set is ok for auto-accepting, check device limit
+		allow, err := d.canAcceptDevice(ctx)
+		if err != nil {
+			return nil, err
+		}
 
-	// auth set is ok for auto-accepting, check device limit
-	allow, err := d.canAcceptDevice(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	if !allow {
-		return nil, ErrMaxDeviceCountReached
+		if !allow {
+			return nil, ErrMaxDeviceCountReached
+		}
 	}
 
 	update := model.AuthSetUpdate{
