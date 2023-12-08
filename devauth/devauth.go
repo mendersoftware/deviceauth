@@ -488,6 +488,11 @@ func (d *DevAuth) processPreAuthRequest(
 		}
 	}
 
+	// Ensure that the old acceptable auth sets are rejected
+	if err := d.db.RejectAuthSetsForDevice(ctx, aset.DeviceId); err != nil &&
+		!errors.Is(err, store.ErrAuthSetNotFound) {
+		return nil, errors.Wrap(err, "failed to reject auth sets")
+	}
 	update := model.AuthSetUpdate{
 		Status: model.DevStatusAccepted,
 	}
