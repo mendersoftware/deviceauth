@@ -481,13 +481,13 @@ func (_m *DataStore) PutLimit(ctx context.Context, lim model.Limit) error {
 	return r0
 }
 
-// StoreMigrationVersion provides a mock function with given fields: ctx, version
-func (_m *DataStore) StoreMigrationVersion(ctx context.Context, version *migrate.Version) error {
-	ret := _m.Called(ctx, version)
+// RejectAuthSetsForDevice provides a mock function with given fields: ctx, deviceID
+func (_m *DataStore) RejectAuthSetsForDevice(ctx context.Context, deviceID string) error {
+	ret := _m.Called(ctx, deviceID)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *migrate.Version) error); ok {
-		r0 = rf(ctx, version)
+	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = rf(ctx, deviceID)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -495,13 +495,13 @@ func (_m *DataStore) StoreMigrationVersion(ctx context.Context, version *migrate
 	return r0
 }
 
-// UpdateAuthSet provides a mock function with given fields: ctx, filter, mod
-func (_m *DataStore) UpdateAuthSet(ctx context.Context, filter interface{}, mod model.AuthSetUpdate) error {
-	ret := _m.Called(ctx, filter, mod)
+// StoreMigrationVersion provides a mock function with given fields: ctx, version
+func (_m *DataStore) StoreMigrationVersion(ctx context.Context, version *migrate.Version) error {
+	ret := _m.Called(ctx, version)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, interface{}, model.AuthSetUpdate) error); ok {
-		r0 = rf(ctx, filter, mod)
+	if rf, ok := ret.Get(0).(func(context.Context, *migrate.Version) error); ok {
+		r0 = rf(ctx, version)
 	} else {
 		r0 = ret.Error(0)
 	}

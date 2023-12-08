@@ -29,7 +29,6 @@ import (
 	"github.com/mendersoftware/go-lib-micro/ratelimits"
 	"github.com/mendersoftware/go-lib-micro/requestid"
 	"github.com/pkg/errors"
-	"go.mongodb.org/mongo-driver/bson"
 
 	"github.com/mendersoftware/deviceauth/access"
 	"github.com/mendersoftware/deviceauth/cache"
@@ -1001,17 +1000,8 @@ func (d *DevAuth) setAuthSetStatus(
 	// if accepting an auth set
 	if status == model.DevStatusAccepted {
 		// reject all accepted auth sets for this device first
-		if err := d.db.UpdateAuthSet(ctx,
-			bson.M{
-				model.AuthSetKeyDeviceId: deviceID,
-				"$or": []bson.M{
-					{model.AuthSetKeyStatus: model.DevStatusAccepted},
-					{model.AuthSetKeyStatus: model.DevStatusPreauth},
-				},
-			},
-			model.AuthSetUpdate{
-				Status: model.DevStatusRejected,
-			}); err != nil && err != store.ErrAuthSetNotFound {
+		err := d.db.RejectAuthSetsForDevice(ctx, deviceID)
+		if err != nil && err != store.ErrAuthSetNotFound {
 			return errors.Wrap(err, "failed to reject auth sets")
 		}
 	}

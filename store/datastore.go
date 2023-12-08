@@ -98,9 +98,9 @@ type DataStore interface {
 
 	GetAuthSetsForDevice(ctx context.Context, devid string) ([]model.AuthSet, error)
 
-	// update matching AuthSets and set their fields to values in AuthSetUpdate
-	UpdateAuthSet(ctx context.Context, filter interface{}, mod model.AuthSetUpdate) error
-
+	// RejectAuthSetsForDevice updates the auth set status for all auth sets
+	// with status "accepted" or "preauthorized" to "rejected"
+	RejectAuthSetsForDevice(ctx context.Context, deviceID string) error
 	UpdateAuthSetById(ctx context.Context, authId string, mod model.AuthSetUpdate) error
 
 	// deletes all auth sets for device

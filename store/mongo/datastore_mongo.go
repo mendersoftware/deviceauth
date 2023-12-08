@@ -681,6 +681,36 @@ func (db *DataStoreMongo) GetAuthSetsForDevice(
 	return res, nil
 }
 
+func (db *DataStoreMongo) RejectAuthSetsForDevice(
+	ctx context.Context,
+	deviceID string,
+) error {
+	c := db.client.Database(DbName).Collection(DbAuthSetColl)
+	var tenantID string
+	if id := identity.FromContext(ctx); id != nil {
+		tenantID = id.Tenant
+	}
+
+	filter := bson.M{
+		model.AuthSetKeyDeviceId: deviceID,
+		model.AuthSetKeyStatus:   model.DevStatusAccepted,
+		dbFieldTenantID:          tenantID,
+	}
+	update := bson.M{
+		"$set": bson.M{
+			model.AuthSetKeyStatus: model.DevStatusRejected,
+		},
+	}
+
+	if res, err := c.UpdateMany(ctx, filter, update); err != nil {
+		return errors.Wrap(err, "failed to update auth set")
+	} else if res.MatchedCount == 0 {
+		return store.ErrAuthSetNotFound
+	}
+
+	return nil
+}
+
 func (db *DataStoreMongo) UpdateAuthSet(
 	ctx context.Context,
 	filter interface{},
