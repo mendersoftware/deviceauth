@@ -431,33 +431,11 @@ func (d *DevAuth) SubmitAuthRequest(ctx context.Context, r *model.AuthReq) (stri
 
 }
 
-func (d *DevAuth) processPreAuthRequest(
+func (d *DevAuth) handlePreAuthDevice(
 	ctx context.Context,
-	r *model.AuthReq,
+	aset *model.AuthSet,
 ) (*model.AuthSet, error) {
 	var deviceAlreadyAccepted bool
-
-	_, idDataSha256, err := parseIdData(r.IdData)
-	if err != nil {
-		return nil, MakeErrDevAuthBadRequest(err)
-	}
-
-	// authset exists?
-	aset, err := d.db.GetAuthSetByIdDataHashKey(ctx, idDataSha256, r.PubKey)
-	switch err {
-	case nil:
-		break
-	case store.ErrAuthSetNotFound:
-		return nil, nil
-	default:
-		return nil, errors.Wrap(err, "failed to fetch auth set")
-	}
-
-	// if authset status is not 'preauthorized', nothing to do
-	if aset.Status != model.DevStatusPreauth {
-		return nil, nil
-	}
-
 	// check the device status
 	// if the device status is accepted then do not trigger provisioning workflow
 	// this needs to be checked before changing authentication set status
@@ -535,6 +513,34 @@ func (d *DevAuth) processPreAuthRequest(
 		}
 	}
 	return aset, nil
+}
+
+func (d *DevAuth) processPreAuthRequest(
+	ctx context.Context,
+	r *model.AuthReq,
+) (*model.AuthSet, error) {
+
+	_, idDataSha256, err := parseIdData(r.IdData)
+	if err != nil {
+		return nil, MakeErrDevAuthBadRequest(err)
+	}
+
+	// authset exists?
+	aset, err := d.db.GetAuthSetByIdDataHashKey(ctx, idDataSha256, r.PubKey)
+	switch err {
+	case nil:
+		break
+	case store.ErrAuthSetNotFound:
+		return nil, nil
+	default:
+		return nil, errors.Wrap(err, "failed to fetch auth set")
+	}
+
+	// if authset status is not 'preauthorized', nothing to do
+	if aset.Status != model.DevStatusPreauth {
+		return nil, nil
+	}
+	return d.handlePreAuthDevice(ctx, aset)
 }
 
 func (d *DevAuth) updateDeviceStatus(
