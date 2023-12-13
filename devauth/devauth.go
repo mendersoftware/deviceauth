@@ -29,7 +29,6 @@ import (
 	"github.com/mendersoftware/go-lib-micro/ratelimits"
 	"github.com/mendersoftware/go-lib-micro/requestid"
 	"github.com/pkg/errors"
-	"go.mongodb.org/mongo-driver/bson"
 
 	"github.com/mendersoftware/deviceauth/access"
 	"github.com/mendersoftware/deviceauth/cache"
@@ -432,33 +431,11 @@ func (d *DevAuth) SubmitAuthRequest(ctx context.Context, r *model.AuthReq) (stri
 
 }
 
-func (d *DevAuth) processPreAuthRequest(
+func (d *DevAuth) handlePreAuthDevice(
 	ctx context.Context,
-	r *model.AuthReq,
+	aset *model.AuthSet,
 ) (*model.AuthSet, error) {
 	var deviceAlreadyAccepted bool
-
-	_, idDataSha256, err := parseIdData(r.IdData)
-	if err != nil {
-		return nil, MakeErrDevAuthBadRequest(err)
-	}
-
-	// authset exists?
-	aset, err := d.db.GetAuthSetByIdDataHashKey(ctx, idDataSha256, r.PubKey)
-	switch err {
-	case nil:
-		break
-	case store.ErrAuthSetNotFound:
-		return nil, nil
-	default:
-		return nil, errors.Wrap(err, "failed to fetch auth set")
-	}
-
-	// if authset status is not 'preauthorized', nothing to do
-	if aset.Status != model.DevStatusPreauth {
-		return nil, nil
-	}
-
 	// check the device status
 	// if the device status is accepted then do not trigger provisioning workflow
 	// this needs to be checked before changing authentication set status
@@ -477,18 +454,23 @@ func (d *DevAuth) processPreAuthRequest(
 	currentStatus := dev.Status
 	if dev.Status == model.DevStatusAccepted {
 		deviceAlreadyAccepted = true
+	} else {
+		// auth set is ok for auto-accepting, check device limit
+		allow, err := d.canAcceptDevice(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		if !allow {
+			return nil, ErrMaxDeviceCountReached
+		}
 	}
 
-	// auth set is ok for auto-accepting, check device limit
-	allow, err := d.canAcceptDevice(ctx)
-	if err != nil {
-		return nil, err
+	// Ensure that the old acceptable auth sets are rejected
+	if err := d.db.RejectAuthSetsForDevice(ctx, aset.DeviceId); err != nil &&
+		!errors.Is(err, store.ErrAuthSetNotFound) {
+		return nil, errors.Wrap(err, "failed to reject auth sets")
 	}
-
-	if !allow {
-		return nil, ErrMaxDeviceCountReached
-	}
-
 	update := model.AuthSetUpdate{
 		Status: model.DevStatusAccepted,
 	}
@@ -531,6 +513,34 @@ func (d *DevAuth) processPreAuthRequest(
 		}
 	}
 	return aset, nil
+}
+
+func (d *DevAuth) processPreAuthRequest(
+	ctx context.Context,
+	r *model.AuthReq,
+) (*model.AuthSet, error) {
+
+	_, idDataSha256, err := parseIdData(r.IdData)
+	if err != nil {
+		return nil, MakeErrDevAuthBadRequest(err)
+	}
+
+	// authset exists?
+	aset, err := d.db.GetAuthSetByIdDataHashKey(ctx, idDataSha256, r.PubKey)
+	switch err {
+	case nil:
+		break
+	case store.ErrAuthSetNotFound:
+		return nil, nil
+	default:
+		return nil, errors.Wrap(err, "failed to fetch auth set")
+	}
+
+	// if authset status is not 'preauthorized', nothing to do
+	if aset.Status != model.DevStatusPreauth {
+		return nil, nil
+	}
+	return d.handlePreAuthDevice(ctx, aset)
 }
 
 func (d *DevAuth) updateDeviceStatus(
@@ -1001,17 +1011,8 @@ func (d *DevAuth) setAuthSetStatus(
 	// if accepting an auth set
 	if status == model.DevStatusAccepted {
 		// reject all accepted auth sets for this device first
-		if err := d.db.UpdateAuthSet(ctx,
-			bson.M{
-				model.AuthSetKeyDeviceId: deviceID,
-				"$or": []bson.M{
-					{model.AuthSetKeyStatus: model.DevStatusAccepted},
-					{model.AuthSetKeyStatus: model.DevStatusPreauth},
-				},
-			},
-			model.AuthSetUpdate{
-				Status: model.DevStatusRejected,
-			}); err != nil && err != store.ErrAuthSetNotFound {
+		err := d.db.RejectAuthSetsForDevice(ctx, deviceID)
+		if err != nil && err != store.ErrAuthSetNotFound {
 			return errors.Wrap(err, "failed to reject auth sets")
 		}
 	}

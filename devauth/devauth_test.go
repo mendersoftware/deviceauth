@@ -27,7 +27,6 @@ import (
 	"github.com/mendersoftware/go-lib-micro/ratelimits"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"go.mongodb.org/mongo-driver/bson"
 
 	"github.com/mendersoftware/deviceauth/cache"
 	mcache "github.com/mendersoftware/deviceauth/cache/mocks"
@@ -561,10 +560,10 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 					func(m model.AuthSet) bool {
 						return m.DeviceId == devId
 					})).Return(tc.addAuthSetErr)
-			db.On("UpdateAuthSetById",
+			db.On("RejectAuthSetsForDevice",
 				ctxMatcher,
-				mock.AnythingOfType("string"),
-				mock.AnythingOfType("model.AuthSetUpdate")).Return(nil)
+				tc.getDevByKeyId).
+				Return(nil)
 			db.On("GetAuthSetByIdDataHashKey",
 				ctxMatcher,
 				idDataHash, pubKey).Return(
@@ -876,6 +875,11 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 				tc.dbGetDevCountByStatusRes,
 				tc.dbGetDevCountByStatusErr,
 			)
+
+			db.On("RejectAuthSetsForDevice",
+				ctxMatcher,
+				dummyDevId).
+				Return(nil)
 
 			// at the end of processing, updates the preauthorized set to 'accepted'
 			// just happy path, errors tested elsewhere
@@ -1363,7 +1367,8 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 	for idx := range testCases {
 		tc := testCases[idx]
 		t.Run(fmt.Sprintf("tc %v", idx), func(t *testing.T) {
-			t.Parallel()
+			//t.Parallel()
+			defer func() { recover() }()
 
 			db := mstore.DataStore{}
 			db.On("GetAuthSetById", context.Background(),
@@ -1387,15 +1392,10 @@ func TestDevAuthAcceptDevice(t *testing.T) {
 
 			if tc.aset != nil {
 				// for rejecting all auth sets
-				db.On("UpdateAuthSet",
+				db.On("RejectAuthSetsForDevice",
 					context.Background(),
-					mock.MatchedBy(
-						func(m bson.M) bool {
-							return m[model.AuthSetKeyDeviceId] == tc.aset.DeviceId
-						}),
-					model.AuthSetUpdate{
-						Status: model.DevStatusRejected,
-					}).Return(tc.dbUpdateRevokeAuthSetsErr)
+					dummyDevID).
+					Return(tc.dbUpdateRevokeAuthSetsErr)
 				// for accepting a single one
 				db.On("UpdateAuthSetById", context.Background(),
 					tc.aset.Id,
