@@ -404,7 +404,9 @@ func TestPropagateStatusesInventory(t *testing.T) {
 			db.On("StoreMigrationVersion",
 				mock.Anything,
 				v).Return(nil)
-			db.On("ListTenantsIds", mock.AnythingOfType("*context.emptyCtx")).Return(tc.tenantIds, tc.errDbTenants)
+			db.On("ListTenantsIds",
+				mock.MatchedBy(func(context.Context) bool { return true })).
+				Return(tc.tenantIds, tc.errDbTenants)
 
 			for j := range model.DevStatuses {
 				db.On("GetDevices",

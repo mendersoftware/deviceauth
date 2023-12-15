@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -30,7 +29,6 @@ import (
 	"github.com/ant0ine/go-json-rest/rest/test"
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/requestid"
-	"github.com/mendersoftware/go-lib-micro/requestlog"
 	"github.com/mendersoftware/go-lib-micro/rest_utils"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
@@ -69,21 +67,20 @@ func runTestRequest(t *testing.T, handler http.Handler, req *http.Request, code 
 }
 
 func makeMockApiHandler(t *testing.T, da devauth.App, db store.DataStore) http.Handler {
+	t.Helper()
 	handlers := NewDevAuthApiHandlers(da, db)
-	assert.NotNil(t, handlers)
+	if handlers == nil {
+		t.Error("Failed to initalize API handlers")
+		t.FailNow()
+	}
 
-	app, err := handlers.GetApp()
-	assert.NotNil(t, app)
-	assert.NoError(t, err)
+	apiHandler, err := handlers.Build()
+	if err != nil {
+		t.Errorf("Failed to build HTTP handlers: %s", err.Error())
+		t.FailNow()
+	}
 
-	api := rest.NewApi()
-	api.Use(
-		&requestlog.RequestLogMiddleware{},
-		&requestid.RequestIdMiddleware{},
-	)
-	api.SetApp(app)
-
-	return api.MakeHandler()
+	return apiHandler
 }
 
 // create an auth req that's optionally:
@@ -366,7 +363,7 @@ func TestApiDevAuthSubmitAuthReq(t *testing.T) {
 			recorded := runTestRequest(t, apih, tc.req, tc.code, tc.body)
 			if tc.code == http.StatusOK {
 				assert.Equal(t, "application/jwt",
-					recorded.Recorder.HeaderMap.Get("Content-Type"))
+					recorded.Recorder.Result().Header.Get("Content-Type"))
 			}
 		})
 	}
@@ -391,8 +388,8 @@ func NewJSONResponseIDChecker(status int, headers map[string]string, body interf
 }
 
 func (d *DevicePreauthReturnID) CheckHeaders(t *testing.T, recorded *test.Recorded) {
-	assert.Contains(t, recorded.Recorder.HeaderMap, "Location")
-	assert.Contains(t, recorded.Recorder.HeaderMap["Location"][0], "devices/")
+	assert.Contains(t, recorded.Recorder.Result().Header, "Location")
+	assert.Contains(t, recorded.Recorder.Result().Header["Location"][0], "devices/")
 }
 
 func TestApiV2DevAuthPreauthDevice(t *testing.T) {
@@ -957,6 +954,7 @@ func TestSearchDevices(t *testing.T) {
 				bytes.NewReader(body),
 			)
 			req.Header.Add("X-MEN-RequestID", "test")
+			req.Header.Set("Content-Type", "application/json")
 			return req
 		}(),
 		DeviceFilter: model.DeviceFilter{
@@ -983,13 +981,13 @@ func TestSearchDevices(t *testing.T) {
 		Name: "ok, single device url-encoded post-form",
 
 		Request: func() *http.Request {
-			body := []byte(`id=123456789012345678901234&status=accepted`)
+			body := []byte(`{"id":"123456789012345678901234","status":"accepted"}`)
 			req, _ := http.NewRequest("POST",
 				"http://localhost/api/management/v2/devauth/devices/search",
 				bytes.NewReader(body),
 			)
 			req.Header.Add("X-MEN-RequestID", "test")
-			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+			req.Header.Set("Content-Type", "application/json")
 			return req
 		}(),
 		DeviceFilter: model.DeviceFilter{
@@ -1017,13 +1015,13 @@ func TestSearchDevices(t *testing.T) {
 		Name: "error, bad paging params",
 
 		Request: func() *http.Request {
-			body := []byte(`id=123456789012345678901234&status=accepted`)
+			body := []byte(`{"id":"123456789012345678901234","status":"accepted"}`)
 			req, _ := http.NewRequest("POST",
 				"http://localhost/api/management/v2/devauth/devices/search?per_page=many",
 				bytes.NewReader(body),
 			)
 			req.Header.Add("X-MEN-RequestID", "test")
-			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+			req.Header.Set("Content-Type", "application/json")
 			return req
 		}(),
 
@@ -1041,13 +1039,13 @@ func TestSearchDevices(t *testing.T) {
 		Name: "error, bad Content-Type",
 
 		Request: func() *http.Request {
-			body := []byte(`id=123456789012345678901234&status=accepted`)
+			body := []byte(`id: 123456789012345678901234\nstatus: accepted`)
 			req, _ := http.NewRequest("POST",
 				"http://localhost/api/management/v2/devauth/devices/search",
 				bytes.NewReader(body),
 			)
 			req.Header.Add("X-MEN-RequestID", "test")
-			req.Header.Add("Content-Type", "application/yæml")
+			req.Header.Set("Content-Type", "application/yæml")
 			return req
 		}(),
 
@@ -1055,8 +1053,7 @@ func TestSearchDevices(t *testing.T) {
 		Headers:    http.Header{"X-Men-Requestid": []string{"test"}},
 		Body: func() []byte {
 			err := rest_utils.ApiError{
-				Err:   "Content-Type 'application/yæml' not supported",
-				ReqId: "test",
+				Err: "Bad Content-Type or charset, expected 'application/json'",
 			}
 			b, _ := json.Marshal(err)
 			return b
@@ -1071,7 +1068,7 @@ func TestSearchDevices(t *testing.T) {
 				bytes.NewReader(body),
 			)
 			req.Header.Add("X-MEN-RequestID", "test")
-			req.Header.Add("Content-Type", "application/json")
+			req.Header.Set("Content-Type", "application/json")
 			return req
 		}(),
 
@@ -1082,56 +1079,6 @@ func TestSearchDevices(t *testing.T) {
 				Err: "api: malformed request body: " +
 					"invalid character '{' looking for " +
 					"beginning of object key string",
-				ReqId: "test",
-			}
-			b, _ := json.Marshal(err)
-			return b
-		}(),
-	}, {
-		Name: "error, bad url form",
-
-		Request: func() *http.Request {
-			body := []byte(`id=%%%%%%`)
-			req, _ := http.NewRequest("POST",
-				"http://localhost/api/management/v2/devauth/devices/search",
-				bytes.NewReader(body),
-			)
-			req.Header.Add("X-MEN-RequestID", "test")
-			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-			return req
-		}(),
-
-		StatusCode: http.StatusBadRequest,
-		Headers:    http.Header{"X-Men-Requestid": []string{"test"}},
-		Body: func() []byte {
-			err := rest_utils.ApiError{
-				Err:   "api: malformed query parameters: invalid URL escape \"%%%\"",
-				ReqId: "test",
-			}
-			b, _ := json.Marshal(err)
-			return b
-		}(),
-	}, {
-		Name: "error, bad form parameters",
-
-		Request: func() *http.Request {
-			body := []byte(`status=vettiche`)
-			req, _ := http.NewRequest("POST",
-				"http://localhost/api/management/v2/devauth/devices/search",
-				bytes.NewReader(body),
-			)
-			req.Header.Add("X-MEN-RequestID", "test")
-			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-			return req
-		}(),
-
-		StatusCode: http.StatusBadRequest,
-		Headers:    http.Header{"X-Men-Requestid": []string{"test"}},
-		Body: func() []byte {
-			err := rest_utils.ApiError{
-				Err: "filter status must be one of: " +
-					"accepted, pending, rejected, " +
-					"preauthorized or noauth",
 				ReqId: "test",
 			}
 			b, _ := json.Marshal(err)
@@ -1163,7 +1110,7 @@ func TestSearchDevices(t *testing.T) {
 					}
 				}
 			}
-			assert.Equal(t, w.Body.String(), string(tc.Body))
+			assert.Equal(t, string(tc.Body), w.Body.String())
 		})
 	}
 }
@@ -2083,17 +2030,6 @@ func TestApiDevAuthGetTenantDeviceCount(t *testing.T) {
 	}
 }
 
-func mockAuthSets(num int) []model.DevAdmAuthSet {
-	var sets []model.DevAdmAuthSet
-	for i := 0; i < num; i++ {
-		sets = append(sets, model.DevAdmAuthSet{
-			Id:       strconv.Itoa(i),
-			DeviceId: strconv.Itoa(i),
-		})
-	}
-	return sets
-}
-
 func ExtractHeader(hdr, val string, r *test.Recorded) string {
 	rec := r.Recorder
 	for _, v := range rec.Header()[hdr] {
@@ -2103,15 +2039,6 @@ func ExtractHeader(hdr, val string, r *test.Recorded) string {
 	}
 
 	return ""
-}
-
-func toJsonString(t *testing.T, d interface{}) string {
-	out, err := json.Marshal(d)
-	if err != nil {
-		t.FailNow()
-	}
-
-	return string(out)
 }
 
 func TestApiGetTenantDevicesV2(t *testing.T) {

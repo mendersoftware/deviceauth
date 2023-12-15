@@ -163,7 +163,7 @@ func TestAutogenOptionHeaders(t *testing.T) {
 		rtest.MakeSimpleRequest(http.MethodOptions,
 			"http://1.2.3.4/test", nil))
 
-	allowmeth := rec.Recorder.HeaderMap[http.CanonicalHeaderKey("Allow")]
+	allowmeth := rec.Recorder.Result().Header[http.CanonicalHeaderKey("Allow")]
 
 	// expecting only 2 allowed methods (should OPTIONS be
 	// included in Allow too?)

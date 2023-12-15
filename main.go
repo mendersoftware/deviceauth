@@ -55,10 +55,6 @@ func doMain(args []string) {
 			Destination: &configPath,
 		},
 		cli.BoolFlag{
-			Name:  "dev",
-			Usage: "Use development setup",
-		},
-		cli.BoolFlag{
 			Name:        "debug",
 			Usage:       "Enable debug logging",
 			Destination: &debug,
@@ -217,14 +213,7 @@ func doMain(args []string) {
 }
 
 func cmdServer(args *cli.Context) error {
-	devSetup := args.GlobalBool("dev")
-
 	l := log.New(log.Ctx{})
-
-	if devSetup {
-		l.Infof("setting up development configuration")
-		config.Config.Set(dconfig.SettingMiddleware, EnvDev)
-	}
 
 	db, err := mongo.NewDataStoreMongo(makeDataStoreConfig())
 	if err != nil {
