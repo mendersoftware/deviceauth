@@ -271,8 +271,8 @@ func (d *DevAuthApiHandlers) SubmitAuthRequestHandler(w rest.ResponseWriter, r *
 			)
 			return
 		}
-		_, _ = w.(http.ResponseWriter).Write([]byte(token))
 		w.Header().Set("Content-Type", "application/jwt")
+		_, _ = w.(http.ResponseWriter).Write([]byte(token))
 		return
 	case devauth.ErrDevIdAuthIdMismatch, devauth.ErrMaxDeviceCountReached:
 		// error is always set to unauthorized, client does not need to
