@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM golang:1.20.4-alpine3.16 as builder
+FROM --platform=$BUILDPLATFORM golang:1.21.5-alpine3.19 as builder
 ARG TARGETARCH
 WORKDIR /go/src/github.com/mendersoftware/deviceauth
 RUN mkdir -p /etc_extra
