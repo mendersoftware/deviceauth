@@ -9,7 +9,7 @@ require (
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/golang-jwt/jwt/v4 v4.5.0
 	github.com/google/uuid v1.5.0
-	github.com/mendersoftware/go-lib-micro v0.0.0-20231127092909-9e088ac77669
+	github.com/mendersoftware/go-lib-micro v0.0.0-20231212090330-dbd92a22bbee
 	github.com/pkg/errors v0.9.1
 	github.com/redis/go-redis/v9 v9.3.0
 	github.com/stretchr/testify v1.8.4
