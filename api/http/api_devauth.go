@@ -21,9 +21,12 @@ import (
 	"time"
 
 	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/mendersoftware/go-lib-micro/accesslog"
 	ctxhttpheader "github.com/mendersoftware/go-lib-micro/context/httpheader"
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/log"
+	"github.com/mendersoftware/go-lib-micro/requestid"
+	"github.com/mendersoftware/go-lib-micro/requestlog"
 	"github.com/mendersoftware/go-lib-micro/rest_utils"
 	"github.com/pkg/errors"
 
@@ -64,6 +67,10 @@ const (
 	HdrAuthReqSign = "X-MEN-Signature"
 )
 
+func init() {
+	rest.ErrorFieldName = "error"
+}
+
 const (
 	defaultTimeout = time.Second * 5
 )
@@ -89,13 +96,26 @@ func NewDevAuthApiHandlers(devAuth devauth.App, db store.DataStore) ApiHandler {
 	}
 }
 
-func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
-	routes := []*rest.Route{
+func wrapMiddleware(middleware rest.Middleware, routes ...*rest.Route) []*rest.Route {
+	for _, route := range routes {
+		route.Func = middleware.MiddlewareFunc(route.Func)
+	}
+	return routes
+}
+
+func (d *DevAuthApiHandlers) Build() (http.Handler, error) {
+	identityMiddleware := &identity.IdentityMiddleware{
+		UpdateLogger: true,
+	}
+	internalRoutes := []*rest.Route{
 		rest.Get(uriAlive, d.AliveHandler),
 		rest.Get(uriHealth, d.HealthCheckHandler),
-		rest.Post(uriAuthReqs, d.SubmitAuthRequestHandler),
-		rest.Get(uriTokenVerify, d.VerifyTokenHandler),
-		rest.Post(uriTokenVerify, d.VerifyTokenHandler),
+		rest.Get(uriTokenVerify, identityMiddleware.MiddlewareFunc(
+			d.VerifyTokenHandler,
+		)),
+		rest.Post(uriTokenVerify, identityMiddleware.MiddlewareFunc(
+			d.VerifyTokenHandler,
+		)),
 		rest.Delete(uriTokens, d.DeleteTokensHandler),
 
 		rest.Put(uriTenantLimit, d.PutTenantLimitHandler),
@@ -107,6 +127,10 @@ func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
 		rest.Get(uriTenantDevices, d.GetTenantDevicesHandler),
 		rest.Get(uriTenantDevicesCount, d.GetTenantDevicesCountHandler),
 		rest.Delete(uriTenantDevice, d.DeleteDeviceHandler),
+	}
+	publicRoutes := []*rest.Route{
+		// Devices API
+		rest.Post(uriAuthReqs, d.SubmitAuthRequestHandler),
 
 		// API v2
 		rest.Get(v2uriDevicesCount, d.GetDevicesCountHandler),
@@ -121,6 +145,9 @@ func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
 		rest.Delete(v2uriToken, d.DeleteTokenHandler),
 		rest.Get(v2uriDevicesLimit, d.GetLimitHandler),
 	}
+	publicRoutes = wrapMiddleware(identityMiddleware, publicRoutes...)
+
+	routes := append(publicRoutes, internalRoutes...)
 
 	app, err := rest.MakeRouter(
 		// augment routes with OPTIONS handler
@@ -130,7 +157,29 @@ func (d *DevAuthApiHandlers) GetApp() (rest.App, error) {
 		return nil, errors.Wrap(err, "failed to create router")
 	}
 
-	return app, nil
+	api := rest.NewApi()
+	api.SetApp(app)
+	api.Use(
+		&requestlog.RequestLogMiddleware{},
+		&requestid.RequestIdMiddleware{},
+		&accesslog.AccessLogMiddleware{
+			Format: accesslog.SimpleLogFormat,
+			DisableLog: func(statusCode int, r *rest.Request) bool {
+				if statusCode < 300 &&
+					(r.Request.URL.Path == uriAlive ||
+						r.Request.URL.Path == uriHealth) {
+					return true
+				}
+				return false
+			},
+		},
+		// verifies the request Content-Type header
+		// The expected Content-Type is 'application/json'
+		// if the content is non-null
+		&rest.ContentTypeCheckerMiddleware{},
+	)
+
+	return api.MakeHandler(), nil
 }
 
 func (d *DevAuthApiHandlers) AliveHandler(w rest.ResponseWriter, r *rest.Request) {
@@ -222,8 +271,8 @@ func (d *DevAuthApiHandlers) SubmitAuthRequestHandler(w rest.ResponseWriter, r *
 			)
 			return
 		}
-		_, _ = w.(http.ResponseWriter).Write([]byte(token))
 		w.Header().Set("Content-Type", "application/jwt")
+		_, _ = w.(http.ResponseWriter).Write([]byte(token))
 		return
 	case devauth.ErrDevIdAuthIdMismatch, devauth.ErrMaxDeviceCountReached:
 		// error is always set to unauthorized, client does not need to

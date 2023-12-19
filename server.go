@@ -19,7 +19,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/mendersoftware/go-lib-micro/config"
 	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/pkg/errors"
@@ -33,21 +32,6 @@ import (
 	"github.com/mendersoftware/deviceauth/jwt"
 	"github.com/mendersoftware/deviceauth/store/mongo"
 )
-
-func SetupAPI(stacktype string) (*rest.Api, error) {
-	api := rest.NewApi()
-	if err := SetupMiddleware(api, stacktype); err != nil {
-		return nil, errors.Wrap(err, "failed to setup middleware")
-	}
-
-	//this will override the framework's error resp to the desired one:
-	// {"error": "msg"}
-	// instead of:
-	// {"Error": "msg"}
-	rest.ErrorFieldName = "error"
-
-	return api, nil
-}
 
 func RunServer(c config.Reader) error {
 	var tenantadmAddr = c.GetString(dconfig.SettingTenantAdmAddr)
@@ -134,21 +118,15 @@ func RunServer(c config.Reader) error {
 		devauth = devauth.WithCache(cache)
 	}
 
-	api, err := SetupAPI(c.GetString(dconfig.SettingMiddleware))
-	if err != nil {
-		return errors.Wrap(err, "API setup failed")
-	}
-
 	devauthapi := api_http.NewDevAuthApiHandlers(devauth, db)
 
-	apph, err := devauthapi.GetApp()
+	apiHandler, err := devauthapi.Build()
 	if err != nil {
 		return errors.Wrap(err, "device authentication API handlers setup failed")
 	}
-	api.SetApp(apph)
 
 	addr := c.GetString(dconfig.SettingListen)
 	l.Printf("listening on %s", addr)
 
-	return http.ListenAndServe(addr, api.MakeHandler())
+	return http.ListenAndServe(addr, apiHandler)
 }
