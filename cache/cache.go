@@ -150,6 +150,7 @@ func NewRedisCache(
 	return &RedisCache{
 		c:               c,
 		LimitsExpireSec: limitsExpireSec,
+		prefix:          prefix,
 		clock:           utils.NewClock(),
 	}, err
 }
