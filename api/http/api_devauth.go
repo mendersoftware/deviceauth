@@ -167,7 +167,8 @@ func (d *DevAuthApiHandlers) Build() (http.Handler, error) {
 			DisableLog: func(statusCode int, r *rest.Request) bool {
 				if statusCode < 300 &&
 					(r.Request.URL.Path == uriAlive ||
-						r.Request.URL.Path == uriHealth) {
+						r.Request.URL.Path == uriHealth ||
+						r.Request.URL.Path == uriTokenVerify) {
 					return true
 				}
 				return false
