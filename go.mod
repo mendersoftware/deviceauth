@@ -11,10 +11,10 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/mendersoftware/go-lib-micro v0.0.0-20240202092122-d43b50b285b9
 	github.com/pkg/errors v0.9.1
-	github.com/redis/go-redis/v9 v9.4.0
+	github.com/redis/go-redis/v9 v9.5.1
 	github.com/stretchr/testify v1.8.4
 	github.com/urfave/cli v1.22.14
-	go.mongodb.org/mongo-driver v1.13.1
+	go.mongodb.org/mongo-driver v1.14.0
 )
 
 require (
