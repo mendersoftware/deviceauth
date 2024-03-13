@@ -25,6 +25,7 @@ import (
 )
 
 type preAuthReq struct {
+	Force  bool                   `json:"force" valid:"-"`
 	IdData map[string]interface{} `json:"identity_data" valid:"-"`
 	PubKey string                 `json:"pubkey" valid:"required"`
 }
@@ -85,6 +86,7 @@ func (r *preAuthReq) getDbModel() (*model.PreAuthReq, error) {
 	asId := uuid.New()
 
 	return &model.PreAuthReq{
+		Force:     r.Force,
 		DeviceId:  dId.String(),
 		AuthSetId: asId.String(),
 		IdData:    string(enc),
