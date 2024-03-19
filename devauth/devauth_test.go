@@ -566,7 +566,9 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 				Return(nil)
 			db.On("GetAuthSetByIdDataHashKey",
 				ctxMatcher,
-				idDataHash, pubKey).Return(
+				idDataHash,
+				pubKey,
+			).Return(
 				func(ctx context.Context, idDataHash []byte, key string) *model.AuthSet {
 					if tc.getAuthSetErr == nil {
 						return &model.AuthSet{
@@ -580,7 +582,25 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 					return nil
 				},
 				tc.getAuthSetErr)
-
+			db.On("GetAuthSetByIdDataHashKeyByStatus",
+				ctxMatcher,
+				idDataHash,
+				pubKey,
+				model.DevStatusPreauth,
+			).Return(
+				func(ctx context.Context, idDataHash []byte, key string, status string) *model.AuthSet {
+					if tc.getAuthSetErr == nil {
+						return &model.AuthSet{
+							Id:           authId,
+							DeviceId:     tc.getDevByKeyId,
+							IdDataSha256: idDataHash,
+							PubKey:       key,
+							Status:       tc.devStatus,
+						}
+					}
+					return nil
+				},
+				tc.getAuthSetErr)
 			db.On("AddToken",
 				ctxMatcher,
 				mock.AnythingOfType("*jwt.Token")).Return(nil)
@@ -817,8 +837,8 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 				Id:     dummyDevId,
 				Status: model.DevStatusAccepted,
 			},
-			coSubmitProvisionDeviceJobErr: errors.New("workflows shouldn't be called"),
-			res:                           dummyToken,
+			//coSubmitProvisionDeviceJobErr: errors.New("workflows shouldn't be called"), // MEN-6961: we accept preauth at all times
+			res: "dummytoken",
 		},
 		{
 			desc: "error: cannot get device status",
@@ -849,10 +869,11 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 			db := mstore.DataStore{}
 
 			// get the auth set to check if preauthorized
-			db.On("GetAuthSetByIdDataHashKey",
+			db.On("GetAuthSetByIdDataHashKeyByStatus",
 				ctxMatcher,
 				idDataSha256,
 				inReq.PubKey,
+				model.DevStatusPreauth,
 			).Return(
 				tc.dbGetAuthSetByDataKeyRes,
 				tc.dbGetAuthSetByDataKeyErr,

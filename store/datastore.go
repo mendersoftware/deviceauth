@@ -94,6 +94,13 @@ type DataStore interface {
 		key string,
 	) (*model.AuthSet, error)
 
+	GetAuthSetByIdDataHashKeyByStatus(
+		ctx context.Context,
+		idDataHash []byte,
+		key string,
+		status string,
+	) (*model.AuthSet, error)
+
 	GetAuthSetById(ctx context.Context, id string) (*model.AuthSet, error)
 
 	GetAuthSetsForDevice(ctx context.Context, devid string) ([]model.AuthSet, error)

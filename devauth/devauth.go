@@ -452,9 +452,7 @@ func (d *DevAuth) handlePreAuthDevice(
 	}
 
 	currentStatus := dev.Status
-	if dev.Status == model.DevStatusAccepted {
-		deviceAlreadyAccepted = true
-	} else {
+	if dev.Status != model.DevStatusAccepted {
 		// auth set is ok for auto-accepting, check device limit
 		allow, err := d.canAcceptDevice(ctx)
 		if err != nil {
@@ -526,7 +524,12 @@ func (d *DevAuth) processPreAuthRequest(
 	}
 
 	// authset exists?
-	aset, err := d.db.GetAuthSetByIdDataHashKey(ctx, idDataSha256, r.PubKey)
+	aset, err := d.db.GetAuthSetByIdDataHashKeyByStatus(
+		ctx,
+		idDataSha256,
+		r.PubKey,
+		model.DevStatusPreauth,
+	)
 	switch err {
 	case nil:
 		break
@@ -1117,6 +1120,25 @@ func (d *DevAuth) PreauthorizeDevice(
 		if err != nil {
 			l.Error("failed to find device but could not preauthorize either")
 			return nil, errors.New("failed to preauthorize device")
+		}
+		// if device exists we handle force: just add the authset, if force is in req
+		if req.Force {
+			// record authentication request
+			authset := model.AuthSet{
+				Id:           req.AuthSetId,
+				IdData:       req.IdData,
+				IdDataStruct: idDataStruct,
+				IdDataSha256: idDataSha256,
+				PubKey:       req.PubKey,
+				DeviceId:     dev.Id,
+				Status:       model.DevStatusPreauth,
+				Timestamp:    uto.TimePtr(time.Now()),
+			}
+			err = d.db.AddAuthSet(ctx, authset)
+			if err != nil {
+				return nil, err
+			}
+			return dev, nil
 		}
 		return dev, ErrDeviceExists
 	default:

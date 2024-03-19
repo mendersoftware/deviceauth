@@ -635,6 +635,40 @@ func (db *DataStoreMongo) GetAuthSetByIdDataHashKey(
 	return &res, nil
 }
 
+func (db *DataStoreMongo) GetAuthSetByIdDataHashKeyByStatus(
+	ctx context.Context,
+	idDataHash []byte,
+	key string,
+	status string,
+) (*model.AuthSet, error) {
+	c := db.client.Database(DbName).Collection(DbAuthSetColl)
+
+	id := identity.FromContext(ctx)
+	tenantId := ""
+	if id != nil {
+		tenantId = id.Tenant
+	}
+
+	filter := model.AuthSet{
+		IdDataSha256: idDataHash,
+		PubKey:       key,
+		TenantID:     tenantId,
+		Status:       status,
+	}
+	res := model.AuthSet{}
+
+	err := c.FindOne(ctx, filter).Decode(&res)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, store.ErrAuthSetNotFound
+		} else {
+			return nil, errors.Wrap(err, "failed to fetch authentication set")
+		}
+	}
+
+	return &res, nil
+}
+
 func (db *DataStoreMongo) GetAuthSetById(
 	ctx context.Context,
 	auth_id string,

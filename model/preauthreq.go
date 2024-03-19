@@ -25,6 +25,7 @@ import (
 )
 
 type PreAuthReq struct {
+	Force     bool   `json:"force" bson:"force"`
 	DeviceId  string `json:"device_id" valid:"required" bson:"device_id"`
 	AuthSetId string `json:"auth_set_id" valid:"required" bson:"auth_set_id"`
 	IdData    string `json:"id_data" valid:"required" bson:"id_data"`

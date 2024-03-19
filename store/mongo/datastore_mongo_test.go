@@ -1297,6 +1297,7 @@ func TestStoreAuthSet(t *testing.T) {
 		DeviceId:     "1",
 		Timestamp:    uto.TimePtr(time.Now()),
 		TenantID:     tenant,
+		Status:       model.DevStatusPreauth,
 	}
 	err := db.AddAuthSet(ctx, asin)
 	assert.NoError(t, err)
@@ -1322,6 +1323,14 @@ func TestStoreAuthSet(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, as)
 	assert.WithinDuration(t, time.Now(), uto.Time(as.Timestamp), time.Second)
+
+	as, err = db.GetAuthSetByIdDataHashKeyByStatus(ctx, getIdDataHash("foobar"), "pubkey-1", model.DevStatusPreauth)
+	assert.NoError(t, err)
+	assert.NotNil(t, as)
+	assert.WithinDuration(t, time.Now(), uto.Time(as.Timestamp), time.Second)
+
+	as, err = db.GetAuthSetByIdDataHashKeyByStatus(ctx, getIdDataHash("foobar"), "pubkey-1", model.DevStatusAccepted)
+	assert.Error(t, err)
 
 	// clear timestamp field
 	asin.Timestamp = nil

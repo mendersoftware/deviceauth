@@ -559,6 +559,11 @@ definitions:
   PreAuthSet:
     type: object
     properties:
+      force:
+        type: boolean
+        description: >
+          Indicates that despite the device having any authsets the preauthorization
+          should proceed.
       identity_data:
         $ref: "#/definitions/IdentityData"
       pubkey:
