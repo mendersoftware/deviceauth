@@ -1,4 +1,4 @@
-// Copyright 2023 Northern.tech AS
+// Copyright 2024 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -224,7 +224,8 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 			getDevByIdKey: pubKey,
 			getDevByKeyId: devId,
 
-			updateDeviceStatus: true,
+			updateDeviceStatus:    true,
+			updateDeviceInventory: true,
 
 			res: "dummytoken",
 		},
@@ -469,8 +470,9 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 			getDevByIdKey: pubKey,
 			getDevByKeyId: devId,
 
-			tenantVerify:       true,
-			updateDeviceStatus: true,
+			tenantVerify:          true,
+			updateDeviceStatus:    true,
+			updateDeviceInventory: true,
 
 			devStatus: model.DevStatusAccepted,
 
@@ -500,8 +502,9 @@ func TestDevAuthSubmitAuthRequest(t *testing.T) {
 			getDevByIdKey: pubKey,
 			getDevByKeyId: devId,
 
-			tenantVerify:       true,
-			updateDeviceStatus: true,
+			tenantVerify:          true,
+			updateDeviceStatus:    true,
+			updateDeviceInventory: true,
 
 			devStatus: model.DevStatusAccepted,
 
@@ -948,6 +951,9 @@ func TestDevAuthSubmitAuthRequestPreauth(t *testing.T) {
 				Return(tc.coSubmitProvisionDeviceJobErr)
 			co.On("SubmitUpdateDeviceStatusJob", ctxMatcher,
 				mock.AnythingOfType("orchestrator.UpdateDeviceStatusReq")).
+				Return(nil)
+			co.On("SubmitUpdateDeviceInventoryJob", ctxMatcher,
+				mock.AnythingOfType("orchestrator.UpdateDeviceInventoryReq")).
 				Return(nil)
 
 			// setup devauth
@@ -2028,8 +2034,12 @@ func TestDevAuthVerifyToken(t *testing.T) {
 
 			db := &mstore.DataStore{}
 			ja := &mjwt.Handler{}
+			co := &morchestrator.ClientRunner{}
+			co.On("SubmitUpdateDeviceInventoryJob", context.Background(),
+				mock.AnythingOfType("orchestrator.UpdateDeviceInventoryReq")).
+				Return(nil)
 
-			devauth := NewDevAuth(db, nil, ja, Config{})
+			devauth := NewDevAuth(db, co, ja, Config{})
 			if tc.jwtHandlerFallback {
 				jaFallback := &mjwt.Handler{}
 				jaFallback.On("Validate", tc.tokenString).Return(tc.fallbackValidateErr)
@@ -2412,13 +2422,18 @@ func TestDevAuthVerifyTokenWithCache(t *testing.T) {
 			db := &mstore.DataStore{}
 			ja := &mjwt.Handler{}
 			c := &mcache.Cache{}
+			co := &morchestrator.ClientRunner{}
 
-			devauth := NewDevAuth(db, nil, ja, Config{})
+			devauth := NewDevAuth(db, co, ja, Config{})
 			devauth = devauth.WithCache(c)
 			tclient := &mtenant.ClientRunner{}
 
 			devauth = devauth.WithTenantVerification(tclient)
 			devauth = devauth.WithClock(mclock)
+
+			co.On("SubmitUpdateDeviceInventoryJob", ctx,
+				mock.AnythingOfType("orchestrator.UpdateDeviceInventoryReq")).
+				Return(nil)
 
 			ja.On("FromJWT", tc.tokenString).Return(
 				func(s string) *jwt.Token {

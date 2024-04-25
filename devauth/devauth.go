@@ -1,4 +1,4 @@
-// Copyright 2023 Northern.tech AS
+// Copyright 2024 Northern.tech AS
 //
 //	Licensed under the Apache License, Version 2.0 (the "License");
 //	you may not use this file except in compliance with the License.
@@ -45,6 +45,7 @@ import (
 const (
 	MsgErrDevAuthUnauthorized = "dev auth: unauthorized"
 	MsgErrDevAuthBadRequest   = "dev auth: bad request"
+	InventoryScopeSystem      = "system"
 )
 
 var (
@@ -192,10 +193,9 @@ func (d *DevAuth) setDeviceIdentity(ctx context.Context, dev *model.Device, tena
 			continue
 		}
 		attribute := model.DeviceAttribute{
-			Name:        name,
-			Description: nil,
-			Value:       value,
-			Scope:       "identity",
+			Name:  name,
+			Value: value,
+			Scope: "identity",
 		}
 		attributes[i] = attribute
 		i++
@@ -1741,6 +1741,14 @@ func (d *DevAuth) updateCheckInTime(
 				err = errors.Wrap(err, "reindex reporting job error")
 				return
 			}
+		} else {
+			// update check-in time in inventory
+			if err := d.syncCheckInTime(ctx, checkInTime, deviceId, tenantId); err != nil {
+				log.FromContext(ctx).Errorf(
+					"failed to synchronize device check-in time with inventory: device %s: %s",
+					deviceId, err.Error(),
+				)
+			}
 		}
 		// dump cached value to database
 		if d.cache != nil {
@@ -1753,4 +1761,36 @@ func (d *DevAuth) updateCheckInTime(
 			}
 		}
 	}
+}
+
+func (d *DevAuth) syncCheckInTime(
+	ctx context.Context,
+	checkInTime *time.Time,
+	deviceId string,
+	tenantId string,
+) error {
+	attributes := []model.DeviceAttribute{
+		{
+			Name:        "check_in_time",
+			Description: nil,
+			Value:       checkInTime,
+			Scope:       InventoryScopeSystem,
+		},
+	}
+	attrJson, err := json.Marshal(attributes)
+	if err != nil {
+		return errors.New("internal error: cannot marshal attributes into json")
+	}
+	if err := d.cOrch.SubmitUpdateDeviceInventoryJob(
+		ctx,
+		orchestrator.UpdateDeviceInventoryReq{
+			RequestId:  requestid.FromContext(ctx),
+			TenantId:   tenantId,
+			DeviceId:   deviceId,
+			Scope:      InventoryScopeSystem,
+			Attributes: string(attrJson),
+		}); err != nil {
+		return errors.Wrap(err, "failed to start device inventory update job")
+	}
+	return nil
 }
