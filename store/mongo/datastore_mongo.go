@@ -579,22 +579,61 @@ func (db *DataStoreMongo) MigrateTenant(ctx context.Context, database, version s
 	return nil
 }
 
-func (db *DataStoreMongo) AddAuthSet(ctx context.Context, set model.AuthSet) error {
-	c := db.client.Database(DbName).Collection(DbAuthSetColl)
-
-	if set.Id == "" {
+func fillAuthSet(ctx context.Context, authSet *model.AuthSet) {
+	if authSet.Id == "" {
 		uid := oid.NewUUIDv4()
-		set.Id = uid.String()
+		authSet.Id = uid.String()
 	}
 	id := identity.FromContext(ctx)
 	tenantId := ""
 	if id != nil {
 		tenantId = id.Tenant
 	}
-	set.TenantID = tenantId
+	authSet.TenantID = tenantId
+	if authSet.Timestamp == nil {
+		ts := time.Now()
+		authSet.Timestamp = &ts
+	}
+}
+
+func (db *DataStoreMongo) AddAuthSet(ctx context.Context, set model.AuthSet) error {
+	c := db.client.Database(DbName).Collection(DbAuthSetColl)
+	fillAuthSet(ctx, &set)
 
 	if _, err := c.InsertOne(ctx, set); err != nil {
-		if strings.Contains(err.Error(), "duplicate key error") {
+		if mongo.IsDuplicateKeyError(err) {
+			return store.ErrObjectExists
+		}
+		return errors.Wrap(err, "failed to store device")
+	}
+
+	return nil
+}
+
+// UpsertAuthSetStatus inserts a new auth set and if it exists, ensures the
+// AuthSet.Status matches the one in authSet.
+func (db *DataStoreMongo) UpsertAuthSetStatus(ctx context.Context, authSet *model.AuthSet) error {
+	c := db.client.Database(DbName).Collection(DbAuthSetColl)
+
+	fillAuthSet(ctx, authSet)
+
+	fltr := bson.D{
+		{Key: dbFieldTenantID, Value: authSet.TenantID},
+		{Key: dbFieldIDDataSha, Value: authSet.IdDataSha256},
+		{Key: dbFieldPubKey, Value: authSet.PubKey},
+	}
+	setOnInsert := *authSet
+	setOnInsert.Status = ""
+
+	update := bson.D{
+		{Key: "$setOnInsert", Value: setOnInsert},
+		{Key: "$set", Value: bson.D{
+			{Key: dbFieldStatus, Value: authSet.Status},
+		}},
+	}
+	_, err := c.UpdateOne(ctx, fltr, update, mopts.Update().SetUpsert(true))
+	if err != nil {
+		if mongo.IsDuplicateKeyError(err) {
 			return store.ErrObjectExists
 		}
 		return errors.Wrap(err, "failed to store device")

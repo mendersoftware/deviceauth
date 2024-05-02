@@ -87,6 +87,7 @@ type DataStore interface {
 	DeleteDevice(ctx context.Context, id string) error
 
 	AddAuthSet(ctx context.Context, set model.AuthSet) error
+	UpsertAuthSetStatus(ctx context.Context, authSet *model.AuthSet) error
 
 	GetAuthSetByIdDataHashKey(
 		ctx context.Context,
