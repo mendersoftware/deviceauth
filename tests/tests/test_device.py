@@ -313,40 +313,6 @@ class TestDevice:
             TestDevice.verify_device_count(management_api, "noauth", 0)
 
 
-class TestDeviceEnterprise:
-    @pytest.mark.parametrize("tenant_foobar_devices", ["5"], indirect=True)
-    def test_device_limit_applied(
-        self, management_api, internal_api, tenant_foobar_devices, tenant_foobar
-    ):
-        """Verify that max accepted devices limit is indeed applied. Since device
-        limits can only be set on per-tenant basis, use fixtures that setup
-        tenant 'foobar' with devices and a token
-        """
-        expected = 2
-        internal_api.put_max_devices_limit("foobar", expected)
-
-        accepted = 0
-        try:
-            with orchestrator.run_fake_for_device_id(orchestrator.ANY_DEVICE):
-                for dev, dev_auth in tenant_foobar_devices:
-                    auth = "Bearer " + tenant_foobar
-                    fdev = management_api.find_device_by_identity(
-                        dev.identity, Authorization=auth
-                    )
-                    aid = fdev.auth_sets[0].id
-                    management_api.accept_device(fdev.id, aid, Authorization=auth)
-                    accepted += 1
-        except bravado.exception.HTTPError as e:
-            assert e.response.status_code == 422
-        finally:
-            if accepted > expected:
-                pytest.fail("expected only {} devices to be accepted".format(expected))
-
-
-def get_fake_orchestrator_addr():
-    return os.environ.get("FAKE_ORCHESTRATOR_ADDR", "0.0.0.0:9998")
-
-
 class TestDeleteAuthsetBase:
     def _test_delete_authset_OK(self, management_api, devices, **kwargs):
         d, da = devices[0]
@@ -397,29 +363,3 @@ class TestDeleteAuthset(TestDeleteAuthsetBase):
 
     def test_delete_authset_error_authset_not_found(self, management_api, devices):
         self._test_delete_authset_error_authset_not_found(management_api, devices)
-
-
-class TestDeleteAuthsetEnterprise(TestDeleteAuthsetBase):
-    def test_delete_authset_OK(
-        self, management_api, tenant_foobar_devices, tenant_foobar
-    ):
-        auth = "Bearer " + tenant_foobar
-        self._test_delete_authset_OK(
-            management_api, tenant_foobar_devices, Authorization=auth
-        )
-
-    def test_delete_authset_error_device_not_found(
-        self, management_api, tenant_foobar_devices, tenant_foobar
-    ):
-        auth = "Bearer " + tenant_foobar
-        self._test_delete_authset_error_device_not_found(
-            management_api, tenant_foobar_devices, Authorization=auth
-        )
-
-    def test_delete_authset_error_authset_not_found(
-        self, management_api, tenant_foobar_devices, tenant_foobar
-    ):
-        auth = "Bearer " + tenant_foobar
-        self._test_delete_authset_error_authset_not_found(
-            management_api, tenant_foobar_devices, Authorization=auth
-        )
