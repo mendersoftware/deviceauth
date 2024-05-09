@@ -186,13 +186,6 @@ def clean_migrated_db(clean_db, cli):
     yield clean_db
 
 
-@pytest.fixture(scope="function")
-def tenant_foobar_clean_migrated_db(clean_db, cli):
-    """Clean 'foobar' database with migrations applied. Yields pymongo.MongoClient connected to the DB."""
-    cli.migrate(tenant="foobar")
-    yield clean_db
-
-
 @pytest.fixture(scope="session")
 def management_api(request):
     yield SimpleManagementClient(
@@ -232,14 +225,6 @@ def make_fake_tenant_token(tenant):
     return "fake." + enc + ".fake-sig"
 
 
-@pytest.fixture
-def tenant_foobar(request, tenant_foobar_clean_migrated_db):
-    """Fixture that sets up a tenant with ID 'foobar', on top of a clean migrated
-    (with tenant support) DB.
-    """
-    return make_fake_tenant_token("foobar")
-
-
 def make_devices(device_api, devcount=1, tenant_token=""):
     url = device_api.auth_requests_url
 
@@ -268,29 +253,6 @@ def devices(device_api, clean_migrated_db, request):
         devcount = int(request.param)
 
     yield make_devices(device_api, devcount)
-
-
-@pytest.fixture(scope="function")
-def tenant_foobar_devices(device_api, management_api, tenant_foobar, request):
-    """Make unauthorized devices owned by tenant with ID 'foobar'. The fixture can
-    be parametrized a number of devices to make. Yields a list of tuples:
-    (instance of Device, instance of DevAuthorizer)
-    """
-    handlers = [
-        (
-            "POST",
-            "/api/internal/v1/tenantadm/tenants/verify",
-            lambda _: (200, {}, '{"id": "foobar", "plan": "os"}'),
-        ),
-    ]
-    with mockserver.run_fake(get_fake_tenantadm_addr(), handlers=handlers) as fake:
-
-        if not hasattr(request, "param"):
-            devcount = 1
-        else:
-            devcount = int(request.param)
-
-        yield make_devices(device_api, devcount, tenant_token=tenant_foobar)
 
 
 def get_fake_tenantadm_addr():

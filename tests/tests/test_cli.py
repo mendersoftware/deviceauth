@@ -53,20 +53,6 @@ MIGRATED_TENANT_DBS = {
 
 
 @pytest.fixture(scope="function")
-def migrated_tenant_dbs(clean_db, mongo):
-    """Init a set of tenant dbs to predefined versions."""
-    for tid, ver in MIGRATED_TENANT_DBS.items():
-        mongo_set_version(mongo, make_tenant_db(tid), ver)
-
-
-@pytest.fixture(scope="function")
-def migrated_tenant_dbs_with_ids(clean_db, mongo):
-    """Init a set of tenant dbs holding just the ids, for listing tenants purpose."""
-    for tid in TENANT_IDS:
-        mongo_insert_tenant_data(mongo, DB_NAME, tid)
-
-
-@pytest.fixture(scope="function")
 def fake_migrated_db(clean_db, mongo, request):
     """Init a default db to version passed in 'request'. Does not run the actual
     migrations, just records DB version in proper collection."""
