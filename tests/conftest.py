@@ -26,10 +26,5 @@ def pytest_configure(config):
         lvl = logging.DEBUG
     logging.basicConfig(level=lvl)
     # configure bravado related loggers to be less verbose
-    logging.getLogger('swagger_spec_validator').setLevel(logging.INFO)
-    logging.getLogger('bravado_core').setLevel(logging.INFO)
-    host = config.getoption("host")
-    if not host:
-        print("you didn't pass all of the required arguments")
-        print(host)
-        sys.exit(1)
+    logging.getLogger("swagger_spec_validator").setLevel(logging.INFO)
+    logging.getLogger("bravado_core").setLevel(logging.INFO)
