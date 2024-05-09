@@ -153,8 +153,9 @@ def explode_jwt(token):
 
 
 @pytest.fixture(scope="session")
-def cli():
-    return CliClient()
+def cli(request):
+    service = request.config.getoption("host").split(":")[0]
+    return CliClient(service)
 
 
 @pytest.fixture(scope="session")

@@ -14,11 +14,14 @@
 #    limitations under the License.
 import logging
 
+
 def pytest_addoption(parser):
-    parser.addoption("--host", action="store", default="localhost",
-                     help="host running API")
+    parser.addoption(
+        "--host", action="store", default="deviceauth", help="host running API"
+    )
     parser.addoption("--spec", default="../docs/internal_api.yml")
     parser.addoption("--management-spec", default="../docs/management_api.yml")
+
 
 def pytest_configure(config):
     lvl = logging.INFO

@@ -249,7 +249,7 @@ class SimpleManagementClient(ManagementClient):
 class CliClient:
     exec_path = "/usr/bin/deviceauth"
 
-    def __init__(self):
+    def __init__(self, service="deviceauth"):
         self.docker = docker.from_env()
         _self = self.docker.containers.list(filters={"id": socket.gethostname()})[0]
 
@@ -258,7 +258,7 @@ class CliClient:
             filters={
                 "label": [
                     f"com.docker.compose.project={project}",
-                    "com.docker.compose.service=mender-device-auth",
+                    f"com.docker.compose.service={service}",
                 ]
             },
             limit=1,
