@@ -19,6 +19,11 @@ def pytest_addoption(parser):
     parser.addoption(
         "--host", action="store", default="deviceauth", help="host running API"
     )
+    parser.addoption(
+        "--mongo-url",
+        default="mongodb://mongo",
+        help="The MongoDB URL (connection string)",
+    )
     parser.addoption("--spec", default="../docs/internal_api.yml")
     parser.addoption("--management-spec", default="../docs/management_api.yml")
 
