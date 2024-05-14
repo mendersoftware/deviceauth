@@ -29,6 +29,7 @@ HOST=${HOST="mender-device-auth:8080"}
 }
 
 py.test -s --tb=short --host $HOST \
+	  --mongo-url "mongodb://mender-mongo" \
           --spec $DIR/internal_api.yml \
           --management-spec $DIR/management_api.yml \
           --verbose --junitxml=$DIR/results.xml \

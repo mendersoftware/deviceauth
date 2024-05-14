@@ -26,9 +26,6 @@ from common import (
     management_api,
     internal_api,
     device_api,
-    tenant_foobar,
-    tenant_foobar_devices,
-    tenant_foobar_clean_migrated_db,
     get_keypair,
 )
 
