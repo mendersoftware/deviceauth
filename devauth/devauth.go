@@ -1124,7 +1124,7 @@ func (d *DevAuth) PreauthorizeDevice(
 		// if device exists we handle force: just add the authset, if force is in req
 		if req.Force {
 			// record authentication request
-			authset := model.AuthSet{
+			authset := &model.AuthSet{
 				Id:           req.AuthSetId,
 				IdData:       req.IdData,
 				IdDataStruct: idDataStruct,
@@ -1134,7 +1134,7 @@ func (d *DevAuth) PreauthorizeDevice(
 				Status:       model.DevStatusPreauth,
 				Timestamp:    uto.TimePtr(time.Now()),
 			}
-			err = d.db.AddAuthSet(ctx, authset)
+			err = d.db.UpsertAuthSetStatus(ctx, authset)
 			if err != nil {
 				return nil, err
 			}

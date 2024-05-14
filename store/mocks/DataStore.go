@@ -560,6 +560,20 @@ func (_m *DataStore) UpdateDevice(ctx context.Context, deviceID string, up model
 	return r0
 }
 
+// UpsertAuthSetStatus provides a mock function with given fields: ctx, authSet
+func (_m *DataStore) UpsertAuthSetStatus(ctx context.Context, authSet *model.AuthSet) error {
+	ret := _m.Called(ctx, authSet)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *model.AuthSet) error); ok {
+		r0 = rf(ctx, authSet)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // WithAutomigrate provides a mock function with given fields:
 func (_m *DataStore) WithAutomigrate() store.DataStore {
 	ret := _m.Called()

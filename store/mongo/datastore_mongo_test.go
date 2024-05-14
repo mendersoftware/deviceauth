@@ -1378,6 +1378,59 @@ func TestStoreAuthSet(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestUpsertAuthSet(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestGetDevices in short mode.")
+	}
+
+	const (
+		IdData       = `{"foo":"bar"}`
+		IdDataSha256 = "7a38bf81f383f69433ad6e900d35b3e2385593f76a7b7ab5d4355b8ba41ee24b"
+		PubKey       = `-----BEGIN PUBLIC KEY-----
+MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAE40NzSJ0FefAHPTDR5eUdEiTIhcztPX58
+/YPgwRoRydYGw299yP5uH+SEHOZUdIxcTLAvGQME5evgPxNjVmq/NVIeXZunTcYs
+UTnpeomhxO70PoGy64hqCAp4cIGDrVJT
+-----END PUBLIC KEY-----`
+	)
+
+	ctx := context.Background()
+	ctx = identity.WithContext(ctx, &identity.Identity{Tenant: "1234"})
+	db := getDb(ctx)
+
+	authSet := &model.AuthSet{
+		IdData:       IdData,
+		IdDataSha256: []byte(IdDataSha256),
+		PubKey:       PubKey,
+		Status:       "pending",
+	}
+
+	err := db.UpsertAuthSetStatus(ctx, authSet)
+	assert.NoError(t, err)
+
+	newPreauth := &model.AuthSet{
+		Id:           "boink!",
+		IdData:       IdData,
+		IdDataSha256: []byte(IdDataSha256),
+		PubKey:       PubKey,
+		Status:       "preauthorized",
+	}
+
+	err = db.UpsertAuthSetStatus(ctx, newPreauth)
+	assert.NoError(t, err)
+
+	// Expected result is the original auth set with only the status updated
+	expected := *authSet
+	expected.Status = newPreauth.Status
+
+	// Strip monotonic clock and truncate resolution to milliseconds.
+	ts := expected.Timestamp.Truncate(time.Millisecond).UTC()
+	expected.Timestamp = &ts
+	actual, err := db.GetAuthSetById(ctx, authSet.Id)
+	if assert.NoError(t, err) {
+		assert.Equal(t, expected, *actual)
+	}
+}
+
 func TestUpdateAuthSetMultiple(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping TestGetDevices in short mode.")
