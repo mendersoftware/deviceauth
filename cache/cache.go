@@ -477,7 +477,7 @@ func (rl *RedisCache) KeyTenantVersion(tid string) string {
 // which just means the key was not found, and is normal
 // it's routinely returned e.g. from GET, or pipelines containing it
 func isErrRedisNil(e error) bool {
-	return e.Error() == "redis: nil"
+	return errors.Is(e, redis.Nil)
 }
 
 // TODO: move to go-lib-micro/ratelimits
