@@ -433,11 +433,6 @@ func (rl *RedisCache) CacheLimits(
 	return res.Err()
 }
 
-// TODO replace with something
-func (rl *RedisCache) FlushDB(ctx context.Context) error {
-	return rl.c.FlushDBAsync(ctx).Err()
-}
-
 func (rl *RedisCache) KeyQuota(tid, id, idtype, intvlNum string, version int) string {
 	return fmt.Sprintf(
 		"%s:tenant:%s:version:%d:%s:%s:quota:%s",
