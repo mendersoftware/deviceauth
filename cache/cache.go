@@ -433,11 +433,6 @@ func (rl *RedisCache) CacheLimits(
 	return res.Err()
 }
 
-// TODO replace with something
-func (rl *RedisCache) FlushDB(ctx context.Context) error {
-	return rl.c.FlushDBAsync(ctx).Err()
-}
-
 func (rl *RedisCache) KeyQuota(tid, id, idtype, intvlNum string, version int) string {
 	return fmt.Sprintf(
 		"%s:tenant:%s:version:%d:%s:%s:quota:%s",
@@ -477,7 +472,7 @@ func (rl *RedisCache) KeyTenantVersion(tid string) string {
 // which just means the key was not found, and is normal
 // it's routinely returned e.g. from GET, or pipelines containing it
 func isErrRedisNil(e error) bool {
-	return e.Error() == "redis: nil"
+	return errors.Is(e, redis.Nil)
 }
 
 // TODO: move to go-lib-micro/ratelimits
@@ -548,35 +543,66 @@ func (rl *RedisCache) GetCheckInTimes(
 	tid string,
 	ids []string,
 ) ([]*time.Time, error) {
+	l := log.FromContext(ctx)
 
 	version, err := rl.getTenantKeyVersion(ctx, tid)
 	if err != nil {
 		return nil, err
 	}
-
-	keys := make([]string, len(ids))
-	for i, id := range ids {
-		keys[i] = rl.KeyCheckInTime(tid, id, IdTypeDevice, version)
-	}
-
-	res := rl.c.MGet(ctx, keys...)
-
 	checkInTimes := make([]*time.Time, len(ids))
-
-	for i, v := range res.Val() {
-		if v != nil {
-			b, ok := v.(string)
+	if _, ok := rl.c.(*redis.ClusterClient); ok {
+		pipe := rl.c.Pipeline()
+		for _, id := range ids {
+			pipe.Get(ctx, rl.KeyCheckInTime(tid, id, IdTypeDevice, version))
+		}
+		results, err := pipe.Exec(ctx)
+		if err != nil && !errors.Is(err, redis.Nil) {
+			return nil, fmt.Errorf("failed to fetch check in times: %w", err)
+		}
+		for i, result := range results {
+			cmd, ok := result.(*redis.StringCmd)
 			if !ok {
-				continue
+				continue // should never happen
 			}
-			var checkInTime time.Time
-			err := json.Unmarshal([]byte(b), &checkInTime)
+			b, err := cmd.Bytes()
 			if err != nil {
-				l := log.FromContext(ctx)
-				l.Errorf("failed to unmarshal check-in time: %s", err.Error())
-				continue
+				if errors.Is(err, redis.Nil) {
+					continue
+				} else {
+					l.Errorf("failed to get device: %s", err.Error())
+				}
+			} else {
+				checkInTime := new(time.Time)
+				err = json.Unmarshal(b, checkInTime)
+				if err != nil {
+					l.Errorf("failed to deserialize check in time: %s", err.Error())
+				} else {
+					checkInTimes[i] = checkInTime
+				}
+
 			}
-			checkInTimes[i] = &checkInTime
+		}
+	} else {
+		keys := make([]string, len(ids))
+		for i, id := range ids {
+			keys[i] = rl.KeyCheckInTime(tid, id, IdTypeDevice, version)
+		}
+		res := rl.c.MGet(ctx, keys...)
+
+		for i, v := range res.Val() {
+			if v != nil {
+				b, ok := v.(string)
+				if !ok {
+					continue
+				}
+				var checkInTime time.Time
+				err := json.Unmarshal([]byte(b), &checkInTime)
+				if err != nil {
+					l.Errorf("failed to unmarshal check-in time: %s", err.Error())
+					continue
+				}
+				checkInTimes[i] = &checkInTime
+			}
 		}
 	}
 
