@@ -11,7 +11,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/mendersoftware/go-lib-micro v0.0.0-20240202092122-d43b50b285b9
 	github.com/pkg/errors v0.9.1
-	github.com/redis/go-redis/v9 v9.5.3
+	github.com/redis/go-redis/v9 v9.6.1
 	github.com/stretchr/testify v1.9.0
 	github.com/urfave/cli v1.22.15
 	go.mongodb.org/mongo-driver v1.16.0
