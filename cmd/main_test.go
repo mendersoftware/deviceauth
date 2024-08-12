@@ -1,4 +1,4 @@
-// Copyright 2023 Northern.tech AS
+// Copyright 2024 Northern.tech AS
 //
 //	Licensed under the Apache License, Version 2.0 (the "License");
 //	you may not use this file except in compliance with the License.
@@ -33,7 +33,7 @@ func TestMain(m *testing.M) {
 		status = mtesting.WithDB(func(dbtest mtesting.TestDBRunner) int {
 			db = dbtest
 			return m.Run()
-		})
+		}, nil)
 	} else {
 		status = m.Run()
 	}
